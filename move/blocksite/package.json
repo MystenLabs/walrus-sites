@@ -1,0 +1,5 @@
+{
+	"dependencies": {
+		"@mysten/bcs": "^0.8.1"
+	}
+}

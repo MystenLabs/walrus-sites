@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" type="text/css" href="./style.css" />
+    <title>BlockSite Landing</title>
+    <base target="_top">
+</head>
+
+<body>
+    <h1>Hello, welcome to a <span class="rainbow-text">BlockSite!</span></h1>
+
+    <h2>BlockSites are "web"-sites that live entirely on Sui</h2>
+    <p>
+        No web involved! The content of this blocksite is loaded from an object on Sui.
+        The object contains all the resources necessary to render this page.
+        To browse a blocksite, you just need its <b>Sui Object ID</b>.
+        No wallet is needed to browse blocksites, and publishing to Sui is extremely inexpensive!
+    </p>
+    <h2>How does it work?</h2>
+    <p>
+    <ul>
+        <li>Each blocksite is represented by an object on Sui, which contains a <b>compressed</b> version of the blocksite
+            (in this case, the <code>html</code> and <code>css</code>).</li>
+        <li>Once the blocksite portal is loaded, it downloads some javascript code to <b>get the contents of the object
+                from the Sui blockchain</b>, decompress it and render them in an <code>iframe</code>.</li>
+        <li>People can browse any blocksite by just typing its object ID after a <code>#</code> in the blocksite portal
+            url.</li>
+        <li>The javascript in the portal then fetches the object from the full node, and displays it. That's it!</li>
+    </ul>
+    </p>
+    <h2>How can i publish a blocksite?</h2>
+    <p>
+        Also easy: Just load up the blocksite portal, connect your wallet, and
+        drag-and-drop the inlined <code>html/css/js</code>. Accept the
+        transaction cost, and you have a blocksite forever!  (For more complex
+        websites, a bit more tooling is needed). In case you
+        are unhappy with the blocksite, you can always update it!
+    </p>
+    <p>
+        <b>
+            Start browsing another blocksite by visiting the
+            <a href="/#0x9bfd168a1f3efe281dab315a552249c6e08b01d89fda7cd8b89a28bb68b7d644">features page!</a>
+        </b> 
+        Alternatively, see how you can cross-browse to the old-school web by loading <a href="https://mystenlabs.com">Mysten Lab's homepage</a>
+    </p>
+</body>
+
+</html>
