@@ -67,10 +67,10 @@ function App() {
                             <Heading size="3">If you don't know where to start, check out:</Heading>
                             <Text>
                                 <ul>
-                                    <li>A a description of the blocksites project: <Link href="/#0x93e9e43be38372f7915aac3bdd30e5c2f2d22c699475e5944f06d8fb67b6874c"><code>0x93e9e43be38372f7915aac3bdd30e5c2f2d22c699475e5944f06d8fb67b6874c</code></Link></li>
-                                    <li>The current feature list supported by blocksites: <Link href="/#0x9bfd168a1f3efe281dab315a552249c6e08b01d89fda7cd8b89a28bb68b7d644"><code>0x9bfd168a1f3efe281dab315a552249c6e08b01d89fda7cd8b89a28bb68b7d644</code></Link></li>
-                                    <li>A simple blocksite with images and javascript: <Link href="/#0x83eb6879ed4ef76cced88c70c806b982e315afc2ba23b8afd189ff098aec4080"><code>0x83eb6879ed4ef76cced88c70c806b982e315afc2ba23b8afd189ff098aec4080</code></Link></li>
-                                    <li>Play snake on a blocksite: <Link href="/#0x50182427c57fb6c050bcbb3755bde94a99749da4507242f2402d31549a2fd12d"><code>0x50182427c57fb6c050bcbb3755bde94a99749da4507242f2402d31549a2fd12d</code></Link></li>
+                                    <li>A a description of the blocksites project: <Link href="/#0x6e95fa8fff2147583f42d54ed4352505e8556b6fd5e27a75f354cee910182bc8"><code>0x6e95fa8fff2147583f42d54ed4352505e8556b6fd5e27a75f354cee910182bc8</code></Link></li>
+                                    <li>The current feature list supported by blocksites: <Link href="/#0x491effc375c2cb94fbb9459fb3185b5c0800c52c9252d2d045f6dfad89fb8487"><code>0x491effc375c2cb94fbb9459fb3185b5c0800c52c9252d2d045f6dfad89fb8487</code></Link></li>
+                                    <li>A simple blocksite with images and javascript: <Link href="/#0x29d5206be278c74923743b9e7284346cdcd4d3632534053123114d8af8714a21"><code>0x29d5206be278c74923743b9e7284346cdcd4d3632534053123114d8af8714a21</code></Link></li>
+                                    <li>Play snake on a blocksite: <Link href="/#0x95d9b1c1475fca7884299eb695b2deb67f52fe7815a10cd1596e4e4fb6cd6c68"><code>0x95d9b1c1475fca7884299eb695b2deb67f52fe7815a10cd1596e4e4fb6cd6c68</code></Link></li>
                                 </ul>
                             </Text>
                         </Container>
