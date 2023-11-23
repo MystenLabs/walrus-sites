@@ -32,7 +32,7 @@ export function BrowseSite({ id }: { id: string }) {
     // Decompress the contents
     let contents = fields?.contents;
     console.log("Contents:", contents);
-    
+
     // Convert into an uitn8array
     const contentsUint8Array = contents ? new Uint8Array(contents) : new Uint8Array();
 
@@ -65,9 +65,9 @@ export function BrowseSite({ id }: { id: string }) {
         let blocksite_title = el.getElementsByTagName('title')[0]?.innerHTML;
         if (blocksite_title) {
             // Set it inthe outer document
-            document.title = blocksite_title;   
+            document.title = blocksite_title;
         }
-    
+
         // Now return the iframe as html
         return (
             <iframe
@@ -82,17 +82,16 @@ export function BrowseSite({ id }: { id: string }) {
 
     return (
         <>
-            <Flex style={{position: "absolute", width: "100%", height: "100vh"}}> 
+            <Flex style={{position: "absolute", width: "100%", height: "100vh"}}>
                 <DecompressedContent contents={contentsUint8Array} />
             </Flex>
             <Flex justify="end">
             <Flex
-                position="sticky"
                 px="4"
                 py="2"
                 style={{
-                    marginTop: "10px",
-                    position: "sticky", 
+                    position: "fixed",
+                    bottom: "10px",
                     borderRadius: "10px",
                     boxShadow: "0 0 20px 0 rgba(0,0,0,0.2)",
                     backgroundColor: "white",
