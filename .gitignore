@@ -3,3 +3,6 @@ build/
 .vercel
 .DS_Store
 dist/
+__pycache__
+single-html/
+inlined.html

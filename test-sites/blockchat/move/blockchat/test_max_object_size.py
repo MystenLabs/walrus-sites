@@ -1,3 +1,5 @@
+"""Keep adding messages to the chat until we hit the object size limits."""
+
 import subprocess
 import json
 import os
@@ -16,13 +18,13 @@ def deploy_contract():
         SUI_BINARY,
         "client",
         "publish",
-        "--skip-fetch-latest-git-deps",
         "--gas-budget",
         f"{GAS_BUDGET}",
         "--json",
     ]
     output = subprocess.run(command, capture_output=True)
     os.chdir(old_wd)
+    print(output)
     output = json.loads(output.stdout)
     output = [
         x["packageId"] for x in output["objectChanges"] if x["type"] == "published"
@@ -30,58 +32,54 @@ def deploy_contract():
     return output[0]
 
 
-def create_blocksite(package_id, contents):
+def create_chat(package_id, name):
     command = [
         SUI_BINARY,
         "client",
         "call",
         "--function",
-        "create_to_sender",
+        "create_chat",
         "--module",
-        "blocksite",
+        "blockchat",
         "--package",
         package_id,
         "--gas-budget",
         f"{GAS_BUDGET}",
         "--json",
         "--args",
-        f"{contents}",
-        "0x6",
+        f"{name}",
     ]
-    print(command)
     output = subprocess.run(command, capture_output=True)
-    print(output.stderr)
     output = json.loads(output.stdout)
     output = [
         x["objectId"]
         for x in output["objectChanges"]
-        if x["objectType"].startswith(f"{package_id}::blocksite::BlockSite")
+        if x["objectType"].startswith(f"{package_id}::blockchat::Chat")
     ]
     return output[0]
 
-def add_piece(site_id, piece, package_id):
+def new_message_and_publish(author, text, chat_id, package_id):
     command = [
         SUI_BINARY,
         "client",
         "call",
         "--function",
-        "add_piece",
+        "new_message_and_publish",
         "--module",
-        "blocksite",
+        "blockchat",
         "--package",
         package_id,
         "--gas-budget",
         f"{GAS_BUDGET}",
         "--json",
         "--args",
-        f"{site_id}",
-        f"{piece}",
-        "0x6",
+        f"{author}",
+        f"{text}",
+        f"{chat_id}",
+        f"0x6",
     ]
     output = subprocess.run(command, capture_output=True)
-    print(
-    output.stderr
-    )
+    print(output)
     output = json.loads(output.stdout)
     output = [
         x["objectId"]
@@ -89,33 +87,23 @@ def add_piece(site_id, piece, package_id):
     ]
     return output[0]
 
-
-def publish_big_site(site, package_id):
-    PIECE_SIZE = 10_000
-    site_id = create_blocksite(package_id, site[:PIECE_SIZE])
-    print(f"Chat ID: {site_id}")
-    for idx in range(PIECE_SIZE, len(site), PIECE_SIZE):
-        add_piece( site_id, f"{site[idx:idx + PIECE_SIZE]}", package_id)
-        print(f"piece added: {idx}")
+# def massive_message(author, text, chat_id, package_id)
 
 
 def main():
-    import sys
-    sitefile = sys.argv[1]
-    with open(sitefile) as f:
-        site = f.read()
-
-    # Convert the base64 string to bytes
-    # TODO: back and forth conversion to base 64
-    import base64
-    site = base64.b64decode(site)
-    site = [int(x) for x in site]
-    print(len(site))
     package_id = deploy_contract()
     print(f"Package ID: {package_id}")
-    publish_big_site(site, package_id)
 
+    chat_id = create_chat(package_id, "My little dummy chat")
+    print(f"Chat ID: {chat_id}")
 
+    N_BYTES = 15_000
+    BYTES = "0x" + "0" * N_BYTES
+    idx = 0
+    while True:
+        idx += 1
+        new_message_and_publish("Giac", BYTES, chat_id, package_id)
+        print(f"Message {idx} sent, for a total of (at least) {idx * N_BYTES} bytes.")
 
 if __name__ == "__main__":
     main()

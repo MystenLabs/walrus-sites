@@ -66,13 +66,14 @@ function App() {
                         <Container pt="9">
                             <Heading size="3">If you don't know where to start, check out:</Heading>
                             <Text>
-                                <ul>
-                                    <li>A a description of the blocksites project: <Link href="/#0x6e95fa8fff2147583f42d54ed4352505e8556b6fd5e27a75f354cee910182bc8"><code>0x6e95fa8fff2147583f42d54ed4352505e8556b6fd5e27a75f354cee910182bc8</code></Link></li>
-                                    <li>The current feature list supported by blocksites: <Link href="/#0x491effc375c2cb94fbb9459fb3185b5c0800c52c9252d2d045f6dfad89fb8487"><code>0x491effc375c2cb94fbb9459fb3185b5c0800c52c9252d2d045f6dfad89fb8487</code></Link></li>
-                                    <li>A simple blocksite with images and javascript: <Link href="/#0x29d5206be278c74923743b9e7284346cdcd4d3632534053123114d8af8714a21"><code>0x29d5206be278c74923743b9e7284346cdcd4d3632534053123114d8af8714a21</code></Link></li>
-                                    <li>Play snake on a blocksite: <Link href="/#0x95d9b1c1475fca7884299eb695b2deb67f52fe7815a10cd1596e4e4fb6cd6c68"><code>0x95d9b1c1475fca7884299eb695b2deb67f52fe7815a10cd1596e4e4fb6cd6c68</code></Link></li>
+<ul>
+                                    <li>A a description of the blocksites project: <Link href="/#0xf1e1352f393ed3d7077107fc5df82f3e3ce56c6baf6463923bb1b445cef10397"><code>0xf1e1352f393ed3d7077107fc5df82f3e3ce56c6baf6463923bb1b445cef10397</code></Link></li>
+                                    <li>The current feature list supported by blocksites: <Link href="/#0xd8353df3e48a3efdc9b45fd5f42549e5be037aba077d45e189ed3b9e2c85b089"><code>0xd8353df3e48a3efdc9b45fd5f42549e5be037aba077d45e189ed3b9e2c85b089</code></Link></li>
+                                    <li>A simple blocksite with images and javascript: <Link href="/#0x817077c2e1e5ed4d45535166daf2ebb187e1c988fc387c0c5db6f6035358d0ea"><code>0x817077c2e1e5ed4d45535166daf2ebb187e1c988fc387c0c5db6f6035358d0ea</code></Link></li>
+                                    <li>Play snake on a blocksite: <Link href="/#0x3daaa5594b73b7bab3f4c7da2d172f0631dd64765cd584a21ae4985ca6f93f85"><code>0x3daaa5594b73b7bab3f4c7da2d172f0631dd64765cd584a21ae4985ca6f93f85</code></Link></li>
+                                    <li>(with hacked wallet only: Try a dApp): <Link href="/#0x61a02cb006b131964e7202cb3c3bcdc19700eee2ea2b082e214e5569bb7c0d93"><code>0x61a02cb006b131964e7202cb3c3bcdc19700eee2ea2b082e214e5569bb7c0d93</code></Link></li>
                                 </ul>
-                            </Text>
+                                                    </Text>
                         </Container>
                     </>
                 )
