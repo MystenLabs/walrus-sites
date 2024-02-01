@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Testing Service workers</title>
+        <!-- <script src="./scripts/app.js"></script> -->
+    </head>
+
+    <body>
+        <h1>Blocksites!</h1>
+
+        <p>Installing, please wait...</p>
+
+        <script>
+            navigator.serviceWorker
+                .register("/sw.js")
+                .then((reg) => {
+                    console.log("SW registered");
+                    if (reg.installing) {
+                        const sw = reg.installing || reg.waiting;
+                        sw.onstatechange = function () {
+                            if (sw.state === "installed") {
+                                console.log("SW installed");
+                                // SW installed.  Refresh page so SW can respond with SW-enabled page.
+                                window.location.reload();
+                            }
+                        };
+                    } else if (reg.active) {
+                        console.log("SW active, error?");
+                        // Previously-installed SW should have redirected this request to different page
+                        handleError(
+                            new Error(
+                                "Service Worker is installed but not redirecting \
+                                - please unregister the service worker and reload twice."
+                            )
+                        );
+                    }
+                })
+                .catch(handleError);
+
+            function handleError(error) {
+                document.body.appendChild(
+                    document.createTextNode(error.message)
+                );
+            }
+        </script>
+    </body>
+</html>

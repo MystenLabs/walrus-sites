@@ -3,27 +3,25 @@
 It publishes the smart contract, adds all the test sites including the
 blockchat dApp, and updates the vercel app."""
 
-import re
-import os
-import subprocess
 import json
+import os
+import re
+import subprocess
+from argparse import ArgumentParser
+
 from const import (
     BLOCKCHAT_CONTRACT,
-    PATHS,
     BLOCKCHAT_DAPP,
-    MESSAGES,
-    PORTAL_APP,
-    PORTAL_CONST,
-    NETWORK,
-    PORTAL_MAIN,
-    SUI_BINARY,
-    GAS_BUDGET,
-    BLOCKSITE_CONTRACT,
-    LANDING,
-    SNAKE,
-    IMAGE,
-    FEATURES,
     BLOCKCHAT_HTML,
+    BLOCKSITE_CONTRACT,
+    GAS_BUDGET,
+    LANDING,
+    MESSAGES,
+    NETWORK,
+    PATHS,
+    PORTAL_CONST,
+    SUI_BINARY,
+    SW_PORTAL_CONST,
 )
 from publish_big_site import compress_contents, publish_big_site
 
@@ -31,8 +29,8 @@ from publish_big_site import compress_contents, publish_big_site
 def publish_html(package_id: str, path: str) -> str:
     with open(path, "r") as infile:
         html = infile.read()
-    compressed = compress_contents(html)
-    site_id = publish_big_site(compressed, package_id)
+    html = compress_contents(html)
+    site_id = publish_big_site(html, package_id)
     return site_id
 
 
@@ -146,35 +144,6 @@ def make_blockchat_dapp(path: str):
     os.chdir(old_dir)
 
 
-def update_portal_links(
-    path: str, landing: str, features: str, images: str, snake: str, dapp: str
-):
-    with open(path, "r") as infile:
-        lines = infile.readlines()
-
-    new_description = f"""<ul>
-                                    <li>A a description of the blocksites project: <Link href="/#{landing}"><code>{landing}</code></Link></li>
-                                    <li>The current feature list supported by blocksites: <Link href="/#{features}"><code>{features}</code></Link></li>
-                                    <li>A simple blocksite with images and javascript: <Link href="/#{images}"><code>{images}</code></Link></li>
-                                    <li>Play snake on a blocksite: <Link href="/#{snake}"><code>{snake}</code></Link></li>
-                                    <li>(with hacked wallet only: Try a dApp): <Link href="/#{dapp}"><code>{dapp}</code></Link></li>
-                                </ul>
-    """
-    new_lines = []
-    skip = False
-    for line in lines:
-        if not skip:
-            new_lines.append(line)
-        if line.strip() == "<Text>":
-            skip = True
-            new_lines.append(new_description)
-        if line.strip() == "</Text>":
-            skip = False
-            new_lines.append(line)
-    with open(path, "w") as outfile:
-        outfile.writelines(new_lines)
-
-
 def vercel_publish_prod(path: str):
     old_dir = os.getcwd()
     os.chdir(path)
@@ -183,9 +152,38 @@ def vercel_publish_prod(path: str):
     os.chdir(old_dir)
 
 
+def parse_args():
+    parser = ArgumentParser()
+    parser.add_argument("network", default="localnet")
+    parser.add_argument("--blocksite-package", default=None, type=str)
+    parser.add_argument("--blockchat-package", default=None, type=str)
+    return parser.parse_args()
+
+
+def sw_portal_constants(args, ids) -> str:
+    constants = ""
+    if args.network == "localnet":
+        base_url = "localhost:8000"
+    else:
+        base_url = "blocksite.net"
+    constants += f'export const NETWORK = "{args.network}"\n'
+    constants += f'export const BASE_URL = "{base_url}"\n'
+    constants += "export const SITE_NAMES: { [key: string]: string } = {\n"
+    constants += f'    blockchat: "{ids["blockchat"]},"\n'
+    constants += f'    snake: "{ids["snake"]}",\n'
+    constants += "};"
+    return constants
+
+
 def main():
-    package_id = publish_package(BLOCKSITE_CONTRACT)
-    print(f"Published new blocksite package: {package_id}")
+    args = parse_args()
+
+    if args.blocksite_package:
+        package_id = args.blocksite_package
+        print(f"Reused blocksite package: {package_id}")
+    else:
+        package_id = publish_package(BLOCKSITE_CONTRACT)
+        print(f"Published new blocksite package: {package_id}")
 
     # Publish all the "simple" sites
     ids = {}
@@ -202,27 +200,37 @@ def main():
     print(f"Landing site published: {site_id}")
 
     # Publish the blockchat contract and site
-    blockchat_package = publish_package(BLOCKCHAT_CONTRACT)
-    print(f"Published new blockchat package: {blockchat_package}")
+    if args.blockchat_package:
+        blockchat_package = args.blockchat_package
+        print(f"Reused blockchat package: {blockchat_package}")
+    else:
+        blockchat_package = publish_package(BLOCKCHAT_CONTRACT)
+        print(f"Published new blockchat package: {blockchat_package}")
     chat_id = create_chat(blockchat_package, "Example Chat")
     print(f"Chat created: {chat_id}")
     update_blockchat_dapp_constants(blockchat_package, chat_id, NETWORK)
     make_blockchat_dapp(BLOCKCHAT_DAPP)
     dapp_id = publish_html(package_id, _index_file(BLOCKCHAT_HTML))
     print(f"Blockchat dapp created: {dapp_id}")
+    ids["blockchat"] = dapp_id
+
+    # Update the sw portal constants
+    constants = sw_portal_constants(args, ids)
+    with open(SW_PORTAL_CONST, "w") as outfile:
+        outfile.write(constants)
 
     # Update & deploy the portal
-    update_portal_constants(package_id)
-    update_portal_links(
-        PORTAL_MAIN,
-        ids["landing"],
-        ids["features"],
-        ids["image"],
-        ids["snake"],
-        dapp_id,
-    )
-    vercel_publish_prod(PORTAL_APP)
-    print("Portal published to vercel.")
+    # update_portal_constants(package_id)
+    # update_portal_links(
+    #    PORTAL_MAIN,
+    #    ids["landing"],
+    #    ids["features"],
+    #    ids["image"],
+    #    ids["snake"],
+    #    dapp_id,
+    # )
+    # vercel_publish_prod(PORTAL_APP)
+    # print("Portal published to vercel.")
 
 
 if __name__ == "__main__":
