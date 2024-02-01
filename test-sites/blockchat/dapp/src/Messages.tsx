@@ -4,10 +4,11 @@ import { MoveStruct } from "@mysten/sui.js/client";
 import { SuiObjectData } from "@mysten/sui.js/client";
 import { Box, Avatar, Card, Flex, Heading, Text, Link } from "@radix-ui/themes";
 import { useEffect } from "react";
-
-export const PACKAGE_ID = "0x46ceb846c3dda114926ec0b8c058b0cbf5f4cf5ee454e1b2506719d22261fdfc";
-export const CHAT_ID = "0xa5e4103e74e3eaf2525e01b9493c5d0446fd6b7f2187cb5d0c156868c4170422";
-export const NETWORK= "devnet";
+ 
+ 
+export const PACKAGE_ID = "0x264545e6956042f62b63603a6aa6b327bc26b15a121cef5d2101cde8092f7cff";
+export const CHAT_ID = "0x49aae34bf01d4ad1a895beb6e00d46209d9f94e17544649888426ab2b074430a";
+export const NETWORK= "testnet";
 
 export interface Chat {
     title: string,

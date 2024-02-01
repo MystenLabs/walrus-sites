@@ -1,0 +1,25 @@
+<!doctype html>
+
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Object ID conversion</title>
+  <script>
+    function fromHEX(hexStr) {
+            const normalized = hexStr.startsWith('0x') ? hexStr.slice(2) : hexStr;
+            const padded = normalized.length % 2 === 0 ? normalized : `0${normalized}}`;
+            const intArr = padded.match(/.{2}/g)?.map((byte) => parseInt(byte, 16)) ?? [];
+            return Uint8Array.from(intArr);
+    }
+    function convertB36() {
+        let value = document.getElementById("hex").value;
+        console.log("Converting: ", toB36(fromHEX(value)));
+    }
+  </script>
+</head>
+<body>
+  <h1>Compute the blocksite address</h1>
+  <input type="text" id="hex" name="Object ID (hex)">
+  <button id="convert" onClick="convertB36()">Convert</button>
+</body>
+</html>
