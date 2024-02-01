@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "node",
+    "lib": [
+      "esnext",
+      "webworker"
+    ]
+  },
+  "baseUrl": "./",
+  "rootDir": "src",
+  "outDir": "dist",
+  "skipLibCheck": true,
+  "include": [
+    "src/sw.ts",
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}
