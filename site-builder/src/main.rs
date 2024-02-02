@@ -68,9 +68,10 @@ fn print_effects(config: &Config, site_name: &str, effects: &SuiTransactionBlock
         .reference
         .object_id;
     println!("New blocksite '{}' created: {}", site_name, created_id);
+    let base36 = id_to_base36(&created_id).expect("Could not convert the id to base 36.");
     println!(
-        "Find it at https://{}.blocksite.net",
-        id_to_base36(&created_id).expect("Could not convert to b36")
+        "Find it at https://{}.blocksite.net\nor http://{}.localhost:8000",
+        &base36, &base36,
     );
     println!("Gas cost summary (MIST):");
     let summary = effects.gas_cost_summary();
