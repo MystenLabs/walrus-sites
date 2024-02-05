@@ -1,19 +1,23 @@
 use std::{fs::read_dir, path::PathBuf, str};
 
-use anyhow::{anyhow, ensure, Result};
+use anyhow::{anyhow, bail, ensure, Result};
 use shared_crypto::intent::Intent;
 use sui_keys::keystore::{AccountKeystore, Keystore};
 use sui_sdk::{
     rpc_types::{
-        SuiExecutionStatus, SuiObjectDataOptions, SuiTransactionBlockEffectsAPI,
-        SuiTransactionBlockResponse, SuiTransactionBlockResponseOptions,
+        SuiExecutionStatus,
+        SuiObjectDataOptions,
+        SuiTransactionBlockEffectsAPI,
+        SuiTransactionBlockResponse,
+        SuiTransactionBlockResponseOptions,
     },
     SuiClient,
 };
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
+    object::Owner,
     quorum_driver_types::ExecuteTransactionRequestType,
-    transaction::{ProgrammableTransaction, Transaction, TransactionData},
+    transaction::{CallArg, ProgrammableTransaction, Transaction, TransactionData},
 };
 
 pub fn recursive_readdir(root: &PathBuf) -> Vec<PathBuf> {
@@ -80,6 +84,30 @@ pub async fn get_object_ref_from_id(client: &SuiClient, id: ObjectID) -> Result<
         .await?
         .object_ref_if_exists()
         .ok_or_else(|| anyhow!("Could not get object reference for object with id {}", id))
+}
+
+pub async fn call_arg_from_shared_object_id(
+    client: &SuiClient,
+    id: ObjectID,
+    mutable: bool,
+) -> Result<CallArg> {
+    let Some(Owner::Shared {
+        initial_shared_version,
+    }) = client
+        .read_api()
+        .get_object_with_options(id, SuiObjectDataOptions::new().with_owner())
+        .await?
+        .owner()
+    else {
+        bail!("Trying to get the initial version of a non-shared object")
+    };
+    Ok(CallArg::Object(
+        sui_types::transaction::ObjectArg::SharedObject {
+            id,
+            initial_shared_version,
+            mutable,
+        },
+    ))
 }
 
 /// Convert the hex representation of an object id to base36

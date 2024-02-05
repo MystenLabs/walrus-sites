@@ -2,6 +2,7 @@ mod calls;
 mod manager;
 mod network;
 mod page;
+mod suins;
 mod util;
 
 use std::path::PathBuf;
@@ -16,6 +17,7 @@ use sui_types::{
     base_types::{ObjectID, SuiAddress},
     Identifier,
 };
+use suins::set_suins_name;
 
 use crate::{
     manager::SuiManager,
@@ -35,15 +37,37 @@ struct Args {
 #[derive(Subcommand, Debug)]
 #[clap(rename_all = "kebab-case")]
 enum Commands {
+    /// Publish a new site on sui
     Publish {
+        /// The directory containing the site sources
         directory: PathBuf,
+        /// The encoding for the contents of the BlockPages
         #[clap(short = 'e', long, value_enum, default_value_t = ContentEncoding::PlainText)]
         content_encoding: ContentEncoding,
+        /// The name of the BlockSite
         #[arg(short, long, default_value = "test site")]
         site_name: String,
     },
+    /// Convert an object ID in hex format to the equivalent base36 format.
+    /// Useful to browse sites at particular object IDs.
     Convert {
+        /// The object id (in hex format) to convert
         object_id: ObjectID,
+    },
+    /// Set the SuiNs record to an ObjectID.
+    SetNs {
+        /// The SuiNs packages
+        #[clap(short, long)]
+        package: ObjectID,
+        /// The SuiNs object to be updated
+        #[clap(short, long)]
+        sui_ns: ObjectID,
+        /// The SuiNsRegistration NFT with the SuiNs name
+        #[clap(short, long)]
+        registration: ObjectID,
+        /// The address to be added to the record
+        #[clap(short, long)]
+        target: ObjectID,
     },
 }
 
@@ -119,6 +143,14 @@ async fn main() -> Result<()> {
         } => publish(directory, content_encoding, site_name, &config).await?,
         Commands::Convert { object_id } => {
             println!("{}", id_to_base36(object_id)?)
+        }
+        Commands::SetNs {
+            package,
+            sui_ns,
+            registration,
+            target,
+        } => {
+            set_suins_name(config, package, sui_ns, registration, target).await?;
         }
     };
     Ok(())

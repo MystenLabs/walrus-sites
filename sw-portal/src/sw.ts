@@ -10,7 +10,7 @@ import {
     isValidSuiObjectId,
     toHEX,
 } from "@mysten/sui.js/utils";
-import { SITE_NAMES, NETWORK, BASE_URL } from "./constants";
+import { SITE_NAMES, NETWORK, BASE_URL, PROTO } from "./constants";
 import { bcs } from "@mysten/sui.js/bcs";
 
 // This is to get TypeScript to recognize `clients` and `self`
@@ -35,30 +35,13 @@ self.addEventListener("fetch", (event) => {
     const scope = self.registration.scope;
 
     // Check if the request is for a blocksite
-    const subAndPath = getSubdomainAndPath(url);
-    if (subAndPath && subAndPath.subdomain) {
-        const rpcUrl = getFullnodeUrl(NETWORK);
-        const client = new SuiClient({ url: rpcUrl });
-
-        let objectId = getObjectIdFromSuiNs(subAndPath.subdomain);
-        if (!objectId) {
-            objectId = subdomainToObjectId(subAndPath.subdomain);
-        }
-        if (objectId) {
-            console.log("Object ID: ", objectId);
-            console.log(
-                "Base36 version of the object ID: ",
-                b36.encode(fromHEX(objectId))
-            );
-            let pagePath = subAndPath.path ? subAndPath.path : "index.html";
-            event.respondWith(fetchPage(client, objectId, pagePath));
-            return;
-        }
-        event.respondWith(siteNotFound());
+    const parsedUrl = getSubdomainAndPath(url);
+    if (parsedUrl && parsedUrl.subdomain) {
+        event.respondWith(resolveAndFetchPage(parsedUrl));
         return;
     }
 
-    // Handle the case in which we are at the root
+    // Handle the case in which we are at the root `BASE_URL`
     if (url === scope || url === scope + "index.html") {
         // TODO: handle this better
         const newUrl = scope + "index-sw-enabled.html";
@@ -92,7 +75,7 @@ type Path = {
 function getSubdomainAndPath(url: string): Path | null {
     // At the moment we only support one subdomain level.
     const REGEX = new RegExp(
-        `^https://(?<subdomain>[A-Za-z0-9]+)\.${BASE_URL}/(?<path>[A-Za-z0-9/.-]*)`
+        `^${PROTO}://(?<subdomain>[A-Za-z0-9]+)\.${BASE_URL}/(?<path>[A-Za-z0-9/.-]*)`
     );
     const match = url.match(REGEX);
     if (match?.groups?.subdomain) {
@@ -116,7 +99,20 @@ function removeFirstSlash(path: string): string {
 // SuiNS-like functionality //
 // Right now this just matches the subdomain to fixed strings. Should be replaced with a SuiNS lookup.
 
-function getObjectIdFromSuiNs(subdomain: string): string | null {
+/**  Resolve the subdomain to an object ID using SuiNS
+The subdomain `example` will look up `example.sui` and return the object ID if found. */
+async function resolveSuiNsAddress(
+    client: SuiClient,
+    subdomain: string
+): Promise<string | null> {
+    let suiObjectId: string = await client.call(
+        "suix_resolveNameServiceAddress",
+        [subdomain + ".sui"]
+    );
+    return suiObjectId ? suiObjectId : null;
+}
+
+function hardcodedSubdmains(subdomain: string): string | null {
     if (subdomain in SITE_NAMES) {
         return SITE_NAMES[subdomain];
     }
@@ -131,7 +127,6 @@ type Blocksite = {
     created: number;
     contents: Uint8Array;
     version: number;
-    // TODO: Add fields for HTTP headers
 };
 
 type BlockPage = {
@@ -142,7 +137,6 @@ type BlockPage = {
     content_type: string;
     content_encoding: string;
     contents: Uint8Array;
-    // TODO: Add fields for HTTP headers
 };
 
 // define UID as a 32-byte array, then add a transform to/from hex strings
@@ -179,26 +173,52 @@ const FieldStruct = bcs.struct("Field", {
 
 // Fectching & decompressing on-chain data //
 
+async function resolveAndFetchPage(parsedUrl: Path): Promise<Response> {
+    const rpcUrl = getFullnodeUrl(NETWORK);
+    const client = new SuiClient({ url: rpcUrl });
+
+    let objectId = hardcodedSubdmains(parsedUrl.subdomain);
+    if (!objectId) {
+        // Check if there is a SuiNs name
+        objectId = await resolveSuiNsAddress(client, parsedUrl.subdomain);
+    }
+    if (!objectId) {
+        // Last resort: try to convert the subdomain to an object ID
+        objectId = subdomainToObjectId(parsedUrl.subdomain);
+    }
+    if (objectId) {
+        console.log("Object ID: ", objectId);
+        console.log(
+            "Base36 version of the object ID: ",
+            b36.encode(fromHEX(objectId))
+        );
+        let pagePath = parsedUrl.path ? parsedUrl.path : "index.html";
+        return fetchPage(client, objectId, pagePath);
+    }
+    return noObjectIdFound();
+}
+
 /** Fetch the page */
 async function fetchPage(
     client: SuiClient,
     objectId: string,
     path: string
 ): Promise<Response> {
-    let blockPage = await client
-        .getDynamicFieldObject({
-            parentId: objectId,
-            name: { type: "0x1::string::String", value: path },
-        })
-        .then((dynamicFields) => {
-            return client.getObject({
-                id: dynamicFields.data!.objectId,
-                options: { showBcs: true },
-            });
-        })
-        .then((pageData) => {
-            return getPageFields(pageData.data!);
-        });
+    let dynamicFields = await client.getDynamicFieldObject({
+        parentId: objectId,
+        name: { type: "0x1::string::String", value: path },
+    });
+    if (!dynamicFields.data) {
+        return siteNotFound();
+    }
+    let pageData = await client.getObject({
+        id: dynamicFields.data.objectId,
+        options: { showBcs: true },
+    });
+    if (!pageData.data) {  
+        return siteNotFound();
+    }
+    let blockPage = getPageFields(pageData.data);
     if (!blockPage.contents) {
         return siteNotFound();
     }
@@ -226,7 +246,10 @@ function getPageFields(data: SuiObjectData): BlockPage | null {
     return null;
 }
 
-async function decompressData(data: ArrayBuffer, contentEncoding: string) {
+async function decompressData(
+    data: ArrayBuffer,
+    contentEncoding: string
+): Promise<ArrayBuffer> | null {
     if (contentEncoding === "plaintext") {
         return data;
     }
@@ -240,13 +263,29 @@ async function decompressData(data: ArrayBuffer, contentEncoding: string) {
         });
         if (response) return response;
     }
+    return null;
 }
 
 function siteNotFound(): Response {
-    return new Response("<p>404 - Blocksite not found</p>", {
-        status: 404,
-        headers: {
-            "Content-Type": "text/html",
-        },
-    });
+    return new Response(
+        "<p>404 - The URL provided points to an object ID, but the object does not seem to be a blocksite.</p>",
+        {
+            status: 404,
+            headers: {
+                "Content-Type": "text/html",
+            },
+        }
+    );
+}
+
+function noObjectIdFound(): Response {
+    return new Response(
+        "<p>404 - The URL provided does not point to a valid object id.</p>",
+        {
+            status: 404,
+            headers: {
+                "Content-Type": "text/html",
+            },
+        }
+    );
 }
