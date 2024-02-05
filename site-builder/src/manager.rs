@@ -94,6 +94,7 @@ impl SuiManager {
         self.sign_and_send().await
     }
 
+    /// Create a new blockpage given the contents
     fn create_page_in_chunks(&mut self, page: &Page) -> Result<Argument> {
         let clock = self.calls.pt_builder.input(CallArg::CLOCK_IMM)?;
         let name = self.calls.pt_builder.pure(page.name.clone())?;

@@ -1,7 +1,8 @@
-use std::{fmt, io::Write, path::PathBuf};
+use std::{io::Write, path::PathBuf};
 
 use anyhow::{anyhow, Result};
-use clap::ValueEnum;
+
+use crate::content::{ContentEncoding, ContentType};
 
 pub struct Site {
     pub name: String,
@@ -11,53 +12,6 @@ impl Site {
     pub fn new(name: &str) -> Self {
         Site {
             name: name.to_owned(),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum ContentType {
-    TextHtml,
-    TextCss,
-    TextJs,
-    ImageSvg,
-}
-
-#[derive(Debug, ValueEnum, Clone)]
-#[clap(rename_all = "lowercase")]
-pub enum ContentEncoding {
-    PlainText,
-    Gzip,
-}
-
-impl ContentType {
-    fn from_extension(ext: &str) -> Self {
-        match ext {
-            "html" => ContentType::TextHtml,
-            "css" => ContentType::TextCss,
-            "js" => ContentType::TextJs,
-            "svg" => ContentType::ImageSvg,
-            _ => panic!("Unknown extension {}", ext),
-        }
-    }
-}
-
-impl fmt::Display for ContentType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            ContentType::TextHtml => write!(f, "text/html"),
-            ContentType::TextCss => write!(f, "text/css"),
-            ContentType::TextJs => write!(f, "text/js"),
-            ContentType::ImageSvg => write!(f, "image/svg+xml"),
-        }
-    }
-}
-
-impl fmt::Display for ContentEncoding {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            ContentEncoding::PlainText => write!(f, "plaintext"),
-            ContentEncoding::Gzip => write!(f, "gzip"),
         }
     }
 }

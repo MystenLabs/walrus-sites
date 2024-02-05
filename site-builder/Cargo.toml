@@ -11,8 +11,11 @@ clap = { version = "4.4.18", features = ["derive"] }
 sui-keys = { git = "https://github.com/MystenLabs/sui", tag = "mainnet-v1.16.2" }
 sui-sdk = { git = "https://github.com/MystenLabs/sui", tag = "mainnet-v1.16.2" }
 sui-types = { git = "https://github.com/MystenLabs/sui", tag = "mainnet-v1.16.2" }
+move-core-types = { git = "https://github.com/MystenLabs/sui", tag = "mainnet-v1.16.2" }
 shared-crypto = { git = "https://github.com/MystenLabs/sui", tag = "mainnet-v1.16.2" }
 tokio = { version = "1.35.1", features = ["rt", "rt-multi-thread", "macros"] }
 toml = "0.8.8"
 serde = { version = "1.0.196", features = ["derive"] }
 flate2 = "1.0.28"
+serde_json = "1.0.113"
+futures = "0.3.30"

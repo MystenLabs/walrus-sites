@@ -1,10 +1,12 @@
 use std::{fs::read_dir, path::PathBuf, str};
 
 use anyhow::{anyhow, bail, ensure, Result};
+use futures::Future;
 use shared_crypto::intent::Intent;
 use sui_keys::keystore::{AccountKeystore, Keystore};
 use sui_sdk::{
     rpc_types::{
+        Page,
         SuiExecutionStatus,
         SuiObjectDataOptions,
         SuiTransactionBlockEffectsAPI,
@@ -108,6 +110,37 @@ pub async fn call_arg_from_shared_object_id(
             mutable,
         },
     ))
+}
+
+pub async fn handle_pagination<F, T, C, Fut>(
+    closure: F,
+) -> Result<impl Iterator<Item = T>, sui_sdk::error::Error>
+where
+    F: FnMut(Option<C>) -> Fut,
+    T: 'static,
+    Fut: Future<Output = Result<Page<T, C>, sui_sdk::error::Error>>,
+{
+    handle_pagination_with_cursor(closure, None).await
+}
+
+pub(crate) async fn handle_pagination_with_cursor<F, T, C, Fut>(
+    mut closure: F,
+    mut cursor: Option<C>,
+) -> Result<impl Iterator<Item = T>, sui_sdk::error::Error>
+where
+    F: FnMut(Option<C>) -> Fut,
+    T: 'static,
+    Fut: Future<Output = Result<Page<T, C>, sui_sdk::error::Error>>,
+{
+    let mut cont = true;
+    let mut iterators = vec![];
+    while cont {
+        let page = closure(cursor).await?;
+        cont = page.has_next_page;
+        cursor = page.next_cursor;
+        iterators.push(page.data.into_iter());
+    }
+    Ok(iterators.into_iter().flatten())
 }
 
 /// Convert the hex representation of an object id to base36

@@ -1,4 +1,5 @@
 mod calls;
+mod content;
 mod manager;
 mod network;
 mod page;
@@ -9,8 +10,8 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use content::ContentEncoding;
 use network::Network;
-use page::ContentEncoding;
 use serde::Deserialize;
 use sui_sdk::rpc_types::{SuiTransactionBlockEffects, SuiTransactionBlockEffectsAPI};
 use sui_types::{
@@ -18,6 +19,7 @@ use sui_types::{
     Identifier,
 };
 use suins::set_suins_name;
+use util::handle_pagination;
 
 use crate::{
     manager::SuiManager,
@@ -69,6 +71,8 @@ enum Commands {
         #[clap(short, long)]
         target: ObjectID,
     },
+    /// Show the pages composing the blocksite at the given id
+    Sitemap { object: ObjectID },
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -99,9 +103,9 @@ fn print_effects(config: &Config, site_name: &str, effects: &SuiTransactionBlock
     );
     println!("Gas cost summary (MIST):");
     let summary = effects.gas_cost_summary();
-    println!("   - Computation: {}", summary.computation_cost);
-    println!("   - Storage: {}", summary.storage_cost);
-    println!("   - Storage rebate: {}", summary.storage_rebate);
+    println!("  - Computation: {}", summary.computation_cost);
+    println!("  - Storage: {}", summary.storage_cost);
+    println!("  - Storage rebate: {}", summary.storage_rebate);
     println!(
         "   - Non refundable storage: {}",
         summary.non_refundable_storage_fee
@@ -151,6 +155,21 @@ async fn main() -> Result<()> {
             target,
         } => {
             set_suins_name(config, package, sui_ns, registration, target).await?;
+        }
+        Commands::Sitemap { object } => {
+            let client = config.network.get_sui_client().await?;
+            let all_dynamic_fields = handle_pagination(|cursor| {
+                client.read_api().get_dynamic_fields(*object, cursor, None)
+            })
+            .await?;
+            println!("Pages in site at object id: {}", object);
+            for d in all_dynamic_fields {
+                println!(
+                    "  - {:<40} {:?}",
+                    d.name.value.as_str().unwrap(),
+                    d.object_id
+                );
+            }
         }
     };
     Ok(())
