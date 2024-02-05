@@ -92,7 +92,7 @@ type Path = {
 function getSubdomainAndPath(url: string): Path | null {
     // At the moment we only support one subdomain level.
     const REGEX = new RegExp(
-        `^http://(?<subdomain>[A-Za-z0-9]+)\.${BASE_URL}/(?<path>[A-Za-z0-9/.-]*)`
+        `^https://(?<subdomain>[A-Za-z0-9]+)\.${BASE_URL}/(?<path>[A-Za-z0-9/.-]*)`
     );
     const match = url.match(REGEX);
     if (match?.groups?.subdomain) {

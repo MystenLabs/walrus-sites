@@ -17,31 +17,12 @@
             <ul class="check-list">
                 <li>Browse any blocksite, no wallet asked.</li>
                 <li>Completely hosted on chain, will be availble forever to everyone™️ (or until the owner decides to destroy the object).</li>
-                <li>One-click deploy of (simple) blocksites.</li>
-                <li>Very cheap thanks to Sui.</li>
+                <li>Very fast and simple deployment of blocksites (no DNS, no server setup, etc.).</li>
+                <li>Very cheap thanks to Sui (this whole site, images, code, and all, was only <code>0.3 SUI</code>).</li>
                 <li>Link across blockpages, and seamlessly with Web2 websites.</li>
+                <li>TBD Security benefits...</li>
             </ul>
         </div>
-        <div class="column">
-            <h2>Current problems</h2>
-            <ul class="cross-list">
-                <li>Maximum object size limits the size of each blocksite (<code>~250KB</code> compressed).</li>
-                <li>The blocksite is an opaque compressed blob: Updating is almost as costly as publishing an entirely new blocksite.</li>
-                <li>The blocksite portal is just a PoC.</li>
-                <li><em>Cannot connect to the sui wallet!!</em></li>
-            </ul>
-        </div>
-    </div>
-    <div>
-        <h2>Ideas for future improvement</h2>
-        <ul class="idea-list">
-            <li>Serve <code>js/css</code> from other blocks as plaintext files.</li>
-            <li>Linking is quite cumbersome at the moment (need to create the Objects to get the IDs, and then update them with the content). Create tooling for that (Note: Started).</li>
-            <li>Implmement the same functionality of the "blocksite portal" in a bookmarklet, so that hosting the portal is not required anymore.</li>
-            <li>Add the possiblity to store the blocksite in multiple objects to get around the maximum object size limit</li>
-            <li>Create tooling to split a single logical "webpage" into multiple Sui objects, according to some template. This could be interesting, e.g., to allow "multi-owner websites". For instance, a news site where individual articles are <em>actually</em> owned by individual authors, which can load anything in their "section" (the Sui object they own that is then linked in the blocksite). </li>
-        </ul>
     </div>
 </body>
-
 </html>

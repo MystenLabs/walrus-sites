@@ -22,32 +22,24 @@
     <h2>How does it work?</h2>
     <p>
     <ul>
-        <li>Each blocksite is represented by an object on Sui, which contains a <b>compressed</b> version of the blocksite
-            (in this case, the <code>html</code> and <code>css</code>).</li>
-        <li>Once the blocksite portal is loaded, it downloads some javascript code to <b>get the contents of the object
-                from the Sui blockchain</b>, decompress it and render them in an <code>iframe</code>.</li>
-        <li>People can browse any blocksite by just typing its object ID after a <code>#</code> in the blocksite portal
+        <li>Each blocksite is represented by objects on Sui, which contain a version of the blocksite</li>
+        <li>Once the blocksite portal is loaded, it downloads a service worker that <b>gets the contents of the objects
+                from the Sui blockchain</b> and serves them to the browser.</li>
+        <li>People can browse any blocksite by just typing its object ID (in base36 encoding) as a subdomain to the blocksite portal
             url.</li>
-        <li>The javascript in the portal then fetches the object from the full node, and displays it. That's it!</li>
+        <li>The service worker in the portal then fetches the objects from the full node and displays them. That's it!</li>
     </ul>
     </p>
     <h2>How can i publish a blocksite?</h2>
     <p>
-        Also easy: Just load up the blocksite portal, connect your wallet, and
-        drag-and-drop the inlined <code>html/css/js</code>. Accept the
-        transaction cost, and you have a blocksite forever!  (For more complex
-        websites, a bit more tooling is needed). In case you
-        are unhappy with the blocksite, you can always update it!
+        By using the <code>site builder</code> tool.
     </p>
-    <p>
-        <b>
-            Start browsing another blocksite by visiting the
-            <a href="./features.html">features page!</a> or 
-            <a href="./image/bullshark.html">bullshark images</a> or even
-            <a href="./snake/index.html">play snake</a>
-        </b>
-        Alternatively, see how you can cross-browse to the old-school web by loading <a href="https://mystenlabs.com">Mysten Lab's homepage</a>
-    </p>
+    <h2>Some test sites</h2>
+    <p> Have a look at some of the test blocksites we have created:</p>
+    <ul>
+           <li>A <a href="./features.html">features page</a> for the project</li> 
+           <li>A <a href="./image/bullshark.html">site with javascript and images </a></li>
+           <li><a href="./snake/index.html">Play snake!</a></li>
+    </ul>
 </body>
-
 </html>
