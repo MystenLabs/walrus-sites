@@ -179,12 +179,18 @@ async function resolveAndFetchPage(parsedUrl: Path): Promise<Response> {
 
     let objectId = hardcodedSubdmains(parsedUrl.subdomain);
     if (!objectId) {
-        // Check if there is a SuiNs name
-        objectId = await resolveSuiNsAddress(client, parsedUrl.subdomain);
+        // Try to convert the subdomain to an object ID
+        // NOTE: This effectively _disables_ any SuiNs name that is
+        // the base36 encoding of an object ID (i.e., a 32-byte
+        // string). This is desirable, prevents people from getting
+        // suins names that are the base36 encoding the object ID of a
+        // target blocksite (with the goal of hijacking non-suins
+        // queries)
+        objectId = subdomainToObjectId(parsedUrl.subdomain);
     }
     if (!objectId) {
-        // Last resort: try to convert the subdomain to an object ID
-        objectId = subdomainToObjectId(parsedUrl.subdomain);
+        // Check if there is a SuiNs name
+        objectId = await resolveSuiNsAddress(client, parsedUrl.subdomain);
     }
     if (objectId) {
         console.log("Object ID: ", objectId);
@@ -215,7 +221,7 @@ async function fetchPage(
         id: dynamicFields.data.objectId,
         options: { showBcs: true },
     });
-    if (!pageData.data) {  
+    if (!pageData.data) {
         return siteNotFound();
     }
     let blockPage = getPageFields(pageData.data);
