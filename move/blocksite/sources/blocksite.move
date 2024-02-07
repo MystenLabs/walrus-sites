@@ -17,7 +17,8 @@ module blocksite::blocksite {
         created: u64,
     }
 
-    struct BlockPage has store {
+    // TODO: is the version/timestamp useful?
+    struct BlockResource has store, drop {
         name: String,
         // The date and time of creation
         created: u64,
@@ -37,6 +38,10 @@ module blocksite::blocksite {
             created: clock::timestamp_ms(clk),
         }
     }
+    
+    public fun update_name(site: &mut BlockSite, new_name: String) {
+        site.name = new_name
+    }
 
     #[lint_allow(self_transfer)]
     /// For use with the command line
@@ -45,16 +50,16 @@ module blocksite::blocksite {
         transfer::transfer(site, tx_context::sender(ctx));
     }
 
-    // Manipulation of pages //
+    // Manipulation of resources //
 
-    public fun new_page(
+    public fun new_resource(
         name: String,
         content_type: String,
         content_encoding: String,
         contents: vector<u8>,
         clk: &Clock,
-    ): BlockPage {
-        BlockPage {
+    ): BlockResource {
+        BlockResource {
             name,
             created: clock::timestamp_ms(clk),
             updated: none(),
@@ -65,25 +70,51 @@ module blocksite::blocksite {
         }
     }
 
-    public fun add_page(node: &mut BlockSite, page: BlockPage) {
-        df::add(&mut node.id, page.name, page);
+    public fun add_resource(node: &mut BlockSite, resource: BlockResource) {
+        df::add(&mut node.id, resource.name, resource);
     }
 
-    public fun remove_page(site: &mut BlockSite, name: String): BlockPage{
+    public fun remove_resource(site: &mut BlockSite, name: String): BlockResource{
         df::remove(&mut site.id, name)
     }
 
-    // TODO: Update content encoding and content type too
-    /// Update the contents of the page, and increment version number and updated timestamps
-    public fun update(page: &mut BlockPage, contents: vector<u8>, clk: &Clock) {
-        page.contents = contents;
-        page.updated = some(clock::timestamp_ms(clk));
-        page.version = page.version + 1;
+    public fun remove_resource_if_exists(site: &mut BlockSite, name: String): Option<BlockResource>{
+        df::remove_if_exists(&mut site.id, name)
+    }
+
+    public fun move_resource(site: &mut BlockSite, old_name: String, new_name: String) {
+        let resource = remove_resource(site, old_name);
+        resource.name = new_name;
+        add_resource(site, resource);
+    }
+
+    /// Update the contents of the resource, and increment version number and updated timestamps
+    public fun update_contents(resource: &mut BlockResource, contents: vector<u8>, clk: &Clock) {
+        resource.contents = contents;
+        resource.updated = some(clock::timestamp_ms(clk));
+        resource.version = resource.version + 1;
+    }
+
+    public fun update_content_type(resource: &mut BlockResource, content_type: String, clk: &Clock) {
+        resource.content_type = content_type;
+        resource.updated = some(clock::timestamp_ms(clk));
+        resource.version = resource.version + 1;
+    }
+
+    public fun update_content_encodng(resource: &mut BlockResource, content_encoding: String, clk: &Clock) {
+        resource.content_encoding = content_encoding;
+        resource.updated = some(clock::timestamp_ms(clk));
+        resource.version = resource.version + 1;
     }
 
     /// Add more bytes to the content
-    public fun add_piece(page: &mut BlockPage, piece: vector<u8>, clk: &Clock) {
-        vector::append(&mut page.contents, piece);
-        page.updated = some(clock::timestamp_ms(clk));
+    public fun add_piece(resource: &mut BlockResource, piece: vector<u8>, clk: &Clock) {
+        vector::append(&mut resource.contents, piece);
+        resource.updated = some(clock::timestamp_ms(clk));
+    }
+
+    public fun add_piece_to_existing(site: &mut BlockSite, name: String, piece: vector<u8>, clk: &Clock) {
+        let resource = df::borrow_mut(&mut site.id, name);
+        add_piece(resource, piece, clk);
     }
 }

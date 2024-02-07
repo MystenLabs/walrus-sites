@@ -36,6 +36,7 @@ self.addEventListener("fetch", (event) => {
 
     // Check if the request is for a blocksite
     const parsedUrl = getSubdomainAndPath(url);
+    console.log("Parsed URL: ", parsedUrl);
     if (parsedUrl && parsedUrl.subdomain) {
         event.respondWith(resolveAndFetchPage(parsedUrl));
         return;
@@ -43,7 +44,6 @@ self.addEventListener("fetch", (event) => {
 
     // Handle the case in which we are at the root `BASE_URL`
     if (url === scope || url === scope + "index.html") {
-        // TODO: handle this better
         const newUrl = scope + "index-sw-enabled.html";
         event.respondWith(fetch(newUrl));
         return;
@@ -74,14 +74,16 @@ type Path = {
 
 function getSubdomainAndPath(url: string): Path | null {
     // At the moment we only support one subdomain level.
+    // TODO: ensure all characters of a valid subdomain and path are supported
     const REGEX = new RegExp(
-        `^${PROTO}://(?<subdomain>[A-Za-z0-9]+)\.${BASE_URL}/(?<path>[A-Za-z0-9/.-]*)`
+        `^${PROTO}://(?<subdomain>[A-Za-z0-9]+)\.${BASE_URL}/(?<path>[A-Za-z0-9\/._-]*)`
     );
     const match = url.match(REGEX);
     if (match?.groups?.subdomain) {
         let path = null;
         if (match?.groups?.path) {
-            path = removeFirstSlash(match.groups.path);
+            path = removeLastSlash(match.groups.path);
+            path = "/" + path;
         }
         return { subdomain: match.groups.subdomain, path } as Path;
     }
@@ -89,7 +91,7 @@ function getSubdomainAndPath(url: string): Path | null {
 }
 
 /** Remove the last forward-slash if present */
-function removeFirstSlash(path: string): string {
+function removeLastSlash(path: string): string {
     if (path[path.length - 1] === "/") {
         path = path.slice(0, -1);
     }
@@ -198,7 +200,7 @@ async function resolveAndFetchPage(parsedUrl: Path): Promise<Response> {
             "Base36 version of the object ID: ",
             b36.encode(fromHEX(objectId))
         );
-        let pagePath = parsedUrl.path ? parsedUrl.path : "index.html";
+        let pagePath = parsedUrl.path ? parsedUrl.path : "/index.html";
         return fetchPage(client, objectId, pagePath);
     }
     return noObjectIdFound();
@@ -215,6 +217,8 @@ async function fetchPage(
         name: { type: "0x1::string::String", value: path },
     });
     if (!dynamicFields.data) {
+        console.log("No dynamic field found");
+        console.log(dynamicFields);
         return siteNotFound();
     }
     let pageData = await client.getObject({
@@ -222,6 +226,7 @@ async function fetchPage(
         options: { showBcs: true },
     });
     if (!pageData.data) {
+        console.log("No page data found");
         return siteNotFound();
     }
     let blockPage = getPageFields(pageData.data);

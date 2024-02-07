@@ -1,4 +1,4 @@
-export const NETWORK = "testnet"
+export const NETWORK = "localnet"
 export const BASE_URL = "localhost:8000"
 export const PROTO = "http"
 // export const BASE_URL = "blocksite.net"
