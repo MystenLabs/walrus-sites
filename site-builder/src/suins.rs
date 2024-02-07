@@ -2,10 +2,8 @@ use anyhow::Result;
 use sui_keys::keystore::{FileBasedKeystore, Keystore};
 use sui_sdk::rpc_types::SuiTransactionBlockResponse;
 use sui_types::{
-    base_types::ObjectID,
-    programmable_transaction_builder::ProgrammableTransactionBuilder,
-    transaction::CallArg,
-    Identifier,
+    base_types::ObjectID, programmable_transaction_builder::ProgrammableTransactionBuilder,
+    transaction::CallArg, Identifier,
 };
 
 use crate::{

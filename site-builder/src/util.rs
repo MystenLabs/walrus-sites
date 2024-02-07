@@ -1,4 +1,4 @@
-use std::{fs::read_dir, path::PathBuf, str};
+use std::str;
 
 use anyhow::{anyhow, bail, ensure, Result};
 use futures::Future;
@@ -6,11 +6,8 @@ use shared_crypto::intent::Intent;
 use sui_keys::keystore::{AccountKeystore, Keystore};
 use sui_sdk::{
     rpc_types::{
-        Page,
-        SuiExecutionStatus,
-        SuiObjectDataOptions,
-        SuiTransactionBlockEffectsAPI,
-        SuiTransactionBlockResponse,
+        Page, SuiExecutionStatus, SuiObjectDataOptions, SuiTransactionBlockEffects,
+        SuiTransactionBlockEffectsAPI, SuiTransactionBlockResponse,
         SuiTransactionBlockResponseOptions,
     },
     SuiClient,
@@ -21,20 +18,6 @@ use sui_types::{
     quorum_driver_types::ExecuteTransactionRequestType,
     transaction::{CallArg, ProgrammableTransaction, Transaction, TransactionData},
 };
-
-pub fn recursive_readdir(root: &PathBuf) -> Vec<PathBuf> {
-    let mut files = vec![];
-    let entries = read_dir(root).expect("Reading path failed. Please provide a valid path");
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            files.extend(recursive_readdir(&path));
-        } else {
-            files.push(path);
-        }
-    }
-    files
-}
 
 pub async fn sign_and_send_ptb(
     client: &SuiClient,
@@ -172,6 +155,33 @@ pub fn id_to_base36(id: &ObjectID) -> Result<String> {
     .unwrap()
     .to_owned();
     Ok(string)
+}
+
+/// Get the object id of the site that was published in the transaction
+pub fn get_site_id_from_response(
+    address: SuiAddress,
+    effects: &SuiTransactionBlockEffects,
+) -> Result<ObjectID> {
+    Ok(effects
+        .created()
+        .iter()
+        .find(|c| c.owner == address)
+        .expect("Could not find the object ID for the created blocksite.")
+        .reference
+        .object_id)
+}
+
+pub async fn get_dynamic_field_names(client: &SuiClient, object: ObjectID) -> Result<Vec<String>> {
+    handle_pagination(|cursor| client.read_api().get_dynamic_fields(object, cursor, None))
+        .await?
+        .map(|d| {
+            d.name
+                .value
+                .as_str()
+                .map(|s| s.to_owned())
+                .ok_or(anyhow!("Could not read the name of the dynamic field"))
+        })
+        .collect()
 }
 
 #[cfg(test)]

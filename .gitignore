@@ -9,3 +9,4 @@ inlined.html
 target/
 config.toml
 .vscode/
+rustfmt.toml

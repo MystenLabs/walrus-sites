@@ -19,3 +19,5 @@ serde = { version = "1.0.196", features = ["derive"] }
 flate2 = "1.0.28"
 serde_json = "1.0.113"
 futures = "0.3.30"
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"

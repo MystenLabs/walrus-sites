@@ -4,17 +4,23 @@ const CopyPlugin = require("copy-webpack-plugin");
 module.exports = {
     mode: "development",
     watch: true,
-    entry: "./src/sw.ts",
+    entry: {
+        sw: "./src/sw.ts",},
     module: {
         rules: [
             {
+                test: /\.txt$/,
+                type: "asset/source",
+            },
+            {
+                test: /\.ts$/,
                 use: "ts-loader",
                 exclude: /node_modules/,
             },
         ],
     },
     output: {
-        filename: "sw.js",
+        filename: "[name].js",
         path: path.resolve(__dirname, "./dist/"),
     },
     resolve: {
@@ -22,7 +28,7 @@ module.exports = {
     },
     plugins: [
         new CopyPlugin({
-            patterns: [{ from: "static"}],
+            patterns: [{ from: "static" }],
         }),
     ],
 };

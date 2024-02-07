@@ -71,14 +71,16 @@ impl CallBuilder {
     // Calls
     move_call!(new_site, name, clock);
     move_call!(
-        new_page,
+        new_resource,
         name,
         content_type,
         content_encoding,
         contents,
         clock
     );
-    move_call!(add_page, site, page);
-    // move_call!(remove_page, site, name);
-    move_call!(add_piece, page, piece, clock);
+    move_call!(add_resource, site, resource);
+    move_call!(remove_resource_if_exists, site, name);
+    move_call!(add_piece, resource, piece, clock);
+    move_call!(move_resource, site, old_name, new_name);
+    move_call!(add_piece_to_existing, site, name, piece, clock);
 }

@@ -1,0 +1,10 @@
+# The wallet address of the publisher & path to the keystore
+address = "0x962d88830321733c1b25a8f0105e13cb7711a194fd7d0178a453fb26cadc1488"
+keystore = "/path/to/sui.keystore"
+# The Blocksite site package, module, and network where it is published
+package = "0xf71f185d3654e56e41744fd19f355bcb6eda67f281ccf94528d45cb1e839d6b9"
+module = "blocksite"
+network = "localnet"
+# Gas coin to use and suitable gas budget
+gas_coin = "0xc4f78640fe3676fa70368129bf0bde91df2c6fabaf0a7d9f4d94816a9567d91e"
+gas_budget = 10_000_000_000

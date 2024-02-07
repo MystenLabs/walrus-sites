@@ -2,7 +2,7 @@ use std::fmt;
 
 use clap::ValueEnum;
 
-#[derive(Debug, ValueEnum, Clone)]
+#[derive(Debug, ValueEnum, Clone, Copy, PartialEq, Eq)]
 #[clap(rename_all = "lowercase")]
 pub enum ContentEncoding {
     PlainText,
@@ -21,7 +21,7 @@ impl fmt::Display for ContentEncoding {
 /// Content types for content of a page
 /// The list is generated starting from
 /// https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types/Common_types
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ContentType {
     AudioAac,
     ApplicationXabiword,
