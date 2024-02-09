@@ -1,16 +1,48 @@
 <!DOCTYPE html>
 <html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Testing Service workers</title>
-    <!-- <script src="./scripts/app.js"></script> -->
-</head>
-
-<body>
-    <h1>Blocksites!</h1>
-    <p>All ready, good to go.</p>
-</body>
-
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Blocksites Home</title>
+        <link rel="stylesheet" href="concrete.css" />
+        <link rel="stylesheet" href="normalize.css" />
+    </head>
+    <body>
+        <main>
+            <header>
+                <h1 class="inverted">Blocksites!</h1>
+            </header>
+            <h3>What is a Blocksite?</h3>
+            <p>
+                BlockSites are "web"-sites that live entirely on Sui, no web
+                involved! The content of a blocksite is loaded from an object on
+                Sui, as the object contains all the resources necessary to
+                render the site. To browse a blocksite, you just need its
+                <b>Sui Object ID</b> or <b>SuiNS name</b>. No wallet is needed
+                to browse blocksites, they are accessible to everyone!
+            </p>
+            <h3>Cool! Where can I find one?</h3>
+            <p>Here are a few examples:</p>
+            <ul>
+                <li>
+                    A simple
+                    <a href="http://testchat.blocksite.net">chat dApp</a>
+                    (requires a sui wallet to post messages).
+                </li>
+                <li>
+                    A <a href="http://snake.blocksite.net">game of snake</a> in
+                    javascript.
+                </li>
+                <li>
+                    The
+                    <a href="http://features.blocksite.net"
+                        >blocksites features page</a
+                    >.
+                </li>
+            </ul>
+            <h3>How can I publish my own Blocksite?</h3>
+            <p>You can use the <code>site-builder</code> tool we developed.</p>
+        </main>
+        <footer>2024 Mysten Labs. A prototype.</footer>
+    </body>
 </html>

@@ -6,8 +6,8 @@ import { Box, Avatar, Card, Flex, Heading, Text, Link } from "@radix-ui/themes";
 import { useEffect } from "react";
  
  
-export const PACKAGE_ID = "0x264545e6956042f62b63603a6aa6b327bc26b15a121cef5d2101cde8092f7cff";
-export const CHAT_ID = "0x49aae34bf01d4ad1a895beb6e00d46209d9f94e17544649888426ab2b074430a";
+export const PACKAGE_ID = "0x2003d0b7386b8fe7a6cd4f43445b8075830ae570621d31b91641218e621842c2";
+export const CHAT_ID = "0x8745714410272de43e6b81917b8a30a05a90e8753d506152f44ac3937efac40b";
 export const NETWORK= "testnet";
 
 export interface Chat {
