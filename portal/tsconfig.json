@@ -6,7 +6,7 @@
     "lib": [
       "esnext",
       "webworker"
-    ]
+    ],
   },
   "baseUrl": "./",
   "rootDir": "src",
@@ -14,9 +14,11 @@
   "skipLibCheck": true,
   "include": [
     "src/sw.ts",
+    "src/custom.d.ts",
+    "src/constants.ts"
   ],
   "exclude": [
     "node_modules",
-    "dist"
+    "dist",
   ]
 }

@@ -12,6 +12,7 @@ import {
 } from "@mysten/sui.js/utils";
 import { SITE_NAMES, NETWORK, BASE_URL, PROTO } from "./constants";
 import { bcs } from "@mysten/sui.js/bcs";
+import template_404 from '../static/404-page.template.html';
 
 // This is to get TypeScript to recognize `clients` and `self`
 // Default type of `self` is `WorkerGlobalScope & typeof globalThis`
@@ -80,7 +81,7 @@ function getSubdomainAndPath(url: string): Path | null {
     );
     const match = url.match(REGEX);
     if (match?.groups?.subdomain) {
-        let path = null;
+        let path: string | null = null;
         if (match?.groups?.path) {
             path = removeLastSlash(match.groups.path);
             path = "/" + path;
@@ -192,7 +193,11 @@ async function resolveAndFetchPage(parsedUrl: Path): Promise<Response> {
     }
     if (!objectId) {
         // Check if there is a SuiNs name
-        objectId = await resolveSuiNsAddress(client, parsedUrl.subdomain);
+        try {
+            objectId = await resolveSuiNsAddress(client, parsedUrl.subdomain);
+        } catch {
+            return fullNodeFail();
+        }
     }
     if (objectId) {
         console.log("Object ID: ", objectId);
@@ -230,7 +235,7 @@ async function fetchPage(
         return siteNotFound();
     }
     let blockPage = getPageFields(pageData.data);
-    if (!blockPage.contents) {
+    if (!blockPage || !blockPage.contents) {
         return siteNotFound();
     }
     let decompressed = await decompressData(
@@ -250,7 +255,7 @@ async function fetchPage(
 // Type definitions for BCS decoding //
 function getPageFields(data: SuiObjectData): BlockPage | null {
     // Deserialize the bcs encoded struct
-    if (data.bcs.dataType === "moveObject") {
+    if (data.bcs && data.bcs.dataType === "moveObject") {
         let blockpage = FieldStruct.parse(fromB64(data.bcs.bcsBytes));
         return blockpage.value;
     }
@@ -260,7 +265,7 @@ function getPageFields(data: SuiObjectData): BlockPage | null {
 async function decompressData(
     data: ArrayBuffer,
     contentEncoding: string
-): Promise<ArrayBuffer> | null {
+): Promise<ArrayBuffer | null> {
     if (contentEncoding === "plaintext") {
         return data;
     }
@@ -278,20 +283,22 @@ async function decompressData(
 }
 
 function siteNotFound(): Response {
-    return new Response(
-        "<p>404 - The URL provided points to an object ID, but the object does not seem to be a blocksite.</p>",
-        {
-            status: 404,
-            headers: {
-                "Content-Type": "text/html",
-            },
-        }
-    );
+    return Response404("The URL provided points to an object ID, but the object does not seem to be a blocksite.");
 }
 
 function noObjectIdFound(): Response {
+    return Response404("The URL provided does not point to a valid object id.");
+}
+
+function fullNodeFail(): Response {
+    return Response404("Failed to contact the full node.");
+}
+
+function Response404(message: String) : Response {
+    console.log();
     return new Response(
-        "<p>404 - The URL provided does not point to a valid object id.</p>",
+        // TODO: better way for this?
+        template_404.replace("${message}", message),
         {
             status: 404,
             headers: {
