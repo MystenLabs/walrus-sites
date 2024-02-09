@@ -7,7 +7,7 @@ mod util;
 
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use network::NetworkConfig;
 use publish::publish;
@@ -98,7 +98,11 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
     let args = Args::parse();
-    let mut config: Config = toml::from_str(&std::fs::read_to_string(&args.config)?)?;
+    let mut config: Config = std::fs::read_to_string(&args.config)
+        .context(format!("unable to read config file {:?}", args.config))
+        .and_then(|s| {
+            toml::from_str(&s).context(format!("unable to parse toml in file {:?}", args.config))
+        })?;
     config.network.load()?;
 
     match &args.command {

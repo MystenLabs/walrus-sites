@@ -13,6 +13,10 @@
 		"webpack-dev-server": "^4.15.1"
 	},
     "scripts": {
-        "serve": "webpack serve"
+        "serve": "webpack serve",
+        "build": "pnpm build:prod",
+        "dev": "pnpm build:dev",
+        "build:dev": "webpack --mode development",
+        "build:prod": "webpack --mode production"
     }
 }
