@@ -1,8 +1,6 @@
 mod calls;
-mod publish;
-// mod interface;
 mod network;
-// mod page;
+mod publish;
 mod site;
 mod suins;
 mod util;
@@ -11,14 +9,11 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use network::Network;
+use network::NetworkConfig;
 use publish::publish;
 use serde::Deserialize;
 use site::content::ContentEncoding;
-use sui_types::{
-    base_types::{ObjectID, SuiAddress},
-    Identifier,
-};
+use sui_types::{base_types::ObjectID, Identifier};
 use suins::set_suins_name;
 use util::handle_pagination;
 
@@ -75,22 +70,37 @@ enum Commands {
     Sitemap { object: ObjectID },
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug)]
 pub struct Config {
-    pub address: SuiAddress,
-    pub keystore: PathBuf,
+    #[serde(default = "blocksite_module")]
     pub module: Identifier,
+    #[serde(default = "testnet_package")]
     pub package: ObjectID,
-    pub network: Network,
+
     pub gas_coin: ObjectID,
     pub gas_budget: u64,
+
+    #[serde(default)]
+    pub network: NetworkConfig,
+}
+
+fn blocksite_module() -> Identifier {
+    Identifier::new("blocksite").expect("valid literal identifier")
+}
+
+fn testnet_package() -> ObjectID {
+    ObjectID::from_hex_literal("0x66b0b2d46dcd2e56952f1bd9e90218deaab0885e0f60ca29163f5e53c72ef810")
+        .expect("valid hex literal")
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
+
     let args = Args::parse();
-    let config: Config = toml::from_str(&std::fs::read_to_string(&args.config)?)?;
+    let mut config: Config = toml::from_str(&std::fs::read_to_string(&args.config)?)?;
+    config.network.load()?;
+
     match &args.command {
         Commands::Publish {
             directory,
@@ -98,9 +108,7 @@ async fn main() -> Result<()> {
             site_name,
             object_id,
         } => publish(directory, content_encoding, site_name, object_id, &config).await?,
-        Commands::Convert { object_id } => {
-            println!("{}", id_to_base36(object_id)?)
-        }
+
         Commands::SetNs {
             package,
             sui_ns,
@@ -109,6 +117,7 @@ async fn main() -> Result<()> {
         } => {
             set_suins_name(config, package, sui_ns, registration, target).await?;
         }
+
         Commands::Sitemap { object } => {
             let client = config.network.get_sui_client().await?;
             let all_dynamic_fields = handle_pagination(|cursor| {
@@ -124,6 +133,9 @@ async fn main() -> Result<()> {
                 );
             }
         }
+
+        Commands::Convert { object_id } => println!("{}", id_to_base36(object_id)?),
     };
+
     Ok(())
 }
