@@ -19,4 +19,5 @@ gas_budget = 10_000_000_000
 # [network]
 # alias = "local"
 # address = "0x962d88830321733c1b25a8f0105e13cb7711a194fd7d0178a453fb26cadc1488"
-# keystore = "/path/to/sui.keystore"
+# [network.keystore]
+# file = /Users/jsmith/.sui/sui_config/sui.keystore
