@@ -6115,6 +6115,7 @@ dependencies = [
  "move-core-types",
  "serde",
  "serde_json",
+ "serde_yaml",
  "shared-crypto",
  "sui-keys",
  "sui-sdk",

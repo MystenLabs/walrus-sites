@@ -1,9 +1,10 @@
 use anyhow::Result;
-use sui_keys::keystore::{FileBasedKeystore, Keystore};
 use sui_sdk::rpc_types::SuiTransactionBlockResponse;
 use sui_types::{
-    base_types::ObjectID, programmable_transaction_builder::ProgrammableTransactionBuilder,
-    transaction::CallArg, Identifier,
+    base_types::ObjectID,
+    programmable_transaction_builder::ProgrammableTransactionBuilder,
+    transaction::CallArg,
+    Identifier,
 };
 
 use crate::{
@@ -20,7 +21,6 @@ pub async fn set_suins_name(
 ) -> Result<SuiTransactionBlockResponse> {
     let client = config.network.get_sui_client().await?;
     let mut builder = ProgrammableTransactionBuilder::new();
-    let keystore = Keystore::File(FileBasedKeystore::new(&config.keystore)?);
     let suins_arg = builder.input(call_arg_from_shared_object_id(&client, *sui_ns, true).await?)?;
     let reg_arg = builder.input(get_object_ref_from_id(&client, *registration).await?.into())?;
     let target_arg = builder.pure(vec![target.into_bytes()])?;
@@ -34,8 +34,8 @@ pub async fn set_suins_name(
     );
     sign_and_send_ptb(
         &client,
-        &keystore,
-        config.address,
+        config.network.keystore(),
+        config.network.address(),
         builder.finish(),
         get_object_ref_from_id(&client, config.gas_coin).await?,
         config.gas_budget,

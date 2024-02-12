@@ -1,7 +1,6 @@
 use std::mem;
 
 use anyhow::{anyhow, ensure, Result};
-use sui_keys::keystore::{FileBasedKeystore, Keystore};
 use sui_sdk::{rpc_types::SuiTransactionBlockResponse, SuiClient};
 use sui_types::{
     base_types::ObjectID,
@@ -26,25 +25,22 @@ pub const ARG_MARGIN: usize = 1_000; // TODO: check if there is better way
 pub const TX_MARGIN: usize = 10_000; // TODO: check if there is better way
 pub const MAX_OBJ_SIZE: usize = 256_000;
 
-pub struct SiteManager {
+pub struct SiteManager<'a> {
     pub calls: CallBuilder,
     pub client: SuiClient,
-    pub config: Config,
-    pub keystore: Keystore,
+    pub config: &'a Config,
     // The Object ID of the site under construction or update
     pub site_id: Option<ObjectID>,
 }
 
-impl SiteManager {
-    pub async fn new(site_id: Option<ObjectID>, config: Config) -> Result<Self> {
+impl<'a> SiteManager<'a> {
+    pub async fn new(site_id: Option<ObjectID>, config: &'a Config) -> Result<Self> {
         let builder = CallBuilder::new(config.package, config.module.clone());
         let client = config.network.get_sui_client().await?;
-        let keystore = Keystore::File(FileBasedKeystore::new(&config.keystore)?);
         Ok(SiteManager {
             calls: builder,
             client,
             config,
-            keystore,
             site_id,
         })
     }
@@ -81,10 +77,11 @@ impl SiteManager {
         if let Some(batch) = resource_iter.next() {
             self.create_and_add_resources(site_arg, &batch)?;
         }
-        self.calls.transfer_arg(self.config.address, site_arg);
+        self.calls
+            .transfer_arg(self.config.network.address(), site_arg);
         let response = self.sign_and_send().await?;
         self.site_id = Some(get_site_id_from_response(
-            self.config.address,
+            self.config.network.address(),
             &response
                 .effects
                 .clone()
@@ -214,8 +211,8 @@ impl SiteManager {
         );
         sign_and_send_ptb(
             &self.client,
-            &self.keystore,
-            self.config.address,
+            self.config.network.keystore(),
+            self.config.network.address(),
             builder.finish(),
             get_object_ref_from_id(&self.client, self.config.gas_coin).await?,
             self.config.gas_budget,

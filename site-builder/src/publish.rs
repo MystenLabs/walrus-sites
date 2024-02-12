@@ -2,7 +2,9 @@ use std::path::Path;
 
 use anyhow::{anyhow, Result};
 use sui_sdk::rpc_types::{
-    SuiTransactionBlockEffects, SuiTransactionBlockEffectsAPI, SuiTransactionBlockResponse,
+    SuiTransactionBlockEffects,
+    SuiTransactionBlockEffectsAPI,
+    SuiTransactionBlockResponse,
 };
 use sui_types::base_types::ObjectID;
 
@@ -29,7 +31,7 @@ pub async fn publish(
         resource_manager.add_resource(res);
     }
     println!("{}", resource_manager);
-    let mut site_manger = SiteManager::new(*site_object, config.clone()).await?;
+    let mut site_manger = SiteManager::new(*site_object, config).await?;
     let responses = site_manger
         .publish_site(site_name, &mut resource_manager)
         .await?;
@@ -57,7 +59,7 @@ fn print_effects(
             effects[0]
                 .created()
                 .iter()
-                .find(|c| c.owner == config.address)
+                .find(|c| c.owner == config.network.address())
                 .expect("Could not find the object ID for the created blocksite.")
                 .reference
                 .object_id
@@ -79,11 +81,12 @@ fn print_effects(
     println!("New blocksite '{}' created: {}", site_name, object_id);
     let base36 = id_to_base36(&object_id).expect("Could not convert the id to base 36.");
     println!(
-        "Find it at https://{}.blocksite.net\nor http://{}.localhost:8000\n(explorer url: {})\n",
-        &base36,
-        &base36,
-        config.network.explorer_url(&object_id),
+        "Find it at https://{}.blocksite.net\nor http://{}.localhost:8000",
+        &base36, &base36,
     );
+    if let Some(explorer_url) = config.network.explorer_url(&object_id) {
+        println!("(explorer url: {})\n", explorer_url);
+    }
 
     println!("Gas cost summary (MIST):");
     println!("  - Computation: {}", computation);
