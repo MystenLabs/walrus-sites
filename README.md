@@ -10,10 +10,6 @@ A "blocksite" is a website that is hosted in owned objects on Sui.
 - The `site-builder` is a Rust cli tool to create blocksites on chain, starting from a directory containing html/css/js...
 - In `examples` there is a collection of websites to test the functions of the blocksites directly.
 
-## Running & testing
- 
-TODO 
-
 ## Known issues
 
 Problems with functionality & security are documented in the github issues.
