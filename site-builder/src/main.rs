@@ -1,23 +1,20 @@
-mod calls;
 mod network;
 mod publish;
 mod site;
 mod suins;
 mod util;
-
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use network::NetworkConfig;
-use publish::publish;
+use publish::{publish_site, update_site};
 use serde::Deserialize;
 use site::content::ContentEncoding;
 use sui_types::{base_types::ObjectID, Identifier};
 use suins::set_suins_name;
-use util::handle_pagination;
 
-use crate::util::id_to_base36;
+use crate::util::{get_existing_resource_ids, id_to_base36};
 
 #[derive(Parser, Debug)]
 #[clap(rename_all = "kebab-case")]
@@ -36,14 +33,23 @@ enum Commands {
         /// The directory containing the site sources
         directory: PathBuf,
         /// The encoding for the contents of the BlockPages
-        #[clap(short = 'e', long, value_enum, default_value_t = ContentEncoding::PlainText)]
+        #[clap(short = 'e', long, value_enum, default_value_t = ContentEncoding::Gzip)]
         content_encoding: ContentEncoding,
         /// The name of the BlockSite
-        #[arg(short, long, default_value = "test site")]
+        #[clap(short, long, default_value = "test site")]
         site_name: String,
+    },
+    /// Update an existing site
+    Update {
+        /// The directory containing the site sources
+        directory: PathBuf,
         /// The object ID of a partially published site to be completed
-        #[arg(short, long, default_value=None)]
-        object_id: Option<ObjectID>,
+        object_id: ObjectID,
+        /// The encoding for the contents of the BlockPages
+        #[clap(short = 'e', long, value_enum, default_value_t = ContentEncoding::Gzip)]
+        content_encoding: ContentEncoding,
+        #[clap(short, long, action)]
+        watch: bool,
     },
     /// Convert an object ID in hex format to the equivalent base36 format.
     /// Useful to browse sites at particular object IDs.
@@ -110,9 +116,15 @@ async fn main() -> Result<()> {
             directory,
             content_encoding,
             site_name,
+        } => publish_site(directory, content_encoding, site_name, &config).await?,
+        Commands::Update {
+            directory,
             object_id,
-        } => publish(directory, content_encoding, site_name, object_id, &config).await?,
-
+            content_encoding,
+            watch,
+        } => {
+            update_site(directory, content_encoding, object_id, &config, *watch).await?;
+        }
         Commands::SetNs {
             package,
             sui_ns,
@@ -121,23 +133,16 @@ async fn main() -> Result<()> {
         } => {
             set_suins_name(config, package, sui_ns, registration, target).await?;
         }
-
+        // Add a path to be watched. All files and directories at that path and
+        // below will be monitored for changes.
         Commands::Sitemap { object } => {
             let client = config.network.get_sui_client().await?;
-            let all_dynamic_fields = handle_pagination(|cursor| {
-                client.read_api().get_dynamic_fields(*object, cursor, None)
-            })
-            .await?;
+            let all_dynamic_fields = get_existing_resource_ids(&client, object).await?;
             println!("Pages in site at object id: {}", object);
-            for d in all_dynamic_fields {
-                println!(
-                    "  - {:<40} {:?}",
-                    d.name.value.as_str().unwrap(),
-                    d.object_id
-                );
+            for (name, id) in all_dynamic_fields {
+                println!("  - {:<40} {:?}", name, id);
             }
         }
-
         Commands::Convert { object_id } => println!("{}", id_to_base36(object_id)?),
     };
 
