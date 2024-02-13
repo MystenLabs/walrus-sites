@@ -1,10 +1,7 @@
 const path = require("path");
-const HtmlMinimizerPlugin = require("html-minimizer-webpack-plugin");
 const CopyPlugin = require("copy-webpack-plugin");
-const CssMinimizerPlugin = require("css-minimizer-webpack-plugin");
 
 module.exports = {
-    mode: "development",
     watch: true,
     entry: {
         sw: "./src/sw.ts",
@@ -40,7 +37,4 @@ module.exports = {
             ],
         }),
     ],
-    optimization: {
-        minimizer: [`...`, new HtmlMinimizerPlugin(), new CssMinimizerPlugin()],
-    },
 };
