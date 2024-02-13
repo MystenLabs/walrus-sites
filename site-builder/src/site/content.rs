@@ -1,5 +1,6 @@
 use std::fmt;
 
+use anyhow::anyhow;
 use clap::ValueEnum;
 
 #[derive(Debug, ValueEnum, Clone, Copy, PartialEq, Eq)]
@@ -18,10 +19,30 @@ impl fmt::Display for ContentEncoding {
     }
 }
 
+impl TryFrom<&str> for ContentEncoding {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "plaintext" => Ok(ContentEncoding::PlainText),
+            "gzip" => Ok(ContentEncoding::Gzip),
+            _ => Err(anyhow!("Invalid content encoding string")),
+        }
+    }
+}
+
+impl TryFrom<String> for ContentEncoding {
+    type Error = anyhow::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::try_from(value.as_str())
+    }
+}
+
 /// Content types for content of a page
 /// The list is generated starting from
 /// https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types/Common_types
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ContentType {
     AudioAac,
     ApplicationXabiword,
@@ -279,5 +300,108 @@ impl fmt::Display for ContentType {
             ContentType::ApplicationZip => write!(f, "application/zip"),
             ContentType::ApplicationX7zcompressed => write!(f, "application/x-7z-compressed"),
         }
+    }
+}
+
+impl TryFrom<&str> for ContentType {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "audio/aac" => Ok(ContentType::AudioAac),
+            "application/x-abiword" => Ok(ContentType::ApplicationXabiword),
+            "image/apng" => Ok(ContentType::ImageApng),
+            "application/x-freearc" => Ok(ContentType::ApplicationXfreearc),
+            "image/avif" => Ok(ContentType::ImageAvif),
+            "video/x-msvideo" => Ok(ContentType::VideoXmsvideo),
+            "application/vnd.amazon.ebook" => Ok(ContentType::ApplicationVndamazonebook),
+            "application/octet-stream" => Ok(ContentType::ApplicationOctetstream),
+            "image/bmp" => Ok(ContentType::ImageBmp),
+            "application/x-bzip" => Ok(ContentType::ApplicationXbzip),
+            "application/x-bzip2" => Ok(ContentType::ApplicationXbzip2),
+            "application/x-cdf" => Ok(ContentType::ApplicationXcdf),
+            "application/x-csh" => Ok(ContentType::ApplicationXcsh),
+            "text/css" => Ok(ContentType::TextCss),
+            "text/csv" => Ok(ContentType::TextCsv),
+            "application/msword" => Ok(ContentType::ApplicationMsword),
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => {
+                Ok(ContentType::ApplicationVndopenxmlformatsofficedocumentwordprocessingmldocument)
+            }
+            "application/vnd.ms-fontobject" => Ok(ContentType::ApplicationVndmsfontobject),
+            "application/epub+zip" => Ok(ContentType::ApplicationEpubzip),
+            "application/gzip" => Ok(ContentType::ApplicationGzip),
+            "image/gif" => Ok(ContentType::ImageGif),
+            "text/html" => Ok(ContentType::TextHtml),
+            "image/vnd.microsoft.icon" => Ok(ContentType::ImageVndmicrosofticon),
+            "text/calendar" => Ok(ContentType::TextCalendar),
+            "application/java-archive" => Ok(ContentType::ApplicationJavaarchive),
+            "image/jpeg" => Ok(ContentType::ImageJpeg),
+            "text/javascript" => Ok(ContentType::TextJavascript),
+            "application/json" => Ok(ContentType::ApplicationJson),
+            "application/ld+json" => Ok(ContentType::ApplicationLdjson),
+            "audio/midi" => Ok(ContentType::AudioMidi),
+            "audio/mpeg" => Ok(ContentType::AudioMpeg),
+            "video/mp4" => Ok(ContentType::VideoMp4),
+            "video/mpeg" => Ok(ContentType::VideoMpeg),
+            "application/vnd.apple.installer+xml" => {
+                Ok(ContentType::ApplicationVndappleinstallerxml)
+            }
+
+            "application/vnd.oasis.opendocument.presentation" => {
+                Ok(ContentType::ApplicationVndoasisopendocumentpresentation)
+            }
+            "application/vnd.oasis.opendocument.spreadsheet" => {
+                Ok(ContentType::ApplicationVndoasisopendocumentspreadsheet)
+            }
+            "application/vnd.oasis.opendocument.text" => {
+                Ok(ContentType::ApplicationVndoasisopendocumenttext)
+            }
+            "audio/ogg" => Ok(ContentType::AudioOgg),
+            "video/ogg" => Ok(ContentType::VideoOgg),
+            "application/ogg" => Ok(ContentType::ApplicationOgg),
+            "audio/opus" => Ok(ContentType::AudioOpus),
+            "font/otf" => Ok(ContentType::FontOtf),
+            "image/png" => Ok(ContentType::ImagePng),
+            "application/pdf" => Ok(ContentType::ApplicationPdf),
+            "application/x-httpd-php" => Ok(ContentType::ApplicationXhttpdphp),
+            "application/vnd.ms-powerpoint" => Ok(ContentType::ApplicationVndmspowerpoint),
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation" => Ok(
+                ContentType::ApplicationVndopenxmlformatsofficedocumentpresentationmlpresentation,
+            ),
+            "application/vnd.rar" => Ok(ContentType::ApplicationVndrar),
+            "application/rtf" => Ok(ContentType::ApplicationRtf),
+            "application/x-sh" => Ok(ContentType::ApplicationXsh),
+            "image/svg+xml" => Ok(ContentType::ImageSvgxml),
+            "application/x-tar" => Ok(ContentType::ApplicationXtar),
+            "image/tiff" => Ok(ContentType::ImageTiff),
+            "video/mp2t" => Ok(ContentType::VideoMp2t),
+            "font/ttf" => Ok(ContentType::FontTtf),
+            "text/plain" => Ok(ContentType::TextPlain),
+            "application/vnd.visio" => Ok(ContentType::ApplicationVndvisio),
+            "audio/wav" => Ok(ContentType::AudioWav),
+            "audio/webm" => Ok(ContentType::AudioWebm),
+            "video/webm" => Ok(ContentType::VideoWebm),
+            "image/webp" => Ok(ContentType::ImageWebp),
+            "font/woff" => Ok(ContentType::FontWoff),
+            "font/woff2" => Ok(ContentType::FontWoff2),
+            "application/xhtml+xml" => Ok(ContentType::ApplicationXhtmlxml),
+            "application/vnd.ms-excel" => Ok(ContentType::ApplicationVndmsexcel),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => {
+                Ok(ContentType::ApplicationVndopenxmlformatsofficedocumentspreadsheetmlsheet)
+            }
+            "application/xml" => Ok(ContentType::ApplicationXml),
+            "application/vnd.mozilla.xul+xml" => Ok(ContentType::ApplicationVndmozillaxulxml),
+            "application/zip" => Ok(ContentType::ApplicationZip),
+            "application/x-7z-compressed" => Ok(ContentType::ApplicationX7zcompressed),
+            _ => Err(anyhow!("Invalid conversion to content type")),
+        }
+    }
+}
+
+impl TryFrom<String> for ContentType {
+    type Error = anyhow::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::try_from(value.as_str())
     }
 }

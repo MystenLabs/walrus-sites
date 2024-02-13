@@ -1,4 +1,4 @@
-use std::str;
+use std::{collections::HashMap, str};
 
 use anyhow::{anyhow, bail, ensure, Result};
 use futures::Future;
@@ -6,14 +6,22 @@ use shared_crypto::intent::Intent;
 use sui_keys::keystore::{AccountKeystore, Keystore};
 use sui_sdk::{
     rpc_types::{
-        Page, SuiExecutionStatus, SuiObjectDataOptions, SuiTransactionBlockEffects,
-        SuiTransactionBlockEffectsAPI, SuiTransactionBlockResponse,
+        Page,
+        SuiExecutionStatus,
+        SuiMoveStruct,
+        SuiObjectDataOptions,
+        SuiObjectResponse,
+        SuiParsedData,
+        SuiTransactionBlockEffects,
+        SuiTransactionBlockEffectsAPI,
+        SuiTransactionBlockResponse,
         SuiTransactionBlockResponseOptions,
     },
     SuiClient,
 };
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
+    dynamic_field::DynamicFieldInfo,
     object::Owner,
     quorum_driver_types::ExecuteTransactionRequestType,
     transaction::{CallArg, ProgrammableTransaction, Transaction, TransactionData},
@@ -95,6 +103,20 @@ pub async fn call_arg_from_shared_object_id(
     ))
 }
 
+pub async fn get_all_dynamic_field_info(
+    client: &SuiClient,
+    object_id: ObjectID,
+) -> Result<Vec<DynamicFieldInfo>> {
+    let iter = handle_pagination(|cursor| {
+        client
+            .read_api()
+            .get_dynamic_fields(object_id, cursor, None)
+    })
+    .await?
+    .collect();
+    Ok(iter)
+}
+
 pub async fn handle_pagination<F, T, C, Fut>(
     closure: F,
 ) -> Result<impl Iterator<Item = T>, sui_sdk::error::Error>
@@ -171,17 +193,43 @@ pub fn get_site_id_from_response(
         .object_id)
 }
 
-pub async fn get_dynamic_field_names(client: &SuiClient, object: ObjectID) -> Result<Vec<String>> {
-    handle_pagination(|cursor| client.read_api().get_dynamic_fields(object, cursor, None))
+pub(crate) fn get_struct_from_object_response(
+    object_response: &SuiObjectResponse,
+) -> Result<SuiMoveStruct> {
+    match object_response {
+        SuiObjectResponse {
+            data: Some(data),
+            error: None,
+        } => match &data.content {
+            Some(SuiParsedData::MoveObject(parsed_object)) => Ok(parsed_object.fields.clone()),
+            _ => Err(anyhow!("Unexpected data in ObjectResponse: {:?}", data)),
+        },
+        SuiObjectResponse {
+            error: Some(error), ..
+        } => Err(anyhow!("Error in ObjectResponse: {:?}", error)),
+        SuiObjectResponse { .. } => Err(anyhow!(
+            "ObjectResponse contains data and error: {:?}",
+            object_response
+        )),
+    }
+}
+
+pub async fn get_existing_resource_ids(
+    client: &SuiClient,
+    site_id: &ObjectID,
+) -> Result<HashMap<String, ObjectID>> {
+    let existing = get_all_dynamic_field_info(client, *site_id)
         .await?
+        .iter()
         .map(|d| {
             d.name
                 .value
                 .as_str()
-                .map(|s| s.to_owned())
-                .ok_or(anyhow!("Could not read the name of the dynamic field"))
+                .map(|s| (s.to_owned(), d.object_id))
+                .ok_or(anyhow!("Could not read dynamic field name"))
         })
-        .collect()
+        .collect::<Result<HashMap<String, ObjectID>>>();
+    existing
 }
 
 #[cfg(test)]
