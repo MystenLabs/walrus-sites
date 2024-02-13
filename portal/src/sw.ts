@@ -10,9 +10,9 @@ import {
     isValidSuiObjectId,
     toHEX,
 } from "@mysten/sui.js/utils";
-import { SITE_NAMES, NETWORK, BASE_URL, PROTO } from "./constants";
+import { SITE_NAMES, NETWORK } from "./constants";
 import { bcs } from "@mysten/sui.js/bcs";
-import template_404 from '../static/404-page.template.html';
+import template_404 from "../static/404-page.template.html";
 
 // This is to get TypeScript to recognize `clients` and `self`
 // Default type of `self` is `WorkerGlobalScope & typeof globalThis`
@@ -62,41 +62,38 @@ self.addEventListener("fetch", (event) => {
 // The encoding must be case insensitive.
 
 function subdomainToObjectId(subdomain: string): string | null {
-    subdomain = subdomain.toLowerCase();
-    let hexObjectId = toHEX(b36.decode(subdomain));
-    let objectId = "0x" + hexObjectId;
+    const objectId = "0x" + toHEX(b36.decode(subdomain.toLowerCase()));
     return isValidSuiObjectId(objectId) ? objectId : null;
 }
 
 type Path = {
     subdomain: string;
-    path: string | null;
+    path: string;
 };
 
-function getSubdomainAndPath(url: string): Path | null {
+function getSubdomainAndPath(scope: string): Path | null {
     // At the moment we only support one subdomain level.
-    // TODO: ensure all characters of a valid subdomain and path are supported
-    const REGEX = new RegExp(
-        `^${PROTO}://(?<subdomain>[A-Za-z0-9]+)\.${BASE_URL}/(?<path>[A-Za-z0-9\/._-]*)`
-    );
-    const match = url.match(REGEX);
-    if (match?.groups?.subdomain) {
-        let path: string | null = null;
-        if (match?.groups?.path) {
-            path = removeLastSlash(match.groups.path);
-            path = "/" + path;
-        }
-        return { subdomain: match.groups.subdomain, path } as Path;
+    const url = new URL(scope);
+    const hostname = url.hostname.split(".");
+
+    if (
+        hostname.length === 3 ||
+        (hostname.length === 2 && hostname[1] === "localhost")
+    ) {
+        // Accept only one level of subdomain
+        // eg `subdomain.example.com` or `subdomain.localhost` in case of local development
+        const path =
+            url.pathname == "/" ? "/index.html" : removeLastSlash(url.pathname);
+        return { subdomain: hostname[0], path } as Path;
     }
     return null;
 }
 
-/** Remove the last forward-slash if present */
+/** Remove the last forward-slash if present
+ * Resources on chain are only stored as `/path/to/resource.extension`.
+ */
 function removeLastSlash(path: string): string {
-    if (path[path.length - 1] === "/") {
-        path = path.slice(0, -1);
-    }
-    return path;
+    return path.endsWith("/") ? path.slice(0, -1) : path;
 }
 
 // SuiNS-like functionality //
@@ -108,7 +105,7 @@ async function resolveSuiNsAddress(
     client: SuiClient,
     subdomain: string
 ): Promise<string | null> {
-    let suiObjectId: string = await client.call(
+    const suiObjectId: string = await client.call(
         "suix_resolveNameServiceAddress",
         [subdomain + ".sui"]
     );
@@ -125,14 +122,7 @@ function hardcodedSubdmains(subdomain: string): string | null {
 // Types & encoding/decoding for the on-chain objects //
 
 // Fetching objects from the full node //
-type Blocksite = {
-    updated: number | null;
-    created: number;
-    contents: Uint8Array;
-    version: number;
-};
-
-type BlockPage = {
+type BlockResource = {
     name: string;
     created: number;
     updated: number | null;
@@ -205,8 +195,7 @@ async function resolveAndFetchPage(parsedUrl: Path): Promise<Response> {
             "Base36 version of the object ID: ",
             b36.encode(fromHEX(objectId))
         );
-        let pagePath = parsedUrl.path ? parsedUrl.path : "/index.html";
-        return fetchPage(client, objectId, pagePath);
+        return fetchPage(client, objectId, parsedUrl.path);
     }
     return noObjectIdFound();
 }
@@ -217,7 +206,7 @@ async function fetchPage(
     objectId: string,
     path: string
 ): Promise<Response> {
-    let dynamicFields = await client.getDynamicFieldObject({
+    const dynamicFields = await client.getDynamicFieldObject({
         parentId: objectId,
         name: { type: "0x1::string::String", value: path },
     });
@@ -226,7 +215,7 @@ async function fetchPage(
         console.log(dynamicFields);
         return siteNotFound();
     }
-    let pageData = await client.getObject({
+    const pageData = await client.getObject({
         id: dynamicFields.data.objectId,
         options: { showBcs: true },
     });
@@ -234,11 +223,11 @@ async function fetchPage(
         console.log("No page data found");
         return siteNotFound();
     }
-    let blockPage = getPageFields(pageData.data);
+    const blockPage = getPageFields(pageData.data);
     if (!blockPage || !blockPage.contents) {
         return siteNotFound();
     }
-    let decompressed = await decompressData(
+    const decompressed = await decompressData(
         blockPage.contents,
         blockPage.content_encoding
     );
@@ -253,10 +242,10 @@ async function fetchPage(
 }
 
 // Type definitions for BCS decoding //
-function getPageFields(data: SuiObjectData): BlockPage | null {
+function getPageFields(data: SuiObjectData): BlockResource | null {
     // Deserialize the bcs encoded struct
     if (data.bcs && data.bcs.dataType === "moveObject") {
-        let blockpage = FieldStruct.parse(fromB64(data.bcs.bcsBytes));
+        const blockpage = FieldStruct.parse(fromB64(data.bcs.bcsBytes));
         return blockpage.value;
     }
     return null;
@@ -271,10 +260,10 @@ async function decompressData(
     }
     // check that contentencoding is a valid CompressionFormat
     if (["gzip", "deflate", "deflate-raw"].includes(contentEncoding)) {
-        let enc = contentEncoding as CompressionFormat;
-        let blob = new Blob([data], { type: "application/gzip" });
-        let stream = blob.stream().pipeThrough(new DecompressionStream(enc));
-        let response = await new Response(stream).arrayBuffer().catch((e) => {
+        const enc = contentEncoding as CompressionFormat;
+        const blob = new Blob([data], { type: "application/gzip" });
+        const stream = blob.stream().pipeThrough(new DecompressionStream(enc));
+        const response = await new Response(stream).arrayBuffer().catch((e) => {
             console.error("DecompressionStream error", e);
         });
         if (response) return response;
@@ -283,7 +272,9 @@ async function decompressData(
 }
 
 function siteNotFound(): Response {
-    return Response404("The URL provided points to an object ID, but the object does not seem to be a blocksite.");
+    return Response404(
+        "The URL provided points to an object ID, but the object does not seem to be a blocksite."
+    );
 }
 
 function noObjectIdFound(): Response {
@@ -294,7 +285,7 @@ function fullNodeFail(): Response {
     return Response404("Failed to contact the full node.");
 }
 
-function Response404(message: String) : Response {
+function Response404(message: String): Response {
     console.log();
     return new Response(
         // TODO: better way for this?
