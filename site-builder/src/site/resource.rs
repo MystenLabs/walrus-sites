@@ -5,11 +5,11 @@ use std::{
     path::Path,
 };
 
-use anyhow::{anyhow, ensure, Result};
+use anyhow::{anyhow, Result};
 use flate2::{write::GzEncoder, Compression};
 use sui_sdk::rpc_types::{SuiMoveStruct, SuiMoveValue};
 
-use super::builder::BlocksiteCall;
+use super::{builder::BlocksiteCall, manager::OBJ_MARGIN};
 use crate::site::{
     content::{ContentEncoding, ContentType},
     macros::get_dynamic_field,
@@ -21,6 +21,7 @@ pub struct Resource {
     pub name: String,
     pub content_type: ContentType,
     pub content_encoding: ContentEncoding,
+    pub parts: usize,
     pub content: Vec<u8>,
 }
 
@@ -29,12 +30,14 @@ impl Resource {
         name: String,
         content_type: ContentType,
         content_encoding: ContentEncoding,
+        parts: usize,
         content: Vec<u8>,
     ) -> Self {
         Resource {
             name,
             content_type,
             content_encoding,
+            parts,
             content,
         }
     }
@@ -43,7 +46,7 @@ impl Resource {
         full_path: &Path,
         root: &Path,
         content_encoding: &ContentEncoding,
-    ) -> Result<Option<Self>> {
+    ) -> Result<Option<Vec<Self>>> {
         let rel_path = full_path.strip_prefix(root)?;
         let content_type = ContentType::from_extension(
             full_path
@@ -61,21 +64,46 @@ impl Resource {
             ContentEncoding::PlainText => plain_content,
             ContentEncoding::Gzip => compress(&plain_content)?,
         };
-        ensure!(
-            content.len() < MAX_OBJ_SIZE,
-            "Resource {:?} is too large, with size {}",
-            rel_path,
-            content.len(),
-        );
-        Ok(Some(Resource::new(
-            format!(
+        Ok(Some(Resource::split_multi_resource(
+            &format!(
                 "/{}", // We want the path to be in the form `/path/to/resource.ext`
                 rel_path.to_str().ok_or(anyhow!("Invalid path"))?
             ),
             content_type,
-            *content_encoding,
-            content,
+            content_encoding,
+            &content,
         )))
+    }
+
+    /// Split a resource over [MAX_OBJ_SIZE] into multiple smaller resources
+    fn split_multi_resource(
+        rel_path: &str,
+        content_type: ContentType,
+        content_encoding: &ContentEncoding,
+        content: &[u8],
+    ) -> Vec<Resource> {
+        let n_parts = content.len() / (MAX_OBJ_SIZE - OBJ_MARGIN) + 1;
+        content
+            .chunks(MAX_OBJ_SIZE - OBJ_MARGIN)
+            .enumerate()
+            .map(|(idx, chunk)| {
+                Resource::new(
+                    Resource::path_to_multi_resource_name(rel_path, idx),
+                    content_type.clone(),
+                    *content_encoding,
+                    n_parts,
+                    chunk.to_vec(),
+                )
+            })
+            // .map()
+            .collect::<Vec<_>>()
+    }
+
+    fn path_to_multi_resource_name(path: &str, number: usize) -> String {
+        if number == 0 {
+            return path.to_owned();
+        }
+        format!("part-{}{}", number, path)
     }
 
     /// Compute the (approximate) size of the resource when added to a PTB
@@ -104,6 +132,7 @@ impl Resource {
             &self.tmp_path(),
             &self.content_type.to_string(),
             &self.content_encoding.to_string(),
+            self.parts,
             &[],
         )?;
 
@@ -149,7 +178,7 @@ impl Resource {
             if path.is_dir() {
                 resources.extend(Resource::inner_iter_dir(&path, root, content_encoding)?);
             } else if let Some(res) = Resource::read(&path, root, content_encoding)? {
-                resources.push(res);
+                resources.extend(res);
             }
         }
         Ok(resources)
@@ -171,6 +200,8 @@ impl TryFrom<SuiMoveStruct> for Resource {
             get_dynamic_field!(sui_move_struct, "content_type", SuiMoveValue::String);
         let content_encoding =
             get_dynamic_field!(sui_move_struct, "content_encoding", SuiMoveValue::String);
+        let parts =
+            get_dynamic_field!(sui_move_struct, "parts", SuiMoveValue::String).parse::<usize>()?;
         let content = get_dynamic_field!(sui_move_struct, "contents", SuiMoveValue::Vector)
             .iter()
             .map(|v| match v {
@@ -182,6 +213,7 @@ impl TryFrom<SuiMoveStruct> for Resource {
             name,
             content_type.try_into()?,
             content_encoding.try_into()?,
+            parts,
             content,
         ))
     }

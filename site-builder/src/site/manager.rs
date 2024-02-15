@@ -25,9 +25,10 @@ use crate::{
 
 pub const MAX_TX_SIZE: usize = 131_072;
 pub const MAX_ARG_SIZE: usize = 16_300;
+pub const MAX_OBJ_SIZE: usize = 256_000;
 pub const ARG_MARGIN: usize = 1_000; // TODO: check if there is better way
 pub const TX_MARGIN: usize = 10_000; // TODO: check if there is better way
-pub const MAX_OBJ_SIZE: usize = 256_000;
+pub const OBJ_MARGIN: usize = 10_000; // TODO: check if there is better way
 
 pub struct SiteManager<'a> {
     pub client: SuiClient,

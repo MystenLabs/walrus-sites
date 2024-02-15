@@ -129,6 +129,7 @@ type BlockResource = {
     version: number;
     content_type: string;
     content_encoding: string;
+    parts: number;
     contents: Uint8Array;
 };
 
@@ -155,6 +156,7 @@ const BlockPageStruct = bcs.struct("BlockPage", {
     version: NUMBER,
     content_type: bcs.string(),
     content_encoding: bcs.string(),
+    parts: NUMBER,
     contents: VECTOR,
 });
 
@@ -206,14 +208,56 @@ async function fetchPage(
     objectId: string,
     path: string
 ): Promise<Response> {
+    const blockResource = await fetchBlockResource(client, objectId, path);
+    if (!blockResource || !blockResource.contents) {
+        siteNotFound();
+    }
+    let contents = blockResource.contents;
+    //  Either its a one-part page, or we need to fetch the other parts
+    if (blockResource.parts >= 1) {
+        // Fetch the other parts in parallel
+        const otherParts = await Promise.all([
+            ...partNames(path, blockResource.parts).map((part_name) =>
+                fetchBlockResource(client, objectId, part_name)
+            ),
+        ]);
+        // Merge all parts with the contents
+        // TODO: better way?
+        let contentsArray = [Array.from(contents), ...otherParts.map(part => Array.from(part.contents))];
+        contents = new Uint8Array(contentsArray.flat());
+    }
+    const decompressed = await decompressData(
+        contents,
+        blockResource.content_encoding
+    );
+    if (!decompressed) {
+        return siteNotFound();
+    }
+    return new Response(decompressed, {
+        headers: {
+            "Content-Type": blockResource.content_type,
+        },
+    });
+}
+
+function partNames(name: string, parts: number): string[] {
+    return Array.from({ length: parts - 1 }, (_, i) => `part-${i + 1}${name}`);
+}
+
+async function fetchBlockResource(
+    client: SuiClient,
+    objectId: string,
+    path: string
+): Promise<BlockResource | null> {
     const dynamicFields = await client.getDynamicFieldObject({
         parentId: objectId,
         name: { type: "0x1::string::String", value: path },
     });
+    console.log("Dynamic fields: ", dynamicFields);
     if (!dynamicFields.data) {
         console.log("No dynamic field found");
         console.log(dynamicFields);
-        return siteNotFound();
+        return null;
     }
     const pageData = await client.getObject({
         id: dynamicFields.data.objectId,
@@ -221,24 +265,13 @@ async function fetchPage(
     });
     if (!pageData.data) {
         console.log("No page data found");
-        return siteNotFound();
+        return null;
     }
     const blockPage = getPageFields(pageData.data);
     if (!blockPage || !blockPage.contents) {
-        return siteNotFound();
+        return null;
     }
-    const decompressed = await decompressData(
-        blockPage.contents,
-        blockPage.content_encoding
-    );
-    if (!decompressed) {
-        return siteNotFound();
-    }
-    return new Response(decompressed, {
-        headers: {
-            "Content-Type": blockPage.content_type,
-        },
-    });
+    return blockPage;
 }
 
 // Type definitions for BCS decoding //

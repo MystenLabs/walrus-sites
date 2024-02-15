@@ -130,6 +130,7 @@ impl BlocksiteCall {
         resource_name: &str,
         content_type: &str,
         content_encoding: &str,
+        parts: usize,
         contents: &[u8],
     ) -> Result<BlocksiteCall> {
         tracing::info!("New Move call: Creating {}", resource_name);
@@ -139,6 +140,7 @@ impl BlocksiteCall {
                 pure_call_arg(&resource_name)?,
                 pure_call_arg(&content_type)?,
                 pure_call_arg(&content_encoding)?,
+                pure_call_arg(&parts)?,
                 pure_call_arg(&contents)?,
                 CallArg::CLOCK_IMM,
             ],
