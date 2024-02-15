@@ -134,7 +134,7 @@ fn print_effects(
     println!("{}", edit_string);
     let base36 = id_to_base36(&object_id).expect("Could not convert the id to base 36.");
     println!(
-        "Find it at https://{}.blocksite.net\nor http://{}.localhost:8000",
+        "Find it at https://{}.blocksite.net\nor http://{}.localhost:8080",
         &base36, &base36,
     );
     if let Some(explorer_url) = config.network.explorer_url(&object_id) {

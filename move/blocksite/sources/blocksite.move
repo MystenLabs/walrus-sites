@@ -28,6 +28,7 @@ module blocksite::blocksite {
         version: u64,
         content_type: String,
         content_encoding: String,
+        parts: u64,
         contents: vector<u8>,
     }
 
@@ -56,6 +57,7 @@ module blocksite::blocksite {
         name: String,
         content_type: String,
         content_encoding: String,
+        parts: u64,
         contents: vector<u8>,
         clk: &Clock,
     ): BlockResource {
@@ -66,6 +68,7 @@ module blocksite::blocksite {
             version: 1,
             content_type,
             content_encoding,
+            parts,
             contents,
         }
     }

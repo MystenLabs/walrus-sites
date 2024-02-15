@@ -95,7 +95,7 @@ fn blocksite_module() -> Identifier {
 }
 
 fn testnet_package() -> ObjectID {
-    ObjectID::from_hex_literal("0x66b0b2d46dcd2e56952f1bd9e90218deaab0885e0f60ca29163f5e53c72ef810")
+    ObjectID::from_hex_literal("0x8dae89b2505ce9d84592e0e57d38848a2d863ead6a0e946a49fd8edbc8c7b919")
         .expect("valid hex literal")
 }
 
