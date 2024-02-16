@@ -10,9 +10,10 @@ import {
     isValidSuiObjectId,
     toHEX,
 } from "@mysten/sui.js/utils";
-import { SITE_NAMES, NETWORK } from "./constants";
+import { SITE_NAMES, NETWORK, DOMAIN } from "./constants";
 import { bcs } from "@mysten/sui.js/bcs";
 import template_404 from "../static/404-page.template.html";
+import error_page_style from "../static/error-page-style.html";
 
 // This is to get TypeScript to recognize `clients` and `self`
 // Default type of `self` is `WorkerGlobalScope & typeof globalThis`
@@ -202,29 +203,65 @@ async function resolveAndFetchPage(parsedUrl: Path): Promise<Response> {
     return noObjectIdFound();
 }
 
+async function loadBlocklist(): Promise<Set<string>> {
+    console.log("Fetching blocklist from network ...");
+
+    const response = await fetch(`http://${DOMAIN}/blocklist.txt`);
+    if (!response.ok) {
+        console.log("Failed to fetch the blocklist: ", response);
+    }
+    const blocklist = await response.text().then((body) => {
+        return new Set<string>(
+            body.split(/\r?\n/)
+                .filter((entry) => entry.trim().length !== 0)
+        );
+    });
+    console.log("Loaded list of blocked objects. Count = ", blocklist.size);
+
+    return blocklist;
+}
+
 /** Fetch the page */
 async function fetchPage(
     client: SuiClient,
     objectId: string,
     path: string
 ): Promise<Response> {
-    const blockResource = await fetchBlockResource(client, objectId, path);
+    const blocklist = await loadBlocklist();
+    if (blocklist.has(objectId)) {
+        return objectBlocked();
+    }
+
+    const [blockResource, isBlocked] = await fetchBlockResource(client, objectId, path, blocklist);
+    if (isBlocked) {
+        return objectBlocked();
+    }
     if (!blockResource || !blockResource.contents) {
-        siteNotFound();
+        return siteNotFound();
     }
     let contents = blockResource.contents;
+
     //  Either its a one-part page, or we need to fetch the other parts
     if (blockResource.parts >= 1) {
         // Fetch the other parts in parallel
         const otherParts = await Promise.all([
             ...partNames(path, blockResource.parts).map((part_name) =>
-                fetchBlockResource(client, objectId, part_name)
+                fetchBlockResource(client, objectId, part_name, blocklist)
             ),
         ]);
-        // Merge all parts with the contents
-        // TODO: better way?
-        let contentsArray = [Array.from(contents), ...otherParts.map(part => Array.from(part.contents))];
-        contents = new Uint8Array(contentsArray.flat());
+
+
+        let contentsArray = [blockResource.contents];
+        for (const [resource, isBlocked] of otherParts) {
+            if (isBlocked) {
+                return objectBlocked();
+            } else if (!blockResource || !blockResource.contents) {
+                return siteNotFound();
+            }
+            contentsArray.push(blockResource.contents);
+        }
+
+        contents = Uint8Array.from(contentsArray.reduce((a, b) => [...a, ...b], []));
     }
     const decompressed = await decompressData(
         contents,
@@ -247,8 +284,9 @@ function partNames(name: string, parts: number): string[] {
 async function fetchBlockResource(
     client: SuiClient,
     objectId: string,
-    path: string
-): Promise<BlockResource | null> {
+    path: string,
+    blocklist: Set<string>
+): Promise<[BlockResource | null, boolean]> {
     const dynamicFields = await client.getDynamicFieldObject({
         parentId: objectId,
         name: { type: "0x1::string::String", value: path },
@@ -257,21 +295,27 @@ async function fetchBlockResource(
     if (!dynamicFields.data) {
         console.log("No dynamic field found");
         console.log(dynamicFields);
-        return null;
+        return [null, false];
     }
+    if (blocklist.has(dynamicFields.data.objectId)) {
+        console.log("object dynamic field is blocked:", path);
+        return [null, true];
+    }
+
     const pageData = await client.getObject({
         id: dynamicFields.data.objectId,
         options: { showBcs: true },
     });
     if (!pageData.data) {
         console.log("No page data found");
-        return null;
+        return [null, false];
     }
+
     const blockPage = getPageFields(pageData.data);
     if (!blockPage || !blockPage.contents) {
-        return null;
+        return [null, false];
     }
-    return blockPage;
+    return [blockPage, false];
 }
 
 // Type definitions for BCS decoding //
@@ -304,6 +348,17 @@ async function decompressData(
     return null;
 }
 
+function objectBlocked(): Response {
+    return ErrorResponse(
+        418,
+        "418 I'm a Teapot",
+        "418",
+        ("I'm a teapot, so I can't serve you that <em>particular</em>" +
+         " Blocksite.<br/><br/>Some may say that a \"410 Gone\" or a \"403 Forbidden\" would be more" +
+         " appropriate, but to them I say \"Shhhh! You're not a teapot!\"")
+    );
+}
+
 function siteNotFound(): Response {
     return Response404(
         "The URL provided points to an object ID, but the object does not seem to be a blocksite."
@@ -318,16 +373,33 @@ function fullNodeFail(): Response {
     return Response404("Failed to contact the full node.");
 }
 
-function Response404(message: String): Response {
-    console.log();
-    return new Response(
-        // TODO: better way for this?
-        template_404.replace("${message}", message),
-        {
-            status: 404,
-            headers: {
-                "Content-Type": "text/html",
-            },
-        }
-    );
+function ErrorResponse(status_code: number, title: string, headline: string, message: string): Response {
+    const html = `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+            <title>${ title }</title>
+            ${ error_page_style }
+        </head>
+        <body>
+            <div class="container">
+                <p class="headline error">${ headline }</p>
+                <p class="description">${ message }</p>
+                <button onclick="history.back()" href="/" class="button">Go Back</button>
+            </div>
+        </body>
+        </html>`;
+        return new Response(
+            html,
+            {
+                status: status_code,
+                headers: { "Content-Type": "text/html" },
+            }
+        );
+}
+
+function Response404(message: string): Response {
+    return ErrorResponse(404, "404 Blocksite Not Found", "404", message);
 }
