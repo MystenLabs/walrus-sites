@@ -21,7 +21,40 @@ declare var self: ServiceWorkerGlobalScope;
 declare var clients: Clients;
 
 var BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz";
+let fullNodeUrl: string | null = null;
 const b36 = baseX(BASE36);
+
+// Event listeners //
+
+// Listen to messages to set the full node rpc url
+function confirmFullNodeUrl() {
+    self.clients.matchAll().then((clients) => {
+        clients.forEach((client) => {
+            client.postMessage({
+                type: "fullNodeUrl",
+                url: fullNodeUrl ? fullNodeUrl : getFullnodeUrl(NETWORK),
+            });
+        });
+    });
+}
+
+self.addEventListener("message", (event) => {
+    let data = event.data;
+    if (data && data.type === "setFullNodeUrl") {
+        console.log("Setting full node url: ", data.url);
+        try {
+            const url = new URL(data.url);
+            fullNodeUrl = data.url;
+        } catch (e) {
+            fullNodeUrl = getFullnodeUrl(NETWORK);
+        }
+        confirmFullNodeUrl();
+    }
+    if (data && data.type === "getFullNodeUrl") {
+        console.log("Getting full node url: ", fullNodeUrl);
+        confirmFullNodeUrl();
+    }
+});
 
 self.addEventListener("install", (event) => {
     self.skipWaiting();
@@ -34,6 +67,13 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
     const url = event.request.url;
     const scope = self.registration.scope;
+
+    // Pass-through for the configuration page
+    if (url === scope + "blocksiteconfig.html") {
+        return fetch(event.request).then((response) => {
+            return response;
+        });
+    }
 
     // Check if the request is for a blocksite
     const parsedUrl = getSubdomainAndPath(url);
@@ -169,8 +209,9 @@ const FieldStruct = bcs.struct("Field", {
 // Fectching & decompressing on-chain data //
 
 async function resolveAndFetchPage(parsedUrl: Path): Promise<Response> {
-    const rpcUrl = getFullnodeUrl(NETWORK);
+    const rpcUrl = fullNodeUrl ? fullNodeUrl : getFullnodeUrl(NETWORK);
     const client = new SuiClient({ url: rpcUrl });
+    console.log("Loading with client at full node url: ", rpcUrl);
 
     let objectId = hardcodedSubdmains(parsedUrl.subdomain);
     if (!objectId) {

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Blocksite Configuration</title>
+    </head>
+    <body>
+        <main>
+            <h2>Blocksite configuration page</h2>
+            <p>
+                You can configure here the settings for blocksites. Most
+                importantly, you can set the
+                <strong>full node RPC URL</strong> from which the blocksites are
+                loaded.
+            </p>
+            <form>
+                <fieldset>
+                    <legend>Full Node Configuration</legend>
+                    <label for="fullNodeRpc">Full Node URL</label>
+                    <input type="text" name="fullNodeRpc" id="fullNodeRpc" />
+                    <button type="submit">Save</button>
+                </fieldset>
+            </form>
+            <hr />
+            <button id="check">Check RPC</button>
+            <p>The current full node RPC url is set to: <strong><span id="rpc"></span></strong></p>
+        </main>
+        <footer>2024 Mysten Labs. A prototype.</footer>
+        <script>
+            const form = document.querySelector("form");
+            const fullNodeRpc = document.querySelector("#fullNodeRpc");
+            form.addEventListener("submit", (e) => {
+                e.preventDefault();
+                console.log(fullNodeRpc.value);
+                navigator.serviceWorker.controller.postMessage({
+                    type: "setFullNodeUrl",
+                    url: fullNodeRpc.value,
+                });
+            });
+            const button = document.getElementById("check");
+            button.addEventListener("click", (e) => {
+                console.log("reset");
+                navigator.serviceWorker.controller.postMessage({
+                    type: "getFullNodeUrl",
+                });
+            });
+
+            document.addEventListener("DOMContentLoaded", () => {
+                console.log("DOMContentLoaded");
+                navigator.serviceWorker.controller.postMessage({
+                    type: "getFullNodeUrl",
+                });
+            });
+
+            navigator.serviceWorker.onmessage = (event) => {
+                console.log(event.data);
+                // change the text that says what the current full node url is
+                document.getElementById("rpc").textContent = event.data.url;
+            };
+        </script>
+    </body>
+</html>
