@@ -6,16 +6,9 @@ use shared_crypto::intent::Intent;
 use sui_keys::keystore::{AccountKeystore, Keystore};
 use sui_sdk::{
     rpc_types::{
-        Page,
-        SuiExecutionStatus,
-        SuiMoveStruct,
-        SuiObjectDataOptions,
-        SuiObjectResponse,
-        SuiParsedData,
-        SuiTransactionBlockEffects,
-        SuiTransactionBlockEffectsAPI,
-        SuiTransactionBlockResponse,
-        SuiTransactionBlockResponseOptions,
+        Page, SuiExecutionStatus, SuiMoveStruct, SuiObjectDataOptions, SuiObjectResponse,
+        SuiParsedData, SuiTransactionBlockEffects, SuiTransactionBlockEffectsAPI,
+        SuiTransactionBlockResponse, SuiTransactionBlockResponseOptions,
     },
     SuiClient,
 };

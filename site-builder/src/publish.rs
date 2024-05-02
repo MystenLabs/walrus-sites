@@ -3,9 +3,7 @@ use std::{path::Path, sync::mpsc::channel};
 use anyhow::{anyhow, Result};
 use notify::{RecursiveMode, Watcher};
 use sui_sdk::rpc_types::{
-    SuiTransactionBlockEffects,
-    SuiTransactionBlockEffectsAPI,
-    SuiTransactionBlockResponse,
+    SuiTransactionBlockEffects, SuiTransactionBlockEffectsAPI, SuiTransactionBlockResponse,
 };
 use sui_types::base_types::ObjectID;
 

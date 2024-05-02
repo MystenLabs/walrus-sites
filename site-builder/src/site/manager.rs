@@ -14,11 +14,8 @@ use super::{
 use crate::{
     site::resource::Resource,
     util::{
-        get_existing_resource_ids,
-        get_object_ref_from_id,
-        get_site_id_from_response,
-        get_struct_from_object_response,
-        sign_and_send_ptb,
+        get_existing_resource_ids, get_object_ref_from_id, get_site_id_from_response,
+        get_struct_from_object_response, sign_and_send_ptb,
     },
     Config,
 };

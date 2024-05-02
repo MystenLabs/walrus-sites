@@ -178,8 +178,8 @@ fieldset {
  */
 
 label, legend {
-  display: block; /* 1 */
-  font-weight: bold; /* 1 */
+  /* display: block; 1 */
+  /* font-weight: bold; 1 */
   margin-bottom: .8rem; /* 2 */
 }
 

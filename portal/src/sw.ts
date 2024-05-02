@@ -13,6 +13,7 @@ import {
 import { SITE_NAMES, NETWORK } from "./constants";
 import { bcs } from "@mysten/sui.js/bcs";
 import template_404 from "../static/404-page.template.html";
+import { collapseTextChangeRangesAcrossMultipleVersions } from "typescript";
 
 // This is to get TypeScript to recognize `clients` and `self`
 // Default type of `self` is `WorkerGlobalScope & typeof globalThis`
@@ -20,41 +21,12 @@ import template_404 from "../static/404-page.template.html";
 declare var self: ServiceWorkerGlobalScope;
 declare var clients: Clients;
 
+const RPC_URL_CACHE = "RPC_URL_CACHE";
+const SHOW_NOTIFICATION_CACHE = "SHOW_NOTIFICATION_CACH";
 var BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz";
-let fullNodeUrl: string | null = null;
 const b36 = baseX(BASE36);
 
 // Event listeners //
-
-// Listen to messages to set the full node rpc url
-function confirmFullNodeUrl() {
-    self.clients.matchAll().then((clients) => {
-        clients.forEach((client) => {
-            client.postMessage({
-                type: "fullNodeUrl",
-                url: fullNodeUrl ? fullNodeUrl : getFullnodeUrl(NETWORK),
-            });
-        });
-    });
-}
-
-self.addEventListener("message", (event) => {
-    let data = event.data;
-    if (data && data.type === "setFullNodeUrl") {
-        console.log("Setting full node url: ", data.url);
-        try {
-            const url = new URL(data.url);
-            fullNodeUrl = data.url;
-        } catch (e) {
-            fullNodeUrl = getFullnodeUrl(NETWORK);
-        }
-        confirmFullNodeUrl();
-    }
-    if (data && data.type === "getFullNodeUrl") {
-        console.log("Getting full node url: ", fullNodeUrl);
-        confirmFullNodeUrl();
-    }
-});
 
 self.addEventListener("install", (event) => {
     self.skipWaiting();
@@ -64,20 +36,65 @@ self.addEventListener("activate", (event) => {
     clients.claim();
 });
 
+/**
+ * Listen to messages to set the full node rpc url
+ * If the message does not contain a valid url, the full node rpc url is reset
+ * to the default (sui.io)
+ */
+self.addEventListener("message", async (event) => {
+    let data = event.data;
+    if (data && data.type === "setFullNodeUrl") {
+        console.log("Setting full node url: ", data.url);
+        try {
+            const url = new URL(data.url);
+            await cacheRpcUrl(data.url);
+        } catch {
+            // The url is not valid, setting the default by deleting all entries
+            await deleteAllCachedEntries(RPC_URL_CACHE);
+        }
+        confirmFullNodeUrl();
+    }
+    if (data && data.type === "getFullNodeUrl") {
+        let url = await getFullNodeRpcUrl();
+        console.log("Confirming full node url: ", url);
+        confirmFullNodeUrl();
+    }
+    if (data && data.type === "notifyFullNode") {
+        await cacheValue(data.show, SHOW_NOTIFICATION_CACHE);
+    }
+    if (data && data.type === "getNotificationSetting") {
+        let show = await getNotificationSetting();
+        console.log("Notification setting: ", show);
+        const clients = await self.clients.matchAll();
+        clients.forEach((client) => {
+            client.postMessage({
+                type: "notificationSetting",
+                show: show,
+            });
+        });
+    }
+});
+
 self.addEventListener("fetch", (event) => {
     const url = event.request.url;
     const scope = self.registration.scope;
 
     // Pass-through for the configuration page
-    if (url === scope + "blocksiteconfig.html") {
+    if (url === scope + "bscfg.html") {
+        console.log("Passthrough");
+
         return fetch(event.request).then((response) => {
             return response;
         });
     }
 
+    console.log("no passthrough");
+
     // Check if the request is for a blocksite
     const parsedUrl = getSubdomainAndPath(url);
-    console.log("Parsed URL: ", parsedUrl);
+    console.log(
+        `Parsed URL ${url}\nsubdomain ${parsedUrl?.subdomain}\npath ${parsedUrl?.path}`
+    );
     if (parsedUrl && parsedUrl.subdomain) {
         event.respondWith(resolveAndFetchPage(parsedUrl));
         return;
@@ -129,7 +146,8 @@ function getSubdomainAndPath(scope: string): Path | null {
     return null;
 }
 
-/** Remove the last forward-slash if present
+/**
+ * Remove the last forward-slash if present
  * Resources on chain are only stored as `/path/to/resource.extension`.
  */
 function removeLastSlash(path: string): string {
@@ -139,8 +157,10 @@ function removeLastSlash(path: string): string {
 // SuiNS-like functionality //
 // Right now this just matches the subdomain to fixed strings. Should be replaced with a SuiNS lookup.
 
-/**  Resolve the subdomain to an object ID using SuiNS
-The subdomain `example` will look up `example.sui` and return the object ID if found. */
+/**
+ * Resolve the subdomain to an object ID using SuiNS
+ * The subdomain `example` will look up `example.sui` and return the object ID if found.
+ */
 async function resolveSuiNsAddress(
     client: SuiClient,
     subdomain: string
@@ -209,10 +229,10 @@ const FieldStruct = bcs.struct("Field", {
 // Fectching & decompressing on-chain data //
 
 async function resolveAndFetchPage(parsedUrl: Path): Promise<Response> {
-    const rpcUrl = fullNodeUrl ? fullNodeUrl : getFullnodeUrl(NETWORK);
+    const rpcUrl = await getFullNodeRpcUrl();
     const client = new SuiClient({ url: rpcUrl });
-    console.log("Loading with client at full node url: ", rpcUrl);
-
+    console.log("Loading with full node at: ", rpcUrl);
+    await showFullNodeNotification(rpcUrl);
     let objectId = hardcodedSubdmains(parsedUrl.subdomain);
     if (!objectId) {
         // Try to convert the subdomain to an object ID
@@ -243,7 +263,9 @@ async function resolveAndFetchPage(parsedUrl: Path): Promise<Response> {
     return noObjectIdFound();
 }
 
-/** Fetch the page */
+/**
+ * Fetch the page
+ */
 async function fetchPage(
     client: SuiClient,
     objectId: string,
@@ -264,7 +286,10 @@ async function fetchPage(
         ]);
         // Merge all parts with the contents
         // TODO: better way?
-        let contentsArray = [Array.from(contents), ...otherParts.map(part => Array.from(part.contents))];
+        let contentsArray = [
+            Array.from(contents),
+            ...otherParts.map((part) => Array.from(part.contents)),
+        ];
         contents = new Uint8Array(contentsArray.flat());
     }
     const decompressed = await decompressData(
@@ -294,10 +319,8 @@ async function fetchBlockResource(
         parentId: objectId,
         name: { type: "0x1::string::String", value: path },
     });
-    console.log("Dynamic fields: ", dynamicFields);
     if (!dynamicFields.data) {
         console.log("No dynamic field found");
-        console.log(dynamicFields);
         return null;
     }
     const pageData = await client.getObject({
@@ -345,6 +368,99 @@ async function decompressData(
     return null;
 }
 
+/**
+ * Get the url for the full node RPC
+ * Either from the scriptURL of the service worker, or, if that is missing,
+ * from the default RPC url
+ */
+async function getFullNodeRpcUrl(): Promise<string> {
+    // const rpcUrl = new URLSearchParams(
+    // new URL(self.registration.active.scriptURL).search
+    // ).get("rpcUrl");
+    let cachedUrl = await getCachedRpcUrl();
+    return cachedUrl ? cachedUrl : getFullnodeUrl(NETWORK);
+}
+
+async function confirmFullNodeUrl() {
+    const url = await getFullNodeRpcUrl();
+    await showFullNodeNotification(url);
+    const clients = await self.clients.matchAll();
+    clients.forEach((client) => {
+        client.postMessage({
+            type: "fullNodeUrl",
+            url: url,
+        });
+    });
+}
+
+async function showFullNodeNotification(url: string | null) {
+    if (!url) {
+        url = await getFullNodeRpcUrl();
+    }
+    if (await getNotificationSetting()) {
+        self.registration.showNotification("Full Node Setting", {
+            body: url,
+        });
+    }
+}
+
+// Cache operations //
+
+/**
+ * Store the RPC url in the cache
+ * The cache should have only one entry at all times, in which the key only key
+ * is the current RPC url.
+ */
+async function cacheRpcUrl(url: string) {
+    await cacheValue(url, RPC_URL_CACHE);
+}
+
+/**
+ * Delete all entries in the cache
+ */
+async function deleteAllCachedEntries(cache_name: string) {
+    const cache = await caches.open(cache_name);
+    const keys = await cache.keys();
+    await Promise.all(keys.map((key) => cache.delete(key)));
+}
+
+async function cacheValue(value: string, cache_name: string) {
+    await deleteAllCachedEntries(cache_name);
+    const cache = await caches.open(cache_name);
+    await cache.put(new Request(value), new Response());
+}
+
+async function getCachedValue(cache_name: string): Promise<string | null> {
+    const cache = await caches.open(cache_name);
+    const keys = await cache.keys();
+    if (keys.length > 1) {
+        console.log("ERROR: the cache contains more than 1 entry");
+        return null;
+    } else if (keys.length === 1) {
+        return keys[0].url;
+    } else {
+        return null;
+    }
+}
+
+/**
+ * Get the RPC url currently stored in the cache
+ */
+async function getCachedRpcUrl(): Promise<string | null> {
+    return getCachedValue(RPC_URL_CACHE);
+}
+
+async function getNotificationSetting(): Promise<boolean> {
+    let value = await getCachedValue(SHOW_NOTIFICATION_CACHE);
+    // The value is encoded as URL + "/true" or "/false". Recover the last part.
+    if (value) {
+        return value.split("/").pop() === "true";
+    }
+    return false;
+}
+
+// Responses //
+
 function siteNotFound(): Response {
     return Response404(
         "The URL provided points to an object ID, but the object does not seem to be a blocksite."
@@ -360,7 +476,6 @@ function fullNodeFail(): Response {
 }
 
 function Response404(message: String): Response {
-    console.log();
     return new Response(
         // TODO: better way for this?
         template_404.replace("${message}", message),

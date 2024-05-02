@@ -5,8 +5,7 @@ use serde::Deserialize;
 use sui_keys::keystore::Keystore;
 use sui_sdk::{
     sui_client_config::{SuiClientConfig, SuiEnv},
-    SuiClient,
-    SuiClientBuilder,
+    SuiClient, SuiClientBuilder,
 };
 use sui_types::base_types::{ObjectID, SuiAddress};
 
