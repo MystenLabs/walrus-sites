@@ -24,3 +24,4 @@ tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
 bcs = "0.1.6"
 notify = "6.1.1"
+walrus-service = { path = "../../walrus-project/walrus/crates/walrus-service" }
