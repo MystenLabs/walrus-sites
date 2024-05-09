@@ -7,7 +7,6 @@ module blocksite::blocksite {
     use sui::tx_context::{Self, TxContext};
     use sui::dynamic_field as df;
     use std::string::String;
-    use std::vector;
 
     /// The blocksite
     struct BlockSite has key, store {
@@ -23,13 +22,13 @@ module blocksite::blocksite {
         // The date and time of creation
         created: u64,
         // The date and time latest update
-        updated: Option<u64>, 
+        updated: Option<u64>,
         // The number of times this site has been updated
         version: u64,
         content_type: String,
         content_encoding: String,
-        parts: u64,
-        contents: vector<u8>,
+        // The walrus blob id containing the bytes for this resource
+        blob_id: String
     }
 
     public fun new_site(name: String, clk: &Clock, ctx: &mut TxContext): BlockSite {
@@ -39,10 +38,11 @@ module blocksite::blocksite {
             created: clock::timestamp_ms(clk),
         }
     }
-    
+
     public fun update_name(site: &mut BlockSite, new_name: String) {
         site.name = new_name
     }
+
 
     #[lint_allow(self_transfer)]
     /// For use with the command line
@@ -57,8 +57,7 @@ module blocksite::blocksite {
         name: String,
         content_type: String,
         content_encoding: String,
-        parts: u64,
-        contents: vector<u8>,
+        blob_id: String,
         clk: &Clock,
     ): BlockResource {
         BlockResource {
@@ -68,13 +67,30 @@ module blocksite::blocksite {
             version: 1,
             content_type,
             content_encoding,
-            parts,
-            contents,
+            blob_id,
         }
     }
 
-    public fun add_resource(node: &mut BlockSite, resource: BlockResource) {
-        df::add(&mut node.id, resource.name, resource);
+    #[lint_allow(self_transfer)]
+    /// Create a new site with a first resource already present.
+    /// Testing function to speed up development.
+    public fun new_site_with_resource_to_sender(
+        site_name: String,
+        resource_name: String,
+        content_type: String,
+        content_encoding: String,
+        blob_id: String,
+        clk: &Clock,
+        ctx: &mut TxContext
+    ) {
+        let resource = new_resource(resource_name, content_type, content_encoding, blob_id, clk);
+        let site = new_site(site_name, clk, ctx);
+        add_resource(&mut site, resource);
+        transfer::transfer(site, tx_context::sender(ctx));
+    }
+
+    public fun add_resource(site: &mut BlockSite, resource: BlockResource) {
+        df::add(&mut site.id, resource.name, resource);
     }
 
     public fun remove_resource(site: &mut BlockSite, name: String): BlockResource{
@@ -92,8 +108,8 @@ module blocksite::blocksite {
     }
 
     /// Update the contents of the resource, and increment version number and updated timestamps
-    public fun update_contents(resource: &mut BlockResource, contents: vector<u8>, clk: &Clock) {
-        resource.contents = contents;
+    public fun update_blob_id(resource: &mut BlockResource, blob_id: String, clk: &Clock) {
+        resource.blob_id = blob_id;
         resource.updated = some(clock::timestamp_ms(clk));
         resource.version = resource.version + 1;
     }
@@ -108,16 +124,5 @@ module blocksite::blocksite {
         resource.content_encoding = content_encoding;
         resource.updated = some(clock::timestamp_ms(clk));
         resource.version = resource.version + 1;
-    }
-
-    /// Add more bytes to the content
-    public fun add_piece(resource: &mut BlockResource, piece: vector<u8>, clk: &Clock) {
-        vector::append(&mut resource.contents, piece);
-        resource.updated = some(clock::timestamp_ms(clk));
-    }
-
-    public fun add_piece_to_existing(site: &mut BlockSite, name: String, piece: vector<u8>, clk: &Clock) {
-        let resource = df::borrow_mut(&mut site.id, name);
-        add_piece(resource, piece, clk);
     }
 }

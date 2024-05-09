@@ -10,7 +10,7 @@ import {
     isValidSuiObjectId,
     toHEX,
 } from "@mysten/sui.js/utils";
-import { SITE_NAMES, NETWORK } from "./constants";
+import { AGGREGATOR, SITE_NAMES, NETWORK } from "./constants";
 import { bcs } from "@mysten/sui.js/bcs";
 import template_404 from "../static/404-page.template.html";
 
@@ -23,15 +23,15 @@ declare var clients: Clients;
 var BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz";
 const b36 = baseX(BASE36);
 
-self.addEventListener("install", (event) => {
+self.addEventListener("install", (_event) => {
     self.skipWaiting();
 });
 
-self.addEventListener("activate", (event) => {
+self.addEventListener("activate", (_event) => {
     clients.claim();
 });
 
-self.addEventListener("fetch", (event) => {
+self.addEventListener("fetch", async (event) => {
     const url = event.request.url;
     const scope = self.registration.scope;
 
@@ -51,15 +51,15 @@ self.addEventListener("fetch", (event) => {
     }
 
     // Default case: Fetch all other sites from the web
-    return fetch(event.request).then((response) => {
-        return response;
-    });
+    const response = await fetch(event.request);
+    return response;
 });
 
-// Subdomain encoding & parsing //
-
-// Use base36 instead of HEX to encode object ids in the subdomain, as the subdomain must be < 64 characters.
-// The encoding must be case insensitive.
+// Subdomain encoding & parsing.
+//
+// Use base36 instead of HEX to encode object ids in the subdomain, as
+// the subdomain must be < 64 characters.  The encoding must be case
+// insensitive.
 
 function subdomainToObjectId(subdomain: string): string | null {
     const objectId = "0x" + toHEX(b36.decode(subdomain.toLowerCase()));
@@ -96,11 +96,13 @@ function removeLastSlash(path: string): string {
     return path.endsWith("/") ? path.slice(0, -1) : path;
 }
 
-// SuiNS-like functionality //
-// Right now this just matches the subdomain to fixed strings. Should be replaced with a SuiNS lookup.
+// SuiNS-like functionality.
 
-/**  Resolve the subdomain to an object ID using SuiNS
-The subdomain `example` will look up `example.sui` and return the object ID if found. */
+
+/** Resolve the subdomain to an object ID using SuiNS The subdomain
+* `example` will look up `example.sui` and return the object ID if
+* found.
+*/
 async function resolveSuiNsAddress(
     client: SuiClient,
     subdomain: string
@@ -119,9 +121,9 @@ function hardcodedSubdmains(subdomain: string): string | null {
     return null;
 }
 
-// Types & encoding/decoding for the on-chain objects //
+// Types & encoding/decoding for the on-chain objects.
 
-// Fetching objects from the full node //
+// Fetching objects from the full node.
 type BlockResource = {
     name: string;
     created: number;
@@ -129,11 +131,11 @@ type BlockResource = {
     version: number;
     content_type: string;
     content_encoding: string;
-    parts: number;
-    contents: Uint8Array;
+    blob_id: string;
 };
 
-// define UID as a 32-byte array, then add a transform to/from hex strings
+// Define UID as a 32-byte array, then add a transform to/from hex
+// strings.
 const UID = bcs.fixedArray(32, bcs.u8()).transform({
     input: (id: string) => fromHEX(id),
     output: (id) => toHEX(Uint8Array.from(id)),
@@ -156,8 +158,7 @@ const BlockPageStruct = bcs.struct("BlockPage", {
     version: NUMBER,
     content_type: bcs.string(),
     content_encoding: bcs.string(),
-    parts: NUMBER,
-    contents: VECTOR,
+    blob_id: bcs.string(),
 });
 
 const FieldStruct = bcs.struct("Field", {
@@ -166,7 +167,7 @@ const FieldStruct = bcs.struct("Field", {
     value: BlockPageStruct,
 });
 
-// Fectching & decompressing on-chain data //
+// Fectching & decompressing on-chain data.
 
 async function resolveAndFetchPage(parsedUrl: Path): Promise<Response> {
     const rpcUrl = getFullnodeUrl(NETWORK);
@@ -174,13 +175,12 @@ async function resolveAndFetchPage(parsedUrl: Path): Promise<Response> {
 
     let objectId = hardcodedSubdmains(parsedUrl.subdomain);
     if (!objectId) {
-        // Try to convert the subdomain to an object ID
-        // NOTE: This effectively _disables_ any SuiNs name that is
-        // the base36 encoding of an object ID (i.e., a 32-byte
-        // string). This is desirable, prevents people from getting
-        // suins names that are the base36 encoding the object ID of a
-        // target blocksite (with the goal of hijacking non-suins
-        // queries)
+        // Try to convert the subdomain to an object ID NOTE: This
+        // effectively _disables_ any SuiNs name that is the base36
+        // encoding of an object ID (i.e., a 32-byte string). This is
+        // desirable, prevents people from getting suins names that
+        // are the base36 encoding the object ID of a target blocksite
+        // (with the goal of hijacking non-suins queries)
         objectId = subdomainToObjectId(parsedUrl.subdomain);
     }
     if (!objectId) {
@@ -209,25 +209,25 @@ async function fetchPage(
     path: string
 ): Promise<Response> {
     const blockResource = await fetchBlockResource(client, objectId, path);
-    if (!blockResource || !blockResource.contents) {
+    if (!blockResource || !blockResource.blob_id) {
         siteNotFound();
     }
-    let contents = blockResource.contents;
-    //  Either its a one-part page, or we need to fetch the other parts
-    if (blockResource.parts >= 1) {
-        // Fetch the other parts in parallel
-        const otherParts = await Promise.all([
-            ...partNames(path, blockResource.parts).map((part_name) =>
-                fetchBlockResource(client, objectId, part_name)
-            ),
-        ]);
-        // Merge all parts with the contents
-        // TODO: better way?
-        let contentsArray = [Array.from(contents), ...otherParts.map(part => Array.from(part.contents))];
-        contents = new Uint8Array(contentsArray.flat());
+
+    const blob_id = blockResource.blob_id;
+    console.log("Found blob id for resource: ", blob_id);
+    const contents = await fetch(aggregator_endopoint(blob_id));
+    if (!contents.ok) {
+      return siteNotFound()
     }
+
+    // Deserialize the bcs encoded body and decompress.
+    const body = new Uint8Array(await contents.arrayBuffer());
+    // TODO(giac): remove the bcs encoding of the vector -- redundant
+    // body = VECTOR.parse(body);
+
+    console.log("body: ", body);
     const decompressed = await decompressData(
-        contents,
+        body,
         blockResource.content_encoding
     );
     if (!decompressed) {
@@ -240,9 +240,6 @@ async function fetchPage(
     });
 }
 
-function partNames(name: string, parts: number): string[] {
-    return Array.from({ length: parts - 1 }, (_, i) => `part-${i + 1}${name}`);
-}
 
 async function fetchBlockResource(
     client: SuiClient,
@@ -268,13 +265,14 @@ async function fetchBlockResource(
         return null;
     }
     const blockPage = getPageFields(pageData.data);
-    if (!blockPage || !blockPage.contents) {
+    if (!blockPage || !blockPage.blob_id) {
         return null;
     }
     return blockPage;
 }
 
-// Type definitions for BCS decoding //
+// Type definitions for BCS decoding.
+
 function getPageFields(data: SuiObjectData): BlockResource | null {
     // Deserialize the bcs encoded struct
     if (data.bcs && data.bcs.dataType === "moveObject") {
@@ -330,4 +328,9 @@ function Response404(message: String): Response {
             },
         }
     );
+}
+
+
+function aggregator_endopoint(blob_id: string): URL {
+  return new URL(AGGREGATOR + "/v1/" + blob_id)
 }
