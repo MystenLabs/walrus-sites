@@ -14,9 +14,8 @@ import { AGGREGATOR, SITE_NAMES, NETWORK } from "./constants";
 import { bcs } from "@mysten/sui.js/bcs";
 import template_404 from "../static/404-page.template.html";
 
-// This is to get TypeScript to recognize `clients` and `self`
-// Default type of `self` is `WorkerGlobalScope & typeof globalThis`
-// https://github.com/microsoft/TypeScript/issues/14877
+// This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
+// `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
 declare var self: ServiceWorkerGlobalScope;
 declare var clients: Clients;
 
@@ -57,9 +56,8 @@ self.addEventListener("fetch", async (event) => {
 
 // Subdomain encoding & parsing.
 //
-// Use base36 instead of HEX to encode object ids in the subdomain, as
-// the subdomain must be < 64 characters.  The encoding must be case
-// insensitive.
+// Use base36 instead of HEX to encode object ids in the subdomain, as the subdomain must be < 64
+// characters.  The encoding must be case insensitive.
 
 function subdomainToObjectId(subdomain: string): string | null {
     const objectId = "0x" + toHEX(b36.decode(subdomain.toLowerCase()));
@@ -80,8 +78,8 @@ function getSubdomainAndPath(scope: string): Path | null {
         hostname.length === 3 ||
         (hostname.length === 2 && hostname[1] === "localhost")
     ) {
-        // Accept only one level of subdomain
-        // eg `subdomain.example.com` or `subdomain.localhost` in case of local development
+        // Accept only one level of subdomain eg `subdomain.example.com` or `subdomain.localhost` in
+        // case of local development
         const path =
             url.pathname == "/" ? "/index.html" : removeLastSlash(url.pathname);
         return { subdomain: hostname[0], path } as Path;
@@ -125,25 +123,16 @@ function hardcodedSubdmains(subdomain: string): string | null {
 
 // Fetching objects from the full node.
 type BlockResource = {
-    name: string;
-    created: number;
-    updated: number | null;
-    version: number;
+    path: string;
     content_type: string;
     content_encoding: string;
     blob_id: string;
 };
 
-// Define UID as a 32-byte array, then add a transform to/from hex
-// strings.
+// Define UID as a 32-byte array, then add a transform to/from hex strings.
 const UID = bcs.fixedArray(32, bcs.u8()).transform({
     input: (id: string) => fromHEX(id),
     output: (id) => toHEX(Uint8Array.from(id)),
-});
-
-const NUMBER = bcs.u64().transform({
-    input: (ts: number) => Number(ts),
-    output: (ts) => Number(ts),
 });
 
 const VECTOR = bcs.vector(bcs.u8()).transform({
@@ -151,14 +140,16 @@ const VECTOR = bcs.vector(bcs.u8()).transform({
     output: (contents) => Uint8Array.from(contents),
 });
 
+const BLOB_ID = bcs.u256().transform({
+    input: (id: string) => id,
+    output: (id) => base64UrlSafeEncode(bcs.u256().serialize(id).toBytes()),
+});
+
 const BlockPageStruct = bcs.struct("BlockPage", {
-    name: bcs.string(),
-    created: NUMBER,
-    updated: bcs.option(NUMBER),
-    version: NUMBER,
+    path: bcs.string(),
     content_type: bcs.string(),
     content_encoding: bcs.string(),
-    blob_id: bcs.string(),
+    blob_id: BLOB_ID,
 });
 
 const FieldStruct = bcs.struct("Field", {
@@ -175,12 +166,10 @@ async function resolveAndFetchPage(parsedUrl: Path): Promise<Response> {
 
     let objectId = hardcodedSubdmains(parsedUrl.subdomain);
     if (!objectId) {
-        // Try to convert the subdomain to an object ID NOTE: This
-        // effectively _disables_ any SuiNs name that is the base36
-        // encoding of an object ID (i.e., a 32-byte string). This is
-        // desirable, prevents people from getting suins names that
-        // are the base36 encoding the object ID of a target blocksite
-        // (with the goal of hijacking non-suins queries)
+        // Try to convert the subdomain to an object ID NOTE: This effectively _disables_ any SuiNs
+        // name that is the base36 encoding of an object ID (i.e., a 32-byte string). This is
+        // desirable, prevents people from getting suins names that are the base36 encoding the
+        // object ID of a target blocksite (with the goal of hijacking non-suins queries)
         objectId = subdomainToObjectId(parsedUrl.subdomain);
     }
     if (!objectId) {
@@ -213,17 +202,14 @@ async function fetchPage(
         siteNotFound();
     }
 
-    const blob_id = blockResource.blob_id;
-    console.log("Found blob id for resource: ", blob_id);
-    const contents = await fetch(aggregator_endopoint(blob_id));
+    console.log("Fetched Resource: ", blockResource);
+    const contents = await fetch(aggregatorEndpoint(blockResource.blob_id));
     if (!contents.ok) {
       return siteNotFound()
     }
 
     // Deserialize the bcs encoded body and decompress.
     const body = new Uint8Array(await contents.arrayBuffer());
-    // TODO(giac): remove the bcs encoding of the vector -- redundant
-    // body = VECTOR.parse(body);
 
     console.log("body: ", body);
     const decompressed = await decompressData(
@@ -330,7 +316,19 @@ function Response404(message: String): Response {
     );
 }
 
-
-function aggregator_endopoint(blob_id: string): URL {
+function aggregatorEndpoint(blob_id: string): URL {
   return new URL(AGGREGATOR + "/v1/" + blob_id)
+}
+
+function base64UrlSafeEncode(data: Uint8Array): string {
+    let base64 = arrayBufferToBas64(data);
+    // Use the URL-safe base 64 encoding by removing padding and swapping characters.
+    return base64.replaceAll('/', '_').replaceAll('+', '-').replaceAll('=', '');
+}
+
+function arrayBufferToBas64( bytes: Uint8Array ): string {
+    // Convert each byte in the array to the correct character
+    const binaryString = Array.from(bytes, byte => String.fromCharCode(byte)).join('');
+    // Encode the binary string to base64 using btoa
+    return btoa(binaryString);
 }

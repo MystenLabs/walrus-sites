@@ -3,7 +3,7 @@ use std::fmt;
 use anyhow::anyhow;
 use clap::ValueEnum;
 
-#[derive(Debug, ValueEnum, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, ValueEnum, Clone, Copy, PartialEq, Eq, Ord, PartialOrd)]
 #[clap(rename_all = "lowercase")]
 pub enum ContentEncoding {
     PlainText,
@@ -26,7 +26,7 @@ impl TryFrom<&str> for ContentEncoding {
         match value {
             "plaintext" => Ok(ContentEncoding::PlainText),
             "gzip" => Ok(ContentEncoding::Gzip),
-            _ => Err(anyhow!("Invalid content encoding string")),
+            _ => Err(anyhow!("Invalid content encoding string: {value}")),
         }
     }
 }
@@ -42,7 +42,7 @@ impl TryFrom<String> for ContentEncoding {
 /// Content types for content of a page
 /// The list is generated starting from
 /// https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types/Common_types
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Ord, PartialOrd)]
 pub enum ContentType {
     AudioAac,
     ApplicationXabiword,

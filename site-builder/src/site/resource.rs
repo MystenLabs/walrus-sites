@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeSet,
     fmt::{self, Display},
     fs::read_dir,
     io::Write,
@@ -7,46 +8,303 @@ use std::{
 
 use anyhow::{anyhow, Result};
 use flate2::{write::GzEncoder, Compression};
+use move_core_types::u256::U256;
 use sui_sdk::rpc_types::{SuiMoveStruct, SuiMoveValue};
-
-use super::{builder::BlocksiteCall, manager::OBJ_MARGIN};
-use crate::site::{
-    content::{ContentEncoding, ContentType},
-    macros::get_dynamic_field,
-    manager::{ARG_MARGIN, MAX_ARG_SIZE, MAX_OBJ_SIZE, MAX_TX_SIZE, TX_MARGIN},
+use walrus_core::{
+    encoding::{EncodingConfig, SliverPair},
+    metadata::VerifiedBlobMetadataWithId,
+    BlobId,
 };
 
-#[derive(PartialEq, Eq, Debug, Clone)]
-pub struct Resource {
-    pub name: String,
+use crate::site::content::{ContentEncoding, ContentType};
+
+#[derive(PartialEq, Eq, Debug, Clone, Ord, PartialOrd)]
+pub struct ResourceInfo {
+    pub path: String,
     pub content_type: ContentType,
     pub content_encoding: ContentEncoding,
-    pub parts: usize,
-    pub content: Vec<u8>,
+    pub blob_id: BlobId,
+}
+
+impl TryFrom<&SuiMoveStruct> for ResourceInfo {
+    type Error = anyhow::Error;
+
+    fn try_from(source: &SuiMoveStruct) -> Result<Self, Self::Error> {
+        let path = get_dynamic_field!(source, "path", SuiMoveValue::String)?;
+        let content_type: ContentType =
+            get_dynamic_field!(source, "content_type", SuiMoveValue::String)?.try_into()?;
+        let content_encoding: ContentEncoding =
+            get_dynamic_field!(source, "content_encoding", SuiMoveValue::String)?.try_into()?;
+        let blob_id = blob_id_from_u256(
+            get_dynamic_field!(source, "blob_id", SuiMoveValue::String)?.parse::<U256>()?,
+        );
+        Ok(Self {
+            path,
+            content_type,
+            content_encoding,
+            blob_id,
+        })
+    }
+}
+
+impl TryFrom<SuiMoveStruct> for ResourceInfo {
+    type Error = anyhow::Error;
+
+    fn try_from(value: SuiMoveStruct) -> Result<Self, Self::Error> {
+        Self::try_from(&value)
+    }
+}
+
+pub(crate) fn blob_id_from_u256(input: U256) -> BlobId {
+    BlobId(input.to_le_bytes())
+}
+
+/// A resource inside a site.
+///
+/// [`Resource`] objects are always compared on their `info` field
+/// ([`ResourceInfo`]), and never on their `slivers` or `metadata`.
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct Resource {
+    pub info: ResourceInfo,
+    pub slivers: Option<Vec<SliverPair>>,
+    pub metadata: Option<VerifiedBlobMetadataWithId>,
+    pub unencoded_size: usize,
+}
+
+impl PartialOrd for Resource {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.info.partial_cmp(&other.info)
+    }
+}
+
+impl Ord for Resource {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.info.cmp(&other.info)
+    }
+}
+
+impl From<ResourceInfo> for Resource {
+    fn from(source: ResourceInfo) -> Self {
+        Self {
+            info: source,
+            slivers: None,
+            metadata: None,
+            unencoded_size: 0,
+        }
+    }
 }
 
 impl Resource {
     pub fn new(
-        name: String,
+        path: String,
         content_type: ContentType,
         content_encoding: ContentEncoding,
-        parts: usize,
-        content: Vec<u8>,
+        blob_id: BlobId,
+        slivers: Option<Vec<SliverPair>>,
+        metadata: Option<VerifiedBlobMetadataWithId>,
+        unencoded_size: usize,
     ) -> Self {
         Resource {
-            name,
-            content_type,
-            content_encoding,
-            parts,
-            content,
+            info: ResourceInfo {
+                path,
+                content_type,
+                content_encoding,
+                blob_id,
+            },
+            slivers,
+            metadata,
+            unencoded_size,
         }
     }
+}
 
-    pub fn read(
+impl Display for Resource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Resource: {}, blob id: {})",
+            self.info.path, self.info.blob_id
+        )
+    }
+}
+
+/// The operations on resources that are necessary to update a site.
+///
+/// Updates to resources are implemented as deleting the outdated
+/// resource and adding a new one. Two [`Resources`][Resource] are
+/// different if their respective [`ResourceInfo`] differ.
+pub enum ResourceOp<'a> {
+    Deleted(&'a Resource),
+    Created(&'a Resource),
+}
+
+impl<'a> fmt::Debug for ResourceOp<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let (op, path) = match self {
+            ResourceOp::Deleted(resource) => ("delete", &resource.info.path),
+            ResourceOp::Created(resource) => ("create", &resource.info.path),
+        };
+        f.debug_struct("ResourceOp")
+            .field("operation", &op)
+            .field("path", path)
+            .finish()
+    }
+}
+
+impl<'a> ResourceOp<'a> {
+    /// Returns the resource for which this operation is defined.
+    pub fn inner(&self) -> &'a Resource {
+        match self {
+            ResourceOp::Deleted(r) => r,
+            ResourceOp::Created(r) => r,
+        }
+    }
+}
+
+/// A summary of the operations performed by the site builder.
+#[derive(Debug, Clone)]
+pub struct OperationSummary {
+    operation: String,
+    path: String,
+    blob_id: BlobId,
+}
+
+impl<'a> From<&ResourceOp<'a>> for OperationSummary {
+    fn from(source: &ResourceOp<'a>) -> Self {
+        let (op, info) = match source {
+            ResourceOp::Deleted(resource) => ("deleted".to_owned(), &resource.info),
+            ResourceOp::Created(resource) => ("created".to_owned(), &resource.info),
+        };
+        OperationSummary {
+            operation: op,
+            path: info.path.clone(),
+            blob_id: info.blob_id,
+        }
+    }
+}
+
+impl Display for OperationSummary {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{} resource {} with blob ID {}",
+            self.operation, self.path, self.blob_id
+        )
+    }
+}
+
+pub struct OperationsSummary(pub Vec<OperationSummary>);
+
+impl<'a> From<&Vec<ResourceOp<'a>>> for OperationsSummary {
+    fn from(source: &Vec<ResourceOp<'a>>) -> Self {
+        Self(source.iter().map(OperationSummary::from).collect())
+    }
+}
+
+impl<'a> From<Vec<ResourceOp<'a>>> for OperationsSummary {
+    fn from(source: Vec<ResourceOp<'a>>) -> Self {
+        Self::from(&source)
+    }
+}
+
+impl Display for OperationsSummary {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let ops = self
+            .0
+            .iter()
+            .map(|s| format!("  - {}", s))
+            .collect::<Vec<_>>()
+            .join("\n");
+        write!(f, "Operations performed:\n{}", ops)
+    }
+}
+
+/// A set of resources composing a site.
+#[derive(Default, Debug, Clone)]
+pub struct ResourceSet {
+    pub inner: BTreeSet<Resource>,
+}
+
+impl ResourceSet {
+    /// Returns a vector of deletion and creation operations to move
+    /// from the current set to the target set.
+    ///
+    /// The deletions are always before the creation operations, such
+    /// that if two resources have the same path but different
+    /// contents they are first deleted and then created anew.
+    pub fn diff<'a>(&'a self, target: &'a ResourceSet) -> Vec<ResourceOp<'a>> {
+        let create = self
+            .inner
+            .difference(&target.inner)
+            .map(ResourceOp::Created);
+        let delete = target
+            .inner
+            .difference(&self.inner)
+            .map(ResourceOp::Deleted);
+        delete.chain(create).collect()
+    }
+}
+
+impl FromIterator<Resource> for ResourceSet {
+    fn from_iter<I: IntoIterator<Item = Resource>>(source: I) -> Self {
+        Self {
+            inner: BTreeSet::from_iter(source),
+        }
+    }
+}
+
+impl FromIterator<ResourceInfo> for ResourceSet {
+    fn from_iter<I: IntoIterator<Item = ResourceInfo>>(source: I) -> Self {
+        Self::from_iter(source.into_iter().map(Resource::from))
+    }
+}
+
+impl Display for ResourceSet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ResourceSet({})",
+            self.inner
+                .iter()
+                .map(|r| r.info.path.to_owned())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    }
+}
+
+#[derive(Debug)]
+pub struct ResourceManager {
+    /// The resources in the site.
+    pub resources: ResourceSet,
+}
+
+impl ResourceManager {
+    pub fn new() -> Result<Self> {
+        Ok(ResourceManager {
+            resources: ResourceSet::default(),
+        })
+    }
+
+    // /// List all names of resources stored in the [`ResourceManager`].
+    // pub fn all_names(&self) -> Vec<String> {
+    //     self.resources
+    //         .inner
+    //         .iter()
+    //         .map(|res| res.info.path.clone())
+    //         .collect()
+    // }
+
+    /// Read a resource at a path.
+    ///
+    /// Ignores empty files.
+    pub fn read_resource(
+        &self,
         full_path: &Path,
         root: &Path,
         content_encoding: &ContentEncoding,
-    ) -> Result<Option<Vec<Self>>> {
+        encoding_config: &EncodingConfig,
+    ) -> Result<Option<Resource>> {
         let rel_path = full_path.strip_prefix(root)?;
         let content_type = ContentType::from_extension(
             full_path
@@ -57,246 +315,68 @@ impl Resource {
         );
         let plain_content = std::fs::read(full_path)?;
         if plain_content.is_empty() {
-            // We are ignoring empty files
+            // We are ignoring empty files.
             return Ok(None);
         }
         let content = match content_encoding {
             ContentEncoding::PlainText => plain_content,
             ContentEncoding::Gzip => compress(&plain_content)?,
         };
-        Ok(Some(Resource::split_multi_resource(
-            &format!(
-                "/{}", // We want the path to be in the form `/path/to/resource.ext`
-                rel_path.to_str().ok_or(anyhow!("Invalid path"))?
-            ),
+
+        let pathname = format!(
+            "/{}",
+            rel_path
+                .to_str()
+                .ok_or(anyhow!("could not process the path string: {:?}", rel_path))?
+        );
+
+        let (slivers, metadata) = encoding_config
+            .get_blob_encoder(&content)?
+            .encode_with_metadata();
+
+        Ok(Some(Resource::new(
+            pathname,
             content_type,
-            content_encoding,
-            &content,
+            *content_encoding,
+            *metadata.blob_id(),
+            Some(slivers),
+            Some(metadata),
+            content.len(),
         )))
     }
 
-    /// Split a resource over [MAX_OBJ_SIZE] into multiple smaller resources
-    fn split_multi_resource(
-        rel_path: &str,
-        content_type: ContentType,
+    /// Recursively iterate a directory and load all [`Resources`][Resource] within.
+    pub fn read_dir(
+        &mut self,
+        root: &Path,
         content_encoding: &ContentEncoding,
-        content: &[u8],
-    ) -> Vec<Resource> {
-        let n_parts = content.len() / (MAX_OBJ_SIZE - OBJ_MARGIN) + 1;
-        content
-            .chunks(MAX_OBJ_SIZE - OBJ_MARGIN)
-            .enumerate()
-            .map(|(idx, chunk)| {
-                Resource::new(
-                    Resource::path_to_multi_resource_name(rel_path, idx),
-                    content_type.clone(),
-                    *content_encoding,
-                    n_parts,
-                    chunk.to_vec(),
-                )
-            })
-            // .map()
-            .collect::<Vec<_>>()
+        encoding_config: &EncodingConfig,
+    ) -> Result<()> {
+        self.resources =
+            ResourceSet::from_iter(self.iter_dir(root, root, content_encoding, encoding_config)?);
+        Ok(())
     }
 
-    fn path_to_multi_resource_name(path: &str, number: usize) -> String {
-        if number == 0 {
-            return path.to_owned();
-        }
-        format!("part-{}{}", number, path)
-    }
-
-    /// Compute the (approximate) size of the resource when added to a PTB
-    pub fn size_in_ptb(&self) -> usize {
-        // TODO: check this approximation
-        (1 + self.content.len() / (MAX_ARG_SIZE - ARG_MARGIN)) * MAX_ARG_SIZE
-    }
-
-    /// Get the "temporary path" for this resource
-    /// The temporary path does not start with `/`, so that it will
-    /// not be routable by the portal (the portal always prepends `/`
-    /// to path names).
-    pub fn tmp_path(&self) -> String {
-        format!("tmp{}", self.name)
-    }
-
-    /// Get the series of move calls needed to push the resource's content
-    /// The calls are already grouped by PTB.  If there is no content,
-    /// no resource is created. TODO: This is a UX decision -- would
-    /// anyone want to have "empty files" in their filetree?
-    pub fn to_ptb_calls(&self) -> Result<Vec<Vec<BlocksiteCall>>> {
-        if self.content.is_empty() {
-            return Ok(vec![]);
-        }
-        let create = BlocksiteCall::new_resource_and_add(
-            &self.tmp_path(),
-            &self.content_type.to_string(),
-            &self.content_encoding.to_string(),
-            self.parts,
-            &[],
-        )?;
-
-        let mut calls = self
-            .content
-            .chunks(MAX_TX_SIZE - TX_MARGIN)
-            .map(|c| {
-                c.chunks(MAX_ARG_SIZE - ARG_MARGIN)
-                    .map(|piece| BlocksiteCall::add_piece_to_existing(&self.tmp_path(), piece))
-                    .collect()
-            })
-            .collect::<Result<Vec<Vec<_>>>>()?;
-
-        // Add the creation command in front
-        calls
-            .first_mut()
-            .expect("There must be at least one vec of calls")
-            .insert(0, create);
-
-        // As a last step, move the resource at the right place
-        calls
-            .last_mut()
-            .expect("There must be at least one vec of calls")
-            .push(BlocksiteCall::move_resource(&self.tmp_path(), &self.name)?);
-
-        Ok(calls)
-    }
-
-    /// Recursively iterate a directory and load all resources within
-    pub fn iter_dir(root: &Path, content_encoding: &ContentEncoding) -> Result<Vec<Resource>> {
-        Resource::inner_iter_dir(root, root, content_encoding)
-    }
-
-    fn inner_iter_dir(
+    fn iter_dir(
+        &self,
         start: &Path,
         root: &Path,
         content_encoding: &ContentEncoding,
+        encoding_config: &EncodingConfig,
     ) -> Result<Vec<Resource>> {
         let mut resources: Vec<Resource> = vec![];
-        let entries = read_dir(start).expect("Reading path failed. Please provide a valid path");
+        let entries = read_dir(start)?;
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
-                resources.extend(Resource::inner_iter_dir(&path, root, content_encoding)?);
-            } else if let Some(res) = Resource::read(&path, root, content_encoding)? {
-                resources.extend(res);
+                resources.extend(self.iter_dir(&path, root, content_encoding, encoding_config)?);
+            } else if let Some(res) =
+                self.read_resource(&path, root, content_encoding, encoding_config)?
+            {
+                resources.push(res);
             }
         }
         Ok(resources)
-    }
-}
-
-impl Display for Resource {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Resource: {} ({} B)", self.name, self.content.len())
-    }
-}
-
-impl TryFrom<SuiMoveStruct> for Resource {
-    type Error = anyhow::Error;
-
-    fn try_from(sui_move_struct: SuiMoveStruct) -> Result<Self, Self::Error> {
-        let name = get_dynamic_field!(sui_move_struct, "name", SuiMoveValue::String);
-        let content_type =
-            get_dynamic_field!(sui_move_struct, "content_type", SuiMoveValue::String);
-        let content_encoding =
-            get_dynamic_field!(sui_move_struct, "content_encoding", SuiMoveValue::String);
-        let parts =
-            get_dynamic_field!(sui_move_struct, "parts", SuiMoveValue::String).parse::<usize>()?;
-        let content = get_dynamic_field!(sui_move_struct, "contents", SuiMoveValue::Vector)
-            .iter()
-            .map(|v| match v {
-                SuiMoveValue::Number(x) => Ok(*x as u8), // TODO: there must be a better way
-                _ => Err(anyhow!("Could not convert to vec<u8>")),
-            })
-            .collect::<Result<Vec<_>>>()?;
-        Ok(Resource::new(
-            name,
-            content_type.try_into()?,
-            content_encoding.try_into()?,
-            parts,
-            content,
-        ))
-    }
-}
-
-#[derive(Default, Clone)]
-pub struct ResourceManager {
-    /// The resources that fit into a single PTB
-    pub single_ptb: Vec<Resource>,
-    /// The resources that span multiple PTBs
-    pub multi_ptb: Vec<Resource>,
-}
-
-impl ResourceManager {
-    /// Schedule the resource for publishing depending on its size
-    pub fn add_resource(&mut self, resource: Resource) {
-        if resource.size_in_ptb() < MAX_TX_SIZE {
-            self.single_ptb.push(resource);
-        } else {
-            self.multi_ptb.push(resource);
-        }
-    }
-
-    /// Get an iterator over vectors of resources that fit into a single PTB
-    pub fn group_by_ptb(&mut self) -> impl Iterator<Item = Vec<Resource>> {
-        let mut iter: Vec<Vec<_>> = vec![];
-        let mut current_ptb_size = 0;
-        self.single_ptb
-            .sort_unstable_by_key(|first| first.size_in_ptb());
-        for resource in self.single_ptb.drain(..) {
-            let required_space = resource.size_in_ptb();
-            if iter.is_empty() || current_ptb_size + required_space > MAX_TX_SIZE {
-                iter.push(vec![resource]);
-                current_ptb_size = required_space;
-            } else {
-                iter.last_mut().unwrap().push(resource);
-                current_ptb_size += required_space;
-            }
-        }
-        iter.into_iter()
-    }
-
-    /// List all names of resources stored in the [ResourceManager]
-    pub fn all_names(&self) -> Vec<String> {
-        self.single_ptb
-            .iter()
-            .chain(self.multi_ptb.iter())
-            .map(|res| res.name.clone())
-            .collect()
-    }
-
-    pub fn total_size(&self) -> usize {
-        self.multi_ptb
-            .iter()
-            .chain(self.single_ptb.iter())
-            .fold(0, |size, r| size + r.content.len())
-    }
-
-    pub fn get_resource_by_name(&self, name: &str) -> Option<&Resource> {
-        self.single_ptb
-            .iter()
-            .chain(self.multi_ptb.iter())
-            .find(|res| res.name == name)
-    }
-}
-
-impl Display for ResourceManager {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.single_ptb.is_empty() && self.multi_ptb.is_empty() {
-            write!(f, "No Resources")
-        } else {
-            write!(
-                f,
-                "Resources for a total of {} B:\n  - {}",
-                self.total_size(),
-                self.multi_ptb
-                    .iter()
-                    .chain(self.single_ptb.iter())
-                    .map(|r| r.to_string())
-                    .collect::<Vec<_>>()
-                    .join("\n  - ")
-            )
-        }
     }
 }
 

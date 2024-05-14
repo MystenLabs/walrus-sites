@@ -1,107 +1,22 @@
 use std::{collections::HashMap, str};
 
-use anyhow::{anyhow, bail, ensure, Result};
+use anyhow::{anyhow, Result};
 use futures::Future;
-use shared_crypto::intent::Intent;
-use sui_keys::keystore::{AccountKeystore, Keystore};
 use sui_sdk::{
     rpc_types::{
         Page,
-        SuiExecutionStatus,
         SuiMoveStruct,
-        SuiObjectDataOptions,
         SuiObjectResponse,
         SuiParsedData,
         SuiTransactionBlockEffects,
         SuiTransactionBlockEffectsAPI,
-        SuiTransactionBlockResponse,
-        SuiTransactionBlockResponseOptions,
     },
     SuiClient,
 };
 use sui_types::{
-    base_types::{ObjectID, ObjectRef, SuiAddress},
+    base_types::{ObjectID, SuiAddress},
     dynamic_field::DynamicFieldInfo,
-    object::Owner,
-    quorum_driver_types::ExecuteTransactionRequestType,
-    transaction::{CallArg, ProgrammableTransaction, Transaction, TransactionData},
 };
-
-pub async fn sign_and_send_ptb(
-    client: &SuiClient,
-    keystore: &Keystore,
-    address: SuiAddress,
-    programmable_transaction: ProgrammableTransaction,
-    gas_coin: ObjectRef,
-    gas_budget: u64,
-) -> Result<SuiTransactionBlockResponse> {
-    let gas_price = client.read_api().get_reference_gas_price().await?;
-
-    let transaction = TransactionData::new_programmable(
-        address,
-        vec![gas_coin],
-        programmable_transaction,
-        gas_budget,
-        gas_price,
-    );
-    let signature = keystore.sign_secure(&address, &transaction, Intent::sui_transaction())?;
-    let response = client
-        .quorum_driver_api()
-        .execute_transaction_block(
-            Transaction::from_data(transaction, vec![signature]),
-            SuiTransactionBlockResponseOptions::full_content(),
-            Some(ExecuteTransactionRequestType::WaitForLocalExecution),
-        )
-        .await?;
-    ensure!(
-        response.confirmed_local_execution == Some(true),
-        "Transaction execution was not confirmed"
-    );
-    match response
-        .effects
-        .as_ref()
-        .ok_or_else(|| anyhow!("No transaction effects in response"))?
-        .status()
-    {
-        SuiExecutionStatus::Success => Ok(response),
-        SuiExecutionStatus::Failure { error } => {
-            Err(anyhow!("Error in transaction execution: {}", error))
-        }
-    }
-}
-
-pub async fn get_object_ref_from_id(client: &SuiClient, id: ObjectID) -> Result<ObjectRef> {
-    client
-        .read_api()
-        .get_object_with_options(id, SuiObjectDataOptions::new())
-        .await?
-        .object_ref_if_exists()
-        .ok_or_else(|| anyhow!("Could not get object reference for object with id {}", id))
-}
-
-pub async fn call_arg_from_shared_object_id(
-    client: &SuiClient,
-    id: ObjectID,
-    mutable: bool,
-) -> Result<CallArg> {
-    let Some(Owner::Shared {
-        initial_shared_version,
-    }) = client
-        .read_api()
-        .get_object_with_options(id, SuiObjectDataOptions::new().with_owner())
-        .await?
-        .owner()
-    else {
-        bail!("Trying to get the initial version of a non-shared object")
-    };
-    Ok(CallArg::Object(
-        sui_types::transaction::ObjectArg::SharedObject {
-            id,
-            initial_shared_version,
-            mutable,
-        },
-    ))
-}
 
 pub async fn get_all_dynamic_field_info(
     client: &SuiClient,
@@ -180,6 +95,7 @@ pub fn id_to_base36(id: &ObjectID) -> Result<String> {
 }
 
 /// Get the object id of the site that was published in the transaction
+#[allow(dead_code)]
 pub fn get_site_id_from_response(
     address: SuiAddress,
     effects: &SuiTransactionBlockEffects,
@@ -216,9 +132,9 @@ pub(crate) fn get_struct_from_object_response(
 
 pub async fn get_existing_resource_ids(
     client: &SuiClient,
-    site_id: &ObjectID,
+    site_id: ObjectID,
 ) -> Result<HashMap<String, ObjectID>> {
-    let existing = get_all_dynamic_field_info(client, *site_id)
+    let existing = get_all_dynamic_field_info(client, site_id.into())
         .await?
         .iter()
         .map(|d| {

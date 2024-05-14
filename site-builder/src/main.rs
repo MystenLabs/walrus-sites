@@ -1,25 +1,28 @@
-mod network;
+// mod network;
 mod publish;
 mod site;
-mod suins;
+// mod suins;
 mod util;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use network::NetworkConfig;
 use publish::{publish_site, update_site};
 use serde::Deserialize;
 use site::content::ContentEncoding;
 use sui_types::{base_types::ObjectID, Identifier};
-use suins::set_suins_name;
+// use suins::set_suins_name;
+use walrus_service::{
+    cli_utils::load_wallet_context,
+    client::{ClientCommunicationConfig, Config as WalrusConfig},
+};
 
 use crate::util::{get_existing_resource_ids, id_to_base36};
 
 #[derive(Parser, Debug)]
 #[clap(rename_all = "kebab-case")]
 struct Args {
-    #[arg(short, long, default_value = "config.toml")]
+    #[arg(short, long, default_value = "config.yaml")]
     config: PathBuf,
     #[command(subcommand)]
     command: Commands,
@@ -38,6 +41,9 @@ enum Commands {
         /// The name of the BlockSite
         #[clap(short, long, default_value = "test site")]
         site_name: String,
+        /// The number of epochs for which to save the resources on Walrus.
+        #[clap(short, long, default_value_t = 0)]
+        epochs: u64,
     },
     /// Update an existing site
     Update {
@@ -50,6 +56,9 @@ enum Commands {
         content_encoding: ContentEncoding,
         #[clap(short, long, action)]
         watch: bool,
+        /// The number of epochs for which to save the updated resources on Walrus.
+        #[clap(short, long, default_value_t = 0)]
+        epochs: u64,
     },
     /// Convert an object ID in hex format to the equivalent base36 format.
     /// Useful to browse sites at particular object IDs.
@@ -73,30 +82,30 @@ enum Commands {
         target: ObjectID,
     },
     /// Show the pages composing the blocksite at the given id
-    Sitemap { object: ObjectID },
+    Sitemap {
+        object: ObjectID,
+    },
+    Test,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct Config {
     #[serde(default = "blocksite_module")]
     pub module: Identifier,
-    #[serde(default = "testnet_package")]
+    #[serde(default = "default_portal")]
+    pub portal: String,
     pub package: ObjectID,
-
     pub gas_coin: ObjectID,
     pub gas_budget: u64,
-
-    #[serde(default)]
-    pub network: NetworkConfig,
+    pub walrus: WalrusConfig,
 }
 
 fn blocksite_module() -> Identifier {
     Identifier::new("blocksite").expect("valid literal identifier")
 }
 
-fn testnet_package() -> ObjectID {
-    ObjectID::from_hex_literal("0x8dae89b2505ce9d84592e0e57d38848a2d863ead6a0e946a49fd8edbc8c7b919")
-        .expect("valid hex literal")
+fn default_portal() -> String {
+    "blocksite.net".to_owned()
 }
 
 #[tokio::main]
@@ -104,46 +113,62 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
     let args = Args::parse();
-    let mut config: Config = std::fs::read_to_string(&args.config)
+    let config: Config = std::fs::read_to_string(&args.config)
         .context(format!("unable to read config file {:?}", args.config))
         .and_then(|s| {
-            toml::from_str(&s).context(format!("unable to parse toml in file {:?}", args.config))
+            serde_yaml::from_str(&s)
+                .context(format!("unable to parse toml in file {:?}", args.config))
         })?;
-    config.network.load()?;
 
     match &args.command {
         Commands::Publish {
             directory,
             content_encoding,
             site_name,
-        } => publish_site(directory, content_encoding, site_name, &config).await?,
+            epochs,
+        } => publish_site(directory, content_encoding, site_name, &config, *epochs).await?,
         Commands::Update {
             directory,
             object_id,
             content_encoding,
             watch,
+            epochs,
         } => {
-            update_site(directory, content_encoding, object_id, &config, *watch).await?;
+            update_site(directory, content_encoding, object_id, &config, *watch, *epochs).await?;
         }
         Commands::SetNs {
-            package,
-            sui_ns,
-            registration,
-            target,
+            ..
+            // package,
+            // sui_ns,
+            // registration,
+            // target,
         } => {
-            set_suins_name(config, package, sui_ns, registration, target).await?;
+            todo!()
+            // set_suins_name(config, package, sui_ns, registration, target).await?;
         }
         // Add a path to be watched. All files and directories at that path and
         // below will be monitored for changes.
         Commands::Sitemap { object } => {
-            let client = config.network.get_sui_client().await?;
-            let all_dynamic_fields = get_existing_resource_ids(&client, object).await?;
+            let wallet = load_wallet_context(&config.walrus.wallet_config.clone())?;
+            let all_dynamic_fields =
+                get_existing_resource_ids(&wallet.get_client().await?, *object).await?;
             println!("Pages in site at object id: {}", object);
             for (name, id) in all_dynamic_fields {
                 println!("  - {:<40} {:?}", name, id);
             }
         }
         Commands::Convert { object_id } => println!("{}", id_to_base36(object_id)?),
+        Commands::Test => {
+            let cc: ClientCommunicationConfig = serde_yaml::from_str("")?;
+            let wc = WalrusConfig {
+                system_pkg: ObjectID::random(),
+                system_object: ObjectID::random(),
+                wallet_config: None,
+                communication_config: cc,
+            };
+
+            println!("{}", serde_yaml::to_string(&wc)?)
+        }
     };
 
     Ok(())

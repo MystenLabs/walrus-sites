@@ -6,6 +6,7 @@ use sui_types::{
     transaction::CallArg,
     Identifier,
 };
+use walrus_service::cli_utils::load_wallet_context;
 
 use crate::{
     util::{call_arg_from_shared_object_id, get_object_ref_from_id, sign_and_send_ptb},
@@ -19,7 +20,7 @@ pub async fn set_suins_name(
     registration: &ObjectID,
     target: &ObjectID,
 ) -> Result<SuiTransactionBlockResponse> {
-    let client = config.network.get_sui_client().await?;
+    let client = load_wallet_context(&config.walrus.wallet_config).get_client().await?;
     let mut builder = ProgrammableTransactionBuilder::new();
     let suins_arg = builder.input(call_arg_from_shared_object_id(&client, *sui_ns, true).await?)?;
     let reg_arg = builder.input(get_object_ref_from_id(&client, *registration).await?.into())?;
