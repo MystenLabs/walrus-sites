@@ -2,13 +2,33 @@
 <html>
 
 <head>
-    <title>BlockSite Snake Game</title>
+    <title>the Walrus Game</title>
     <meta charset="UTF-8">
     <style>
+        @font-face {
+            font-family: 'Oi';
+            src: url('./Oi-Regular.ttf') format('truetype');
+        }
+
         html,
         body {
             height: 100%;
             margin: 0;
+        }
+
+        h1 {
+            font-family: 'Oi';
+            font-size: 40px;
+            font-weight: normal;
+            text-align: center;
+            margin-top: 1px;
+        }
+
+        h3 {
+            font-size: 20px;
+            font-weight: normal;
+            text-align: center;
+            margin-bottom: 1px;
         }
 
         body {
@@ -16,7 +36,14 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-family: Arial, Helvetica, sans-serif;
+            font-family:  Arial, Helvetica, sans-serif;
+       }
+
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
         canvas {
@@ -26,9 +53,14 @@
 </head>
 
 <body>
+       <div>
     <div>
-        <div>
+            <h3>eat all the blobs!</h3>
+            <h1>the Walrus Game</h1>
+            </div>
+    <div>
 
+        <div class="container">
             <canvas width="400" height="400" id="game"></canvas>
             <script>
                 var canvas = document.getElementById('game');
@@ -38,6 +70,12 @@
                 // (e.g. 16 * 25 = 400)
                 var grid = 16;
                 var count = 0;
+
+                // Load images
+                var headImage = new Image();
+                var appleImage = new Image();
+                headImage.src = 'walrus.png';
+                appleImage.src = 'file.png';
 
                 var snake = {
                     x: 160,
@@ -105,15 +143,21 @@
                     }
 
                     // draw apple
-                    context.fillStyle = 'red';
-                    context.fillRect(apple.x, apple.y, grid - 1, grid - 1);
+                    context.drawImage(appleImage, apple.x - grid, apple.y - grid, 3 * grid,3 *  grid);
+                    // context.fillStyle = 'red';
+                    // context.fillRect(apple.x, apple.y, grid - 1, grid - 1);
 
                     // draw snake one cell at a time
-                    context.fillStyle = 'green';
+
                     snake.cells.forEach(function (cell, index) {
+                        if (index !== 0) {
+                           // Draw body
+                            context.fillStyle = 'SaddleBrown';
+                            context.fillRect(cell.x, cell.y, grid - 1, grid - 1);
+                        }
 
                         // drawing 1 px smaller than the grid creates a grid effect in the snake body so you can see how long it is
-                        context.fillRect(cell.x, cell.y, grid - 1, grid - 1);
+                        // context.fillRect(cell.x, cell.y, grid - 1, grid - 1);
 
                         // snake ate apple
                         if (cell.x === apple.x && cell.y === apple.y) {
@@ -141,6 +185,7 @@
                             }
                         }
                     });
+                context.drawImage(headImage, snake.cells[0].x - grid, snake.cells[0].y - grid, 3*grid, 3*grid);
                 }
 
                 // listen to keyboard events to move the snake
@@ -174,8 +219,12 @@
                 // start the game
                 requestAnimationFrame(loop);
             </script>
+
+            * Click the game area to start playing.</br>
+            ** Hit the *center* of the blobs with the Walrus.</br>
         </div>
-        * Click the game area to start playing (credit: <a href="https://gist.github.com/straker/ff00b4b49669ad3dec890306d348adc4">straker</a>)
+    </div>
+
     </div>
 </body>
 </html>
