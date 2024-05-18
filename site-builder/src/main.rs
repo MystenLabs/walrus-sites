@@ -42,7 +42,7 @@ enum Commands {
         #[clap(short, long, default_value = "test site")]
         site_name: String,
         /// The number of epochs for which to save the resources on Walrus.
-        #[clap(short, long, default_value_t = 0)]
+        #[clap(long, default_value_t = 1)]
         epochs: u64,
     },
     /// Update an existing site
@@ -143,7 +143,6 @@ async fn main() -> Result<()> {
             // registration,
             // target,
         } => {
-            todo!()
             // set_suins_name(config, package, sui_ns, registration, target).await?;
         }
         // Add a path to be watched. All files and directories at that path and

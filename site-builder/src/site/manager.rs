@@ -128,6 +128,7 @@ impl<'a> SiteManager<'a> {
             tracing::debug!(
                 resource=?resource.info.path,
                 blob_id=%metadata.blob_id(),
+                unencoded_size=%resource.unencoded_size,
                 "storing new blob on Walrus"
             );
             self.client
@@ -143,7 +144,7 @@ impl<'a> SiteManager<'a> {
         updates: &[ResourceOp<'b>],
         transfer: bool,
     ) -> Result<SuiTransactionBlockResponse> {
-        tracing::debug!("starting to update site resources on chain");
+        tracing::debug!(address=?self.active_address()?, "starting to update site resources on chain");
         ptb.add_calls(
             updates
                 .iter()

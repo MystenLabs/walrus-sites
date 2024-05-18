@@ -164,6 +164,7 @@ impl ContentType {
             "odt" => ContentType::ApplicationVndoasisopendocumenttext,
             "oga" => ContentType::AudioOgg,
             "ogv" => ContentType::VideoOgg,
+            "ogg" => ContentType::VideoOgg,
             "ogx" => ContentType::ApplicationOgg,
             "opus" => ContentType::AudioOpus,
             "otf" => ContentType::FontOtf,
