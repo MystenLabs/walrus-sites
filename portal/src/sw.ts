@@ -8,6 +8,7 @@ import {
     fromB64,
     fromHEX,
     isValidSuiObjectId,
+    isValidSuiAddress,
     toHEX,
 } from "@mysten/sui.js/utils";
 import { AGGREGATOR, SITE_NAMES, NETWORK } from "./constants";
@@ -61,6 +62,7 @@ self.addEventListener("fetch", async (event) => {
 
 function subdomainToObjectId(subdomain: string): string | null {
     const objectId = "0x" + toHEX(b36.decode(subdomain.toLowerCase()));
+    console.log("obtained object id: ", objectId, isValidSuiObjectId(objectId), isValidSuiAddress(objectId));
     return isValidSuiObjectId(objectId) ? objectId : null;
 }
 
@@ -109,6 +111,7 @@ async function resolveSuiNsAddress(
         "suix_resolveNameServiceAddress",
         [subdomain + ".sui"]
     );
+    console.log("resolved suins name: ", subdomain, suiObjectId);
     return suiObjectId ? suiObjectId : null;
 }
 
@@ -198,7 +201,7 @@ async function fetchPage(
     path: string
 ): Promise<Response> {
     const blockResource = await fetchBlockResource(client, objectId, path);
-    if (!blockResource || !blockResource.blob_id) {
+    if (blockResource == null || !blockResource.blob_id) {
         siteNotFound();
     }
 
