@@ -1,8 +1,4 @@
-import {
-    getFullnodeUrl,
-    SuiClient,
-    SuiObjectData,
-} from "@mysten/sui.js/client";
+import { getFullnodeUrl, SuiClient, SuiObjectData } from "@mysten/sui.js/client";
 import * as baseX from "base-x";
 import {
     fromB64,
@@ -11,7 +7,7 @@ import {
     isValidSuiAddress,
     toHEX,
 } from "@mysten/sui.js/utils";
-import { AGGREGATOR, SITE_NAMES, NETWORK } from "./constants";
+import { AGGREGATOR, BLOCKSITE_OID, SITE_NAMES, NETWORK } from "./constants";
 import { bcs } from "@mysten/sui.js/bcs";
 import template_404 from "../static/404-page.template.html";
 
@@ -62,7 +58,12 @@ self.addEventListener("fetch", async (event) => {
 
 function subdomainToObjectId(subdomain: string): string | null {
     const objectId = "0x" + toHEX(b36.decode(subdomain.toLowerCase()));
-    console.log("obtained object id: ", objectId, isValidSuiObjectId(objectId), isValidSuiAddress(objectId));
+    console.log(
+        "obtained object id: ",
+        objectId,
+        isValidSuiObjectId(objectId),
+        isValidSuiAddress(objectId)
+    );
     return isValidSuiObjectId(objectId) ? objectId : null;
 }
 
@@ -76,14 +77,11 @@ function getSubdomainAndPath(scope: string): Path | null {
     const url = new URL(scope);
     const hostname = url.hostname.split(".");
 
-    if (
-        hostname.length === 3 ||
-        (hostname.length === 2 && hostname[1] === "localhost")
-    ) {
+    if (hostname.length === 3 || (hostname.length === 2 && hostname[1] === "localhost")) {
         // Accept only one level of subdomain eg `subdomain.example.com` or `subdomain.localhost` in
-        // case of local development
-        const path =
-            url.pathname == "/" ? "/index.html" : removeLastSlash(url.pathname);
+        // case of local development.
+        // TODO: This should be changed to allow for SuiNS subdomains.
+        const path = url.pathname == "/" ? "/index.html" : removeLastSlash(url.pathname);
         return { subdomain: hostname[0], path } as Path;
     }
     return null;
@@ -98,19 +96,14 @@ function removeLastSlash(path: string): string {
 
 // SuiNS-like functionality.
 
-
 /** Resolve the subdomain to an object ID using SuiNS The subdomain
-* `example` will look up `example.sui` and return the object ID if
-* found.
-*/
-async function resolveSuiNsAddress(
-    client: SuiClient,
-    subdomain: string
-): Promise<string | null> {
-    const suiObjectId: string = await client.call(
-        "suix_resolveNameServiceAddress",
-        [subdomain + ".sui"]
-    );
+ * `example` will look up `example.sui` and return the object ID if
+ * found.
+ */
+async function resolveSuiNsAddress(client: SuiClient, subdomain: string): Promise<string | null> {
+    const suiObjectId: string = await client.call("suix_resolveNameServiceAddress", [
+        subdomain + ".sui",
+    ]);
     console.log("resolved suins name: ", subdomain, suiObjectId);
     return suiObjectId ? suiObjectId : null;
 }
@@ -161,6 +154,12 @@ const FieldStruct = bcs.struct("Field", {
     value: BlockPageStruct,
 });
 
+const FieldStructRedirect = bcs.struct("Field", {
+    id: UID,
+    name: VECTOR,
+    value: UID,
+});
+
 // Fectching & decompressing on-chain data.
 
 async function resolveAndFetchPage(parsedUrl: Path): Promise<Response> {
@@ -185,21 +184,14 @@ async function resolveAndFetchPage(parsedUrl: Path): Promise<Response> {
     }
     if (objectId) {
         console.log("Object ID: ", objectId);
-        console.log(
-            "Base36 version of the object ID: ",
-            b36.encode(fromHEX(objectId))
-        );
+        console.log("Base36 version of the object ID: ", b36.encode(fromHEX(objectId)));
         return fetchPage(client, objectId, parsedUrl.path);
     }
     return noObjectIdFound();
 }
 
 /** Fetch the page */
-async function fetchPage(
-    client: SuiClient,
-    objectId: string,
-    path: string
-): Promise<Response> {
+async function fetchPage(client: SuiClient, objectId: string, path: string): Promise<Response> {
     const blockResource = await fetchBlockResource(client, objectId, path);
     if (blockResource == null || !blockResource.blob_id) {
         siteNotFound();
@@ -208,17 +200,14 @@ async function fetchPage(
     console.log("Fetched Resource: ", blockResource);
     const contents = await fetch(aggregatorEndpoint(blockResource.blob_id));
     if (!contents.ok) {
-      return siteNotFound()
+        return siteNotFound();
     }
 
     // Deserialize the bcs encoded body and decompress.
     const body = new Uint8Array(await contents.arrayBuffer());
 
     console.log("body: ", body);
-    const decompressed = await decompressData(
-        body,
-        blockResource.content_encoding
-    );
+    const decompressed = await decompressData(body, blockResource.content_encoding);
     if (!decompressed) {
         return siteNotFound();
     }
@@ -229,16 +218,40 @@ async function fetchPage(
     });
 }
 
+function specialRedirectField(): string {
+    return BLOCKSITE_OID + "-site";
+}
 
 async function fetchBlockResource(
     client: SuiClient,
     objectId: string,
     path: string
 ): Promise<BlockResource | null> {
-    const dynamicFields = await client.getDynamicFieldObject({
+    // Also check the special site field
+    const siteFieldPromise = client.getDynamicFieldObject({
+        parentId: objectId,
+        name: { type: "0x1::string::String", value: specialRedirectField() },
+    });
+    const dynamicFieldsPromise = client.getDynamicFieldObject({
         parentId: objectId,
         name: { type: "0x1::string::String", value: path },
     });
+    let [siteField, dynamicFields] = await Promise.all([siteFieldPromise, dynamicFieldsPromise]);
+
+    if (siteField.data) {
+        console.log("Special redirect field found");
+        const redirectPage = await client.getObject({
+            id: siteField.data.objectId,
+            options: { showBcs: true },
+        });
+        console.log("Redirect page: ", redirectPage);
+        if (!redirectPage.data) {
+            return null;
+        }
+        const redirectObjectId = getRedirectField(redirectPage.data);
+        return fetchBlockResource(client, redirectObjectId, path);
+    }
+
     console.log("Dynamic fields: ", dynamicFields);
     if (!dynamicFields.data) {
         console.log("No dynamic field found");
@@ -266,6 +279,15 @@ function getPageFields(data: SuiObjectData): BlockResource | null {
     // Deserialize the bcs encoded struct
     if (data.bcs && data.bcs.dataType === "moveObject") {
         const blockpage = FieldStruct.parse(fromB64(data.bcs.bcsBytes));
+        return blockpage.value;
+    }
+    return null;
+}
+
+function getRedirectField(data: SuiObjectData): string | null {
+    // Deserialize the bcs encoded struct
+    if (data.bcs && data.bcs.dataType === "moveObject") {
+        const blockpage = FieldStructRedirect.parse(fromB64(data.bcs.bcsBytes));
         return blockpage.value;
     }
     return null;
@@ -320,18 +342,18 @@ function Response404(message: String): Response {
 }
 
 function aggregatorEndpoint(blob_id: string): URL {
-  return new URL(AGGREGATOR + "/v1/" + blob_id)
+    return new URL(AGGREGATOR + "/v1/" + blob_id);
 }
 
 function base64UrlSafeEncode(data: Uint8Array): string {
     let base64 = arrayBufferToBas64(data);
     // Use the URL-safe base 64 encoding by removing padding and swapping characters.
-    return base64.replaceAll('/', '_').replaceAll('+', '-').replaceAll('=', '');
+    return base64.replaceAll("/", "_").replaceAll("+", "-").replaceAll("=", "");
 }
 
-function arrayBufferToBas64( bytes: Uint8Array ): string {
+function arrayBufferToBas64(bytes: Uint8Array): string {
     // Convert each byte in the array to the correct character
-    const binaryString = Array.from(bytes, byte => String.fromCharCode(byte)).join('');
+    const binaryString = Array.from(bytes, (byte) => String.fromCharCode(byte)).join("");
     // Encode the binary string to base64 using btoa
     return btoa(binaryString);
 }

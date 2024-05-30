@@ -40,8 +40,6 @@ module blocksite::blocksite {
         transfer::transfer(site, tx_context::sender(ctx));
     }
 
-    // Manipulation of resources //
-
     public fun new_resource(
         path: String,
         content_type: String,

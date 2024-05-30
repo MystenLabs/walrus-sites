@@ -8,11 +8,11 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.82"
 clap = { version = "4.5.4", features = ["derive"] }
-sui-keys = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.24.0" }
-sui-sdk = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.24.0" }
-sui-types = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.24.0" }
-move-core-types = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.24.0" }
-shared-crypto = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.24.0" }
+sui-keys = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.26.0" }
+sui-sdk = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.26.0" }
+sui-types = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.26.0" }
+move-core-types = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.26.0" }
+shared-crypto = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.26.0" }
 tokio = { version = "1.37.0", features = ["rt", "rt-multi-thread", "macros"] }
 toml = "0.8.8"
 serde = { version = "1.0.199", features = ["derive"] }

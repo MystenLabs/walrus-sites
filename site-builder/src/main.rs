@@ -57,7 +57,7 @@ enum Commands {
         #[clap(short, long, action)]
         watch: bool,
         /// The number of epochs for which to save the updated resources on Walrus.
-        #[clap(short, long, default_value_t = 0)]
+        #[clap(long, default_value_t = 1)]
         epochs: u64,
     },
     /// Convert an object ID in hex format to the equivalent base36 format.
@@ -85,7 +85,6 @@ enum Commands {
     Sitemap {
         object: ObjectID,
     },
-    Test,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -157,17 +156,6 @@ async fn main() -> Result<()> {
             }
         }
         Commands::Convert { object_id } => println!("{}", id_to_base36(object_id)?),
-        Commands::Test => {
-            let cc: ClientCommunicationConfig = serde_yaml::from_str("")?;
-            let wc = WalrusConfig {
-                system_pkg: ObjectID::random(),
-                system_object: ObjectID::random(),
-                wallet_config: None,
-                communication_config: cc,
-            };
-
-            println!("{}", serde_yaml::to_string(&wc)?)
-        }
     };
 
     Ok(())
