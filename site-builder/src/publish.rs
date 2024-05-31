@@ -31,6 +31,7 @@ pub async fn publish_site(
         SiteIdentifier::NewSite(site_name.to_owned()),
         config,
         epochs,
+        false,
     )
     .await
 }
@@ -41,6 +42,7 @@ pub async fn watch_edit_site(
     site_id: SiteIdentifier,
     config: &Config,
     epochs: u64,
+    force: bool,
 ) -> Result<()> {
     let (tx, rx) = channel();
     let mut watcher = notify::recommended_watcher(move |res| {
@@ -55,7 +57,15 @@ pub async fn watch_edit_site(
         match rx.recv() {
             Ok(event) => {
                 tracing::info!("change detected: {:?}", event);
-                edit_site(directory, content_encoding, site_id.clone(), config, epochs).await?;
+                edit_site(
+                    directory,
+                    content_encoding,
+                    site_id.clone(),
+                    config,
+                    epochs,
+                    force,
+                )
+                .await?;
             }
             Err(e) => println!("Watch error!: {}", e),
         }
@@ -69,6 +79,7 @@ pub async fn update_site(
     config: &Config,
     watch: bool,
     epochs: u64,
+    force: bool,
 ) -> Result<()> {
     if watch {
         watch_edit_site(
@@ -77,6 +88,7 @@ pub async fn update_site(
             SiteIdentifier::ExistingSite(*site_object),
             config,
             epochs,
+            force,
         )
         .await
     } else {
@@ -86,6 +98,7 @@ pub async fn update_site(
             SiteIdentifier::ExistingSite(*site_object),
             config,
             epochs,
+            force,
         )
         .await
     }
@@ -97,6 +110,7 @@ pub async fn edit_site(
     site_id: SiteIdentifier,
     config: &Config,
     epochs: u64,
+    force: bool,
 ) -> Result<()> {
     tracing::debug!(?site_id, ?directory, "editing site");
     let wallet = load_wallet_context(&config.walrus.wallet_config.clone())?;
@@ -114,7 +128,7 @@ pub async fn edit_site(
     resource_manager.read_dir(directory, content_encoding, walrus_client.encoding_config())?;
     tracing::debug!(resources=%resource_manager.resources, "resources loaded from directory");
 
-    let site_manager = SiteManager::new(config, walrus_client, site_id.clone(), epochs).await?;
+    let site_manager = SiteManager::new(config, walrus_client, site_id.clone(), epochs, force).await?;
     let (response, summary) = site_manager.update_site(&resource_manager).await?;
     print_summary(
         config,

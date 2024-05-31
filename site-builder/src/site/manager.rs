@@ -35,6 +35,7 @@ pub struct SiteManager<'a> {
     pub client: WalrusClient<SuiContractClient>,
     pub site_id: SiteIdentifier,
     pub epochs: u64,
+    pub force: bool,
 }
 
 impl<'a> SiteManager<'a> {
@@ -43,12 +44,14 @@ impl<'a> SiteManager<'a> {
         client: WalrusClient<SuiContractClient>,
         site_id: SiteIdentifier,
         epochs: u64,
+        force: bool,
     ) -> Result<Self> {
         Ok(SiteManager {
             client,
             config,
             site_id,
             epochs,
+            force,
         })
     }
 
@@ -64,7 +67,13 @@ impl<'a> SiteManager<'a> {
         let (ptb, existing_resources, needs_transfer) = match &self.site_id {
             SiteIdentifier::ExistingSite(site_id) => (
                 ptb.with_call_arg(&self.get_wallet().get_object_ref(*site_id).await?.into())?,
-                self.get_existing_resources(*site_id).await?,
+                if self.force {
+                    // We want to force an update, so we don't need to get the resources from the
+                    // existing site. We will update them regardless.
+                    ResourceSet::default()
+                } else {
+                    self.get_existing_resources(*site_id).await?
+                },
                 false,
             ),
             SiteIdentifier::NewSite(site_name) => (

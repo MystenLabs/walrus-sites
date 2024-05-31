@@ -54,6 +54,12 @@ enum Commands {
         /// The number of epochs for which to save the updated resources on Walrus.
         #[clap(long, default_value_t = 1)]
         epochs: u64,
+        /// Publish all resources to Sui and Walrus, even if they may be already present.
+        ///
+        /// This can be useful in case the Walrus devnet is reset, but the resources are still
+        /// available on Sui.
+        #[clap(long, action)]
+        force: bool,
     },
     /// Convert an object ID in hex format to the equivalent Base36 format.
     ///
@@ -111,6 +117,7 @@ async fn main() -> Result<()> {
             content_encoding,
             watch,
             epochs,
+            force,
         } => {
             update_site(
                 directory,
@@ -119,6 +126,7 @@ async fn main() -> Result<()> {
                 &config,
                 *watch,
                 *epochs,
+                *force,
             )
             .await?;
         }
