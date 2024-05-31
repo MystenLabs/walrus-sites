@@ -4,11 +4,7 @@ use anyhow::{anyhow, Result};
 use futures::Future;
 use sui_sdk::{
     rpc_types::{
-        Page,
-        SuiMoveStruct,
-        SuiObjectResponse,
-        SuiParsedData,
-        SuiTransactionBlockEffects,
+        Page, SuiMoveStruct, SuiObjectResponse, SuiParsedData, SuiTransactionBlockEffects,
         SuiTransactionBlockEffectsAPI,
     },
     SuiClient,
@@ -134,7 +130,7 @@ pub async fn get_existing_resource_ids(
     client: &SuiClient,
     site_id: ObjectID,
 ) -> Result<HashMap<String, ObjectID>> {
-    let existing = get_all_dynamic_field_info(client, site_id.into())
+    let existing = get_all_dynamic_field_info(client, site_id)
         .await?
         .iter()
         .map(|d| {

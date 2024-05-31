@@ -4,8 +4,7 @@ use sui_types::{
     base_types::{ObjectID, SuiAddress},
     programmable_transaction_builder::ProgrammableTransactionBuilder,
     transaction::{Argument, CallArg, ProgrammableTransaction},
-    Identifier,
-    TypeTag,
+    Identifier, TypeTag,
 };
 
 use super::resource::{ResourceInfo, ResourceOp};
@@ -64,7 +63,6 @@ impl<T> BlocksitePtb<T> {
         self.pt_builder.transfer_arg(recipient, arg);
     }
 
-
     /// Move call to create a new blocksite.
     pub fn create_site(&mut self, site_name: &str) -> Result<Argument> {
         tracing::debug!(site=%site_name, "new Move call: creating site");
@@ -89,7 +87,6 @@ impl<T> BlocksitePtb<T> {
 
     /// Concludes the creation of the PTB.
     pub fn finish(self) -> ProgrammableTransaction {
-
         self.pt_builder.finish()
     }
 }
@@ -125,7 +122,7 @@ impl BlocksitePtb<Argument> {
                 self.add_programmable_move_call(Identifier::new("new_resource")?, vec![], args);
             args = vec![new_resource_arg];
             // Replace the call to execute the adding
-            call.function = "add_resource".to_owned();
+            "add_resource".clone_into(&mut call.function);
         }
         args.insert(0, self.site_argument);
         self.add_programmable_move_call(Identifier::new(call.function)?, vec![], args);
@@ -180,13 +177,10 @@ impl<'a> TryFrom<&ResourceOp<'a>> for BlocksiteCall {
             ResourceOp::Deleted(resource) => {
                 BlocksiteCall::remove_resource_if_exists(&resource.info)
             }
-            ResourceOp::Created(resource) => {
-                BlocksiteCall::new_resource_and_add(&resource.info)
-            }
+            ResourceOp::Created(resource) => BlocksiteCall::new_resource_and_add(&resource.info),
         }
     }
 }
-
 
 impl<'a> TryFrom<ResourceOp<'a>> for BlocksiteCall {
     type Error = anyhow::Error;

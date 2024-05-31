@@ -14,7 +14,7 @@ use sui_types::{
 use walrus_service::client::Client as WalrusClient;
 use walrus_sui::client::SuiContractClient;
 
-use super::resource::{ResourceInfo, ResourceManager, ResourceOp, ResourceSet, OperationsSummary};
+use super::resource::{OperationsSummary, ResourceInfo, ResourceManager, ResourceOp, ResourceSet};
 use crate::{
     site::builder::{BlocksiteCall, BlocksitePtb},
     util::{self, get_struct_from_object_response},
@@ -34,7 +34,7 @@ pub struct SiteManager<'a> {
     pub config: &'a Config,
     pub client: WalrusClient<SuiContractClient>,
     pub site_id: SiteIdentifier,
-    pub epochs: u64
+    pub epochs: u64,
 }
 
 impl<'a> SiteManager<'a> {
@@ -80,7 +80,7 @@ impl<'a> SiteManager<'a> {
         Ok((
             self.execute_updates(ptb, &update_operations, needs_transfer)
                 .await?,
-            update_operations.into()
+            update_operations.into(),
         ))
     }
 
@@ -216,7 +216,7 @@ impl<'a> SiteManager<'a> {
     }
 
     fn get_wallet(&self) -> &WalletContext {
-        &self.client.sui_client().wallet()
+        self.client.sui_client().wallet()
     }
 
     async fn sui_client(&self) -> Result<SuiClient> {

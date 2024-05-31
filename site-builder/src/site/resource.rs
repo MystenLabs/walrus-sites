@@ -73,7 +73,7 @@ pub struct Resource {
 
 impl PartialOrd for Resource {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.info.partial_cmp(&other.info)
+        Some(self.cmp(other))
     }
 }
 
