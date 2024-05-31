@@ -2,6 +2,7 @@
 mod publish;
 mod site;
 mod util;
+mod walrus;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};

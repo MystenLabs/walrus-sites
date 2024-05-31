@@ -27,3 +27,6 @@ notify = "6.1.1"
 walrus-service = { path = "../../walrus-project/walrus/crates/walrus-service" }
 walrus-core= { path = "../../walrus-project/walrus/crates/walrus-core" }
 walrus-sui= { path = "../../walrus-project/walrus/crates/walrus-sui" }
+serde_with = "3.8.1"
+base64 = "0.22.1"
+thiserror = "1.0.61"

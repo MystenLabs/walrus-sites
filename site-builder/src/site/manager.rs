@@ -55,7 +55,7 @@ impl<'a> SiteManager<'a> {
         })
     }
 
-    /// Update the site with the given [Resource]s.
+    /// Update the site with the given [`Resource`]s.
     ///
     /// If the site does not exist, it is created and updated. The resources that need to be updated
     /// or created are published to Walrus.
