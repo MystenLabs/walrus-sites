@@ -1,7 +1,6 @@
 // mod network;
 mod publish;
 mod site;
-// mod suins;
 mod util;
 use std::path::PathBuf;
 
@@ -11,11 +10,7 @@ use publish::{publish_site, update_site};
 use serde::Deserialize;
 use site::content::ContentEncoding;
 use sui_types::{base_types::ObjectID, Identifier};
-// use suins::set_suins_name;
-use walrus_service::{
-    cli_utils::load_wallet_context,
-    client::{ClientCommunicationConfig, Config as WalrusConfig},
-};
+use walrus_service::{cli_utils::load_wallet_context, client::Config as WalrusConfig};
 
 use crate::util::{get_existing_resource_ids, id_to_base36};
 
@@ -60,31 +55,15 @@ enum Commands {
         #[clap(long, default_value_t = 1)]
         epochs: u64,
     },
-    /// Convert an object ID in hex format to the equivalent base36 format.
-    /// Useful to browse sites at particular object IDs.
+    /// Convert an object ID in hex format to the equivalent Base36 format.
+    ///
+    /// This command may be useful to browse a site, given it object ID.
     Convert {
         /// The object id (in hex format) to convert
         object_id: ObjectID,
     },
-    /// Set the SuiNs record to an ObjectID.
-    SetNs {
-        /// The SuiNs packages
-        #[clap(short, long)]
-        package: ObjectID,
-        /// The SuiNs object to be updated
-        #[clap(short, long)]
-        sui_ns: ObjectID,
-        /// The SuiNsRegistration NFT with the SuiNs name
-        #[clap(short, long)]
-        registration: ObjectID,
-        /// The address to be added to the record
-        #[clap(short, long)]
-        target: ObjectID,
-    },
     /// Show the pages composing the blocksite at the given id
-    Sitemap {
-        object: ObjectID,
-    },
+    Sitemap { object: ObjectID },
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -133,16 +112,15 @@ async fn main() -> Result<()> {
             watch,
             epochs,
         } => {
-            update_site(directory, content_encoding, object_id, &config, *watch, *epochs).await?;
-        }
-        Commands::SetNs {
-            ..
-            // package,
-            // sui_ns,
-            // registration,
-            // target,
-        } => {
-            // set_suins_name(config, package, sui_ns, registration, target).await?;
+            update_site(
+                directory,
+                content_encoding,
+                object_id,
+                &config,
+                *watch,
+                *epochs,
+            )
+            .await?;
         }
         // Add a path to be watched. All files and directories at that path and
         // below will be monitored for changes.
