@@ -27,14 +27,14 @@ struct Args {
 #[derive(Subcommand, Debug)]
 #[clap(rename_all = "kebab-case")]
 enum Commands {
-    /// Publish a new site on sui
+    /// Publish a new site on Sui.
     Publish {
-        /// The directory containing the site sources
+        /// The directory containing the site sources.
         directory: PathBuf,
-        /// The encoding for the contents of the BlockPages
+        /// The encoding for the contents of the BlockPages.
         #[clap(short = 'e', long, value_enum, default_value_t = ContentEncoding::Gzip)]
         content_encoding: ContentEncoding,
-        /// The name of the BlockSite
+        /// The name of the BlockSite.
         #[clap(short, long, default_value = "test site")]
         site_name: String,
         /// The number of epochs for which to save the resources on Walrus.
@@ -43,11 +43,11 @@ enum Commands {
     },
     /// Update an existing site
     Update {
-        /// The directory containing the site sources
+        /// The directory containing the site sources.
         directory: PathBuf,
-        /// The object ID of a partially published site to be completed
+        /// The object ID of a partially published site to be completed.
         object_id: ObjectID,
-        /// The encoding for the contents of the BlockPages
+        /// The encoding for the contents of the BlockPages.
         #[clap(short = 'e', long, value_enum, default_value_t = ContentEncoding::Gzip)]
         content_encoding: ContentEncoding,
         #[clap(short, long, action)]
@@ -69,12 +69,12 @@ enum Commands {
         /// The object id (in hex format) to convert
         object_id: ObjectID,
     },
-    /// Show the pages composing the blocksite at the given id
+    /// Show the pages composing the blocksite at the given object ID.
     Sitemap { object: ObjectID },
 }
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct Config {
+pub(crate) struct Config {
     #[serde(default = "blocksite_module")]
     pub module: Identifier,
     #[serde(default = "default_portal")]

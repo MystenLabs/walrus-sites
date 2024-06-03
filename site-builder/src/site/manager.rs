@@ -18,12 +18,12 @@ use super::resource::{OperationsSummary, ResourceInfo, ResourceManager, Resource
 use crate::{
     site::builder::{BlocksiteCall, BlocksitePtb},
     util::{self, get_struct_from_object_response},
-    Config,
+    Config, walrus::Walrus,
 };
 
-/// The way we want to address the site.
+/// The indentifier for the new or existing site.
 ///
-/// Either by object id (existing site) or name (new site).
+/// Either object ID (existing site) or name (new site).
 #[derive(Debug, Clone)]
 pub enum SiteIdentifier {
     ExistingSite(ObjectID),
@@ -32,7 +32,7 @@ pub enum SiteIdentifier {
 
 pub struct SiteManager<'a> {
     pub config: &'a Config,
-    pub client: WalrusClient<SuiContractClient>,
+    pub walrus: Walrus,
     pub site_id: SiteIdentifier,
     pub epochs: u64,
     pub force: bool,
@@ -41,13 +41,13 @@ pub struct SiteManager<'a> {
 impl<'a> SiteManager<'a> {
     pub async fn new(
         config: &'a Config,
-        client: WalrusClient<SuiContractClient>,
+        walrus: Walrus,
         site_id: SiteIdentifier,
         epochs: u64,
         force: bool,
     ) -> Result<Self> {
         Ok(SiteManager {
-            client,
+            walrus,
             config,
             site_id,
             epochs,

@@ -14,6 +14,7 @@ pub mod output;
 pub mod types;
 
 /// Controller to execute actions on Walrus.
+#[derive(Debug, Clone)]
 pub struct Walrus {
     /// The name of the Walrus binary.
     bin: String,
@@ -58,11 +59,14 @@ impl Walrus {
         create_command!(self, store, file, epochs)
     }
 
+    // TODO(giac): currently blocking. Parallelize reads.
     /// Issues a `read` JSON command to the Walrus CLI, returning the parsed output.
     pub fn read(&self, blob_id: BlobId, out: Option<PathBuf>) -> Result<ReadOutput> {
         create_command!(self, read, blob_id, out, self.rpc_arg())
     }
 
+    // TODO(giac): currently blocking. Parallelize reads.
+    // TODO(giac): maybe preconfigure the `n_shards` to avid repeating `None`.
     /// Issues a `blob_id` JSON command to the Walrus CLI, returning the parsed output.
     pub fn blob_id(&self, file: PathBuf, n_shards: Option<NonZeroU16>) -> Result<BlobIdOutput> {
         create_command!(self, blob_id, file, n_shards, self.rpc_arg())
