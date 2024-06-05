@@ -1,5 +1,6 @@
 {
 	"dependencies": {
+		"@mysten/bcs": "^1.0.2",
 		"@mysten/sui.js": "^0.54.1",
 		"base-x": "^4.0.0",
 		"ts-loader": "^9.5.1",

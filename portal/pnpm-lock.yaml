@@ -5,6 +5,9 @@ settings:
   excludeLinksFromLockfile: false
 
 dependencies:
+  '@mysten/bcs':
+    specifier: ^1.0.2
+    version: 1.0.2
   '@mysten/sui.js':
     specifier: ^0.54.1
     version: 0.54.1(svelte@4.2.17)(typescript@5.4.5)
@@ -198,6 +201,12 @@ packages:
 
   /@mysten/bcs@0.11.1:
     resolution: {integrity: sha512-xP85isNSYUCHd3O/g+TmZYmg4wK6cU8q/n/MebkIGP4CYVJZz2wU/G24xIZ3wI+0iTop4dfgA5kYrg/DQKCUzA==}
+    dependencies:
+      bs58: 5.0.0
+    dev: false
+
+  /@mysten/bcs@1.0.2:
+    resolution: {integrity: sha512-haHT0km/9yIIe8lwo8gDFxGLnoxfRF4WmEVCz4lDXbEVQRsZkF0zB97kukiwMjDuFBaGVUhrOMCLz6td8tSMaQ==}
     dependencies:
       bs58: 5.0.0
     dev: false
