@@ -356,7 +356,7 @@ impl ResourceManager {
             content_type,
             *content_encoding,
             output.blob_id,
-            // TODO(giac): Move to `content` when the content encoding is decided.
+            // TODO(giac): Change to `content.len()` when the problem with content encoding is fixed.
             plain_content.len(),
         )))
     }

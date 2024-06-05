@@ -1,9 +1,10 @@
-# Gas coin to use and suitable gas budget
-gas_coin: 0x4414377f07bf7ad6a77e1de779f742ca9fd46c3d4a5bbff341dd3e27bf9a7e23
-gas_budget: 1000000000
-package: 0x3cd64700b96a4d67158395d3a23af3f53ba3b3d6cbec45cc7939645e52daf435
-module: blocksite
-walrus:
-    system_pkg: 0x145ab80035e95406cb09273d0eacd8d353140e959847abc6a539a963abc82113
-    system_object: 0x795b9bf0595f370b19b2906b94d2f7a3821d572b0e3b42170c088e2135df2d7c
-    wallet_config: /Users/giacomo/.sui/sui_config/client.yaml
+# module: blocksite
+# portal: blocksite.net
+package: 0x31e123f07597dd04f4603d7ab98c036c14959e90f932de5e71f6cdaf54d84121
+# general:
+#   rpc_url: https://fullnode.testnet.sui.io:443
+#   wallet: /path/to/.sui/sui_config/client.yaml
+#   walrus_binary: /path/to/walrus
+#   walrus_config: /path/to/devnet_deployment/client_config.yaml
+#   gas_budget: 500000000
+#   gas_coin: 0x1234... # testnet coin

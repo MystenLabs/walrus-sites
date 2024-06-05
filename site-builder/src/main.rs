@@ -30,6 +30,8 @@ struct Args {
 #[clap(rename_all = "kebab-case")]
 pub(crate) struct GeneralArgs {
     /// The URL or the RPC enpoint to connect the client to.
+    ///
+    /// Can be specified as a CLI argument or in the config.
     #[clap(long)]
     rpc_url: Option<String>,
     /// The path to the Sui Wallet config.
@@ -40,6 +42,7 @@ pub(crate) struct GeneralArgs {
     /// The path or name of the walrus binary.
     ///
     /// The Walrus binary will then be called with this configuration to perform actions on Walrus.
+    /// Can be specified as a CLI argument or in the config.
     #[clap(long)]
     #[serde(default = "default::walrus_binary")]
     walrus_binary: Option<String>,
@@ -50,22 +53,18 @@ pub(crate) struct GeneralArgs {
     #[clap(long)]
     walrus_config: Option<PathBuf>,
     /// The gas budget for the operations on Sui.
+    ///
+    /// Can be specified as a CLI argument or in the config.
+    #[clap(long)]
     #[clap(short, long)]
     #[serde(default = "default::gas_budget")]
     gas_budget: Option<u64>,
     /// The gas coin to be used
+    ///
+    /// Can be specified as a CLI argument or in the config.
     // TODO(giac): automatic gas coin selection.
     #[clap(long)]
     gas_coin: Option<ObjectID>,
-}
-
-mod default {
-    pub(crate) fn walrus_binary() -> Option<String> {
-        Some("walrus".to_owned())
-    }
-    pub(crate) fn gas_budget() -> Option<u64> {
-        Some(500_000_000)
-    }
 }
 
 impl Default for GeneralArgs {
@@ -165,14 +164,11 @@ enum Commands {
 }
 
 /// The configuration for the site builder.
-///
-/// The type flag `M` indicates if the config has been merged with the arguments passed from the
-/// command line.
 #[derive(Deserialize, Debug, Clone)]
 pub(crate) struct Config {
-    #[serde(default = "blocksite_module")]
+    #[serde(default = "default::blocksite_module")]
     pub module: Identifier,
-    #[serde(default = "default_portal")]
+    #[serde(default = "default::default_portal")]
     pub portal: String,
     pub package: ObjectID,
     // TODO(giac): automatically select the gas coin.
@@ -203,12 +199,23 @@ impl Config {
     }
 }
 
-fn blocksite_module() -> Identifier {
-    Identifier::new("blocksite").expect("valid literal identifier")
-}
+mod default {
+    use sui_types::Identifier;
 
-fn default_portal() -> String {
-    "blocksite.net".to_owned()
+    pub(crate) fn walrus_binary() -> Option<String> {
+        Some("walrus".to_owned())
+    }
+    pub(crate) fn gas_budget() -> Option<u64> {
+        Some(500_000_000)
+    }
+
+    pub(crate) fn blocksite_module() -> Identifier {
+        Identifier::new("blocksite").expect("valid literal identifier")
+    }
+
+    pub(crate) fn default_portal() -> String {
+        "blocksite.net".to_owned()
+    }
 }
 
 #[tokio::main]
