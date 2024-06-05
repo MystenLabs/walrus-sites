@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use anyhow::{anyhow, Result};
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{
@@ -11,14 +9,13 @@ use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
     transaction::{Argument, ProgrammableTransaction, TransactionData},
 };
-use walrus_service::client::Client as WalrusClient;
-use walrus_sui::client::SuiContractClient;
 
 use super::resource::{OperationsSummary, ResourceInfo, ResourceManager, ResourceOp, ResourceSet};
 use crate::{
     site::builder::{BlocksiteCall, BlocksitePtb},
     util::{self, get_struct_from_object_response},
-    Config, walrus::Walrus,
+    walrus::Walrus,
+    Config,
 };
 
 /// The indentifier for the new or existing site.
@@ -30,24 +27,28 @@ pub enum SiteIdentifier {
     NewSite(String),
 }
 
-pub struct SiteManager<'a> {
-    pub config: &'a Config,
+pub struct SiteManager {
+    pub config: Config,
     pub walrus: Walrus,
+    pub wallet: WalletContext,
     pub site_id: SiteIdentifier,
     pub epochs: u64,
     pub force: bool,
 }
 
-impl<'a> SiteManager<'a> {
+impl SiteManager {
+    /// Creates a new site manager.
     pub async fn new(
-        config: &'a Config,
+        config: Config,
         walrus: Walrus,
+        wallet: WalletContext,
         site_id: SiteIdentifier,
         epochs: u64,
         force: bool,
     ) -> Result<Self> {
         Ok(SiteManager {
             walrus,
+            wallet,
             config,
             site_id,
             epochs,
@@ -55,7 +56,7 @@ impl<'a> SiteManager<'a> {
         })
     }
 
-    /// Update the site with the given [`Resource`]s.
+    /// Updates the site with the given [`Resource`]s.
     ///
     /// If the site does not exist, it is created and updated. The resources that need to be updated
     /// or created are published to Walrus.
@@ -66,8 +67,9 @@ impl<'a> SiteManager<'a> {
         let ptb = BlocksitePtb::new(self.config.package, self.config.module.clone())?;
         let (ptb, existing_resources, needs_transfer) = match &self.site_id {
             SiteIdentifier::ExistingSite(site_id) => (
-                ptb.with_call_arg(&self.get_wallet().get_object_ref(*site_id).await?.into())?,
+                ptb.with_call_arg(&self.wallet.get_object_ref(*site_id).await?.into())?,
                 if self.force {
+                    // TODO(giac): bug here - we need to delete too, not only add!!!
                     // We want to force an update, so we don't need to get the resources from the
                     // existing site. We will update them regardless.
                     ResourceSet::default()
@@ -93,7 +95,7 @@ impl<'a> SiteManager<'a> {
         ))
     }
 
-    /// Publish the resources to Walrus.
+    /// Publishes the resources to Walrus.
     async fn publish_to_walrus<'b>(&self, updates: &[ResourceOp<'b>]) -> Result<()> {
         let to_update = updates
             .iter()
@@ -101,48 +103,15 @@ impl<'a> SiteManager<'a> {
             .collect::<Vec<_>>();
         tracing::debug!(resources=?to_update, "publishing new or updated resources to Walrus");
 
-        // First send all the requests to reserve the blob space on chain. This way we don't have to
-        // wait after each.
         for update in to_update.iter() {
             let resource = update.inner();
-            let _ = self
-                .client
-                .reserve_blob(
-                    resource
-                        .metadata
-                        .as_ref()
-                        .expect("created operation must have metadata"),
-                    resource.unencoded_size,
-                    self.epochs,
-                )
-                .await?;
-        }
-        tracing::debug!("sent all requests to reserve space for blobs");
-
-        // Wait for even the last reservation to go through. Consider that the polling time for
-        // walrus storage nodes is ~400ms.
-        tokio::time::sleep(Duration::from_millis(500)).await;
-
-        for update in to_update.iter() {
-            let resource = update.inner();
-            let pairs = resource
-                .slivers
-                .as_ref()
-                .expect("the resources to be created have slivers");
-            let metadata = resource
-                .metadata
-                .as_ref()
-                .expect("created operation must have metadata");
-
             tracing::debug!(
-                resource=?resource.info.path,
-                blob_id=%metadata.blob_id(),
+                resource=?resource.full_path,
+                blob_id=%resource.info.blob_id,
                 unencoded_size=%resource.unencoded_size,
                 "storing new blob on Walrus"
             );
-            self.client
-                .store_metadata_and_pairs(metadata, pairs)
-                .await?;
+            self.walrus.store(resource.full_path.clone(), self.epochs)?;
         }
         Ok(())
     }
@@ -165,9 +134,7 @@ impl<'a> SiteManager<'a> {
         }
         self.sign_and_send_ptb(
             ptb.finish(),
-            self.get_wallet()
-                .get_object_ref(self.config.gas_coin)
-                .await?,
+            self.wallet.get_object_ref(self.gas_coin().await?).await?,
         )
         .await
     }
@@ -177,17 +144,16 @@ impl<'a> SiteManager<'a> {
         programmable_transaction: ProgrammableTransaction,
         gas_coin: ObjectRef,
     ) -> Result<SuiTransactionBlockResponse> {
-        let wallet = self.get_wallet();
-        let gas_price = wallet.get_reference_gas_price().await?;
+        let gas_price = self.wallet.get_reference_gas_price().await?;
         let transaction = TransactionData::new_programmable(
             self.active_address()?,
             vec![gas_coin],
             programmable_transaction,
-            self.config.gas_budget,
+            self.config.gas_budget(),
             gas_price,
         );
-        let transaction = wallet.sign_transaction(&transaction);
-        wallet.execute_transaction_may_fail(transaction).await
+        let transaction = self.wallet.sign_transaction(&transaction);
+        self.wallet.execute_transaction_may_fail(transaction).await
     }
 
     async fn get_existing_resources(&self, site_id: ObjectID) -> Result<ResourceSet> {
@@ -224,19 +190,14 @@ impl<'a> SiteManager<'a> {
         get_dynamic_field!(object, "value", SuiMoveValue::Struct)?.try_into()
     }
 
-    fn get_wallet(&self) -> &WalletContext {
-        self.client.sui_client().wallet()
-    }
-
     async fn sui_client(&self) -> Result<SuiClient> {
-        self.get_wallet().get_client().await
+        self.wallet.get_client().await
     }
 
-    // TODO: This is a copy of `[WalletContext::active_address`] that works without borrowing as
-    // mutable. Use the implementation in `WalletContext` when the TODO there is fixed.
+    // TODO(giac): This is a copy of `[WalletContext::active_address`] that works without borrowing
+    //     as mutable. Use the implementation in `WalletContext` when the TODO there is fixed.
     pub(crate) fn active_address(&self) -> Result<SuiAddress> {
-        let wallet = self.get_wallet();
-        if wallet.config.keystore.addresses().is_empty() {
+        if self.wallet.config.keystore.addresses().is_empty() {
             return Err(anyhow!(
                 "No managed addresses. Create new address with `new-address` command."
             ));
@@ -244,9 +205,14 @@ impl<'a> SiteManager<'a> {
 
         // Ok to unwrap because we checked that config addresses not empty
         // Set it if not exists
-        Ok(wallet
+        Ok(self
+            .wallet
             .config
             .active_address
-            .unwrap_or(*wallet.config.keystore.addresses().first().unwrap()))
+            .unwrap_or(*self.wallet.config.keystore.addresses().first().unwrap()))
+    }
+
+    async fn gas_coin(&self) -> Result<ObjectID> {
+        self.config.general.gas_coin.ok_or(anyhow!("a gas coin must be specified"))
     }
 }

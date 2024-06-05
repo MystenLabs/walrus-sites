@@ -1,9 +1,6 @@
 //! The representation of a walrus cli command.
 
-use std::{
-    num::{NonZeroU16, NonZeroU64},
-    path::PathBuf,
-};
+use std::{num::NonZeroU16, path::PathBuf};
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -36,7 +33,6 @@ impl WalrusJsonCmd {
         Ok(serde_json::to_string(&self)?)
     }
 }
-
 
 /// Represents a command to be run on the Walrus CLI.
 #[serde_as]
@@ -148,6 +144,7 @@ impl WalrusCmdBuilder {
     }
 
     /// Adds a [`Command::Read`] command to the builder.
+    #[allow(dead_code)]
     pub fn read(
         self,
         blob_id: BlobId,

@@ -61,6 +61,7 @@ impl Walrus {
 
     // TODO(giac): currently blocking. Parallelize reads.
     /// Issues a `read` JSON command to the Walrus CLI, returning the parsed output.
+    #[allow(dead_code)]
     pub fn read(&self, blob_id: BlobId, out: Option<PathBuf>) -> Result<ReadOutput> {
         create_command!(self, read, blob_id, out, self.rpc_arg())
     }

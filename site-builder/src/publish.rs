@@ -4,8 +4,6 @@ use anyhow::Result;
 use notify::{RecursiveMode, Watcher};
 use sui_sdk::rpc_types::SuiTransactionBlockResponse;
 use sui_types::base_types::{ObjectID, SuiAddress};
-use walrus_service::{cli_utils::load_wallet_context, client::Client as WalrusClient};
-use walrus_sui::client::SuiContractClient;
 
 use crate::{
     site::{
@@ -14,7 +12,8 @@ use crate::{
         // manager::SiteManager,
         resource::{OperationsSummary, ResourceManager},
     },
-    util::{get_site_id_from_response, id_to_base36},
+    util::{get_site_id_from_response, id_to_base36, load_wallet_context},
+    walrus::Walrus,
     Config,
 };
 
@@ -112,23 +111,31 @@ pub async fn edit_site(
     epochs: u64,
     force: bool,
 ) -> Result<()> {
-    tracing::debug!(?site_id, ?directory, "editing site");
-    let wallet = load_wallet_context(&config.walrus.wallet_config.clone())?;
+    tracing::debug!(?site_id, ?directory, ?content_encoding, ?epochs, ?force, "editing site");
 
-    let contract_client = SuiContractClient::new(
-        wallet,
-        config.walrus.system_pkg,
-        config.walrus.system_object,
-        config.gas_budget,
-    )
-    .await?;
-    let walrus_client = WalrusClient::new(config.walrus.clone(), contract_client).await?;
+    let wallet = load_wallet_context(&config.general.wallet)?;
 
-    let mut resource_manager = ResourceManager::new()?;
-    resource_manager.read_dir(directory, content_encoding, walrus_client.encoding_config())?;
+    let walrus = Walrus::new(
+        config.walrus_binary(),
+        config.gas_budget(),
+        config.general.rpc_url.clone(),
+        config.general.walrus_config.clone(),
+        config.general.wallet.clone(),
+    );
+
+    let mut resource_manager = ResourceManager::new(walrus.clone())?;
+    resource_manager.read_dir(directory, content_encoding)?;
     tracing::debug!(resources=%resource_manager.resources, "resources loaded from directory");
 
-    let site_manager = SiteManager::new(config, walrus_client, site_id.clone(), epochs, force).await?;
+    let site_manager = SiteManager::new(
+        config.clone(),
+        walrus,
+        wallet,
+        site_id.clone(),
+        epochs,
+        force,
+    )
+    .await?;
     let (response, summary) = site_manager.update_site(&resource_manager).await?;
     print_summary(
         config,

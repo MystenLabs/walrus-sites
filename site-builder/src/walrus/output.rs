@@ -1,7 +1,7 @@
 //! The output of running commands on the Walrus CLI.
 use std::{path::PathBuf, process::Output};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_with::{base64::Base64, serde_as, DisplayFromStr};
 use sui_types::base_types::ObjectID;
@@ -48,5 +48,6 @@ pub fn try_from_output<T: DeserializeOwned>(output: Output) -> Result<T> {
             String::from_utf8_lossy(&output.stderr)
         ));
     };
-    Ok(serde_json::from_str(&String::from_utf8(output.stdout)?)?)
+    serde_json::from_str(&String::from_utf8(output.stdout)?)
+        .context("failed to parse the Walrus CLI output")
 }

@@ -4,7 +4,8 @@ use sui_types::{
     base_types::{ObjectID, SuiAddress},
     programmable_transaction_builder::ProgrammableTransactionBuilder,
     transaction::{Argument, CallArg, ProgrammableTransaction},
-    Identifier, TypeTag,
+    Identifier,
+    TypeTag,
 };
 
 use super::resource::{ResourceInfo, ResourceOp};
@@ -143,7 +144,7 @@ impl BlocksiteCall {
     /// This call results into two transactions in a PTB, one to create the resource, and one to add
     /// it to the site.
     pub fn new_resource_and_add(resource: &ResourceInfo) -> Result<BlocksiteCall> {
-        tracing::debug!(resource=%resource.path, "new Move call: creating resource");
+        tracing::debug!(resource=%resource.path, content_type=?resource.content_type, encoding=?resource.content_encoding, blob_id=?resource.blob_id, "new Move call: creating resource");
         Ok(BlocksiteCall {
             function: "new_resource_and_add".to_owned(),
             args: vec![

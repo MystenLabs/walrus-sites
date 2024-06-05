@@ -24,9 +24,7 @@ tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
 bcs = "0.1.6"
 notify = "6.1.1"
-walrus-service = { path = "../../walrus-project/walrus/crates/walrus-service" }
-walrus-core= { path = "../../walrus-project/walrus/crates/walrus-core" }
-walrus-sui= { path = "../../walrus-project/walrus/crates/walrus-sui" }
-serde_with = "3.8.1"
+serde_with = { version = "3.8.1", features = ["base64"] }
 base64 = "0.22.1"
 thiserror = "1.0.61"
+home = "0.5.9"

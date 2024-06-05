@@ -11,17 +11,108 @@ use publish::{publish_site, update_site};
 use serde::Deserialize;
 use site::content::ContentEncoding;
 use sui_types::{base_types::ObjectID, Identifier};
-use walrus_service::{cli_utils::load_wallet_context, client::Config as WalrusConfig};
 
-use crate::util::{get_existing_resource_ids, id_to_base36};
+use crate::util::{get_existing_resource_ids, id_to_base36, load_wallet_context};
 
 #[derive(Parser, Debug)]
 #[clap(rename_all = "kebab-case")]
 struct Args {
-    #[arg(short, long, default_value = "config.yaml")]
+    /// The path to the configuration file for the site builder.
+    #[clap(short, long, default_value = "config.yaml")]
     config: PathBuf,
+    #[clap(flatten)]
+    general: GeneralArgs,
     #[command(subcommand)]
     command: Commands,
+}
+
+#[derive(Parser, Clone, Debug, Deserialize)]
+#[clap(rename_all = "kebab-case")]
+pub(crate) struct GeneralArgs {
+    /// The URL or the RPC enpoint to connect the client to.
+    #[clap(long)]
+    rpc_url: Option<String>,
+    /// The path to the Sui Wallet config.
+    ///
+    /// Can be specified as a CLI argument or in the config.
+    #[clap(long)]
+    wallet: Option<PathBuf>,
+    /// The path or name of the walrus binary.
+    ///
+    /// The Walrus binary will then be called with this configuration to perform actions on Walrus.
+    #[clap(long)]
+    #[serde(default = "default::walrus_binary")]
+    walrus_binary: Option<String>,
+    /// The path to the configuration for the Walrus client.
+    ///
+    /// This will be passed to the calls to the Walrus binary.
+    /// Can be specified as a CLI argument or in the config.
+    #[clap(long)]
+    walrus_config: Option<PathBuf>,
+    /// The gas budget for the operations on Sui.
+    #[clap(short, long)]
+    #[serde(default = "default::gas_budget")]
+    gas_budget: Option<u64>,
+    /// The gas coin to be used
+    // TODO(giac): automatic gas coin selection.
+    #[clap(long)]
+    gas_coin: Option<ObjectID>,
+}
+
+mod default {
+    pub(crate) fn walrus_binary() -> Option<String> {
+        Some("walrus".to_owned())
+    }
+    pub(crate) fn gas_budget() -> Option<u64> {
+        Some(500_000_000)
+    }
+}
+
+impl Default for GeneralArgs {
+    fn default() -> Self {
+        Self {
+            rpc_url: None,
+            wallet: None,
+            walrus_binary: default::walrus_binary(),
+            walrus_config: None,
+            gas_budget: default::gas_budget(),
+            gas_coin: None,
+        }
+    }
+}
+
+macro_rules! merge {
+    ($self:ident, $other:ident, $field:ident) => {
+        if $other.$field.is_some() {
+            $self.$field = $other.$field.clone();
+        }
+    };
+}
+
+macro_rules! merge_fields {
+    ($self:ident, $other:ident, $($field:ident),* $(,)?) => (
+        $(
+            merge!($self, $other, $field);
+        )*
+    );
+}
+
+impl GeneralArgs {
+    /// Merges two instances of [`GeneralArgs`], keeping all the `Some` values.
+    ///
+    /// The values of `other` are taken before the values of `self`.
+    pub fn merge(&mut self, other: &Self) {
+        merge_fields!(
+            self,
+            other,
+            rpc_url,
+            wallet,
+            walrus_binary,
+            walrus_config,
+            gas_budget,
+            gas_coin,
+        );
+    }
 }
 
 #[derive(Subcommand, Debug)]
@@ -32,7 +123,7 @@ enum Commands {
         /// The directory containing the site sources.
         directory: PathBuf,
         /// The encoding for the contents of the BlockPages.
-        #[clap(short = 'e', long, value_enum, default_value_t = ContentEncoding::Gzip)]
+        #[clap(short = 'e', long, value_enum, default_value_t = ContentEncoding::PlainText)]
         content_encoding: ContentEncoding,
         /// The name of the BlockSite.
         #[clap(short, long, default_value = "test site")]
@@ -48,7 +139,7 @@ enum Commands {
         /// The object ID of a partially published site to be completed.
         object_id: ObjectID,
         /// The encoding for the contents of the BlockPages.
-        #[clap(short = 'e', long, value_enum, default_value_t = ContentEncoding::Gzip)]
+        #[clap(short = 'e', long, value_enum, default_value_t = ContentEncoding::PlainText)]
         content_encoding: ContentEncoding,
         #[clap(short, long, action)]
         watch: bool,
@@ -73,6 +164,10 @@ enum Commands {
     Sitemap { object: ObjectID },
 }
 
+/// The configuration for the site builder.
+///
+/// The type flag `M` indicates if the config has been merged with the arguments passed from the
+/// command line.
 #[derive(Deserialize, Debug, Clone)]
 pub(crate) struct Config {
     #[serde(default = "blocksite_module")]
@@ -80,9 +175,32 @@ pub(crate) struct Config {
     #[serde(default = "default_portal")]
     pub portal: String,
     pub package: ObjectID,
-    pub gas_coin: ObjectID,
-    pub gas_budget: u64,
-    pub walrus: WalrusConfig,
+    // TODO(giac): automatically select the gas coin.
+    #[serde(default)]
+    pub general: GeneralArgs,
+}
+
+impl Config {
+    /// Merges the other [`GeneralArgs`] (taken from the CLI) with the `general` in the struct.
+    ///
+    /// The values in `other_general` take precedence.
+    pub fn merge(&mut self, other_general: &GeneralArgs) {
+        self.general.merge(other_general);
+    }
+
+    pub fn walrus_binary(&self) -> String {
+        self.general
+            .walrus_binary
+            .as_ref()
+            .expect("serde default => binary exists")
+            .to_owned()
+    }
+
+    pub fn gas_budget(&self) -> u64 {
+        self.general
+            .gas_budget
+            .expect("serde default => gas budget exists")
+    }
 }
 
 fn blocksite_module() -> Identifier {
@@ -96,14 +214,19 @@ fn default_portal() -> String {
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
+    tracing::info!("initializing site builder");
 
     let args = Args::parse();
-    let config: Config = std::fs::read_to_string(&args.config)
+    let mut config: Config = std::fs::read_to_string(&args.config)
         .context(format!("unable to read config file {:?}", args.config))
         .and_then(|s| {
             serde_yaml::from_str(&s)
-                .context(format!("unable to parse toml in file {:?}", args.config))
+                .context(format!("unable to parse yaml in file {:?}", args.config))
         })?;
+    // Merge the configs and the CLI args. Serde default ensures that the `walrus_binary` and
+    // `gas_budget` exist.
+    config.merge(&args.general);
+    tracing::info!(?config, "configuration loaded");
 
     match &args.command {
         Commands::Publish {
@@ -134,7 +257,7 @@ async fn main() -> Result<()> {
         // Add a path to be watched. All files and directories at that path and
         // below will be monitored for changes.
         Commands::Sitemap { object } => {
-            let wallet = load_wallet_context(&config.walrus.wallet_config.clone())?;
+            let wallet = load_wallet_context(&config.general.wallet)?;
             let all_dynamic_fields =
                 get_existing_resource_ids(&wallet.get_client().await?, *object).await?;
             println!("Pages in site at object id: {}", object);

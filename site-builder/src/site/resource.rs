@@ -1,35 +1,85 @@
+//! Functionality to read and check the files in of a website.
+
 use std::{
     collections::BTreeSet,
     fmt::{self, Display},
     fs::read_dir,
     io::Write,
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use anyhow::{anyhow, Result};
 use flate2::{write::GzEncoder, Compression};
+use move_core_types::u256::U256;
+use sui_sdk::rpc_types::{SuiMoveStruct, SuiMoveValue};
 
 use crate::{
     site::content::{ContentEncoding, ContentType},
     walrus::{types::BlobId, Walrus},
 };
 
+/// Information about a resource.
+///
+/// This struct mirrors the information that is stored on chain.
 #[derive(PartialEq, Eq, Debug, Clone, Ord, PartialOrd)]
 pub(crate) struct ResourceInfo {
+    /// The relative path the resource will have on Sui.
     pub path: String,
+    /// The content (MIME) type of the reseource.
     pub content_type: ContentType,
+    /// The encoding of the content.
     pub content_encoding: ContentEncoding,
+    /// The blob ID of the resource.
     pub blob_id: BlobId,
 }
 
-/// A resource inside a site.
+impl TryFrom<&SuiMoveStruct> for ResourceInfo {
+    type Error = anyhow::Error;
+
+    fn try_from(source: &SuiMoveStruct) -> Result<Self, Self::Error> {
+        let path = get_dynamic_field!(source, "path", SuiMoveValue::String)?;
+        let content_type: ContentType =
+            get_dynamic_field!(source, "content_type", SuiMoveValue::String)?.try_into()?;
+        let content_encoding: ContentEncoding =
+            get_dynamic_field!(source, "content_encoding", SuiMoveValue::String)?.try_into()?;
+        let blob_id = blob_id_from_u256(
+            get_dynamic_field!(source, "blob_id", SuiMoveValue::String)?.parse::<U256>()?,
+        );
+        Ok(Self {
+            path,
+            content_type,
+            content_encoding,
+            blob_id,
+        })
+    }
+}
+
+impl TryFrom<SuiMoveStruct> for ResourceInfo {
+    type Error = anyhow::Error;
+
+    fn try_from(value: SuiMoveStruct) -> Result<Self, Self::Error> {
+        Self::try_from(&value)
+    }
+}
+
+pub(crate) fn blob_id_from_u256(input: U256) -> BlobId {
+    BlobId(input.to_le_bytes())
+}
+
+/// The resource that is to be created or updated on Sui.
+///
+/// This struct contains additional information that is not stored on chain, compared to
+/// [`ResourceInfo`] (`unencoded_size`, `full_path`).
 ///
 /// [`Resource`] objects are always compared on their `info` field
-/// ([`ResourceInfo`]), and never on their `slivers` or `metadata`.
+/// ([`ResourceInfo`]), and never on their `unencoded_size` or `full_path`.
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub(crate) struct Resource {
     pub info: ResourceInfo,
+    /// The unencoded length of the resource.
     pub unencoded_size: usize,
+    /// The full path of the resource on disk.
+    pub full_path: PathBuf,
 }
 
 impl PartialOrd for Resource {
@@ -49,13 +99,15 @@ impl From<ResourceInfo> for Resource {
         Self {
             info: source,
             unencoded_size: 0,
+            full_path: PathBuf::default(),
         }
     }
 }
 
 impl Resource {
     pub fn new(
-        path: String,
+        resource_path: String,
+        full_path: PathBuf,
         content_type: ContentType,
         content_encoding: ContentEncoding,
         blob_id: BlobId,
@@ -63,12 +115,13 @@ impl Resource {
     ) -> Self {
         Resource {
             info: ResourceInfo {
-                path,
+                path: resource_path,
                 content_type,
                 content_encoding,
                 blob_id,
             },
             unencoded_size,
+            full_path,
         }
     }
 }
@@ -77,7 +130,7 @@ impl Display for Resource {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Resource: {}, blob id: {})",
+            "Resource: {:?}, blob id: {})",
             self.info.path, self.info.blob_id
         )
     }
@@ -254,11 +307,10 @@ impl ResourceManager {
         root: &Path,
         content_encoding: &ContentEncoding,
     ) -> Result<Option<Resource>> {
-        let rel_path = full_path.strip_prefix(root)?;
         let content_type = ContentType::from_extension(
             full_path
                 .extension()
-                .ok_or(anyhow!("No extension found for {:?}", rel_path))?
+                .ok_or(anyhow!("No extension found for {:?}", full_path))?
                 .to_str()
                 .ok_or(anyhow!("Invalid extension"))?,
         );
@@ -272,19 +324,20 @@ impl ResourceManager {
             return Ok(None);
         }
 
-        // TODO(giac): How to encode based on the content encoding? Temporary file?
+        // TODO(giac): How to encode based on the content encoding? Temporary file? No encoding?
         //     let content = match content_encoding {
         //         ContentEncoding::PlainText => plain_content,
         //         ContentEncoding::Gzip => compress(&plain_content)?,
         //     };
 
-        let pathname = path_to_path_name(rel_path)?;
         Ok(Some(Resource::new(
-            pathname,
+            full_path_to_resource_path(full_path, root)?,
+            full_path.to_owned(),
             content_type,
             *content_encoding,
             output.blob_id,
-            plain_content.len(), // TODO(giac): move to `content`.
+            // TODO(giac): Move to `content` when the content encoding is decided.
+            plain_content.len(),
         )))
     }
 
@@ -314,6 +367,8 @@ impl ResourceManager {
     }
 }
 
+// TODO(giac): remove allow after getting compression back.
+#[allow(dead_code)]
 fn compress(content: &[u8]) -> Result<Vec<u8>> {
     if content.is_empty() {
         // Compression of an empty vector may result in compression headers
@@ -324,7 +379,9 @@ fn compress(content: &[u8]) -> Result<Vec<u8>> {
     Ok(encoder.finish()?)
 }
 
-pub(crate) fn path_to_path_name(rel_path: &Path) -> Result<String> {
+/// Converts the full path of the resource to the on-chain resource path.
+pub(crate) fn full_path_to_resource_path(full_path: &Path, root: &Path) -> Result<String> {
+    let rel_path = full_path.strip_prefix(root)?;
     Ok(format!(
         "/{}",
         rel_path
