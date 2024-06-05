@@ -251,6 +251,26 @@ impl ResourceSet {
             .map(ResourceOp::Deleted);
         delete.chain(create).collect()
     }
+
+    /// Returns a vector of operations to delete all resources in the set.
+    pub fn delete_all<'a>(&'a self) -> Vec<ResourceOp<'a>> {
+        self.inner.iter().map(ResourceOp::Deleted).collect()
+    }
+
+    /// Returns a vector of operations to create all resources in the set.
+    pub fn create_all<'a>(&'a self) -> Vec<ResourceOp<'a>> {
+        self.inner.iter().map(ResourceOp::Created).collect()
+    }
+
+    /// Returns a vector of operations to replace the resources in `self` with the ones in `other`.
+    pub fn replace_all<'a>(&'a self, other: &'a ResourceSet) -> Vec<ResourceOp<'a>> {
+        // Delete all the resources already on chain.
+        let mut delete_operations = self.delete_all();
+        // Create all the resources on disk.
+        let create_operations = other.create_all();
+        delete_operations.extend(create_operations);
+        delete_operations
+    }
 }
 
 impl FromIterator<Resource> for ResourceSet {

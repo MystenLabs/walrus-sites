@@ -68,14 +68,7 @@ impl SiteManager {
         let (ptb, existing_resources, needs_transfer) = match &self.site_id {
             SiteIdentifier::ExistingSite(site_id) => (
                 ptb.with_call_arg(&self.wallet.get_object_ref(*site_id).await?.into())?,
-                if self.force {
-                    // TODO(giac): bug here - we need to delete too, not only add!!!
-                    // We want to force an update, so we don't need to get the resources from the
-                    // existing site. We will update them regardless.
-                    ResourceSet::default()
-                } else {
-                    self.get_existing_resources(*site_id).await?
-                },
+                self.get_existing_resources(*site_id).await?,
                 false,
             ),
             SiteIdentifier::NewSite(site_name) => (
@@ -84,7 +77,11 @@ impl SiteManager {
                 true,
             ),
         };
-        let update_operations = resources.resources.diff(&existing_resources);
+        let update_operations = if self.force {
+            existing_resources.replace_all(&resources.resources)
+        } else {
+            resources.resources.diff(&existing_resources)
+        };
         tracing::debug!(operations=?update_operations, "list of operations computed");
 
         self.publish_to_walrus(&update_operations).await?;
@@ -213,6 +210,9 @@ impl SiteManager {
     }
 
     async fn gas_coin(&self) -> Result<ObjectID> {
-        self.config.general.gas_coin.ok_or(anyhow!("a gas coin must be specified"))
+        self.config
+            .general
+            .gas_coin
+            .ok_or(anyhow!("a gas coin must be specified"))
     }
 }
