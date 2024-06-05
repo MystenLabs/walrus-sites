@@ -12,7 +12,9 @@
             <header>
                 <h1 class="inverted">Blocksites!</h1>
             </header>
-            <p>Opening blocksite, please wait...</p>
+            <div>
+                <p>Opening blocksite, please wait...</p>
+            </div>
             <script>
                 navigator.serviceWorker
                     .register("/sw.js")
@@ -23,7 +25,7 @@
                             sw.onstatechange = function () {
                                 if (sw.state === "installed") {
                                     console.log("SW installed");
-                                    // SW installed.  Refresh page so SW can respond with SW-enabled page.
+                                    // SW installed. Refresh page so SW can respond with SW-enabled page.
                                     window.location.reload();
                                 }
                             };
@@ -33,7 +35,7 @@
                             handleError(
                                 new Error(
                                     "Service Worker is installed but not redirecting \
-                                - please unregister the service worker and reload twice."
+                                - please try to reload twice (or unregister the service worker)."
                                 )
                             );
                         }
