@@ -4,7 +4,11 @@ use anyhow::{anyhow, Result};
 use futures::Future;
 use sui_sdk::{
     rpc_types::{
-        Page, SuiMoveStruct, SuiObjectResponse, SuiParsedData, SuiTransactionBlockEffects,
+        Page,
+        SuiMoveStruct,
+        SuiObjectResponse,
+        SuiParsedData,
+        SuiTransactionBlockEffects,
         SuiTransactionBlockEffectsAPI,
     },
     wallet_context::WalletContext,
@@ -101,7 +105,7 @@ pub fn get_site_id_from_response(
         .created()
         .iter()
         .find(|c| c.owner == address)
-        .expect("Could not find the object ID for the created blocksite.")
+        .expect("Could not find the object ID for the created Walrus site.")
         .reference
         .object_id)
 }
@@ -131,18 +135,20 @@ pub async fn get_existing_resource_ids(
     client: &SuiClient,
     site_id: ObjectID,
 ) -> Result<HashMap<String, ObjectID>> {
-    let existing = get_all_dynamic_field_info(client, site_id)
-        .await?
-        .iter()
-        .map(|d| {
-            d.name
-                .value
-                .as_str()
-                .map(|s| (s.to_owned(), d.object_id))
-                .ok_or(anyhow!("Could not read dynamic field name"))
-        })
-        .collect::<Result<HashMap<String, ObjectID>>>();
-    existing
+    let info = get_all_dynamic_field_info(client, site_id).await?;
+    Ok(info.iter()
+        .filter_map(|d| get_path_from_info(&d).map(|path| (path, d.object_id)))
+        .collect::<HashMap<String, ObjectID>>())
+}
+
+// TODO(giac): check the type of the name.
+fn get_path_from_info(info: &DynamicFieldInfo) -> Option<String> {
+    info.name
+        .value
+        .as_object()
+        .and_then(|obj| obj.get("path"))
+        .and_then(|p| p.as_str())
+        .map(|s| s.to_owned())
 }
 
 /// Returns the path if it is `Some` or any of the default paths if they exist (attempt in order).

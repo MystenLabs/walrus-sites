@@ -124,7 +124,7 @@ enum Commands {
         /// The encoding for the contents of the BlockPages.
         #[clap(short = 'e', long, value_enum, default_value_t = ContentEncoding::PlainText)]
         content_encoding: ContentEncoding,
-        /// The name of the BlockSite.
+        /// The name of the Walrus site.
         #[clap(short, long, default_value = "test site")]
         site_name: String,
         /// The number of epochs for which to save the resources on Walrus.
@@ -159,14 +159,14 @@ enum Commands {
         /// The object id (in hex format) to convert
         object_id: ObjectID,
     },
-    /// Show the pages composing the blocksite at the given object ID.
+    /// Show the pages composing the Walrus site at the given object ID.
     Sitemap { object: ObjectID },
 }
 
 /// The configuration for the site builder.
 #[derive(Deserialize, Debug, Clone)]
 pub(crate) struct Config {
-    #[serde(default = "default::blocksite_module")]
+    #[serde(default = "default::site_module")]
     pub module: Identifier,
     #[serde(default = "default::default_portal")]
     pub portal: String,
@@ -209,11 +209,12 @@ mod default {
         Some(500_000_000)
     }
 
-    pub(crate) fn blocksite_module() -> Identifier {
-        Identifier::new("blocksite").expect("valid literal identifier")
+    pub(crate) fn site_module() -> Identifier {
+        Identifier::new("site").expect("valid literal identifier")
     }
 
     pub(crate) fn default_portal() -> String {
+        // TODO(giac): rename to walrus.site after publishing to vercel (#31).
         "blocksite.net".to_owned()
     }
 }

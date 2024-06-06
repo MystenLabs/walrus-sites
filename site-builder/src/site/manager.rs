@@ -77,6 +77,7 @@ impl SiteManager {
                 true,
             ),
         };
+        tracing::debug!(?existing_resources, "checked existing resources");
         let update_operations = if self.force {
             existing_resources.replace_all(&resources.resources)
         } else {

@@ -19,7 +19,7 @@ pub struct BlocksitePtb<T = ()> {
 
 /// A PTB to update a site.
 ///
-/// It is composed of a series of [BlocksiteCall]s, which all have the blocksite object id as first
+/// It is composed of a series of [BlocksiteCall]s, which all have the Walrus site object id as first
 /// argument.
 impl BlocksitePtb {
     pub fn new(package: ObjectID, module: Identifier) -> Result<Self> {
@@ -64,7 +64,7 @@ impl<T> BlocksitePtb<T> {
         self.pt_builder.transfer_arg(recipient, arg);
     }
 
-    /// Move call to create a new blocksite.
+    /// Move call to create a new Walrus site.
     pub fn create_site(&mut self, site_name: &str) -> Result<Argument> {
         tracing::debug!(site=%site_name, "new Move call: creating site");
         let name_arg = self.pt_builder.input(pure_call_arg(&site_name)?)?;
