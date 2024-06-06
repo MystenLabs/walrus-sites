@@ -1,107 +1,19 @@
-use std::{collections::HashMap, str};
+use std::{collections::HashMap, path::PathBuf, str};
 
-use anyhow::{anyhow, bail, ensure, Result};
+use anyhow::{anyhow, Result};
 use futures::Future;
-use shared_crypto::intent::Intent;
-use sui_keys::keystore::{AccountKeystore, Keystore};
 use sui_sdk::{
     rpc_types::{
-        Page,
-        SuiExecutionStatus,
-        SuiMoveStruct,
-        SuiObjectDataOptions,
-        SuiObjectResponse,
-        SuiParsedData,
-        SuiTransactionBlockEffects,
+        Page, SuiMoveStruct, SuiObjectResponse, SuiParsedData, SuiTransactionBlockEffects,
         SuiTransactionBlockEffectsAPI,
-        SuiTransactionBlockResponse,
-        SuiTransactionBlockResponseOptions,
     },
+    wallet_context::WalletContext,
     SuiClient,
 };
 use sui_types::{
-    base_types::{ObjectID, ObjectRef, SuiAddress},
+    base_types::{ObjectID, SuiAddress},
     dynamic_field::DynamicFieldInfo,
-    object::Owner,
-    quorum_driver_types::ExecuteTransactionRequestType,
-    transaction::{CallArg, ProgrammableTransaction, Transaction, TransactionData},
 };
-
-pub async fn sign_and_send_ptb(
-    client: &SuiClient,
-    keystore: &Keystore,
-    address: SuiAddress,
-    programmable_transaction: ProgrammableTransaction,
-    gas_coin: ObjectRef,
-    gas_budget: u64,
-) -> Result<SuiTransactionBlockResponse> {
-    let gas_price = client.read_api().get_reference_gas_price().await?;
-
-    let transaction = TransactionData::new_programmable(
-        address,
-        vec![gas_coin],
-        programmable_transaction,
-        gas_budget,
-        gas_price,
-    );
-    let signature = keystore.sign_secure(&address, &transaction, Intent::sui_transaction())?;
-    let response = client
-        .quorum_driver_api()
-        .execute_transaction_block(
-            Transaction::from_data(transaction, vec![signature]),
-            SuiTransactionBlockResponseOptions::full_content(),
-            Some(ExecuteTransactionRequestType::WaitForLocalExecution),
-        )
-        .await?;
-    ensure!(
-        response.confirmed_local_execution == Some(true),
-        "Transaction execution was not confirmed"
-    );
-    match response
-        .effects
-        .as_ref()
-        .ok_or_else(|| anyhow!("No transaction effects in response"))?
-        .status()
-    {
-        SuiExecutionStatus::Success => Ok(response),
-        SuiExecutionStatus::Failure { error } => {
-            Err(anyhow!("Error in transaction execution: {}", error))
-        }
-    }
-}
-
-pub async fn get_object_ref_from_id(client: &SuiClient, id: ObjectID) -> Result<ObjectRef> {
-    client
-        .read_api()
-        .get_object_with_options(id, SuiObjectDataOptions::new())
-        .await?
-        .object_ref_if_exists()
-        .ok_or_else(|| anyhow!("Could not get object reference for object with id {}", id))
-}
-
-pub async fn call_arg_from_shared_object_id(
-    client: &SuiClient,
-    id: ObjectID,
-    mutable: bool,
-) -> Result<CallArg> {
-    let Some(Owner::Shared {
-        initial_shared_version,
-    }) = client
-        .read_api()
-        .get_object_with_options(id, SuiObjectDataOptions::new().with_owner())
-        .await?
-        .owner()
-    else {
-        bail!("Trying to get the initial version of a non-shared object")
-    };
-    Ok(CallArg::Object(
-        sui_types::transaction::ObjectArg::SharedObject {
-            id,
-            initial_shared_version,
-            mutable,
-        },
-    ))
-}
 
 pub async fn get_all_dynamic_field_info(
     client: &SuiClient,
@@ -180,6 +92,7 @@ pub fn id_to_base36(id: &ObjectID) -> Result<String> {
 }
 
 /// Get the object id of the site that was published in the transaction
+#[allow(dead_code)]
 pub fn get_site_id_from_response(
     address: SuiAddress,
     effects: &SuiTransactionBlockEffects,
@@ -216,9 +129,9 @@ pub(crate) fn get_struct_from_object_response(
 
 pub async fn get_existing_resource_ids(
     client: &SuiClient,
-    site_id: &ObjectID,
+    site_id: ObjectID,
 ) -> Result<HashMap<String, ObjectID>> {
-    let existing = get_all_dynamic_field_info(client, *site_id)
+    let existing = get_all_dynamic_field_info(client, site_id)
         .await?
         .iter()
         .map(|d| {
@@ -230,6 +143,36 @@ pub async fn get_existing_resource_ids(
         })
         .collect::<Result<HashMap<String, ObjectID>>>();
     existing
+}
+
+/// Returns the path if it is `Some` or any of the default paths if they exist (attempt in order).
+pub fn path_or_defaults_if_exist(path: &Option<PathBuf>, defaults: &[PathBuf]) -> Option<PathBuf> {
+    let mut path = path.clone();
+    for default in defaults {
+        if path.is_some() {
+            break;
+        }
+        path = default.exists().then_some(default.clone());
+    }
+    path
+}
+
+/// Loads the wallet context from the given path.
+///
+/// If no path is provided, tries to load the configuration first from the local folder, and then
+/// from the standard Sui configuration directory.
+// NB: When making changes to the logic, make sure to update the argument docs in
+// `crates/walrus-service/bin/client.rs`.
+#[allow(dead_code)]
+pub fn load_wallet_context(path: &Option<PathBuf>) -> Result<WalletContext> {
+    let mut default_paths = vec!["./client.yaml".into(), "./sui_config.yaml".into()];
+    if let Some(home_dir) = home::home_dir() {
+        default_paths.push(home_dir.join(".sui").join("sui_config").join("client.yaml"))
+    }
+    let path = path_or_defaults_if_exist(path, &default_paths)
+        .ok_or(anyhow!("Could not find a valid wallet config file."))?;
+    tracing::info!("Using wallet configuration from {}", path.display());
+    WalletContext::new(&path, None, None)
 }
 
 #[cfg(test)]

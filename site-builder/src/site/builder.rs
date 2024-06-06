@@ -8,6 +8,8 @@ use sui_types::{
     TypeTag,
 };
 
+use super::resource::{ResourceInfo, ResourceOp};
+
 pub struct BlocksitePtb<T = ()> {
     pt_builder: ProgrammableTransactionBuilder,
     site_argument: T,
@@ -15,9 +17,10 @@ pub struct BlocksitePtb<T = ()> {
     module: Identifier,
 }
 
-/// A PTB to update part of a blocksite
-/// It is composed of a series of [BlocksiteCall]s, which all have the
-/// blocksite object id as first argument.
+/// A PTB to update a site.
+///
+/// It is composed of a series of [BlocksiteCall]s, which all have the blocksite object id as first
+/// argument.
 impl BlocksitePtb {
     pub fn new(package: ObjectID, module: Identifier) -> Result<Self> {
         let pt_builder = ProgrammableTransactionBuilder::new();
@@ -47,23 +50,25 @@ impl BlocksitePtb {
             module: self.module,
         })
     }
+
+    /// Makes the call to create a new site and keeps the resulting argument.
+    pub fn with_create_site(mut self, site_name: &str) -> Result<BlocksitePtb<Argument>> {
+        let argument = self.create_site(site_name)?;
+        self.with_arg(argument)
+    }
 }
 
 impl<T> BlocksitePtb<T> {
-    /// Move call to create a new blocksite
-    pub fn create_site(&mut self, site_name: &str) -> Result<Argument> {
-        let name_arg = self.pt_builder.input(pure_call_arg(&site_name)?)?;
-        let clock_arg = self.pt_builder.input(CallArg::CLOCK_IMM)?;
-        Ok(self.add_programmable_move_call(
-            Identifier::new("new_site")?,
-            vec![],
-            vec![name_arg, clock_arg],
-        ))
-    }
-
     /// Transfer argument to address
     pub fn transfer_arg(&mut self, recipient: SuiAddress, arg: Argument) {
         self.pt_builder.transfer_arg(recipient, arg);
+    }
+
+    /// Move call to create a new blocksite.
+    pub fn create_site(&mut self, site_name: &str) -> Result<Argument> {
+        tracing::debug!(site=%site_name, "new Move call: creating site");
+        let name_arg = self.pt_builder.input(pure_call_arg(&site_name)?)?;
+        Ok(self.add_programmable_move_call(Identifier::new("new_site")?, vec![], vec![name_arg]))
     }
 
     pub fn add_programmable_move_call(
@@ -81,19 +86,29 @@ impl<T> BlocksitePtb<T> {
         )
     }
 
+    /// Concludes the creation of the PTB.
     pub fn finish(self) -> ProgrammableTransaction {
         self.pt_builder.finish()
     }
 }
 
 impl BlocksitePtb<Argument> {
-    pub fn add_calls(&mut self, calls: Vec<BlocksiteCall>) -> Result<()> {
+    pub fn site_argument(&self) -> Argument {
+        self.site_argument
+    }
+
+    pub fn add_calls(&mut self, calls: impl IntoIterator<Item = BlocksiteCall>) -> Result<()> {
         for call in calls {
             self.add_call(call)?;
         }
         Ok(())
     }
 
+    /// Adds a call to the PTB.
+    ///
+    /// If the `function` field of the [`BlocksiteCall`] provided is "new_resource_and_add", this
+    /// function will create two transactions in the PTB, one to creat the resource, and one to add
+    /// it to the site.
     pub fn add_call(&mut self, mut call: BlocksiteCall) -> Result<()> {
         let mut args = call
             .args
@@ -108,7 +123,7 @@ impl BlocksitePtb<Argument> {
                 self.add_programmable_move_call(Identifier::new("new_resource")?, vec![], args);
             args = vec![new_resource_arg];
             // Replace the call to execute the adding
-            call.function = "add_resource".to_owned();
+            "add_resource".clone_into(&mut call.function);
         }
         args.insert(0, self.site_argument);
         self.add_programmable_move_call(Identifier::new(call.function)?, vec![], args);
@@ -124,58 +139,54 @@ pub struct BlocksiteCall {
 }
 
 impl BlocksiteCall {
-    /// This call results into two transactions in a PTB, one to
-    /// create the resource, and one to add it to the site
-    pub fn new_resource_and_add(
-        resource_name: &str,
-        content_type: &str,
-        content_encoding: &str,
-        parts: usize,
-        contents: &[u8],
-    ) -> Result<BlocksiteCall> {
-        tracing::info!("New Move call: Creating {}", resource_name);
+    /// Creates a new resource and adds it to the site.
+    ///
+    /// This call results into two transactions in a PTB, one to create the resource, and one to add
+    /// it to the site.
+    pub fn new_resource_and_add(resource: &ResourceInfo) -> Result<BlocksiteCall> {
+        tracing::debug!(resource=%resource.path, content_type=?resource.content_type, encoding=?resource.content_encoding, blob_id=?resource.blob_id, "new Move call: creating resource");
         Ok(BlocksiteCall {
             function: "new_resource_and_add".to_owned(),
             args: vec![
-                pure_call_arg(&resource_name)?,
-                pure_call_arg(&content_type)?,
-                pure_call_arg(&content_encoding)?,
-                pure_call_arg(&parts)?,
-                pure_call_arg(&contents)?,
-                CallArg::CLOCK_IMM,
+                pure_call_arg(&resource.path)?,
+                pure_call_arg(&resource.content_type.to_string())?,
+                pure_call_arg(&resource.content_encoding.to_string())?,
+                pure_call_arg(&resource.blob_id)?,
             ],
         })
     }
 
-    pub fn add_piece_to_existing(resource_name: &str, piece: &[u8]) -> Result<BlocksiteCall> {
-        tracing::info!("New Move call: Adding piece to {}", resource_name);
-        Ok(BlocksiteCall {
-            function: "add_piece_to_existing".to_owned(),
-            args: vec![
-                pure_call_arg(&resource_name)?,
-                pure_call_arg(&piece)?,
-                CallArg::CLOCK_IMM,
-            ],
-        })
-    }
-
-    pub fn move_resource(old_name: &str, new_name: &str) -> Result<BlocksiteCall> {
-        tracing::info!("New Move call: Moving {} to {}", old_name, new_name);
-        Ok(BlocksiteCall {
-            function: "move_resource".to_owned(),
-            args: vec![pure_call_arg(&old_name)?, pure_call_arg(&new_name)?],
-        })
-    }
-
-    pub fn remove_resource_if_exists(resource_name: &str) -> Result<BlocksiteCall> {
-        tracing::info!("New Move call: Removing {}", resource_name);
+    /// Removes a resource from the site if it exists
+    pub fn remove_resource_if_exists(resource: &ResourceInfo) -> Result<BlocksiteCall> {
+        tracing::debug!(resource=%resource.path, "new Move call: removing resource");
         Ok(BlocksiteCall {
             function: "remove_resource_if_exists".to_owned(),
-            args: vec![pure_call_arg(&resource_name)?],
+            args: vec![pure_call_arg(&resource.path)?],
         })
     }
 }
 
 pub fn pure_call_arg<T: Serialize>(arg: &T) -> Result<CallArg> {
     Ok(CallArg::Pure(bcs::to_bytes(arg)?))
+}
+
+impl<'a> TryFrom<&ResourceOp<'a>> for BlocksiteCall {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &ResourceOp) -> Result<Self, Self::Error> {
+        match value {
+            ResourceOp::Deleted(resource) => {
+                BlocksiteCall::remove_resource_if_exists(&resource.info)
+            }
+            ResourceOp::Created(resource) => BlocksiteCall::new_resource_and_add(&resource.info),
+        }
+    }
+}
+
+impl<'a> TryFrom<ResourceOp<'a>> for BlocksiteCall {
+    type Error = anyhow::Error;
+
+    fn try_from(value: ResourceOp) -> Result<Self, Self::Error> {
+        Self::try_from(&value)
+    }
 }

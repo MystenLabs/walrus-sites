@@ -1,143 +1,272 @@
-mod network;
+// mod network;
 mod publish;
 mod site;
-mod suins;
 mod util;
+mod walrus;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use network::NetworkConfig;
 use publish::{publish_site, update_site};
 use serde::Deserialize;
 use site::content::ContentEncoding;
 use sui_types::{base_types::ObjectID, Identifier};
-use suins::set_suins_name;
 
-use crate::util::{get_existing_resource_ids, id_to_base36};
+use crate::util::{get_existing_resource_ids, id_to_base36, load_wallet_context};
 
 #[derive(Parser, Debug)]
 #[clap(rename_all = "kebab-case")]
 struct Args {
-    #[arg(short, long, default_value = "config.toml")]
+    /// The path to the configuration file for the site builder.
+    #[clap(short, long, default_value = "config.yaml")]
     config: PathBuf,
+    #[clap(flatten)]
+    general: GeneralArgs,
     #[command(subcommand)]
     command: Commands,
+}
+
+#[derive(Parser, Clone, Debug, Deserialize)]
+#[clap(rename_all = "kebab-case")]
+pub(crate) struct GeneralArgs {
+    /// The URL or the RPC enpoint to connect the client to.
+    ///
+    /// Can be specified as a CLI argument or in the config.
+    #[clap(long)]
+    rpc_url: Option<String>,
+    /// The path to the Sui Wallet config.
+    ///
+    /// Can be specified as a CLI argument or in the config.
+    #[clap(long)]
+    wallet: Option<PathBuf>,
+    /// The path or name of the walrus binary.
+    ///
+    /// The Walrus binary will then be called with this configuration to perform actions on Walrus.
+    /// Can be specified as a CLI argument or in the config.
+    #[clap(long)]
+    #[serde(default = "default::walrus_binary")]
+    walrus_binary: Option<String>,
+    /// The path to the configuration for the Walrus client.
+    ///
+    /// This will be passed to the calls to the Walrus binary.
+    /// Can be specified as a CLI argument or in the config.
+    #[clap(long)]
+    walrus_config: Option<PathBuf>,
+    /// The gas budget for the operations on Sui.
+    ///
+    /// Can be specified as a CLI argument or in the config.
+    #[clap(long)]
+    #[clap(short, long)]
+    #[serde(default = "default::gas_budget")]
+    gas_budget: Option<u64>,
+    /// The gas coin to be used
+    ///
+    /// Can be specified as a CLI argument or in the config.
+    // TODO(giac): automatic gas coin selection.
+    #[clap(long)]
+    gas_coin: Option<ObjectID>,
+}
+
+impl Default for GeneralArgs {
+    fn default() -> Self {
+        Self {
+            rpc_url: None,
+            wallet: None,
+            walrus_binary: default::walrus_binary(),
+            walrus_config: None,
+            gas_budget: default::gas_budget(),
+            gas_coin: None,
+        }
+    }
+}
+
+macro_rules! merge {
+    ($self:ident, $other:ident, $field:ident) => {
+        if $other.$field.is_some() {
+            $self.$field = $other.$field.clone();
+        }
+    };
+}
+
+macro_rules! merge_fields {
+    ($self:ident, $other:ident, $($field:ident),* $(,)?) => (
+        $(
+            merge!($self, $other, $field);
+        )*
+    );
+}
+
+impl GeneralArgs {
+    /// Merges two instances of [`GeneralArgs`], keeping all the `Some` values.
+    ///
+    /// The values of `other` are taken before the values of `self`.
+    pub fn merge(&mut self, other: &Self) {
+        merge_fields!(
+            self,
+            other,
+            rpc_url,
+            wallet,
+            walrus_binary,
+            walrus_config,
+            gas_budget,
+            gas_coin,
+        );
+    }
 }
 
 #[derive(Subcommand, Debug)]
 #[clap(rename_all = "kebab-case")]
 enum Commands {
-    /// Publish a new site on sui
+    /// Publish a new site on Sui.
     Publish {
-        /// The directory containing the site sources
+        /// The directory containing the site sources.
         directory: PathBuf,
-        /// The encoding for the contents of the BlockPages
-        #[clap(short = 'e', long, value_enum, default_value_t = ContentEncoding::Gzip)]
+        /// The encoding for the contents of the BlockPages.
+        #[clap(short = 'e', long, value_enum, default_value_t = ContentEncoding::PlainText)]
         content_encoding: ContentEncoding,
-        /// The name of the BlockSite
+        /// The name of the BlockSite.
         #[clap(short, long, default_value = "test site")]
         site_name: String,
+        /// The number of epochs for which to save the resources on Walrus.
+        #[clap(long, default_value_t = 1)]
+        epochs: u64,
     },
     /// Update an existing site
     Update {
-        /// The directory containing the site sources
+        /// The directory containing the site sources.
         directory: PathBuf,
-        /// The object ID of a partially published site to be completed
+        /// The object ID of a partially published site to be completed.
         object_id: ObjectID,
-        /// The encoding for the contents of the BlockPages
-        #[clap(short = 'e', long, value_enum, default_value_t = ContentEncoding::Gzip)]
+        /// The encoding for the contents of the BlockPages.
+        #[clap(short = 'e', long, value_enum, default_value_t = ContentEncoding::PlainText)]
         content_encoding: ContentEncoding,
         #[clap(short, long, action)]
         watch: bool,
+        /// The number of epochs for which to save the updated resources on Walrus.
+        #[clap(long, default_value_t = 1)]
+        epochs: u64,
+        /// Publish all resources to Sui and Walrus, even if they may be already present.
+        ///
+        /// This can be useful in case the Walrus devnet is reset, but the resources are still
+        /// available on Sui.
+        #[clap(long, action)]
+        force: bool,
     },
-    /// Convert an object ID in hex format to the equivalent base36 format.
-    /// Useful to browse sites at particular object IDs.
+    /// Convert an object ID in hex format to the equivalent Base36 format.
+    ///
+    /// This command may be useful to browse a site, given it object ID.
     Convert {
         /// The object id (in hex format) to convert
         object_id: ObjectID,
     },
-    /// Set the SuiNs record to an ObjectID.
-    SetNs {
-        /// The SuiNs packages
-        #[clap(short, long)]
-        package: ObjectID,
-        /// The SuiNs object to be updated
-        #[clap(short, long)]
-        sui_ns: ObjectID,
-        /// The SuiNsRegistration NFT with the SuiNs name
-        #[clap(short, long)]
-        registration: ObjectID,
-        /// The address to be added to the record
-        #[clap(short, long)]
-        target: ObjectID,
-    },
-    /// Show the pages composing the blocksite at the given id
+    /// Show the pages composing the blocksite at the given object ID.
     Sitemap { object: ObjectID },
 }
 
-#[derive(Deserialize, Debug)]
-pub struct Config {
-    #[serde(default = "blocksite_module")]
+/// The configuration for the site builder.
+#[derive(Deserialize, Debug, Clone)]
+pub(crate) struct Config {
+    #[serde(default = "default::blocksite_module")]
     pub module: Identifier,
-    #[serde(default = "testnet_package")]
+    #[serde(default = "default::default_portal")]
+    pub portal: String,
     pub package: ObjectID,
-
-    pub gas_coin: ObjectID,
-    pub gas_budget: u64,
-
+    // TODO(giac): automatically select the gas coin.
     #[serde(default)]
-    pub network: NetworkConfig,
+    pub general: GeneralArgs,
 }
 
-fn blocksite_module() -> Identifier {
-    Identifier::new("blocksite").expect("valid literal identifier")
+impl Config {
+    /// Merges the other [`GeneralArgs`] (taken from the CLI) with the `general` in the struct.
+    ///
+    /// The values in `other_general` take precedence.
+    pub fn merge(&mut self, other_general: &GeneralArgs) {
+        self.general.merge(other_general);
+    }
+
+    pub fn walrus_binary(&self) -> String {
+        self.general
+            .walrus_binary
+            .as_ref()
+            .expect("serde default => binary exists")
+            .to_owned()
+    }
+
+    pub fn gas_budget(&self) -> u64 {
+        self.general
+            .gas_budget
+            .expect("serde default => gas budget exists")
+    }
 }
 
-fn testnet_package() -> ObjectID {
-    ObjectID::from_hex_literal("0x8dae89b2505ce9d84592e0e57d38848a2d863ead6a0e946a49fd8edbc8c7b919")
-        .expect("valid hex literal")
+mod default {
+    use sui_types::Identifier;
+
+    pub(crate) fn walrus_binary() -> Option<String> {
+        Some("walrus".to_owned())
+    }
+    pub(crate) fn gas_budget() -> Option<u64> {
+        Some(500_000_000)
+    }
+
+    pub(crate) fn blocksite_module() -> Identifier {
+        Identifier::new("blocksite").expect("valid literal identifier")
+    }
+
+    pub(crate) fn default_portal() -> String {
+        "blocksite.net".to_owned()
+    }
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
+    tracing::info!("initializing site builder");
 
     let args = Args::parse();
     let mut config: Config = std::fs::read_to_string(&args.config)
         .context(format!("unable to read config file {:?}", args.config))
         .and_then(|s| {
-            toml::from_str(&s).context(format!("unable to parse toml in file {:?}", args.config))
+            serde_yaml::from_str(&s)
+                .context(format!("unable to parse yaml in file {:?}", args.config))
         })?;
-    config.network.load()?;
+    // Merge the configs and the CLI args. Serde default ensures that the `walrus_binary` and
+    // `gas_budget` exist.
+    config.merge(&args.general);
+    tracing::info!(?config, "configuration loaded");
 
     match &args.command {
         Commands::Publish {
             directory,
             content_encoding,
             site_name,
-        } => publish_site(directory, content_encoding, site_name, &config).await?,
+            epochs,
+        } => publish_site(directory, content_encoding, site_name, &config, *epochs).await?,
         Commands::Update {
             directory,
             object_id,
             content_encoding,
             watch,
+            epochs,
+            force,
         } => {
-            update_site(directory, content_encoding, object_id, &config, *watch).await?;
-        }
-        Commands::SetNs {
-            package,
-            sui_ns,
-            registration,
-            target,
-        } => {
-            set_suins_name(config, package, sui_ns, registration, target).await?;
+            update_site(
+                directory,
+                content_encoding,
+                object_id,
+                &config,
+                *watch,
+                *epochs,
+                *force,
+            )
+            .await?;
         }
         // Add a path to be watched. All files and directories at that path and
         // below will be monitored for changes.
         Commands::Sitemap { object } => {
-            let client = config.network.get_sui_client().await?;
-            let all_dynamic_fields = get_existing_resource_ids(&client, object).await?;
+            let wallet = load_wallet_context(&config.general.wallet)?;
+            let all_dynamic_fields =
+                get_existing_resource_ids(&wallet.get_client().await?, *object).await?;
             println!("Pages in site at object id: {}", object);
             for (name, id) in all_dynamic_fields {
                 println!("  - {:<40} {:?}", name, id);

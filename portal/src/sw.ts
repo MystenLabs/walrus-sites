@@ -1,37 +1,88 @@
-import {
-    getFullnodeUrl,
-    SuiClient,
-    SuiObjectData,
-} from "@mysten/sui.js/client";
+import { getFullnodeUrl, SuiClient, SuiObjectData } from "@mysten/sui.js/client";
 import * as baseX from "base-x";
 import {
     fromB64,
     fromHEX,
     isValidSuiObjectId,
+    isValidSuiAddress,
     toHEX,
 } from "@mysten/sui.js/utils";
-import { SITE_NAMES, NETWORK } from "./constants";
-import { bcs } from "@mysten/sui.js/bcs";
+import { AGGREGATOR, BLOCKSITE_PACKAGE, SITE_NAMES, NETWORK, MAX_REDIRECT_DEPTH } from "./constants";
+import { bcs, BcsType } from "@mysten/bcs";
 import template_404 from "../static/404-page.template.html";
 
-// This is to get TypeScript to recognize `clients` and `self`
-// Default type of `self` is `WorkerGlobalScope & typeof globalThis`
-// https://github.com/microsoft/TypeScript/issues/14877
+// This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
+// `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
 declare var self: ServiceWorkerGlobalScope;
 declare var clients: Clients;
 
 var BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz";
 const b36 = baseX(BASE36);
 
-self.addEventListener("install", (event) => {
+// Type definitions.
+
+/**
+ * The origin of the request, divied into subdomain and path.
+ */
+type Path = {
+    subdomain: string;
+    path: string;
+};
+
+/**
+ * The metadata for a site resource, as stored on chain.
+ */
+type BlockResource = {
+    path: string;
+    content_type: string;
+    content_encoding: string;
+    blob_id: string;
+};
+
+// Structs for parsing BCS data.
+
+const Address = bcs.bytes(32).transform({
+    input: (id: string) => fromHEX(id),
+    output: (id) => toHEX(id),
+});
+
+// Blob IDs are represented on chain as u256, but serialized in URLs as URL-safe Base64.
+const BLOB_ID = bcs.u256().transform({
+    input: (id: string) => id,
+    output: (id) => base64UrlSafeEncode(bcs.u256().serialize(id).toBytes()),
+});
+
+const BlockResourceStruct = bcs.struct("BlockPage", {
+    path: bcs.string(),
+    content_type: bcs.string(),
+    content_encoding: bcs.string(),
+    blob_id: BLOB_ID,
+});
+
+const ValueEnum = bcs.enum("ValueEnum", {
+    Resource: BlockResourceStruct,
+    Redirect: Address,
+});
+
+function DynamicFieldStruct<T>(T: BcsType<T>) {
+    return bcs.struct("DynamicFieldStruct<T>", {
+        parentId: Address,
+        name: bcs.string(),
+        value: T,
+    });
+}
+
+// Event listeners.
+
+self.addEventListener("install", (_event) => {
     self.skipWaiting();
 });
 
-self.addEventListener("activate", (event) => {
+self.addEventListener("activate", (_event) => {
     clients.claim();
 });
 
-self.addEventListener("fetch", (event) => {
+self.addEventListener("fetch", async (event) => {
     const url = event.request.url;
     const scope = self.registration.scope;
 
@@ -51,64 +102,65 @@ self.addEventListener("fetch", (event) => {
     }
 
     // Default case: Fetch all other sites from the web
-    return fetch(event.request).then((response) => {
-        return response;
-    });
+    const response = await fetch(event.request);
+    return response;
 });
 
-// Subdomain encoding & parsing //
+// Subdomain handling.
 
-// Use base36 instead of HEX to encode object ids in the subdomain, as the subdomain must be < 64 characters.
-// The encoding must be case insensitive.
-
+/**
+ * Subdomain encoding and parsing.
+ *
+ * Use base36 instead of HEX to encode object ids in the subdomain, as the subdomain must be < 64
+ * characters.  The encoding must be case insensitive.
+ */
 function subdomainToObjectId(subdomain: string): string | null {
     const objectId = "0x" + toHEX(b36.decode(subdomain.toLowerCase()));
+    console.log(
+        "obtained object id: ",
+        objectId,
+        isValidSuiObjectId(objectId),
+        isValidSuiAddress(objectId)
+    );
     return isValidSuiObjectId(objectId) ? objectId : null;
 }
-
-type Path = {
-    subdomain: string;
-    path: string;
-};
 
 function getSubdomainAndPath(scope: string): Path | null {
     // At the moment we only support one subdomain level.
     const url = new URL(scope);
     const hostname = url.hostname.split(".");
 
-    if (
-        hostname.length === 3 ||
-        (hostname.length === 2 && hostname[1] === "localhost")
-    ) {
-        // Accept only one level of subdomain
-        // eg `subdomain.example.com` or `subdomain.localhost` in case of local development
-        const path =
-            url.pathname == "/" ? "/index.html" : removeLastSlash(url.pathname);
+    // TODO(giac): This should be changed to allow for SuiNS subdomains.
+    if (hostname.length === 3 || (hostname.length === 2 && hostname[1] === "localhost")) {
+        // Accept only one level of subdomain eg `subdomain.example.com` or `subdomain.localhost` in
+        // case of local development.
+        const path = url.pathname == "/" ? "/index.html" : removeLastSlash(url.pathname);
         return { subdomain: hostname[0], path } as Path;
     }
     return null;
 }
 
-/** Remove the last forward-slash if present
- * Resources on chain are only stored as `/path/to/resource.extension`.
+/**
+ * Removes the last forward-slash if present
+ *
+ * Resources on chain are stored as `/path/to/resource.extension` exclusively.
  */
 function removeLastSlash(path: string): string {
     return path.endsWith("/") ? path.slice(0, -1) : path;
 }
 
-// SuiNS-like functionality //
-// Right now this just matches the subdomain to fixed strings. Should be replaced with a SuiNS lookup.
+// SuiNS functionality.
 
-/**  Resolve the subdomain to an object ID using SuiNS
-The subdomain `example` will look up `example.sui` and return the object ID if found. */
-async function resolveSuiNsAddress(
-    client: SuiClient,
-    subdomain: string
-): Promise<string | null> {
-    const suiObjectId: string = await client.call(
-        "suix_resolveNameServiceAddress",
-        [subdomain + ".sui"]
-    );
+/**
+ * Resolves the subdomain to an object ID using SuiNS.
+ *
+ * The subdomain `example` will look up `example.sui` and return the object ID if found.
+ */
+async function resolveSuiNsAddress(client: SuiClient, subdomain: string): Promise<string | null> {
+    const suiObjectId: string = await client.call("suix_resolveNameServiceAddress", [
+        subdomain + ".sui",
+    ]);
+    console.log("resolved suins name: ", subdomain, suiObjectId);
     return suiObjectId ? suiObjectId : null;
 }
 
@@ -119,68 +171,21 @@ function hardcodedSubdmains(subdomain: string): string | null {
     return null;
 }
 
-// Types & encoding/decoding for the on-chain objects //
+// Fectching & decompressing on-chain data.
 
-// Fetching objects from the full node //
-type BlockResource = {
-    name: string;
-    created: number;
-    updated: number | null;
-    version: number;
-    content_type: string;
-    content_encoding: string;
-    parts: number;
-    contents: Uint8Array;
-};
-
-// define UID as a 32-byte array, then add a transform to/from hex strings
-const UID = bcs.fixedArray(32, bcs.u8()).transform({
-    input: (id: string) => fromHEX(id),
-    output: (id) => toHEX(Uint8Array.from(id)),
-});
-
-const NUMBER = bcs.u64().transform({
-    input: (ts: number) => Number(ts),
-    output: (ts) => Number(ts),
-});
-
-const VECTOR = bcs.vector(bcs.u8()).transform({
-    input: (contents: Uint8Array) => Array.from(contents),
-    output: (contents) => Uint8Array.from(contents),
-});
-
-const BlockPageStruct = bcs.struct("BlockPage", {
-    name: bcs.string(),
-    created: NUMBER,
-    updated: bcs.option(NUMBER),
-    version: NUMBER,
-    content_type: bcs.string(),
-    content_encoding: bcs.string(),
-    parts: NUMBER,
-    contents: VECTOR,
-});
-
-const FieldStruct = bcs.struct("Field", {
-    id: UID,
-    name: VECTOR,
-    value: BlockPageStruct,
-});
-
-// Fectching & decompressing on-chain data //
-
+/**
+ * Resolves the subdomain to an object ID, and gets the corresponding resources.
+ */
 async function resolveAndFetchPage(parsedUrl: Path): Promise<Response> {
     const rpcUrl = getFullnodeUrl(NETWORK);
     const client = new SuiClient({ url: rpcUrl });
 
     let objectId = hardcodedSubdmains(parsedUrl.subdomain);
     if (!objectId) {
-        // Try to convert the subdomain to an object ID
-        // NOTE: This effectively _disables_ any SuiNs name that is
-        // the base36 encoding of an object ID (i.e., a 32-byte
-        // string). This is desirable, prevents people from getting
-        // suins names that are the base36 encoding the object ID of a
-        // target blocksite (with the goal of hijacking non-suins
-        // queries)
+        // Try to convert the subdomain to an object ID NOTE: This effectively _disables_ any SuiNs
+        // name that is the base36 encoding of an object ID (i.e., a 32-byte string). This is
+        // desirable, prevents people from getting suins names that are the base36 encoding the
+        // object ID of a target blocksite (with the goal of hijacking non-suins queries)
         objectId = subdomainToObjectId(parsedUrl.subdomain);
     }
     if (!objectId) {
@@ -193,43 +198,30 @@ async function resolveAndFetchPage(parsedUrl: Path): Promise<Response> {
     }
     if (objectId) {
         console.log("Object ID: ", objectId);
-        console.log(
-            "Base36 version of the object ID: ",
-            b36.encode(fromHEX(objectId))
-        );
+        console.log("Base36 version of the object ID: ", b36.encode(fromHEX(objectId)));
         return fetchPage(client, objectId, parsedUrl.path);
     }
     return noObjectIdFound();
 }
 
-/** Fetch the page */
-async function fetchPage(
-    client: SuiClient,
-    objectId: string,
-    path: string
-): Promise<Response> {
+/**
+ * Fetches a page.
+ */
+async function fetchPage(client: SuiClient, objectId: string, path: string): Promise<Response> {
     const blockResource = await fetchBlockResource(client, objectId, path);
-    if (!blockResource || !blockResource.contents) {
-        siteNotFound();
+    if (blockResource === null || !blockResource.blob_id) {
+        return siteNotFound();
     }
-    let contents = blockResource.contents;
-    //  Either its a one-part page, or we need to fetch the other parts
-    if (blockResource.parts >= 1) {
-        // Fetch the other parts in parallel
-        const otherParts = await Promise.all([
-            ...partNames(path, blockResource.parts).map((part_name) =>
-                fetchBlockResource(client, objectId, part_name)
-            ),
-        ]);
-        // Merge all parts with the contents
-        // TODO: better way?
-        let contentsArray = [Array.from(contents), ...otherParts.map(part => Array.from(part.contents))];
-        contents = new Uint8Array(contentsArray.flat());
+
+    console.log("Fetched Resource: ", blockResource);
+    const contents = await fetch(aggregatorEndpoint(blockResource.blob_id));
+    if (!contents.ok) {
+        return siteNotFound();
     }
-    const decompressed = await decompressData(
-        contents,
-        blockResource.content_encoding
-    );
+
+    // Deserialize the bcs encoded body and decompress.
+    const body = new Uint8Array(await contents.arrayBuffer());
+    const decompressed = await decompressData(body, blockResource.content_encoding);
     if (!decompressed) {
         return siteNotFound();
     }
@@ -240,23 +232,60 @@ async function fetchPage(
     });
 }
 
-function partNames(name: string, parts: number): string[] {
-    return Array.from({ length: parts - 1 }, (_, i) => `part-${i + 1}${name}`);
-}
-
+/**
+ * Fetches a resource of a site.
+ *
+ * This function is recursive, as it will follow the special redirect field if it is set. A site can
+ * have a special redirect field that points to another site, where the resources to display the
+ * site are found.
+ *
+ * This is usefult to create many objects with an associated site (e.g., NFTs), without having to
+ * repeat the same resources for each object, and allowing to keep some control over the site (for
+ * example, the creator can still edit the site even if the NFT is owned by someone else).
+ * See the `specitalRedirectField` function for more details.
+ *
+ * To prevent infinite loops, the recursion depth is of this function is capped to
+ * `MAX_REDIRECT_DEPTH`.
+ */
 async function fetchBlockResource(
     client: SuiClient,
     objectId: string,
-    path: string
+    path: string,
+    depth: number = 0,
 ): Promise<BlockResource | null> {
-    const dynamicFields = await client.getDynamicFieldObject({
+    if (depth > MAX_REDIRECT_DEPTH) {
+        // TODO(giac): add return codes and return 508 "loop detected" or similar.
+        return null
+    }
+    // Also check the special site field
+    const siteFieldPromise = client.getDynamicFieldObject({
+        parentId: objectId,
+        name: { type: "0x1::string::String", value: specialRedirectField() },
+    });
+    const dynamicFieldsPromise = client.getDynamicFieldObject({
         parentId: objectId,
         name: { type: "0x1::string::String", value: path },
     });
-    console.log("Dynamic fields: ", dynamicFields);
+    let [siteField, dynamicFields] = await Promise.all([siteFieldPromise, dynamicFieldsPromise]);
+
+    if (siteField.data) {
+        console.log("Special redirect field found");
+        const redirectPage = await client.getObject({
+            id: siteField.data.objectId,
+            options: { showBcs: true },
+        });
+        console.log("Redirect page: ", redirectPage);
+        if (!redirectPage.data) {
+            return null;
+        }
+        const redirectObjectId = getRedirectField(redirectPage.data);
+        // Recurs increasing the recursion depth.
+        return fetchBlockResource(client, redirectObjectId, path, depth + 1);
+    }
+
+    console.log("Dynamic fields for ", objectId, dynamicFields);
     if (!dynamicFields.data) {
         console.log("No dynamic field found");
-        console.log(dynamicFields);
         return null;
     }
     const pageData = await client.getObject({
@@ -267,23 +296,51 @@ async function fetchBlockResource(
         console.log("No page data found");
         return null;
     }
-    const blockPage = getPageFields(pageData.data);
-    if (!blockPage || !blockPage.contents) {
+    const blockPage = getResourceFields(pageData.data);
+    if (!blockPage || !blockPage.blob_id) {
         return null;
     }
     return blockPage;
 }
 
-// Type definitions for BCS decoding //
-function getPageFields(data: SuiObjectData): BlockResource | null {
+/**
+ * Returns the string representing the key of the ridirect field.
+ *
+ * This key is always the concatentation of the ID of the blocksite package, concatenated with
+ * "-site", e.g.:
+ * `0x31e123f07597dd04f4603d7ab98c036c14959e90f932de5e71f6cdaf54d84121-site".
+ */
+function specialRedirectField(): string {
+    return BLOCKSITE_PACKAGE + "-site";
+}
+
+/**
+ * Parses the resource information from the Sui object data response.
+ */
+function getResourceFields(data: SuiObjectData): BlockResource | null {
     // Deserialize the bcs encoded struct
     if (data.bcs && data.bcs.dataType === "moveObject") {
-        const blockpage = FieldStruct.parse(fromB64(data.bcs.bcsBytes));
-        return blockpage.value;
+        const df = DynamicFieldStruct(BlockResourceStruct).parse(fromB64(data.bcs.bcsBytes));
+        return df.value;
     }
     return null;
 }
 
+/**
+ * Parses the redirect information from the Sui object data response.
+ */
+function getRedirectField(data: SuiObjectData): string | null {
+    // Deserialize the bcs encoded struct
+    if (data.bcs && data.bcs.dataType === "moveObject") {
+        const df = DynamicFieldStruct(Address).parse(fromB64(data.bcs.bcsBytes));
+        return df.value;
+    }
+    return null;
+}
+
+/**
+ * Decompresses the contents of the buffer according to the content encoding.
+ */
 async function decompressData(
     data: ArrayBuffer,
     contentEncoding: string
@@ -303,6 +360,35 @@ async function decompressData(
     }
     return null;
 }
+
+// Walrus-specific encoding.
+
+/**
+ * Returns the URL to fetch the blob of given ID from the aggregator/cache.
+ */
+function aggregatorEndpoint(blob_id: string): URL {
+    return new URL(AGGREGATOR + "/v1/" + blob_id);
+}
+
+/**
+ * Converts the given bytes to Base 64, and then converts it to URL-safe Base 64.
+ *
+ * See [wikipedia](https://en.wikipedia.org/wiki/Base64#URL_applications).
+ */
+function base64UrlSafeEncode(data: Uint8Array): string {
+    let base64 = arrayBufferToBas64(data);
+    // Use the URL-safe Base 64 encoding by removing padding and swapping characters.
+    return base64.replaceAll("/", "_").replaceAll("+", "-").replaceAll("=", "");
+}
+
+function arrayBufferToBas64(bytes: Uint8Array): string {
+    // Convert each byte in the array to the correct character
+    const binaryString = Array.from(bytes, (byte) => String.fromCharCode(byte)).join("");
+    // Encode the binary string to base64 using btoa
+    return btoa(binaryString);
+}
+
+// Response errors returned.
 
 function siteNotFound(): Response {
     return Response404(

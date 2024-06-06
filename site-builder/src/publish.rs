@@ -1,21 +1,19 @@
 use std::{path::Path, sync::mpsc::channel};
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use notify::{RecursiveMode, Watcher};
-use sui_sdk::rpc_types::{
-    SuiTransactionBlockEffects,
-    SuiTransactionBlockEffectsAPI,
-    SuiTransactionBlockResponse,
-};
-use sui_types::base_types::ObjectID;
+use sui_sdk::rpc_types::SuiTransactionBlockResponse;
+use sui_types::base_types::{ObjectID, SuiAddress};
 
 use crate::{
     site::{
         content::ContentEncoding,
-        manager::SiteManager,
-        resource::{Resource, ResourceManager},
+        manager::{SiteIdentifier, SiteManager},
+        // manager::SiteManager,
+        resource::{OperationsSummary, ResourceManager},
     },
-    util::id_to_base36,
+    util::{get_site_id_from_response, id_to_base36, load_wallet_context},
+    walrus::Walrus,
     Config,
 };
 
@@ -24,51 +22,26 @@ pub async fn publish_site(
     content_encoding: &ContentEncoding,
     site_name: &str,
     config: &Config,
+    epochs: u64,
 ) -> Result<()> {
-    edit_site(directory, content_encoding, site_name, &None, config).await
-}
-
-pub async fn update_site(
-    directory: &Path,
-    content_encoding: &ContentEncoding,
-    site_object: &ObjectID,
-    config: &Config,
-    watch: bool,
-) -> Result<()> {
-    if watch {
-        watch_edit_site(directory, content_encoding, "", &Some(*site_object), config).await
-    } else {
-        edit_site(directory, content_encoding, "", &Some(*site_object), config).await
-    }
-}
-
-pub async fn edit_site(
-    directory: &Path,
-    content_encoding: &ContentEncoding,
-    site_name: &str,
-    site_object: &Option<ObjectID>,
-    config: &Config,
-) -> Result<()> {
-    let resources = Resource::iter_dir(directory, content_encoding)?;
-    let mut resource_manager = ResourceManager::default();
-    for res in resources {
-        resource_manager.add_resource(res);
-    }
-    println!("{}", resource_manager);
-    let mut site_manger = SiteManager::new(*site_object, config).await?;
-    let responses = site_manger
-        .update_site(site_name, &mut resource_manager)
-        .await?;
-    print_effects(config, site_name, site_object, &responses)?;
-    Ok(())
+    edit_site(
+        directory,
+        content_encoding,
+        SiteIdentifier::NewSite(site_name.to_owned()),
+        config,
+        epochs,
+        false,
+    )
+    .await
 }
 
 pub async fn watch_edit_site(
     directory: &Path,
     content_encoding: &ContentEncoding,
-    site_name: &str,
-    site_object: &Option<ObjectID>,
+    site_id: SiteIdentifier,
     config: &Config,
+    epochs: u64,
+    force: bool,
 ) -> Result<()> {
     let (tx, rx) = channel();
     let mut watcher = notify::recommended_watcher(move |res| {
@@ -83,77 +56,128 @@ pub async fn watch_edit_site(
         match rx.recv() {
             Ok(event) => {
                 tracing::info!("change detected: {:?}", event);
-                edit_site(directory, content_encoding, site_name, site_object, config).await?;
+                edit_site(
+                    directory,
+                    content_encoding,
+                    site_id.clone(),
+                    config,
+                    epochs,
+                    force,
+                )
+                .await?;
             }
             Err(e) => println!("Watch error!: {}", e),
         }
     }
 }
 
-fn print_effects(
+pub async fn update_site(
+    directory: &Path,
+    content_encoding: &ContentEncoding,
+    site_object: &ObjectID,
     config: &Config,
-    site_name: &str,
-    site_id: &Option<ObjectID>,
-    responses: &[SuiTransactionBlockResponse],
+    watch: bool,
+    epochs: u64,
+    force: bool,
 ) -> Result<()> {
-    if responses.is_empty() {
-        println!("No operation required. Site already in place.");
-        return Ok(());
+    if watch {
+        watch_edit_site(
+            directory,
+            content_encoding,
+            SiteIdentifier::ExistingSite(*site_object),
+            config,
+            epochs,
+            force,
+        )
+        .await
+    } else {
+        edit_site(
+            directory,
+            content_encoding,
+            SiteIdentifier::ExistingSite(*site_object),
+            config,
+            epochs,
+            force,
+        )
+        .await
     }
-    let effects = responses
-        .iter()
-        .map(|r| r.effects.clone().ok_or(anyhow!("No effects found")))
-        .collect::<Result<Vec<SuiTransactionBlockEffects>>>()?;
-    let (object_id, edit_string) = match site_id {
-        Some(id) => (*id, format!("Blocksite updated: {}", id)),
-        None => {
-            let id = effects[0]
-                .created()
-                .iter()
-                .find(|c| c.owner == config.network.address())
-                .expect("Could not find the object ID for the created blocksite.")
-                .reference
-                .object_id;
-            (id, format!("New blocksite '{}' created: {}", site_name, id))
+}
+
+pub async fn edit_site(
+    directory: &Path,
+    content_encoding: &ContentEncoding,
+    site_id: SiteIdentifier,
+    config: &Config,
+    epochs: u64,
+    force: bool,
+) -> Result<()> {
+    tracing::debug!(?site_id, ?directory, ?content_encoding, ?epochs, ?force, "editing site");
+
+    let wallet = load_wallet_context(&config.general.wallet)?;
+
+    let walrus = Walrus::new(
+        config.walrus_binary(),
+        config.gas_budget(),
+        config.general.rpc_url.clone(),
+        config.general.walrus_config.clone(),
+        config.general.wallet.clone(),
+    );
+
+    let mut resource_manager = ResourceManager::new(walrus.clone())?;
+    resource_manager.read_dir(directory, content_encoding)?;
+    tracing::debug!(resources=%resource_manager.resources, "resources loaded from directory");
+
+    let site_manager = SiteManager::new(
+        config.clone(),
+        walrus,
+        wallet,
+        site_id.clone(),
+        epochs,
+        force,
+    )
+    .await?;
+    let (response, summary) = site_manager.update_site(&resource_manager).await?;
+    print_summary(
+        config,
+        &site_manager.active_address()?,
+        &site_id,
+        &response,
+        &summary,
+    )?;
+    Ok(())
+}
+
+fn print_summary(
+    config: &Config,
+    address: &SuiAddress,
+    site_id: &SiteIdentifier,
+    response: &SuiTransactionBlockResponse,
+    summary: &OperationsSummary,
+) -> Result<()> {
+    println!("{}\n", summary);
+
+    let object_id = match site_id {
+        SiteIdentifier::ExistingSite(id) => {
+            println!("Updated site at object ID: {}", id);
+            *id
+        }
+        SiteIdentifier::NewSite(name) => {
+            let id = get_site_id_from_response(
+                *address,
+                response
+                    .effects
+                    .as_ref()
+                    .ok_or(anyhow::anyhow!("response did not contain effects"))?,
+            )?;
+            println!("Created new site: {}\nNew site object ID: {}", name, id);
+            id
         }
     };
 
-    let (computation, storage, rebate, non_ref) =
-        effects.iter().fold((0, 0, 0, 0), |mut total, e| {
-            let summary = e.gas_cost_summary();
-            total.0 += summary.computation_cost;
-            total.1 += summary.storage_cost;
-            total.2 += summary.storage_rebate;
-            total.3 += summary.non_refundable_storage_fee;
-            total
-        });
-    let total_cost = computation as i64 + storage as i64 - rebate as i64;
-
-    // Print all
-    println!("\n# Effects");
-    println!("{}", edit_string);
-    let base36 = id_to_base36(&object_id).expect("Could not convert the id to base 36.");
     println!(
-        "Find it at https://{}.blocksite.net\nor http://{}.localhost:8080",
-        &base36, &base36,
-    );
-    if let Some(explorer_url) = config.network.explorer_url(&object_id) {
-        println!("(explorer url: {})\n", explorer_url);
-    }
-
-    println!("Gas cost summary (MIST):");
-    println!("  - Computation: {}", computation);
-    println!("  - Storage: {}", storage);
-    println!("  - Storage rebate: {}", rebate);
-    println!("  - Non refundable storage: {}", non_ref);
-    println!(
-        "For a total cost of: {} SUI{}",
-        (total_cost) as f64 / 1e9,
-        if total_cost < 0 {
-            " (you gained SUI by deleting objects)"
-        } else {
-            ""
-        }
+        "\nBrowse the resulting site at: https://{}.{}",
+        id_to_base36(&object_id)?,
+        config.portal
     );
     Ok(())
 }

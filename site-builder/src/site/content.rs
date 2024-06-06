@@ -3,18 +3,19 @@ use std::fmt;
 use anyhow::anyhow;
 use clap::ValueEnum;
 
-#[derive(Debug, ValueEnum, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, ValueEnum, Clone, Copy, PartialEq, Eq, Ord, PartialOrd)]
 #[clap(rename_all = "lowercase")]
 pub enum ContentEncoding {
     PlainText,
-    Gzip,
+    // TODO(giac): Enable GZIP once decided what to do with the encoding.
+    // Gzip,
 }
 
 impl fmt::Display for ContentEncoding {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             ContentEncoding::PlainText => write!(f, "plaintext"),
-            ContentEncoding::Gzip => write!(f, "gzip"),
+            // ContentEncoding::Gzip => write!(f, "gzip"),
         }
     }
 }
@@ -25,8 +26,8 @@ impl TryFrom<&str> for ContentEncoding {
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
             "plaintext" => Ok(ContentEncoding::PlainText),
-            "gzip" => Ok(ContentEncoding::Gzip),
-            _ => Err(anyhow!("Invalid content encoding string")),
+            // "gzip" => Ok(ContentEncoding::Gzip),
+            _ => Err(anyhow!("Invalid content encoding string: {value}")),
         }
     }
 }
@@ -42,7 +43,7 @@ impl TryFrom<String> for ContentEncoding {
 /// Content types for content of a page
 /// The list is generated starting from
 /// https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types/Common_types
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Ord, PartialOrd)]
 pub enum ContentType {
     AudioAac,
     ApplicationXabiword,
@@ -164,6 +165,7 @@ impl ContentType {
             "odt" => ContentType::ApplicationVndoasisopendocumenttext,
             "oga" => ContentType::AudioOgg,
             "ogv" => ContentType::VideoOgg,
+            "ogg" => ContentType::VideoOgg,
             "ogx" => ContentType::ApplicationOgg,
             "opus" => ContentType::AudioOpus,
             "otf" => ContentType::FontOtf,
