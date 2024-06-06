@@ -1,8 +1,12 @@
 use std::{path::Path, sync::mpsc::channel};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use notify::{RecursiveMode, Watcher};
-use sui_sdk::rpc_types::SuiTransactionBlockResponse;
+use sui_sdk::rpc_types::{
+    SuiExecutionStatus,
+    SuiTransactionBlockEffects,
+    SuiTransactionBlockResponse,
+};
 use sui_types::base_types::{ObjectID, SuiAddress};
 
 use crate::{
@@ -111,7 +115,14 @@ pub async fn edit_site(
     epochs: u64,
     force: bool,
 ) -> Result<()> {
-    tracing::debug!(?site_id, ?directory, ?content_encoding, ?epochs, ?force, "editing site");
+    tracing::debug!(
+        ?site_id,
+        ?directory,
+        ?content_encoding,
+        ?epochs,
+        ?force,
+        "editing site"
+    );
 
     let wallet = load_wallet_context(&config.general.wallet)?;
 
@@ -154,8 +165,16 @@ fn print_summary(
     response: &SuiTransactionBlockResponse,
     summary: &OperationsSummary,
 ) -> Result<()> {
-    println!("{}\n", summary);
+    if let Some(SuiTransactionBlockEffects::V1(eff)) = response.effects.as_ref() {
+        if let SuiExecutionStatus::Failure { error } = &eff.status {
+            return Err(anyhow!(
+                "error while processing the Sui transaction: {}",
+                error
+            ));
+        }
+    }
 
+    println!("{}\n", summary);
     let object_id = match site_id {
         SiteIdentifier::ExistingSite(id) => {
             println!("Updated site at object ID: {}", id);
