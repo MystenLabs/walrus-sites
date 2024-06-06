@@ -1,9 +1,8 @@
 /// The module exposes the functionality to create and update blocksites.
 module blocksite::blocksite {
     use std::option::Option;
-    use sui::transfer;
     use sui::object::{Self, UID};
-    use sui::tx_context::{Self, TxContext};
+    use sui::tx_context::TxContext;
     use sui::dynamic_field as df;
     use std::string::String;
 
@@ -22,17 +21,19 @@ module blocksite::blocksite {
         blob_id: u256,
     }
 
+    /// Representation of the resource path.
+    ///
+    /// Ensures there are no namespace collisions in the dynamic fields.
+    struct ResourcePath has copy, store, drop {
+        path: String,
+    }
+
     /// Creates a new site.
     public fun new_site(name: String, ctx: &mut TxContext): BlockSite {
         BlockSite {
             id: object::new(ctx),
             name,
         }
-    }
-
-    /// Updates the name of a site.
-    public fun update_name(site: &mut BlockSite, new_name: String) {
-        site.name = new_name
     }
 
     /// Creates a new resource.
@@ -50,21 +51,33 @@ module blocksite::blocksite {
         }
     }
 
+    fun new_path(path: String): ResourcePath {
+        ResourcePath { path }
+    }
+
+    /// Updates the name of a site.
+    public fun update_name(site: &mut BlockSite, new_name: String) {
+        site.name = new_name
+    }
+
     /// Adds a resource to an existing site.
     public fun add_resource(site: &mut BlockSite, resource: BlockResource) {
-        df::add(&mut site.id, resource.path, resource);
+        let path_obj = new_path(resource.path);
+        df::add(&mut site.id, path_obj, resource);
     }
 
     /// Removes a resource from a site.
     ///
     /// Aborts if the resource does not exist.
     public fun remove_resource(site: &mut BlockSite, path: String): BlockResource{
-        df::remove(&mut site.id, path)
+        let path_obj = new_path(path);
+        df::remove(&mut site.id, path_obj)
     }
 
     /// Removes a resource from a site if it exists.
     public fun remove_resource_if_exists(site: &mut BlockSite, path: String): Option<BlockResource>{
-        df::remove_if_exists(&mut site.id, path)
+        let path_obj = new_path(path);
+        df::remove_if_exists(&mut site.id, path_obj)
     }
 
     /// Changes the path of a resource on a site.
