@@ -101,7 +101,7 @@ pub fn get_site_id_from_response(
         .created()
         .iter()
         .find(|c| c.owner == address)
-        .expect("Could not find the object ID for the created blocksite.")
+        .expect("Could not find the object ID for the created Walrus site.")
         .reference
         .object_id)
 }
