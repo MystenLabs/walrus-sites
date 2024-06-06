@@ -7,7 +7,13 @@ import {
     isValidSuiAddress,
     toHEX,
 } from "@mysten/sui.js/utils";
-import { AGGREGATOR, BLOCKSITE_PACKAGE, SITE_NAMES, NETWORK, MAX_REDIRECT_DEPTH } from "./constants";
+import {
+    AGGREGATOR,
+    BLOCKSITE_PACKAGE,
+    SITE_NAMES,
+    NETWORK,
+    MAX_REDIRECT_DEPTH,
+} from "./constants";
 import { bcs, BcsType } from "@mysten/bcs";
 import template_404 from "../static/404-page.template.html";
 
@@ -257,27 +263,25 @@ async function fetchBlockResource(
     client: SuiClient,
     objectId: string,
     path: string,
-    depth: number = 0,
+    depth: number = 0
 ): Promise<BlockResource | null> {
     if (depth > MAX_REDIRECT_DEPTH) {
         // TODO(giac): add return codes and return 508 "loop detected" or similar.
-        return null
+        return null;
     }
-    // Also check the special site field
-    const siteFieldPromise = client.getDynamicFieldObject({
-        parentId: objectId,
-        name: { type: "0x1::string::String", value: specialRedirectField() },
-    });
-    const dynamicFieldsPromise = client.getDynamicFieldObject({
-        parentId: objectId,
-        name: { type: resourcePathMoveType(), value: path },
-    });
-    let [siteField, dynamicFields] = await Promise.all([siteFieldPromise, dynamicFieldsPromise]);
 
-    if (siteField.data) {
-        console.log("Special redirect field found");
+    let [redirectId, dynamicFields] = await Promise.all([
+        checkRedirect(client, objectId),
+        client.getDynamicFieldObject({
+            parentId: objectId,
+            name: { type: resourcePathMoveType(), value: path },
+        }),
+    ]);
+
+    if (redirectId) {
+        console.log("Redirect found");
         const redirectPage = await client.getObject({
-            id: siteField.data.objectId,
+            id: redirectId,
             options: { showBcs: true },
         });
         console.log("Redirect page: ", redirectPage);
@@ -317,14 +321,17 @@ function resourcePathMoveType(): string {
 }
 
 /**
- * Returns the string representing the key of the ridirect field.
- *
- * This key is always the concatentation of the ID of the blocksite package, concatenated with
- * "-site", e.g.:
- * `0x31e123f07597dd04f4603d7ab98c036c14959e90f932de5e71f6cdaf54d84121-site".
+ * Checks if the object has a redirect in its Display representation.
  */
-function specialRedirectField(): string {
-    return BLOCKSITE_PACKAGE + "-site";
+async function checkRedirect(client: SuiClient, objectId: string): Promise<string | null> {
+    const object = await client.getObject({ id: objectId, options: { showDisplay: true } });
+    if (object.data && object.data.display) {
+        let display = object.data.display;
+        if (display.data["walrus site address"]) {
+            return display.data["walrus site address"];
+        }
+    }
+    return null;
 }
 
 /**
@@ -333,7 +340,9 @@ function specialRedirectField(): string {
 function getResourceFields(data: SuiObjectData): BlockResource | null {
     // Deserialize the bcs encoded struct
     if (data.bcs && data.bcs.dataType === "moveObject") {
-        const df = DynamicFieldStruct(ResourcePathStruct, BlockResourceStruct).parse(fromB64(data.bcs.bcsBytes));
+        const df = DynamicFieldStruct(ResourcePathStruct, BlockResourceStruct).parse(
+            fromB64(data.bcs.bcsBytes)
+        );
         return df.value;
     }
     return null;
