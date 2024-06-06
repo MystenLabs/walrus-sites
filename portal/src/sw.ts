@@ -288,9 +288,8 @@ async function fetchResource(
         if (!redirectPage.data) {
             return null;
         }
-        const redirectObjectId = getRedirectField(redirectPage.data);
         // Recurs increasing the recursion depth.
-        return fetchResource(client, redirectObjectId, path, depth + 1);
+        return fetchResource(client, redirectId, path, depth + 1);
     }
 
     console.log("Dynamic fields for ", objectId, dynamicFields);
@@ -327,7 +326,8 @@ async function checkRedirect(client: SuiClient, objectId: string): Promise<strin
     const object = await client.getObject({ id: objectId, options: { showDisplay: true } });
     if (object.data && object.data.display) {
         let display = object.data.display;
-        if (display.data["walrus site address"]) {
+        // Check if "walrus site address" is set in the display field.
+        if (display.data && display.data["walrus site address"]) {
             return display.data["walrus site address"];
         }
     }
