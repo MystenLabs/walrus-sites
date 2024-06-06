@@ -9,7 +9,7 @@ import {
 } from "@mysten/sui.js/utils";
 import {
     AGGREGATOR,
-    BLOCKSITE_PACKAGE,
+    SITE_PACKAGE,
     SITE_NAMES,
     NETWORK,
     MAX_REDIRECT_DEPTH,
@@ -45,7 +45,7 @@ type ResourcePath = {
 /**
  * The metadata for a site resource, as stored on chain.
  */
-type BlockResource = {
+type Resource = {
     path: string;
     content_type: string;
     content_encoding: string;
@@ -69,7 +69,7 @@ const ResourcePathStruct = bcs.struct("ResourcePath", {
     path: bcs.string(),
 });
 
-const BlockResourceStruct = bcs.struct("BlockPage", {
+const ResourceStruct = bcs.struct("Resource", {
     path: bcs.string(),
     content_type: bcs.string(),
     content_encoding: bcs.string(),
@@ -98,7 +98,7 @@ self.addEventListener("fetch", async (event) => {
     const url = event.request.url;
     const scope = self.registration.scope;
 
-    // Check if the request is for a blocksite
+    // Check if the request is for a site.
     const parsedUrl = getSubdomainAndPath(url);
     console.log("Parsed URL: ", parsedUrl);
     if (parsedUrl && parsedUrl.subdomain) {
@@ -197,7 +197,7 @@ async function resolveAndFetchPage(parsedUrl: Path): Promise<Response> {
         // Try to convert the subdomain to an object ID NOTE: This effectively _disables_ any SuiNs
         // name that is the base36 encoding of an object ID (i.e., a 32-byte string). This is
         // desirable, prevents people from getting suins names that are the base36 encoding the
-        // object ID of a target blocksite (with the goal of hijacking non-suins queries)
+        // object ID of a target site (with the goal of hijacking non-suins queries)
         objectId = subdomainToObjectId(parsedUrl.subdomain);
     }
     if (!objectId) {
@@ -220,26 +220,26 @@ async function resolveAndFetchPage(parsedUrl: Path): Promise<Response> {
  * Fetches a page.
  */
 async function fetchPage(client: SuiClient, objectId: string, path: string): Promise<Response> {
-    const blockResource = await fetchBlockResource(client, objectId, path);
-    if (blockResource === null || !blockResource.blob_id) {
+    const resource = await fetchResource(client, objectId, path);
+    if (resource === null || !resource.blob_id) {
         return siteNotFound();
     }
 
-    console.log("Fetched Resource: ", blockResource);
-    const contents = await fetch(aggregatorEndpoint(blockResource.blob_id));
+    console.log("Fetched Resource: ", resource);
+    const contents = await fetch(aggregatorEndpoint(resource.blob_id));
     if (!contents.ok) {
         return siteNotFound();
     }
 
     // Deserialize the bcs encoded body and decompress.
     const body = new Uint8Array(await contents.arrayBuffer());
-    const decompressed = await decompressData(body, blockResource.content_encoding);
+    const decompressed = await decompressData(body, resource.content_encoding);
     if (!decompressed) {
         return siteNotFound();
     }
     return new Response(decompressed, {
         headers: {
-            "Content-Type": blockResource.content_type,
+            "Content-Type": resource.content_type,
         },
     });
 }
@@ -259,12 +259,12 @@ async function fetchPage(client: SuiClient, objectId: string, path: string): Pro
  * To prevent infinite loops, the recursion depth is of this function is capped to
  * `MAX_REDIRECT_DEPTH`.
  */
-async function fetchBlockResource(
+async function fetchResource(
     client: SuiClient,
     objectId: string,
     path: string,
     depth: number = 0
-): Promise<BlockResource | null> {
+): Promise<Resource | null> {
     if (depth > MAX_REDIRECT_DEPTH) {
         // TODO(giac): add return codes and return 508 "loop detected" or similar.
         return null;
@@ -290,7 +290,7 @@ async function fetchBlockResource(
         }
         const redirectObjectId = getRedirectField(redirectPage.data);
         // Recurs increasing the recursion depth.
-        return fetchBlockResource(client, redirectObjectId, path, depth + 1);
+        return fetchResource(client, redirectObjectId, path, depth + 1);
     }
 
     console.log("Dynamic fields for ", objectId, dynamicFields);
@@ -314,10 +314,10 @@ async function fetchBlockResource(
 }
 
 /**
- * The string representing the ResourcePath struct in the blocksite package.
+ * The string representing the ResourcePath struct in the walrus_site package.
  */
 function resourcePathMoveType(): string {
-    return BLOCKSITE_PACKAGE + "::blocksite::ResourcePath";
+    return SITE_PACKAGE + "::site::ResourcePath";
 }
 
 /**
@@ -337,10 +337,10 @@ async function checkRedirect(client: SuiClient, objectId: string): Promise<strin
 /**
  * Parses the resource information from the Sui object data response.
  */
-function getResourceFields(data: SuiObjectData): BlockResource | null {
+function getResourceFields(data: SuiObjectData): Resource | null {
     // Deserialize the bcs encoded struct
     if (data.bcs && data.bcs.dataType === "moveObject") {
-        const df = DynamicFieldStruct(ResourcePathStruct, BlockResourceStruct).parse(
+        const df = DynamicFieldStruct(ResourcePathStruct, ResourceStruct).parse(
             fromB64(data.bcs.bcsBytes)
         );
         return df.value;
@@ -415,7 +415,7 @@ function arrayBufferToBas64(bytes: Uint8Array): string {
 
 function siteNotFound(): Response {
     return Response404(
-        "The URL provided points to an object ID, but the object does not seem to be a blocksite."
+        "The URL provided points to an object ID, but the object does not seem to be a Walrus site."
     );
 }
 
