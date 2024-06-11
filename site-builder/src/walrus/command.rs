@@ -10,7 +10,7 @@ use super::types::BlobId;
 
 /// Represents a call to the JSON mode of the Walrus CLI.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "camelCase")]
 pub struct WalrusJsonCmd {
     /// The path to the configuration file for the Walrus CLI.
     #[serde(default)]
@@ -37,7 +37,7 @@ impl WalrusJsonCmd {
 /// Represents a command to be run on the Walrus CLI.
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum Command {
     /// Stores a blob to Walrus.
     Store {
@@ -77,7 +77,7 @@ pub enum Command {
 
 /// Represents the Sui RPC endpoint argument.
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "camelCase")]
 pub struct RpcArg {
     /// The RPC URL of a Sui full node.
     #[serde(skip_serializing_if = "Option::is_none")]

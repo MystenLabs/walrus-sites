@@ -18,7 +18,7 @@ use crate::util::{get_existing_resource_ids, id_to_base36, load_wallet_context};
 #[clap(rename_all = "kebab-case")]
 struct Args {
     /// The path to the configuration file for the site builder.
-    #[clap(short, long, default_value = "config.yaml")]
+    #[clap(short, long, default_value = "builder.yaml")]
     config: PathBuf,
     #[clap(flatten)]
     general: GeneralArgs,
