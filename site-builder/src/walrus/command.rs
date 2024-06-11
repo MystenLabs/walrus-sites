@@ -46,6 +46,12 @@ pub enum Command {
         /// The number of epochs for which to store the file.
         #[serde(default = "default::epochs")]
         epochs: u64,
+        /// Do not check for the blob status before storing it.
+        ///
+        /// This will create a new blob even if the blob is already certified for a sufficient
+        /// duration.
+        #[serde(default)]
+        force: bool,
     },
     /// Reads a blob from Walrus.
     Read {
@@ -138,8 +144,8 @@ impl WalrusCmdBuilder {
     }
 
     /// Adds a [`Command::Store`] command to the builder.
-    pub fn store(self, file: PathBuf, epochs: u64) -> WalrusCmdBuilder<Command> {
-        let command = Command::Store { file, epochs };
+    pub fn store(self, file: PathBuf, epochs: u64, force: bool) -> WalrusCmdBuilder<Command> {
+        let command = Command::Store { file, epochs, force};
         self.with_command(command)
     }
 
