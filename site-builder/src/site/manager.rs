@@ -111,7 +111,7 @@ impl SiteManager {
                 unencoded_size=%resource.unencoded_size,
                 "storing new blob on Walrus"
             );
-            self.walrus.store(resource.full_path.clone(), self.epochs)?;
+            self.walrus.store(resource.full_path.clone(), self.epochs, self.force)?;
         }
         Ok(())
     }

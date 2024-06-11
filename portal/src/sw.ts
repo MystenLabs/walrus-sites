@@ -36,13 +36,6 @@ type Path = {
 };
 
 /**
- * The path of a resource in a dynamic field.
- */
-type ResourcePath = {
-    path: string;
-};
-
-/**
  * The metadata for a site resource, as stored on chain.
  */
 type Resource = {

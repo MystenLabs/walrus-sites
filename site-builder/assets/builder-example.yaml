@@ -1,6 +1,6 @@
 # module: blocksite
 # portal: blocksite.net
-package: 0x31e123f07597dd04f4603d7ab98c036c14959e90f932de5e71f6cdaf54d84121
+package: 0x514cf7ce2df33b9e2ca69e75bc9645ef38aca67b6f2852992a34e35e9f907f58
 # general:
 #   rpc_url: https://fullnode.testnet.sui.io:443
 #   wallet: /path/to/.sui/sui_config/client.yaml

@@ -18,7 +18,7 @@ use crate::util::{get_existing_resource_ids, id_to_base36, load_wallet_context};
 #[clap(rename_all = "kebab-case")]
 struct Args {
     /// The path to the configuration file for the site builder.
-    #[clap(short, long, default_value = "config.yaml")]
+    #[clap(short, long, default_value = "builder.yaml")]
     config: PathBuf,
     #[clap(flatten)]
     general: GeneralArgs,
@@ -116,7 +116,7 @@ enum Commands {
         /// The encoding for the contents of the BlockPages.
         #[clap(short = 'e', long, value_enum, default_value_t = ContentEncoding::PlainText)]
         content_encoding: ContentEncoding,
-        /// The name of the Walrus site.
+        /// The name of the site.
         #[clap(short, long, default_value = "test site")]
         site_name: String,
         /// The number of epochs for which to save the resources on Walrus.
@@ -151,7 +151,7 @@ enum Commands {
         /// The object id (in hex format) to convert
         object_id: ObjectID,
     },
-    /// Show the pages composing the Walrus site at the given object ID.
+    /// Show the pages composing the site at the given object ID.
     Sitemap { object: ObjectID },
 }
 
@@ -205,8 +205,7 @@ mod default {
     }
 
     pub(crate) fn default_portal() -> String {
-        // TODO(giac): rename to walrus.site after publishing to vercel (#31).
-        "blocksite.net".to_owned()
+        "walrus.site".to_owned()
     }
 }
 
