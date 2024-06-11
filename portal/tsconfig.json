@@ -1,24 +1,14 @@
 {
-  "compilerOptions": {
-    "target": "esnext",
-    "module": "esnext",
-    "moduleResolution": "node",
-    "lib": [
-      "esnext",
-      "webworker"
-    ],
-  },
-  "baseUrl": "./",
-  "rootDir": "src",
-  "outDir": "dist",
-  "skipLibCheck": true,
-  "include": [
-    "src/sw.ts",
-    "src/custom.d.ts",
-    "src/constants.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-  ]
+    "compilerOptions": {
+        "target": "esnext",
+        "module": "esnext",
+        "moduleResolution": "node",
+        "lib": ["esnext", "webworker"]
+    },
+    "baseUrl": "./",
+    "rootDir": "src",
+    "outDir": "dist",
+    "skipLibCheck": true,
+    "include": ["src"],
+    "exclude": ["node_modules", "dist"]
 }

@@ -1,4 +1,4 @@
-import { getFullnodeUrl, SuiClient, SuiObjectData } from "@mysten/sui.js/client";
+import { getFullnodeUrl, SuiClient, SuiObjectData } from "@mysten/sui/client";
 import * as baseX from "base-x";
 import {
     fromB64,
@@ -6,7 +6,7 @@ import {
     isValidSuiObjectId,
     isValidSuiAddress,
     toHEX,
-} from "@mysten/sui.js/utils";
+} from "@mysten/sui/utils";
 import {
     AGGREGATOR,
     SITE_PACKAGE,
@@ -14,7 +14,7 @@ import {
     NETWORK,
     MAX_REDIRECT_DEPTH,
 } from "./constants";
-import { bcs, BcsType } from "@mysten/bcs";
+import { bcs, BcsType, toB64 } from "@mysten/bcs";
 import template_404 from "../static/404-page.template.html";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
@@ -77,7 +77,7 @@ const ResourceStruct = bcs.struct("Resource", {
 });
 
 function DynamicFieldStruct<K, V>(K: BcsType<K>, V: BcsType<V>) {
-    return bcs.struct("DynamicFieldStruct<T>", {
+    return bcs.struct(`DynamicFieldStruct<${K.name}, ${V.name}>`, {
         parentId: Address,
         name: K,
         value: V,
@@ -143,10 +143,14 @@ function getSubdomainAndPath(scope: string): Path | null {
     const hostname = url.hostname.split(".");
 
     // TODO(giac): This should be changed to allow for SuiNS subdomains.
-    if (hostname.length === 3 || (hostname.length === 2 && hostname[1] === "localhost")) {
+    if (
+        hostname.length === 3 ||
+        (hostname.length === 2 && hostname[1] === "localhost")
+    ) {
         // Accept only one level of subdomain eg `subdomain.example.com` or `subdomain.localhost` in
         // case of local development.
-        const path = url.pathname == "/" ? "/index.html" : removeLastSlash(url.pathname);
+        const path =
+            url.pathname == "/" ? "/index.html" : removeLastSlash(url.pathname);
         return { subdomain: hostname[0], path } as Path;
     }
     return null;
@@ -168,10 +172,14 @@ function removeLastSlash(path: string): string {
  *
  * The subdomain `example` will look up `example.sui` and return the object ID if found.
  */
-async function resolveSuiNsAddress(client: SuiClient, subdomain: string): Promise<string | null> {
-    const suiObjectId: string = await client.call("suix_resolveNameServiceAddress", [
-        subdomain + ".sui",
-    ]);
+async function resolveSuiNsAddress(
+    client: SuiClient,
+    subdomain: string
+): Promise<string | null> {
+    const suiObjectId: string = await client.call(
+        "suix_resolveNameServiceAddress",
+        [subdomain + ".sui"]
+    );
     console.log("resolved suins name: ", subdomain, suiObjectId);
     return suiObjectId ? suiObjectId : null;
 }
@@ -210,7 +218,10 @@ async function resolveAndFetchPage(parsedUrl: Path): Promise<Response> {
     }
     if (objectId) {
         console.log("Object ID: ", objectId);
-        console.log("Base36 version of the object ID: ", b36.encode(fromHEX(objectId)));
+        console.log(
+            "Base36 version of the object ID: ",
+            b36.encode(fromHEX(objectId))
+        );
         return fetchPage(client, objectId, parsedUrl.path);
     }
     return noObjectIdFound();
@@ -219,7 +230,11 @@ async function resolveAndFetchPage(parsedUrl: Path): Promise<Response> {
 /**
  * Fetches a page.
  */
-async function fetchPage(client: SuiClient, objectId: string, path: string): Promise<Response> {
+async function fetchPage(
+    client: SuiClient,
+    objectId: string,
+    path: string
+): Promise<Response> {
     const resource = await fetchResource(client, objectId, path);
     if (resource === null || !resource.blob_id) {
         return siteNotFound();
@@ -322,8 +337,14 @@ function resourcePathMoveType(): string {
 /**
  * Checks if the object has a redirect in its Display representation.
  */
-async function checkRedirect(client: SuiClient, objectId: string): Promise<string | null> {
-    const object = await client.getObject({ id: objectId, options: { showDisplay: true } });
+async function checkRedirect(
+    client: SuiClient,
+    objectId: string
+): Promise<string | null> {
+    const object = await client.getObject({
+        id: objectId,
+        options: { showDisplay: true },
+    });
     if (object.data && object.data.display) {
         let display = object.data.display;
         // Check if "walrus site address" is set in the display field.
@@ -355,7 +376,9 @@ function getResourceFields(data: SuiObjectData): Resource | null {
 function getRedirectField(data: SuiObjectData): string | null {
     // Deserialize the bcs encoded struct
     if (data.bcs && data.bcs.dataType === "moveObject") {
-        const df = DynamicFieldStruct(bcs.string(), Address).parse(fromB64(data.bcs.bcsBytes));
+        const df = DynamicFieldStruct(bcs.string(), Address).parse(
+            fromB64(data.bcs.bcsBytes)
+        );
         return df.value;
     }
     return null;
@@ -399,16 +422,9 @@ function aggregatorEndpoint(blob_id: string): URL {
  * See [wikipedia](https://en.wikipedia.org/wiki/Base64#URL_applications).
  */
 function base64UrlSafeEncode(data: Uint8Array): string {
-    let base64 = arrayBufferToBas64(data);
+    let base64 = toB64(data);
     // Use the URL-safe Base 64 encoding by removing padding and swapping characters.
     return base64.replaceAll("/", "_").replaceAll("+", "-").replaceAll("=", "");
-}
-
-function arrayBufferToBas64(bytes: Uint8Array): string {
-    // Convert each byte in the array to the correct character
-    const binaryString = Array.from(bytes, (byte) => String.fromCharCode(byte)).join("");
-    // Encode the binary string to base64 using btoa
-    return btoa(binaryString);
 }
 
 // Response errors returned.
@@ -428,7 +444,6 @@ function fullNodeFail(): Response {
 }
 
 function Response404(message: String): Response {
-    console.log();
     return new Response(
         // TODO: better way for this?
         template_404.replace("${message}", message),
