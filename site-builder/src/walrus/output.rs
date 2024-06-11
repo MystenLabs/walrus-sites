@@ -48,6 +48,7 @@ pub fn try_from_output<T: DeserializeOwned>(output: Output) -> Result<T> {
             String::from_utf8_lossy(&output.stderr)
         ));
     };
-    serde_json::from_str(&String::from_utf8(output.stdout)?)
-        .context("failed to parse the Walrus CLI output")
+    let output_str = String::from_utf8(output.stdout)?;
+    serde_json::from_str(&output_str)
+        .context(format!("failed to parse the Walrus CLI output: {output_str}"))
 }
