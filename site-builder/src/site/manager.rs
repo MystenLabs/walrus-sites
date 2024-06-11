@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use anyhow::{anyhow, Result};
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{
@@ -130,11 +132,8 @@ impl SiteManager {
         if transfer {
             ptb.transfer_arg(self.active_address()?, ptb.site_argument());
         }
-        self.sign_and_send_ptb(
-            ptb.finish(),
-            self.wallet.get_object_ref(self.gas_coin().await?).await?,
-        )
-        .await
+        self.sign_and_send_ptb(ptb.finish(), self.gas_coin_ref().await?)
+            .await
     }
 
     async fn sign_and_send_ptb(
@@ -210,10 +209,18 @@ impl SiteManager {
             .unwrap_or(*self.wallet.config.keystore.addresses().first().unwrap()))
     }
 
-    async fn gas_coin(&self) -> Result<ObjectID> {
-        self.config
-            .general
-            .gas_coin
-            .ok_or(anyhow!("a gas coin must be specified"))
+    /// Returns the [`ObjectRef`] of an arbitrary gas coin owned by the active wallet
+    /// with a sufficient balance for the gas budget specified in the config.
+    async fn gas_coin_ref(&self) -> Result<ObjectRef> {
+        Ok(self
+            .wallet
+            .gas_for_owner_budget(
+                self.active_address()?,
+                self.config.gas_budget(),
+                BTreeSet::new(),
+            )
+            .await?
+            .1
+            .object_ref())
     }
 }

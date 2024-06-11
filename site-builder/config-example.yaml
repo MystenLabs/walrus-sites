@@ -7,4 +7,3 @@ package: 0x31e123f07597dd04f4603d7ab98c036c14959e90f932de5e71f6cdaf54d84121
 #   walrus_binary: /path/to/walrus
 #   walrus_config: /path/to/devnet_deployment/client_config.yaml
 #   gas_budget: 500000000
-#   gas_coin: 0x1234... # testnet coin
