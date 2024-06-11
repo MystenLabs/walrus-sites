@@ -59,12 +59,6 @@ pub(crate) struct GeneralArgs {
     #[clap(short, long)]
     #[serde(default = "default::gas_budget")]
     gas_budget: Option<u64>,
-    /// The gas coin to be used
-    ///
-    /// Can be specified as a CLI argument or in the config.
-    // TODO(giac): automatic gas coin selection.
-    #[clap(long)]
-    gas_coin: Option<ObjectID>,
 }
 
 impl Default for GeneralArgs {
@@ -75,7 +69,6 @@ impl Default for GeneralArgs {
             walrus_binary: default::walrus_binary(),
             walrus_config: None,
             gas_budget: default::gas_budget(),
-            gas_coin: None,
         }
     }
 }
@@ -109,7 +102,6 @@ impl GeneralArgs {
             walrus_binary,
             walrus_config,
             gas_budget,
-            gas_coin,
         );
     }
 }
@@ -171,7 +163,6 @@ pub(crate) struct Config {
     #[serde(default = "default::default_portal")]
     pub portal: String,
     pub package: ObjectID,
-    // TODO(giac): automatically select the gas coin.
     #[serde(default)]
     pub general: GeneralArgs,
 }
