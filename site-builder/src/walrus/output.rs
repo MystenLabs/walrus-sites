@@ -5,7 +5,7 @@ use std::{path::PathBuf, process::Output};
 use anyhow::{anyhow, Context, Result};
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_with::{base64::Base64, serde_as, DisplayFromStr};
-use sui_types::{event::EventID, base_types::ObjectID};
+use sui_types::{base_types::ObjectID, event::EventID};
 
 use super::types::BlobId;
 

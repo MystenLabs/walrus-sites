@@ -10,7 +10,7 @@ use clap::{Parser, Subcommand};
 use publish::{publish_site, update_site};
 use serde::Deserialize;
 use site::content::ContentEncoding;
-use sui_types::{base_types::ObjectID, Identifier};
+use sui_types::base_types::ObjectID;
 
 use crate::util::{get_existing_resource_ids, id_to_base36, load_wallet_context};
 
@@ -158,8 +158,6 @@ enum Commands {
 /// The configuration for the site builder.
 #[derive(Deserialize, Debug, Clone)]
 pub(crate) struct Config {
-    #[serde(default = "default::site_module")]
-    pub module: Identifier,
     #[serde(default = "default::default_portal")]
     pub portal: String,
     pub package: ObjectID,
@@ -191,17 +189,11 @@ impl Config {
 }
 
 mod default {
-    use sui_types::Identifier;
-
     pub(crate) fn walrus_binary() -> Option<String> {
         Some("walrus".to_owned())
     }
     pub(crate) fn gas_budget() -> Option<u64> {
         Some(500_000_000)
-    }
-
-    pub(crate) fn site_module() -> Identifier {
-        Identifier::new("site").expect("valid literal identifier")
     }
 
     pub(crate) fn default_portal() -> String {

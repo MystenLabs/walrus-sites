@@ -145,7 +145,11 @@ impl WalrusCmdBuilder {
 
     /// Adds a [`Command::Store`] command to the builder.
     pub fn store(self, file: PathBuf, epochs: u64, force: bool) -> WalrusCmdBuilder<Command> {
-        let command = Command::Store { file, epochs, force};
+        let command = Command::Store {
+            file,
+            epochs,
+            force,
+        };
         self.with_command(command)
     }
 
