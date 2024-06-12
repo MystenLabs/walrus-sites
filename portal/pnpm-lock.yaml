@@ -8,9 +8,9 @@ dependencies:
   '@mysten/bcs':
     specifier: ^1.0.2
     version: 1.0.2
-  '@mysten/sui.js':
-    specifier: ^0.54.1
-    version: 0.54.1(svelte@4.2.17)(typescript@5.4.5)
+  '@mysten/sui':
+    specifier: ^1.1.0
+    version: 1.1.0(svelte@4.2.17)(typescript@5.4.5)
   base-x:
     specifier: ^4.0.0
     version: 4.0.0
@@ -199,24 +199,18 @@ packages:
   /@leichtgewicht/ip-codec@2.0.5:
     resolution: {integrity: sha512-Vo+PSpZG2/fmgmiNzYK9qWRh8h/CHrwD0mo1h1DzL4yzHNSfWYujGTYsWGreD000gcgmZ7K4Ys6Tx9TxtsKdDw==}
 
-  /@mysten/bcs@0.11.1:
-    resolution: {integrity: sha512-xP85isNSYUCHd3O/g+TmZYmg4wK6cU8q/n/MebkIGP4CYVJZz2wU/G24xIZ3wI+0iTop4dfgA5kYrg/DQKCUzA==}
-    dependencies:
-      bs58: 5.0.0
-    dev: false
-
   /@mysten/bcs@1.0.2:
     resolution: {integrity: sha512-haHT0km/9yIIe8lwo8gDFxGLnoxfRF4WmEVCz4lDXbEVQRsZkF0zB97kukiwMjDuFBaGVUhrOMCLz6td8tSMaQ==}
     dependencies:
       bs58: 5.0.0
     dev: false
 
-  /@mysten/sui.js@0.54.1(svelte@4.2.17)(typescript@5.4.5):
-    resolution: {integrity: sha512-TSmGIX7U9O/uS9EKIQdv7/S69KTbBhMJVelXCafJE6IJw8iB9cN9uLu0+uklkBSDrbRmLSEY70jMr3uRFjReIg==}
-    engines: {node: '>=16'}
+  /@mysten/sui@1.1.0(svelte@4.2.17)(typescript@5.4.5):
+    resolution: {integrity: sha512-1w8fAOzxF/YRaGK83q5ee1wZVE+snfVnMKSNTFRDWdj6oo8uiWNqUyaaEIt0EJvAXzcfsSjrEDxOU85PHdfaCg==}
+    engines: {node: '>=18'}
     dependencies:
       '@graphql-typed-document-node/core': 3.2.0(graphql@16.8.1)
-      '@mysten/bcs': 0.11.1
+      '@mysten/bcs': 1.0.2
       '@noble/curves': 1.4.0
       '@noble/hashes': 1.4.0
       '@scure/bip32': 1.4.0
@@ -225,8 +219,8 @@ packages:
       bech32: 2.0.0
       gql.tada: 1.7.5(graphql@16.8.1)(svelte@4.2.17)(typescript@5.4.5)
       graphql: 16.8.1
-      superstruct: 1.0.4
       tweetnacl: 1.0.3
+      valibot: 0.25.0
     transitivePeerDependencies:
       - svelte
       - typescript
@@ -2808,11 +2802,6 @@ packages:
       postcss-selector-parser: 6.0.16
     dev: true
 
-  /superstruct@1.0.4:
-    resolution: {integrity: sha512-7JpaAoX2NGyoFlI9NBh66BQXGONc+uE+MRS5i2iOBKuS4e+ccgMDjATgZldkah+33DakBxDHiss9kvUcGAO8UQ==}
-    engines: {node: '>=14.0.0'}
-    dev: false
-
   /supports-color@7.2.0:
     resolution: {integrity: sha512-qpCAvRl9stuOHveKsn7HncJRvv501qIacKzQlO/+Lwxc9+0q2wLyv4Dfvt80/DPn2pqOBsJdDiogXGR9+OvwRw==}
     engines: {node: '>=8'}
@@ -3008,6 +2997,10 @@ packages:
   /uuid@8.3.2:
     resolution: {integrity: sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg==}
     hasBin: true
+
+  /valibot@0.25.0:
+    resolution: {integrity: sha512-cmD0ca15oyAbT75iYLNW6uU6doAeIwYfOshpXka/E1Bx4frzbkrgb7gvkI7K0YK/DVOksei4FfxWfRoBP3NFTg==}
+    dev: false
 
   /vary@1.1.2:
     resolution: {integrity: sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg==}
