@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, str::FromStr};
 
 use anyhow::{anyhow, Result};
 use sui_keys::keystore::AccountKeystore;
@@ -10,6 +10,7 @@ use sui_sdk::{
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
     transaction::{Argument, ProgrammableTransaction, TransactionData},
+    Identifier,
 };
 
 use super::resource::{OperationsSummary, ResourceInfo, ResourceManager, ResourceOp, ResourceSet};
@@ -19,6 +20,8 @@ use crate::{
     walrus::Walrus,
     Config,
 };
+
+const SITE_MODULE: &str = "site";
 
 /// The indentifier for the new or existing site.
 ///
@@ -66,7 +69,10 @@ impl SiteManager {
         &self,
         resources: &ResourceManager,
     ) -> Result<(SuiTransactionBlockResponse, OperationsSummary)> {
-        let ptb = BlocksitePtb::new(self.config.package, self.config.module.clone())?;
+        let ptb = BlocksitePtb::new(
+            self.config.package,
+            Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
+        )?;
         let (ptb, existing_resources, needs_transfer) = match &self.site_id {
             SiteIdentifier::ExistingSite(site_id) => (
                 ptb.with_call_arg(&self.wallet.get_object_ref(*site_id).await?.into())?,
@@ -111,7 +117,8 @@ impl SiteManager {
                 unencoded_size=%resource.unencoded_size,
                 "storing new blob on Walrus"
             );
-            self.walrus.store(resource.full_path.clone(), self.epochs, self.force)?;
+            self.walrus
+                .store(resource.full_path.clone(), self.epochs, self.force)?;
         }
         Ok(())
     }
