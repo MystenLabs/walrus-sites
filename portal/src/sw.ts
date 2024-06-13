@@ -1,4 +1,4 @@
-import { getFullnodeUrl, SuiClient, SuiObjectData } from "@mysten/sui.js/client";
+import { getFullnodeUrl, SuiClient, SuiObjectData } from "@mysten/sui/client";
 import * as baseX from "base-x";
 import {
     fromB64,
@@ -6,7 +6,7 @@ import {
     isValidSuiObjectId,
     isValidSuiAddress,
     toHEX,
-} from "@mysten/sui.js/utils";
+} from "@mysten/sui/utils";
 import {
     AGGREGATOR,
     SITE_PACKAGE,
@@ -24,6 +24,8 @@ declare var clients: Clients;
 
 var BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz";
 const b36 = baseX(BASE36);
+ // The string representing the ResourcePath struct in the walrus_site package.
+const RESOURCE_PATH_MOVE_TYPE = SITE_PACKAGE + "::site::ResourcePath";
 
 // Type definitions.
 
@@ -70,7 +72,7 @@ const ResourceStruct = bcs.struct("Resource", {
 });
 
 function DynamicFieldStruct<K, V>(K: BcsType<K>, V: BcsType<V>) {
-    return bcs.struct("DynamicFieldStruct<T>", {
+    return bcs.struct("DynamicFieldStruct<${K.name}, ${V.name}>", {
         parentId: Address,
         name: K,
         value: V,
@@ -267,7 +269,7 @@ async function fetchResource(
         checkRedirect(client, objectId),
         client.getDynamicFieldObject({
             parentId: objectId,
-            name: { type: resourcePathMoveType(), value: path },
+            name: { type: RESOURCE_PATH_MOVE_TYPE, value: path },
         }),
     ]);
 
@@ -305,12 +307,7 @@ async function fetchResource(
     return blockPage;
 }
 
-/**
- * The string representing the ResourcePath struct in the walrus_site package.
- */
-function resourcePathMoveType(): string {
-    return SITE_PACKAGE + "::site::ResourcePath";
-}
+
 
 /**
  * Checks if the object has a redirect in its Display representation.
@@ -336,19 +333,6 @@ function getResourceFields(data: SuiObjectData): Resource | null {
         const df = DynamicFieldStruct(ResourcePathStruct, ResourceStruct).parse(
             fromB64(data.bcs.bcsBytes)
         );
-        return df.value;
-    }
-    return null;
-}
-
-/**
- * Parses the redirect information from the Sui object data response.
- */
-// TODO(giac): Change to have the redirect field to be in the display field (#49).
-function getRedirectField(data: SuiObjectData): string | null {
-    // Deserialize the bcs encoded struct
-    if (data.bcs && data.bcs.dataType === "moveObject") {
-        const df = DynamicFieldStruct(bcs.string(), Address).parse(fromB64(data.bcs.bcsBytes));
         return df.value;
     }
     return null;
@@ -423,7 +407,6 @@ function fullNodeFail(): Response {
 function Response404(message: String): Response {
     console.log();
     return new Response(
-        // TODO: better way for this?
         template_404.replace("${message}", message),
         {
             status: 404,

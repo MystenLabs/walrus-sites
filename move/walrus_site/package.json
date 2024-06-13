@@ -1,5 +1,6 @@
 {
 	"dependencies": {
-		"@mysten/bcs": "^0.8.1"
+		"@mysten/bcs": "^0.8.1",
+		"@mysten/sui": "^1.1.0"
 	}
 }
