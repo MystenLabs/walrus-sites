@@ -79,8 +79,12 @@ self.addEventListener("activate", (_event) => {
 
 self.addEventListener("fetch", async (event) => {
     const url = event.request.url;
+    const headers = event.request.headers;
+    // Extract the range header from the request.
     const scope = self.registration.scope;
 
+    // Check if the request has a range header.
+    const range = getRangeHeader(headers);
     // Check if the request is for a site.
     const parsedUrl = getSubdomainAndPath(url);
     const portalDomain = getDomain(scope);
@@ -90,7 +94,7 @@ self.addEventListener("fetch", async (event) => {
 
     if (requestDomain == portalDomain && parsedUrl && parsedUrl.subdomain) {
         console.log("fetching from the service worker");
-        event.respondWith(resolveAndFetchPage(parsedUrl));
+        event.respondWith(resolveAndFetchPage(parsedUrl, range));
         return;
     }
 
@@ -196,7 +200,7 @@ function hardcodedSubdmains(subdomain: string): string | null {
 /**
  * Resolves the subdomain to an object ID, and gets the corresponding resources.
  */
-async function resolveAndFetchPage(parsedUrl: Path): Promise<Response> {
+async function resolveAndFetchPage(parsedUrl: Path, range: Range | null): Promise<Response> {
     const rpcUrl = getFullnodeUrl(NETWORK);
     const client = new SuiClient({ url: rpcUrl });
 
@@ -219,7 +223,7 @@ async function resolveAndFetchPage(parsedUrl: Path): Promise<Response> {
     if (objectId) {
         console.log("Object ID: ", objectId);
         console.log("Base36 version of the object ID: ", b36.encode(fromHEX(objectId)));
-        return fetchPage(client, objectId, parsedUrl.path);
+        return fetchPage(client, objectId, parsedUrl.path, range);
     }
     return noObjectIdFound();
 }
@@ -227,7 +231,12 @@ async function resolveAndFetchPage(parsedUrl: Path): Promise<Response> {
 /**
  * Fetches a page.
  */
-async function fetchPage(client: SuiClient, objectId: string, path: string): Promise<Response> {
+async function fetchPage(
+    client: SuiClient,
+    objectId: string,
+    path: string,
+    range: Range | null
+): Promise<Response> {
     const resource = await fetchResource(client, objectId, path);
     if (resource === null || !resource.blob_id) {
         return siteNotFound();
@@ -245,7 +254,21 @@ async function fetchPage(client: SuiClient, objectId: string, path: string): Pro
     if (!decompressed) {
         return siteNotFound();
     }
+    if (range) {
+        // A range header was requested (Safari). Return the requested range and the appropriate
+        // header.
+        console.log("Returning a sub range of the resource: ", range.start, range.end);
+        return new Response(decompressed.slice(range.start, range.end), {
+            status: 206,
+            headers: {
+                "Content-Type": resource.content_type,
+                "Content-Range": `bytes ${range.start}-${range.end}/${decompressed.byteLength}`,
+            },
+        });
+    }
+
     console.log("Returning resource: ", resource.path, resource.blob_id, resource.content_type);
+    // Otherwise, return the full resource.
     return new Response(decompressed, {
         headers: {
             "Content-Type": resource.content_type,
@@ -424,4 +447,31 @@ function Response404(message: String): Response {
             "Content-Type": "text/html",
         },
     });
+}
+
+// Safari-specific hacks.
+
+/**
+ * A range request header.
+ */
+type Range = {
+    start: number;
+    end: number;
+};
+
+/**
+ * Get the range request header, if present.
+ *
+ * Safari adds range requests headers to video/audio requests, and expects specific responses.
+ */
+function getRangeHeader(headers: Headers): Range | null {
+    const range = headers.get("range");
+    const bytes = /^bytes\=(\d+)\-(\d+)?$/g.exec(range);
+    if (bytes && bytes[2]) {
+        const start = parseInt(bytes[1]);
+        const end = parseInt(bytes[2]);
+        console.log("Found range header: ", range, start, end);
+        return { start, end };
+    }
+    return null;
 }
