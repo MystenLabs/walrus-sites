@@ -1,19 +1,7 @@
 import { getFullnodeUrl, SuiClient, SuiObjectData } from "@mysten/sui/client";
 import * as baseX from "base-x";
-import {
-    fromB64,
-    fromHEX,
-    isValidSuiObjectId,
-    isValidSuiAddress,
-    toHEX,
-} from "@mysten/sui/utils";
-import {
-    AGGREGATOR,
-    SITE_PACKAGE,
-    SITE_NAMES,
-    NETWORK,
-    MAX_REDIRECT_DEPTH,
-} from "./constants";
+import { fromB64, fromHEX, isValidSuiObjectId, isValidSuiAddress, toHEX } from "@mysten/sui/utils";
+import { AGGREGATOR, SITE_PACKAGE, SITE_NAMES, NETWORK, MAX_REDIRECT_DEPTH } from "./constants";
 import { bcs, BcsType } from "@mysten/bcs";
 import template_404 from "../static/404-page.template.html";
 
@@ -24,7 +12,7 @@ declare var clients: Clients;
 
 var BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz";
 const b36 = baseX(BASE36);
- // The string representing the ResourcePath struct in the walrus_site package.
+// The string representing the ResourcePath struct in the walrus_site package.
 const RESOURCE_PATH_MOVE_TYPE = SITE_PACKAGE + "::site::ResourcePath";
 
 // Type definitions.
@@ -95,25 +83,50 @@ self.addEventListener("fetch", async (event) => {
 
     // Check if the request is for a site.
     const parsedUrl = getSubdomainAndPath(url);
+    const portalDomain = getDomain(scope);
+    const requestDomain = getDomain(url);
+    console.log("Portal domain and request domain: ", portalDomain, requestDomain);
     console.log("Parsed URL: ", parsedUrl);
-    if (parsedUrl && parsedUrl.subdomain) {
+
+    if (requestDomain == portalDomain && parsedUrl && parsedUrl.subdomain) {
+        console.log("fetching from the service worker");
         event.respondWith(resolveAndFetchPage(parsedUrl));
         return;
     }
 
     // Handle the case in which we are at the root `BASE_URL`
     if (url === scope || url === scope + "index.html") {
+        console.log("serving the landing page");
         const newUrl = scope + "index-sw-enabled.html";
         event.respondWith(fetch(newUrl));
         return;
     }
 
     // Default case: Fetch all other sites from the web
+    console.log("forwarding the request outside of the SW:", url);
     const response = await fetch(event.request);
     return response;
 });
 
 // Subdomain handling.
+
+/**
+ * Returns the domain ("example.com") of the given URL.
+ *
+ * Currently assumes that the URL "example.com", or "localhost:8080". Domains like "example.co.uk"
+ * are not currently supported.
+ */
+// TODO(giac): Improve support for any domain (#26).
+function getDomain(orig_url: string): string {
+    const url = new URL(orig_url);
+    // Split the hostname into parts, and return the last two.
+    // If the hostname is "localhost", return "localhost".
+    const hostname = url.hostname.split(".");
+    if (hostname[hostname.length - 1] == "localhost") {
+        return "localhost";
+    }
+    return hostname[hostname.length - 2] + "." + hostname[hostname.length - 1];
+}
 
 /**
  * Subdomain encoding and parsing.
@@ -132,9 +145,9 @@ function subdomainToObjectId(subdomain: string): string | null {
     return isValidSuiObjectId(objectId) ? objectId : null;
 }
 
-function getSubdomainAndPath(scope: string): Path | null {
+function getSubdomainAndPath(orig_url: string): Path | null {
     // At the moment we only support one subdomain level.
-    const url = new URL(scope);
+    const url = new URL(orig_url);
     const hostname = url.hostname.split(".");
 
     // TODO(giac): This should be changed to allow for SuiNS subdomains.
@@ -232,6 +245,7 @@ async function fetchPage(client: SuiClient, objectId: string, path: string): Pro
     if (!decompressed) {
         return siteNotFound();
     }
+    console.log("Returning resource: ", resource.path, resource.blob_id, resource.content_type);
     return new Response(decompressed, {
         headers: {
             "Content-Type": resource.content_type,
@@ -306,8 +320,6 @@ async function fetchResource(
     }
     return blockPage;
 }
-
-
 
 /**
  * Checks if the object has a redirect in its Display representation.
@@ -406,13 +418,10 @@ function fullNodeFail(): Response {
 
 function Response404(message: String): Response {
     console.log();
-    return new Response(
-        template_404.replace("${message}", message),
-        {
-            status: 404,
-            headers: {
-                "Content-Type": "text/html",
-            },
-        }
-    );
+    return new Response(template_404.replace("${message}", message), {
+        status: 404,
+        headers: {
+            "Content-Type": "text/html",
+        },
+    });
 }
