@@ -78,10 +78,11 @@ img {
  */
 
 main {
+  max-width: 900px; /* 2 */
   margin: auto; /* 1 */
-  max-width: 66rem; /* 2 */
   padding: 0 1rem; /* 2 */
-  width: 100%; /* 2 */
+  width: 100vw; /* 2 */
+  height: 100vh;
 }
 
 /**
@@ -89,14 +90,14 @@ main {
  * 2. Increase the size of text in the header.
  */
 
-header {
-  padding: 16rem 0; /* 1 */
+ header {
+  padding: 3rem 0 0 0; /* 1 */
   font-size: 1.5em; /* 2 */
 }
 
 .inverted {
     padding: 10px;
-    background-color: var(--fg);
+    background-color: rgb(3 15 28);
     color: var(--bg);
 }
 
@@ -105,11 +106,12 @@ header {
  */
 
 footer {
-    padding: 20px;
-    color: #e53e3e;
-    position: absolute;
+    padding: 40px 20px 20px 20px;
+    color: rgb(3 15 28);
     width: 100%;
     text-align: center;
+    font-size: 16px; /* Set text size to 16px */
+    font-weight: bold; /* Set text font weight to bold */
 }
 
 /**
@@ -366,4 +368,89 @@ progress::-moz-progress-bar {
 
 hr {
   border: .1rem solid var(--fg);
+}
+
+/*
+ * Fonts
+ */
+@font-face {
+  font-family: "TWKEverettMedium";
+  src: url("/fonts/TWKEverett-Medium.otf") format("opentype");
+  font-weight: 500;
+  font-style: normal;
+}
+
+.TWKEverettMedium {
+  font-family: "TWKEverettMedium", sans-serif;
+}
+
+.custom-header {
+    padding: 20px 10px; 
+    font-size: 1.5em; 
+    border-radius: 40px; 
+    text-align: center; /* Center the text */
+}
+
+.body-bg {
+  background-color: rgb(3 15 28); background-image: url('/images/background.svg'); /* Replace with your image path */
+  background-size: cover; /* Ensure the image covers the entire element */
+  background-position: center; /* Center the image */
+  background-repeat: no-repeat; /* Do not repeat the image */
+}
+
+.content-div {
+  padding: 1rem 3rem;
+  flex: 1 1 0%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  align-items: center;
+  border-radius: 40px;
+}
+
+.main-div {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: white;
+}
+
+.docs {
+  padding: 10px 20px;
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background-color: rgb(77 162 255);
+  color: white;
+  border-radius: 40px;
+  width: auto;
+  text-decoration: none;
+  font-size: 16px; /* Set text size to 16px */
+}
+
+.center {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Spinner styles */
+.spinner {
+  border: 5px solid rgba(0, 0, 0, 0.1); /* Light grey border */
+  border-top: 5px solid rgb(3 15 28); /* Black border at the top */
+  border-radius: 50%; /* Make it a circle */
+  width: 40px; /* Width of the spinner */
+  height: 40px; /* Height of the spinner */
+  animation: spin 1s linear infinite; /* Spin animation */
+}
+
+/* Keyframes for spin animation */
+@keyframes spin {
+  to {
+    transform: rotate(360deg); /* Rotate the spinner 360 degrees */
+  }
 }
