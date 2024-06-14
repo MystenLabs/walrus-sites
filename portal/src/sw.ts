@@ -78,13 +78,31 @@ self.addEventListener("activate", (_event) => {
 });
 
 self.addEventListener("fetch", async (event) => {
-    const url = event.request.url;
-    const scope = self.registration.scope;
+    const urlString = event.request.url;
+    const url = new URL(urlString);
+    const headers = event.request.headers;
+
+    // Extract the range header from the request.
+    const scopeString = self.registration.scope;
+    const scope = new URL(scopeString);
+
+    const objectIdPath = getObjectIdLink(urlString);
+    if (objectIdPath) {
+        event.respondWith(redirectToPortalURLResponse(scope, objectIdPath));
+        return;
+    }
+
+    const walrusPath = getBlobIdLink(urlString);
+    if (walrusPath) {
+        event.respondWith(redirectToAggregatorUrlResponse(scope, walrusPath));
+        return;
+    }
 
     // Check if the request is for a site.
     const parsedUrl = getSubdomainAndPath(url);
-    const portalDomain = getDomain(scope);
-    const requestDomain = getDomain(url);
+    const portalDomain = getDomain(scopeString);
+    const requestDomain = getDomain(urlString);
+
     console.log("Portal domain and request domain: ", portalDomain, requestDomain);
     console.log("Parsed URL: ", parsedUrl);
 
@@ -95,15 +113,15 @@ self.addEventListener("fetch", async (event) => {
     }
 
     // Handle the case in which we are at the root `BASE_URL`
-    if (url === scope || url === scope + "index.html") {
+    if (urlString === scopeString || urlString === scopeString + "index.html") {
         console.log("serving the landing page");
-        const newUrl = scope + "index-sw-enabled.html";
+        const newUrl = scopeString + "index-sw-enabled.html";
         event.respondWith(fetch(newUrl));
         return;
     }
 
     // Default case: Fetch all other sites from the web
-    console.log("forwarding the request outside of the SW:", url);
+    console.log("forwarding the request outside of the SW:", urlString);
     const response = await fetch(event.request);
     return response;
 });
@@ -129,6 +147,48 @@ function getDomain(orig_url: string): string {
 }
 
 /**
+ * Returns the url for the Portal, given a subdomain and a path.
+ */
+function getPortalUrl(path: Path, scope: string): string {
+    const scopeUrl = new URL(scope);
+    const portalDomain = getDomain(scope);
+    let portString = "";
+    if (scopeUrl.port) {
+        portString = ":" + scopeUrl.port;
+    }
+    return scopeUrl.protocol + "//" + path.subdomain + "." + portalDomain + portString + path.path;
+}
+
+/**
+ * Redirects to the portal URL.
+ */
+function redirectToPortalURLResponse(scope: URL, path: Path): Response {
+    // Redirect to the walrus site for the specified domain and path
+    const redirectUrl = getPortalUrl(path, scope.href);
+    console.log("Redirecting to the Walrus Site link: ", path, redirectUrl);
+    return makeRedirectResponse(redirectUrl);
+}
+
+/**
+ * Redirects to the aggregator URL.
+ */
+function redirectToAggregatorUrlResponse(scope: URL, blobId: string): Response {
+    // Redirect to the walrus site for the specified domain and path
+    const redirectUrl = aggregatorEndpoint(blobId);
+    console.log("Redirecting to the Walrus Blob link: ", redirectUrl);
+    return makeRedirectResponse(redirectUrl.href);
+}
+
+function makeRedirectResponse(url: string): Response {
+    return new Response(null, {
+        status: 302,
+        headers: {
+            Location: url,
+        },
+    });
+}
+
+/**
  * Subdomain encoding and parsing.
  *
  * Use base36 instead of HEX to encode object ids in the subdomain, as the subdomain must be < 64
@@ -145,9 +205,8 @@ function subdomainToObjectId(subdomain: string): string | null {
     return isValidSuiObjectId(objectId) ? objectId : null;
 }
 
-function getSubdomainAndPath(orig_url: string): Path | null {
+function getSubdomainAndPath(url: URL): Path | null {
     // At the moment we only support one subdomain level.
-    const url = new URL(orig_url);
     const hostname = url.hostname.split(".");
 
     // TODO(giac): This should be changed to allow for SuiNS subdomains.
@@ -156,6 +215,39 @@ function getSubdomainAndPath(orig_url: string): Path | null {
         // case of local development.
         const path = url.pathname == "/" ? "/index.html" : removeLastSlash(url.pathname);
         return { subdomain: hostname[0], path } as Path;
+    }
+    return null;
+}
+
+/**
+ * Checks if there is a link to a sui resource in the path.
+ *
+ * These "Walrus Site links" have the following format:
+ * `/[suinsname.sui]/resource/path`
+ *  This links to a walrus site on sui.
+ */
+function getObjectIdLink(url: string): Path | null {
+    console.log("Trying to extract the sui link from:", url);
+    const suiResult = /^https:\/\/(.+)\.suiobj\/(.*)$/.exec(url);
+    if (suiResult) {
+        console.log("Matched sui link: ", suiResult[1], suiResult[2]);
+        return { subdomain: suiResult[1], path: "/" + suiResult[2] };
+    }
+    return null;
+}
+
+/**
+ * Checks if there is a link to a walrus resource in the path.
+ *
+ * These "Walrus Site links" have the following format:
+ * `/[blobid.walrus]`
+ */
+function getBlobIdLink(url: string): string {
+    console.log("Trying to extract the walrus link from:", url);
+    const walrusResult = /^https:\/\/blobid\.walrus\/(.+)$/.exec(url);
+    if (walrusResult) {
+        console.log("Matched walrus link: ", walrusResult[1]);
+        return walrusResult[1];
     }
     return null;
 }
