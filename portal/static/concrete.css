@@ -391,13 +391,6 @@ hr {
     text-align: center; /* Center the text */
 }
 
-.body-bg {
-  background-color: rgb(3 15 28); background-image: url('/images/background.svg'); /* Replace with your image path */
-  background-size: cover; /* Ensure the image covers the entire element */
-  background-position: center; /* Center the image */
-  background-repeat: no-repeat; /* Do not repeat the image */
-}
-
 .content-div {
   padding: 1rem 3rem;
   flex: 1 1 0%;
