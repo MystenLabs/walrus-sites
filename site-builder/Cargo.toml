@@ -2,29 +2,28 @@
 name = "site-builder"
 version = "0.1.0"
 edition = "2021"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 anyhow = "1.0.82"
+base64 = "0.22.1"
+bcs = "0.1.6"
 clap = { version = "4.5.4", features = ["derive"] }
+flate2 = "1.0.28"
+futures = "0.3.30"
+home = "0.5.9"
+move-core-types = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.26.0" }
+notify = "6.1.1"
+serde = { version = "1.0.199", features = ["derive"] }
+serde_json = "1.0.116"
+serde_with = { version = "3.8.1", features = ["base64"] }
+serde_yaml = "0.9"
+shared-crypto = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.26.0" }
 sui-keys = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.26.0" }
 sui-sdk = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.26.0" }
 sui-types = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.26.0" }
-move-core-types = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.26.0" }
-shared-crypto = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.26.0" }
+thiserror = "1.0.61"
 tokio = { version = "1.37.0", features = ["rt", "rt-multi-thread", "macros"] }
 toml = "0.8.8"
-serde = { version = "1.0.199", features = ["derive"] }
-serde_yaml = "0.9"
-serde_json = "1.0.116"
-flate2 = "1.0.28"
-futures = "0.3.30"
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
-bcs = "0.1.6"
-notify = "6.1.1"
-serde_with = { version = "3.8.1", features = ["base64"] }
-base64 = "0.22.1"
-thiserror = "1.0.61"
-home = "0.5.9"

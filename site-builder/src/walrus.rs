@@ -106,9 +106,7 @@ mod tests {
 
         let result = wal
             .blob_id(
-                "/Users/giacomo/Repos/walrus-project/walrus/README.md"
-                    .try_into()
-                    .unwrap(),
+                "/Users/giacomo/Repos/walrus-project/walrus/README.md".into(),
                 Some(270.try_into().unwrap()),
             )
             .unwrap();

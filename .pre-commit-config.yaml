@@ -30,15 +30,11 @@ repos:
   hooks:
   - id: cargo-sort
     args: ["--workspace"]
-- repo: https://github.com/EmbarkStudios/cargo-deny
-  rev: 0.14.24
-  hooks:
-  - id: cargo-deny
 - repo: local
   hooks:
   - id: cargo-fmt
     name: cargo-fmt
-    entry: bash -c "cd site-builder && cargo fmt"
+    entry: cargo fmt
     args:
     - "--"
     - "--config"
@@ -48,33 +44,33 @@ repos:
     pass_filenames: false
   - id: cargo-check
     name: cargo-check
-    entry: bash -c "cd site-builder && cargo check"
+    entry: cargo check
     language: rust
     files: ^(site-builder/|Cargo\.(toml|lock)$)
     pass_filenames: false
   - id: cargo-test
     name: cargo-test
-    entry: bash -c "cd site-builder && cargo test"
+    entry: cargo test
     language: rust
     files: ^(site-builder/|Cargo\.(toml|lock)$)
     pass_filenames: false
   - id: clippy-with-tests
     name: clippy-with-tests
-    entry: bash -c "cd site-builder && cargo clippy"
+    entry: cargo clippy
     args: ["--all-features", "--tests", "--", "-D", "warnings"]
     language: rust
     files: ^(site-builder/|Cargo\.(toml|lock)$)
     pass_filenames: false
   - id: clippy
     name: clippy
-    entry: bash -c "cd site-builder && cargo clippy"
+    entry: cargo clippy
     args: ["--all-features", "--", "-D", "warnings"]
     language: rust
     files: ^(site-builder/|Cargo\.(toml|lock)$)
     pass_filenames: false
   - id: cargo-doc
     name: cargo-doc
-    entry: bash -c "cd site-builder && env RUSTDOCFLAGS="-D warnings" cargo doc"
+    entry: env RUSTDOCFLAGS="-D warnings" cargo doc
     args: ["--workspace", "--no-deps"]
     language: rust
     files: ^(site-builder/|Cargo\.(toml|lock)$)

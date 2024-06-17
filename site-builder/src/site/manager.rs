@@ -64,7 +64,7 @@ impl SiteManager {
         })
     }
 
-    /// Updates the site with the given [`Resource`]s.
+    /// Updates the site with the given [`Resource`](super::resource::Resource).
     ///
     /// If the site does not exist, it is created and updated. The resources that need to be updated
     /// or created are published to Walrus.

@@ -7,7 +7,11 @@ use anyhow::{anyhow, Result};
 use futures::Future;
 use sui_sdk::{
     rpc_types::{
-        Page, SuiMoveStruct, SuiObjectResponse, SuiParsedData, SuiTransactionBlockEffects,
+        Page,
+        SuiMoveStruct,
+        SuiObjectResponse,
+        SuiParsedData,
+        SuiTransactionBlockEffects,
         SuiTransactionBlockEffectsAPI,
     },
     wallet_context::WalletContext,
