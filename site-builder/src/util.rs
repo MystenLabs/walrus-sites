@@ -1,3 +1,6 @@
+// Copyright (c) Mysten Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 use std::{collections::HashMap, path::PathBuf, str};
 
 use anyhow::{anyhow, Result};
@@ -134,7 +137,7 @@ pub async fn get_existing_resource_ids(
     let info = get_all_dynamic_field_info(client, site_id).await?;
     Ok(info
         .iter()
-        .filter_map(|d| get_path_from_info(&d).map(|path| (path, d.object_id)))
+        .filter_map(|d| get_path_from_info(d).map(|path| (path, d.object_id)))
         .collect::<HashMap<String, ObjectID>>())
 }
 

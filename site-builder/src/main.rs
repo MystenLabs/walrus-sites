@@ -1,3 +1,6 @@
+// Copyright (c) Mysten Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // mod network;
 mod publish;
 mod site;
@@ -29,7 +32,7 @@ struct Args {
 #[derive(Parser, Clone, Debug, Deserialize)]
 #[clap(rename_all = "kebab-case")]
 pub(crate) struct GeneralArgs {
-    /// The URL or the RPC enpoint to connect the client to.
+    /// The URL or the RPC endpoint to connect the client to.
     ///
     /// Can be specified as a CLI argument or in the config.
     #[clap(long)]

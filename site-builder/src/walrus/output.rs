@@ -1,3 +1,6 @@
+// Copyright (c) Mysten Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 //! The output of running commands on the Walrus CLI.
 
 use std::{path::PathBuf, process::Output};

@@ -1,3 +1,6 @@
+// Copyright (c) Mysten Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { getFullnodeUrl, SuiClient, SuiObjectData } from "@mysten/sui/client";
 import * as baseX from "base-x";
 import { fromB64, fromHEX, isValidSuiObjectId, isValidSuiAddress, toHEX } from "@mysten/sui/utils";
@@ -352,7 +355,7 @@ async function fetchPage(client: SuiClient, objectId: string, path: string): Pro
  * have a special redirect field that points to another site, where the resources to display the
  * site are found.
  *
- * This is usefult to create many objects with an associated site (e.g., NFTs), without having to
+ * This is useful to create many objects with an associated site (e.g., NFTs), without having to
  * repeat the same resources for each object, and allowing to keep some control over the site (for
  * example, the creator can still edit the site even if the NFT is owned by someone else).
  * See the `specitalRedirectField` function for more details.

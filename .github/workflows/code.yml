@@ -74,6 +74,7 @@ jobs:
     needs: diff
     if: ${{ needs.diff.outputs.isRust == 'true' }}
     runs-on: ubuntu-ghcloud
+    working-dir: ./site-builder
     steps:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2.7.3
@@ -101,6 +102,7 @@ jobs:
     needs: diff
     if: ${{ needs.diff.outputs.isRust == 'true' }}
     runs-on: ubuntu-ghcloud
+    working-dir: ./site-builder
     steps:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2.7.3
@@ -116,6 +118,7 @@ jobs:
     needs: diff
     if: ${{ needs.diff.outputs.isRust == 'true' }}
     runs-on: ubuntu-ghcloud
+    working-dir: ./site-builder
     steps:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2.7.3

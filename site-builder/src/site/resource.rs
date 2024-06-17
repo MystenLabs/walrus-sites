@@ -1,3 +1,6 @@
+// Copyright (c) Mysten Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 //! Functionality to read and check the files in of a website.
 
 use std::{
@@ -356,7 +359,8 @@ impl ResourceManager {
             content_type,
             *content_encoding,
             output.blob_id,
-            // TODO(giac): Change to `content.len()` when the problem with content encoding is fixed.
+            // TODO(giac): Change to `content.len()` when the problem with content encoding is
+            // fixed.
             plain_content.len(),
         )))
     }

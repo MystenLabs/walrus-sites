@@ -1,3 +1,6 @@
+// Copyright (c) Mysten Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 use std::{collections::BTreeSet, str::FromStr};
 
 use anyhow::{anyhow, Result};
@@ -23,7 +26,7 @@ use crate::{
 
 const SITE_MODULE: &str = "site";
 
-/// The indentifier for the new or existing site.
+/// The identifier for the new or existing site.
 ///
 /// Either object ID (existing site) or name (new site).
 #[derive(Debug, Clone)]
@@ -129,7 +132,10 @@ impl SiteManager {
         updates: &[ResourceOp<'b>],
         transfer: bool,
     ) -> Result<SuiTransactionBlockResponse> {
-        tracing::debug!(address=?self.active_address()?, "starting to update site resources on chain");
+        tracing::debug!(
+            address=?self.active_address()?,
+            "starting to update site resources on chain",
+        );
         ptb.add_calls(
             updates
                 .iter()

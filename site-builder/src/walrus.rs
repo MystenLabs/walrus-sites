@@ -1,3 +1,6 @@
+// Copyright (c) Mysten Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 //! High-level controller for the Walrus binary through the JSON interface.
 
 use std::{num::NonZeroU16, path::PathBuf, process::Command as CliCommand};

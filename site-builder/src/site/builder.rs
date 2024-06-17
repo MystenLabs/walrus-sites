@@ -1,3 +1,6 @@
+// Copyright (c) Mysten Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 use anyhow::Result;
 use serde::Serialize;
 use sui_types::{
@@ -18,8 +21,8 @@ pub struct BlocksitePtb<T = ()> {
 
 /// A PTB to update a site.
 ///
-/// It is composed of a series of [BlocksiteCall]s, which all have the Walrus site object id as first
-/// argument.
+/// It is composed of a series of [BlocksiteCall]s, which all have the Walrus site object id as
+/// first argument.
 impl BlocksitePtb {
     pub fn new(package: ObjectID, module: Identifier) -> Result<Self> {
         let pt_builder = ProgrammableTransactionBuilder::new();
@@ -143,7 +146,13 @@ impl BlocksiteCall {
     /// This call results into two transactions in a PTB, one to create the resource, and one to add
     /// it to the site.
     pub fn new_resource_and_add(resource: &ResourceInfo) -> Result<BlocksiteCall> {
-        tracing::debug!(resource=%resource.path, content_type=?resource.content_type, encoding=?resource.content_encoding, blob_id=?resource.blob_id, "new Move call: creating resource");
+        tracing::debug!(
+            resource=%resource.path,
+            content_type=?resource.content_type,
+            encoding=?resource.content_encoding,
+            blob_id=?resource.blob_id,
+            "new Move call: creating resource"
+        );
         Ok(BlocksiteCall {
             function: "new_resource_and_add".to_owned(),
             args: vec![
