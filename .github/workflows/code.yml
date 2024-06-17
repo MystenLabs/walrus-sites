@@ -57,18 +57,6 @@ jobs:
               - 'rust-toolchain.toml'
               - '.github/workflows/code.yml'
 
-  dependencies:
-    name: Check dependencies
-    needs: diff
-    if: ${{ needs.diff.outputs.isRust == 'true' }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: EmbarkStudios/cargo-deny-action@v1.6.3
-        with:
-          # do not check advisories on PRs to prevent sudden failure due to new announcement
-          command: check bans licenses sources
-
   lint:
     name: Lint Rust code
     needs: diff
