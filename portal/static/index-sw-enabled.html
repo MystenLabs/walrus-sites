@@ -15,30 +15,29 @@
         <main>
             <div class="main-div">
                 <div class="content-div">
-                    <div class="TWKEverettMedium custom-header">
+                    <div class="AlumniSans custom-header">
                         Walrus Sites
                     </div>
-                    <p class="custom-p">
-                        A Walrus site is a website that exists entirely on The Walrus Decentralized Store, eliminating the need for traditional web infrastructure.<br />
-                        <span class="collapsible-content">
-                            Walrus sites load their content from a objects on Walrus, which include all the resources required to render the site.
-                            To access a Walrus site, all you need is its Sui Object ID or SuiNS name. There's no need for a wallet; these sites are accessible to everyone. 
-                            Walrus sites take full advantage of the decentralization provided by The Walrus Store, 
-                            offering  low storage costs compared to traditional web2 solutions and greater robustness vs web3 alternatives.
-                            <br />With Walrus sites, Dapps can achieve full decentralization, extending beyond smart contracts. Dapps on Sui, Ethereum, Solana, 
-                            and other L1 and L2 networks can utilize Walrus Sites as a robust, highly available, and censorship-resistant alternative to their existing cloud hosting solutions.
-                            <br />Walrus is secured by Sui, a horizontally scalable Byzantine fault-tolerant and proof-of-stake blockchain. With Walrus, 
-                            data is sharded and efficiently replicated across Walrus nodes globally. This marks a significant step forward in the evolution of fully decentralized applications.
-                        </span>
-                        <span class="learn-more" onclick="toggleContent()">Show more</span>
-                    </p>
+                    <div class="custom-p InterTightMedium center" style="gap: 10px;">
+                        <div>A Walrus site is a website that exists entirely on The Walrus Decentralized Store, eliminating the need for traditional web infrastructure.
+                            Walrus sites load their content from objects on Walrus, which include all the resources required to render the site.</div>
+                        <div>To access a Walrus site, all you need is its Sui Object ID or SuiNS name. There's no need for a wallet; these sites are accessible to everyone. 
+                            Walrus sites take full advantage of the decentralization provided by The Walrus Store, offering  low storage costs compared to traditional web2 solutions 
+                            and greater robustness vs web3 alternatives.</div>
+                        <div>With Walrus sites, Dapps can achieve full decentralization, extending beyond smart contracts. Dapps on Sui, Ethereum, Solana, 
+                            and other L1 and L2 networks can utilize Walrus Sites as a robust, highly available, 
+                            and censorship-resistant alternative to their existing cloud hosting solutions.</div>
+                        <div>Walrus is secured by Sui, a horizontally scalable Byzantine fault-tolerant and proof-of-stake blockchain. 
+                            With Walrus, data is sharded and efficiently replicated across Walrus nodes globally. 
+                            This marks a significant step forward in the evolution of fully decentralized applications.</div> 
+                    </div>
                     <div class="start">
-                        <a class="docs" href="https://docs.walrus.site/" target="_blank">
+                        <a class="docs InterTightBold" href="https://docs.walrus.site/" target="_blank">
                             Read the Docs
                         </a>
                     </div>
                 </div>
-                <footer>
+                <footer class="InterTightBold">
                     <div>
                         Copyright 2024 © Mysten Labs, Inc.  
                     </div>
@@ -53,19 +52,5 @@
                 </footer>
             </div>
         </main>
-        <script>
-            function toggleContent() {
-                var content = document.querySelector('.collapsible-content');
-                var link = document.querySelector('.learn-more');
-    
-                if (content.classList.contains('show')) {
-                    content.classList.remove('show');
-                    link.textContent = 'Show more';
-                } else {
-                    content.classList.add('show');
-                    link.textContent = 'Show less';
-                }
-            }
-        </script>
     </body>
 </html>
