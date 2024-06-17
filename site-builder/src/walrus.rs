@@ -92,29 +92,3 @@ impl Walrus {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use std::str::FromStr;
-
-    use super::{output::BlobIdOutput, types::BlobId, Walrus};
-
-    #[test]
-    #[ignore = "this test depends on local variables, change!"]
-    fn test_walrus_command() {
-        let wal = Walrus::new("walrus".to_owned(), 500_000_000, None, None, None);
-
-        let result = wal
-            .blob_id(
-                "/Users/giacomo/Repos/walrus-project/walrus/README.md".into(),
-                Some(270.try_into().unwrap()),
-            )
-            .unwrap();
-        let exp = BlobIdOutput {
-            blob_id: BlobId::from_str("RIWa4LtzrXERdPP4pAT5gQSUV-QVjok7hAnWSdfY3Xw").unwrap(),
-            file: "/Users/giacomo/Repos/walrus-project/walrus/README.md".into(),
-            unencoded_length: 7153,
-        };
-        assert_eq!(result, exp);
-    }
-}
