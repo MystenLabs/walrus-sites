@@ -4,16 +4,35 @@
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Walrus Site Home</title>
+        <link rel="icon" href="/images/favicon.ico" type="image/x-icon">
+        <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png"> 
+        <link rel="icon" sizes="32x32" href="/images/favicon-32x32.png" type="image/png"> 
+        <link rel="icon" sizes="16x16" href="/images/favicon-16x16.png" type="image/png"> 
         <link rel="stylesheet" href="concrete.css" />
         <link rel="stylesheet" href="normalize.css" />
     </head>
     <body>
         <main>
-            <header>
-                <h1 class="custom-header TWKEverettMedium">Walrus Sites!</h1>
-            </header>
-            <div class="center">
-                <div class="spinner"></div>
+            <div class="main-div">
+                <div class="content-div">
+                    <div class="center">
+                        <div class="spinner"></div>
+                        <div class="spinner-text">just a moment...</div>
+                    </div>
+                </div>
+                <footer>
+                    <div>
+                        Copyright 2024 © Mysten Labs, Inc.  
+                    </div>
+                    <div class="terms-policies">
+                        <div>
+                            Terms of Service
+                        </div>
+                        <div>
+                            Privacy Policy
+                        </div>
+                    </div>
+                </footer>
             </div>
             <script>
                 navigator.serviceWorker
@@ -43,7 +62,7 @@
                     .catch(handleError);
 
                 function handleError(error) {
-                    let main = document.querySelector("div");
+                    let main = document.querySelector(".content-div");
                     main.appendChild(document.createTextNode(error.message));
                 }
             </script>

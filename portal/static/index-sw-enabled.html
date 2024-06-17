@@ -4,34 +4,68 @@
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Walrus Site Home</title>
+        <link rel="icon" href="/images/favicon.ico" type="image/x-icon">
+        <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png"> 
+        <link rel="icon" sizes="32x32" href="/images/favicon-32x32.png" type="image/png"> 
+        <link rel="icon" sizes="16x16" href="/images/favicon-16x16.png" type="image/png"> 
         <link rel="stylesheet" href="concrete.css" />
         <link rel="stylesheet" href="normalize.css" />
     </head>
-    <body style="background-color: rgb(3 15 28);">
+    <body>
         <main>
             <div class="main-div">
-                <header>
-                    <h1 class="custom-header TWKEverettMedium" style="margin-bottom: 0;">Walrus Sites!</h1>
-                </header>
                 <div class="content-div">
-                    <div>
-                        <h3 style="text-align: center;">What is a Walrus site?</h3>
-                        <p style="text-align: center; padding: 0rem 1rem 0rem 1rem; max-width: 800px;">
-                            Walrus sites are "web"-sites that live entirely on Sui and Walrus, no web involved!
-                            <br />The content of a Walrus site is loaded from an object on Walrus, as the object
-                            contains all the resources necessary to render the site. <br />To browse a Walrus site, you
-                            just need its <b>Sui Object ID</b> or <b>SuiNS name</b>. <br />No wallet is needed to
-                            browse Walrus site, they are accessible to everyone!
-                        </p>
+                    <div class="TWKEverettMedium custom-header">
+                        Walrus Sites
                     </div>
-                    <div class="center">
+                    <p class="custom-p">
+                        A Walrus site is a website that exists entirely on The Walrus Decentralized Store, eliminating the need for traditional web infrastructure.<br />
+                        <span class="collapsible-content">
+                            Walrus sites load their content from a objects on Walrus, which include all the resources required to render the site.
+                            To access a Walrus site, all you need is its Sui Object ID or SuiNS name. There's no need for a wallet; these sites are accessible to everyone. 
+                            Walrus sites take full advantage of the decentralization provided by The Walrus Store, 
+                            offering  low storage costs compared to traditional web2 solutions and greater robustness vs web3 alternatives.
+                            <br />With Walrus sites, Dapps can achieve full decentralization, extending beyond smart contracts. Dapps on Sui, Ethereum, Solana, 
+                            and other L1 and L2 networks can utilize Walrus Sites as a robust, highly available, and censorship-resistant alternative to their existing cloud hosting solutions.
+                            <br />Walrus is secured by Sui, a horizontally scalable Byzantine fault-tolerant and proof-of-stake blockchain. With Walrus, 
+                            data is sharded and efficiently replicated across Walrus nodes globally. This marks a significant step forward in the evolution of fully decentralized applications.
+                        </span>
+                        <span class="learn-more" onclick="toggleContent()">Show more</span>
+                    </p>
+                    <div class="start">
                         <a class="docs" href="https://docs.walrus.site/" target="_blank">
                             Read the Docs
                         </a>
                     </div>
                 </div>
-                <footer style="color: white;">2024 Mysten Labs. A prototype.</footer>
+                <footer>
+                    <div>
+                        Copyright 2024 © Mysten Labs, Inc.  
+                    </div>
+                    <div class="terms-policies">
+                        <div>
+                            Terms of Service
+                        </div>
+                        <div>
+                            Privacy Policy
+                        </div>
+                    </div>
+                </footer>
             </div>
         </main>
+        <script>
+            function toggleContent() {
+                var content = document.querySelector('.collapsible-content');
+                var link = document.querySelector('.learn-more');
+    
+                if (content.classList.contains('show')) {
+                    content.classList.remove('show');
+                    link.textContent = 'Show more';
+                } else {
+                    content.classList.add('show');
+                    link.textContent = 'Show less';
+                }
+            }
+        </script>
     </body>
 </html>

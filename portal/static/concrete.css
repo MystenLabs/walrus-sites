@@ -78,11 +78,10 @@ img {
  */
 
 main {
-  max-width: 900px; /* 2 */
   margin: auto; /* 1 */
-  padding: 0 1rem; /* 2 */
   width: 100vw; /* 2 */
   height: 100vh;
+  padding: 0 80px 0 80px;
 }
 
 /**
@@ -106,14 +105,34 @@ main {
  */
 
 footer {
-    padding: 40px 20px 20px 20px;
-    color: rgb(3 15 28);
+    padding: 40px 0px 40px 0px;
     width: 100%;
-    text-align: center;
-    font-size: 16px; /* Set text size to 16px */
-    font-weight: bold; /* Set text font weight to bold */
+    font-size: 14px; /* Set text size to 16px */
+    color: #696969;
+    font-style: normal;
+    font-weight: 700;
+    line-height: 100%; /* 14px */
+    letter-spacing: 0.14px;
+    border-top: 1px solid rgba(105, 105, 105, 0.3); /* Only set the top border */
+    border-right: 0px;
+    border-bottom: 0px;
+    border-left: 0px;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
 }
 
+@media (max-width: 768px) {
+  footer {
+      flex-direction: column;
+      padding: 20px 0 20px 0;
+      gap: 10px;
+  }
+  main {
+    padding: 0 40px 0 40px;
+  }
+}
 /**
  * Add some padding around the sections.
  */
@@ -384,21 +403,17 @@ hr {
   font-family: "TWKEverettMedium", sans-serif;
 }
 
-.custom-header {
-    padding: 20px 10px; 
-    font-size: 1.5em; 
-    border-radius: 40px; 
-    text-align: center; /* Center the text */
-}
-
 .content-div {
-  padding: 1rem 3rem;
   flex: 1 1 0%;
   display: flex;
   flex-direction: column;
-  justify-content: space-evenly;
+  justify-content: center;
   align-items: center;
-  border-radius: 40px;
+  row-gap: 40px;
+  max-width:420px;
+  margin-top: 40px;
+  overflow: auto; /* Enable scrolling if content overflows */
+  max-height: 100vh; /* Ensure it doesn't overflow the viewport height */
 }
 
 .main-div {
@@ -406,22 +421,34 @@ hr {
   height: 100%;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  color: white;
+  justify-content: center;
+  align-items: center;
+  color: black;
+  gap: 40px;
 }
 
 .docs {
-  padding: 10px 20px;
+  padding: 12px 40px;
   display: inline-flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  background-color: rgb(77 162 255);
+  background-color: #EE1A32;
   color: white;
-  border-radius: 40px;
   width: auto;
   text-decoration: none;
   font-size: 16px; /* Set text size to 16px */
+  font-style: normal;
+  font-weight: 700;
+  line-height: 160%; /* 25.6px */
+}
+
+.start {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: start;
+  width: 100%;
 }
 
 .center {
@@ -429,15 +456,17 @@ hr {
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  width: 100%;
 }
 
 /* Spinner styles */
 .spinner {
-  border: 5px solid rgba(0, 0, 0, 0.1); /* Light grey border */
-  border-top: 5px solid rgb(3 15 28); /* Black border at the top */
+  border: 3px solid rgba(0, 0, 0, 0.1); /* Light grey border */
+  border-top: 3px solid rgb(3 15 28); /* Black border at the top */
   border-radius: 50%; /* Make it a circle */
-  width: 40px; /* Width of the spinner */
-  height: 40px; /* Height of the spinner */
+  width: 24px; /* Width of the spinner */
+  height: 24px; /* Height of the spinner */
+  margin-bottom: 12px;
   animation: spin 1s linear infinite; /* Spin animation */
 }
 
@@ -446,4 +475,53 @@ hr {
   to {
     transform: rotate(360deg); /* Rotate the spinner 360 degrees */
   }
+}
+
+.custom-header {
+  color: #000;
+  font-size: 60px;
+  font-style: normal;
+  text-align: left;
+  font-weight: 700;
+  line-height: 100%;
+  letter-spacing: 0.96px;
+  width: 100%;
+}
+
+.custom-p {
+  color: #696969;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 160%;
+  overflow-y: auto;
+}
+
+.terms-policies {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 32px;
+}
+
+.collapsible-content {
+  display: none;
+}
+
+.collapsible-content.show {
+  display: flex;
+}
+
+.learn-more {
+  color: blue;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.spinner-text {
+  color: #696969;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 160%; /* 25.6px */
 }
