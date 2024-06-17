@@ -79,9 +79,9 @@ img {
 
 main {
   margin: auto; /* 1 */
-  max-width: 66rem; /* 2 */
-  padding: 0 1rem; /* 2 */
   width: 100%; /* 2 */
+  min-height: 100vh;
+  padding: 0 80px 0 80px;
 }
 
 /**
@@ -89,14 +89,14 @@ main {
  * 2. Increase the size of text in the header.
  */
 
-header {
-  padding: 16rem 0; /* 1 */
+ header {
+  padding: 3rem 0 0 0; /* 1 */
   font-size: 1.5em; /* 2 */
 }
 
 .inverted {
     padding: 10px;
-    background-color: var(--fg);
+    background-color: rgb(3 15 28);
     color: var(--bg);
 }
 
@@ -105,13 +105,32 @@ header {
  */
 
 footer {
-    padding: 20px;
-    color: #e53e3e;
-    position: absolute;
+    padding: 30px 0px 30px 0px;
     width: 100%;
-    text-align: center;
+    font-size: 14px; /* Set text size to 16px */
+    color: #696969;
+    line-height: 100%; /* 14px */
+    letter-spacing: 0.14px;
+    border-top: 1px solid rgba(105, 105, 105, 0.3); /* Only set the top border */
+    border-right: 0px;
+    border-bottom: 0px;
+    border-left: 0px;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
 }
 
+@media (max-width: 768px) {
+  footer {
+      flex-direction: column;
+      padding: 20px 0 20px 0;
+      gap: 10px;
+  }
+  main {
+    padding: 0 40px 0 40px;
+  }
+}
 /**
  * Add some padding around the sections.
  */
@@ -366,4 +385,160 @@ progress::-moz-progress-bar {
 
 hr {
   border: .1rem solid var(--fg);
+}
+
+/*
+ * Fonts
+ */
+
+@font-face {
+  font-family: "AlumniSans";
+  src: url("/fonts/AlumniSans-Bold.ttf") format("truetype");
+}
+
+.AlumniSans {
+  font-family: "AlumniSans", sans-serif;
+}
+
+@font-face {
+  font-family: "InterTightMedium";
+  src: url("/fonts/InterTight-Medium.ttf") format("truetype");
+}
+
+.InterTightMedium {
+  font-family: "InterTightMedium", sans-serif;
+}
+
+@font-face {
+  font-family: "InterTightBold";
+  src: url("/fonts/InterTight-Bold.ttf") format("truetype");
+}
+
+.InterTightBold {
+  font-family: "InterTightBold", sans-serif;
+}
+
+.content-div {
+  flex: 1 1 0%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  row-gap: 40px;
+  max-width:600px;
+  margin-top: 40px;
+}
+
+.main-div {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: black;
+  gap: 40px;
+}
+
+.docs {
+  padding: 12px 40px;
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background-color: #EE1A32;
+  color: white;
+  width: auto;
+  text-decoration: none;
+  font-size: 16px; /* Set text size to 16px */
+  line-height: 160%; /* 25.6px */
+}
+
+.start {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: start;
+  width: 100%;
+}
+
+.center {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+/* Spinner styles */
+.spinner {
+  border: 3px solid rgba(0, 0, 0, 0.1); /* Light grey border */
+  border-top: 3px solid rgb(3 15 28); /* Black border at the top */
+  border-radius: 50%; /* Make it a circle */
+  width: 24px; /* Width of the spinner */
+  height: 24px; /* Height of the spinner */
+  margin-bottom: 12px;
+  animation: spin 1s linear infinite; /* Spin animation */
+}
+
+/* Keyframes for spin animation */
+@keyframes spin {
+  to {
+    transform: rotate(360deg); /* Rotate the spinner 360 degrees */
+  }
+}
+
+.custom-header {
+  color: #000;
+  font-size: 90px;
+  font-style: normal;
+  text-align: left;
+  line-height: 100%;
+  letter-spacing: 0.96px;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .custom-header {
+      font-size: 70px;
+      line-height: 90%;
+  }
+}
+
+
+.custom-p {
+  color: #696969;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 160%;
+}
+
+.terms-policies {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 32px;
+}
+
+.collapsible-content {
+  display: none;
+}
+
+.collapsible-content.show {
+  display: flex;
+}
+
+.learn-more {
+  color: blue;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.spinner-text {
+  color: #696969;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 160%; /* 25.6px */
 }
