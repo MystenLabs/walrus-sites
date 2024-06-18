@@ -15,17 +15,6 @@
 }
 
 /**
- * Invert the colors if the user has dark mode activated.
- */
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --fg: #fff;
-    --bg: #111;
-  }
-}
-
-/**
  * 1. Modify the base font-size to 62.5% so that 1.6rem = 16px.
  * 2. Set box-sizing globally to handle padding and border widths.
  */
