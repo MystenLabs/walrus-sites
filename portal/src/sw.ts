@@ -409,11 +409,11 @@ async function fetchResource(
         console.log("No page data found");
         return null;
     }
-    const blockPage = getResourceFields(pageData.data);
-    if (!blockPage || !blockPage.blob_id) {
+    const siteResource = getResourceFields(pageData.data);
+    if (!siteResource || !siteResource.blob_id) {
         return null;
     }
-    return blockPage;
+    return siteResource;
 }
 
 /**

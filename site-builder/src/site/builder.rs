@@ -13,7 +13,7 @@ use sui_types::{
 
 use super::resource::{ResourceInfo, ResourceOp};
 
-pub struct BlocksitePtb<T = ()> {
+pub struct SitePtb<T = ()> {
     pt_builder: ProgrammableTransactionBuilder,
     site_argument: T,
     package: ObjectID,
@@ -22,12 +22,12 @@ pub struct BlocksitePtb<T = ()> {
 
 /// A PTB to update a site.
 ///
-/// It is composed of a series of [BlocksiteCall]s, which all have the Walrus site object id as
+/// It is composed of a series of [`SiteCall`]s, which all have the Walrus site object id as
 /// first argument.
-impl BlocksitePtb {
+impl SitePtb {
     pub fn new(package: ObjectID, module: Identifier) -> Result<Self> {
         let pt_builder = ProgrammableTransactionBuilder::new();
-        Ok(BlocksitePtb {
+        Ok(SitePtb {
             pt_builder,
             site_argument: (),
             package,
@@ -35,9 +35,9 @@ impl BlocksitePtb {
         })
     }
 
-    pub fn with_call_arg(mut self, site_arg: &CallArg) -> Result<BlocksitePtb<Argument>> {
+    pub fn with_call_arg(mut self, site_arg: &CallArg) -> Result<SitePtb<Argument>> {
         let site_argument = self.pt_builder.input(site_arg.clone())?;
-        Ok(BlocksitePtb {
+        Ok(SitePtb {
             pt_builder: self.pt_builder,
             site_argument,
             package: self.package,
@@ -45,8 +45,8 @@ impl BlocksitePtb {
         })
     }
 
-    pub fn with_arg(self, site_arg: Argument) -> Result<BlocksitePtb<Argument>> {
-        Ok(BlocksitePtb {
+    pub fn with_arg(self, site_arg: Argument) -> Result<SitePtb<Argument>> {
+        Ok(SitePtb {
             pt_builder: self.pt_builder,
             site_argument: site_arg,
             package: self.package,
@@ -55,13 +55,13 @@ impl BlocksitePtb {
     }
 
     /// Makes the call to create a new site and keeps the resulting argument.
-    pub fn with_create_site(mut self, site_name: &str) -> Result<BlocksitePtb<Argument>> {
+    pub fn with_create_site(mut self, site_name: &str) -> Result<SitePtb<Argument>> {
         let argument = self.create_site(site_name)?;
         self.with_arg(argument)
     }
 }
 
-impl<T> BlocksitePtb<T> {
+impl<T> SitePtb<T> {
     /// Transfer argument to address
     pub fn transfer_arg(&mut self, recipient: SuiAddress, arg: Argument) {
         self.pt_builder.transfer_arg(recipient, arg);
@@ -95,12 +95,12 @@ impl<T> BlocksitePtb<T> {
     }
 }
 
-impl BlocksitePtb<Argument> {
+impl SitePtb<Argument> {
     pub fn site_argument(&self) -> Argument {
         self.site_argument
     }
 
-    pub fn add_calls(&mut self, calls: impl IntoIterator<Item = BlocksiteCall>) -> Result<()> {
+    pub fn add_calls(&mut self, calls: impl IntoIterator<Item = SiteCall>) -> Result<()> {
         for call in calls {
             self.add_call(call)?;
         }
@@ -109,10 +109,10 @@ impl BlocksitePtb<Argument> {
 
     /// Adds a call to the PTB.
     ///
-    /// If the `function` field of the [`BlocksiteCall`] provided is "new_resource_and_add", this
+    /// If the `function` field of the [`SiteCall`] provided is "new_resource_and_add", this
     /// function will create two transactions in the PTB, one to creat the resource, and one to add
     /// it to the site.
-    pub fn add_call(&mut self, mut call: BlocksiteCall) -> Result<()> {
+    pub fn add_call(&mut self, mut call: SiteCall) -> Result<()> {
         let mut args = call
             .args
             .into_iter()
@@ -136,17 +136,17 @@ impl BlocksitePtb<Argument> {
 
 // Testing out
 #[derive(Debug)]
-pub struct BlocksiteCall {
+pub struct SiteCall {
     function: String,
     args: Vec<CallArg>,
 }
 
-impl BlocksiteCall {
+impl SiteCall {
     /// Creates a new resource and adds it to the site.
     ///
     /// This call results into two transactions in a PTB, one to create the resource, and one to add
     /// it to the site.
-    pub fn new_resource_and_add(resource: &ResourceInfo) -> Result<BlocksiteCall> {
+    pub fn new_resource_and_add(resource: &ResourceInfo) -> Result<SiteCall> {
         tracing::debug!(
             resource=%resource.path,
             content_type=?resource.content_type,
@@ -154,7 +154,7 @@ impl BlocksiteCall {
             blob_id=?resource.blob_id,
             "new Move call: creating resource"
         );
-        Ok(BlocksiteCall {
+        Ok(SiteCall {
             function: "new_resource_and_add".to_owned(),
             args: vec![
                 pure_call_arg(&resource.path)?,
@@ -166,9 +166,9 @@ impl BlocksiteCall {
     }
 
     /// Removes a resource from the site if it exists
-    pub fn remove_resource_if_exists(resource: &ResourceInfo) -> Result<BlocksiteCall> {
+    pub fn remove_resource_if_exists(resource: &ResourceInfo) -> Result<SiteCall> {
         tracing::debug!(resource=%resource.path, "new Move call: removing resource");
-        Ok(BlocksiteCall {
+        Ok(SiteCall {
             function: "remove_resource_if_exists".to_owned(),
             args: vec![pure_call_arg(&resource.path)?],
         })
@@ -179,20 +179,18 @@ pub fn pure_call_arg<T: Serialize>(arg: &T) -> Result<CallArg> {
     Ok(CallArg::Pure(bcs::to_bytes(arg)?))
 }
 
-impl<'a> TryFrom<&ResourceOp<'a>> for BlocksiteCall {
+impl<'a> TryFrom<&ResourceOp<'a>> for SiteCall {
     type Error = anyhow::Error;
 
     fn try_from(value: &ResourceOp) -> Result<Self, Self::Error> {
         match value {
-            ResourceOp::Deleted(resource) => {
-                BlocksiteCall::remove_resource_if_exists(&resource.info)
-            }
-            ResourceOp::Created(resource) => BlocksiteCall::new_resource_and_add(&resource.info),
+            ResourceOp::Deleted(resource) => SiteCall::remove_resource_if_exists(&resource.info),
+            ResourceOp::Created(resource) => SiteCall::new_resource_and_add(&resource.info),
         }
     }
 }
 
-impl<'a> TryFrom<ResourceOp<'a>> for BlocksiteCall {
+impl<'a> TryFrom<ResourceOp<'a>> for SiteCall {
     type Error = anyhow::Error;
 
     fn try_from(value: ResourceOp) -> Result<Self, Self::Error> {
