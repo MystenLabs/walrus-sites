@@ -105,8 +105,11 @@ impl BlobStoreResult {
 
 /// The output of the `store` command.
 #[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct StoreOutput(pub BlobStoreResult);
+pub struct StoreOutput {
+    pub result: BlobStoreResult,
+    pub n_shards: u16,
+    pub price_per_unit_size: u64,
+}
 
 /// The output of the `read` command.
 #[serde_as]
