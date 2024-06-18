@@ -1,3 +1,6 @@
+// Copyright (c) Mysten Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 macro_rules! match_for_correct_type {
     ($value:expr, $field_type:path) => {
         match $value {

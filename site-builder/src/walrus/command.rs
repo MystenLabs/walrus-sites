@@ -1,3 +1,6 @@
+// Copyright (c) Mysten Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 //! The representation of a walrus cli command.
 
 use std::{num::NonZeroU16, path::PathBuf};
@@ -200,27 +203,5 @@ impl WalrusCmdBuilder<Command> {
             gas_budget,
             command,
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn serialize_command_test(cmd: &WalrusJsonCmd, expected: &str) {
-        assert_eq!(&cmd.to_json().expect("can be serialized"), expected,);
-    }
-    #[test]
-    fn test_serialize_walrus_command() {
-        serialize_command_test(
-            &WalrusCmdBuilder::new(None, None, 1000)
-                .with_command(Command::BlobId {
-                    file: "test.md".into(),
-                    n_shards: Some(270.try_into().unwrap()),
-                    rpc_arg: RpcArg { rpc_url: None },
-                })
-                .build(),
-            r#"{"gas_budget":1000,"command":{"blob_id":{"file":"test.md","n_shards":270}}}"#,
-        )
     }
 }

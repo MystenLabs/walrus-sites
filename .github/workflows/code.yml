@@ -1,0 +1,141 @@
+name: Code
+
+on:
+  # Run workflow on every PR.
+  pull_request:
+  # Run workflow on the main branch after every merge.
+  # This is important to fill the GitHub Actions cache in a way that PRs can see it.
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CLICOLOR_FORCE: 1
+  # Incremental compilation is useful as part of an edit-build-test-edit cycle, as it lets the
+  # compiler avoid recompiling code that hasn't changed. The setting does not improve the current
+  # compilation but instead saves additional information to speed up future compilations (see
+  # https://doc.rust-lang.org/cargo/reference/profiles.html#incremental). Thus, this is only useful
+  # in CI if the result is cached, which we only do on the `main` branch.
+  CARGO_INCREMENTAL: ${{ github.ref == 'refs/heads/main' && '1' || '0' }}
+  # Allow more retries for network requests in cargo (downloading crates) and
+  # rustup (installing toolchains). This should help to reduce flaky CI failures
+  # from transient network timeouts or other issues.
+  CARGO_NET_RETRY: 10
+  RUSTUP_MAX_RETRIES: 10
+  # Don't emit giant backtraces in the CI logs.
+  RUST_BACKTRACE: short
+  RUSTDOCFLAGS: -D warnings
+  SUI_TAG: testnet-v1.27.0
+
+jobs:
+  diff:
+    runs-on: [ubuntu-ghcloud]
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      isRust: ${{ steps.diff.outputs.isRust }}
+      isMove: ${{ steps.diff.outputs.isMove }}
+      relevantForE2eTests: ${{ steps.diff.outputs.relevantForE2eTests }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detect Changes
+        uses: dorny/paths-filter@v3.0.2
+        id: diff
+        with:
+          filters: |
+            isMove:
+              - 'move/**'
+              - '.github/workflows/code.yml'
+            isRust:
+              - 'site-builder/**'
+              - 'rust-toolchain.toml'
+              - '.github/workflows/code.yml'
+
+  dependencies:
+    name: Check dependencies
+    needs: diff
+    if: ${{ needs.diff.outputs.isRust == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v1.6.3
+        with:
+          # do not check advisories on PRs to prevent sudden failure due to new announcement
+          command: check bans licenses sources
+
+  lint:
+    name: Lint Rust code
+    needs: diff
+    if: ${{ needs.diff.outputs.isRust == 'true' }}
+    runs-on: ubuntu-ghcloud
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2.7.3
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' && 'true' || 'false' }}
+      - run: >
+          cargo install cargo-sort --git https://github.com/DevinR528/cargo-sort
+          --rev 55ec89082466f6bb246d870a8d56d166a8e1f08b
+
+      - name: Check formatting with rustfmt
+        run: >
+          cargo fmt --all -- --check
+          --config group_imports=StdExternalCrate,imports_granularity=Crate,imports_layout=HorizontalVertical
+      - name: Check sorting of dependencies
+        run: cargo sort -w -c
+      - name: Lint using clippy (w/o tests)
+        run: cargo clippy --all-features --no-deps -- -D warnings
+      - name: Lint using clippy (w/ tests)
+        run: cargo clippy --all-features --tests --no-deps -- -D warnings
+      - name: Check documentation
+        run: cargo doc --no-deps --workspace
+
+  build:
+    name: Build Rust code
+    needs: diff
+    if: ${{ needs.diff.outputs.isRust == 'true' }}
+    runs-on: ubuntu-ghcloud
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2.7.3
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' && 'true' || 'false' }}
+      - name: Build Rust code
+        run: cargo build --verbose
+
+  # TODO(mlegner): Currently running all tests on all PRs touching Rust code.
+  # If the running time gets too long, we may need to separate the integration and E2E tests.
+  test:
+    name: Test Rust code
+    needs: diff
+    if: ${{ needs.diff.outputs.isRust == 'true' }}
+    runs-on: ubuntu-ghcloud
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2.7.3
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' && 'true' || 'false' }}
+      - name: Run tests
+        run: cargo test -- --include-ignored
+  check-all:
+    name: Check if all code checks succeeded
+    if: always()
+    needs:
+      - diff
+      - dependencies
+      - lint
+      - build
+      - test
+    runs-on: ubuntu-latest
+    steps:
+    - name: Decide whether all needed jobs succeeded
+      uses: re-actors/alls-green@v1.2.2
+      with:
+        allowed-skips: ${{ toJSON(needs) }}
+        jobs: ${{ toJSON(needs) }}
