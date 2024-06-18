@@ -20,7 +20,7 @@ use super::resource::{OperationsSummary, ResourceInfo, ResourceManager, Resource
 use crate::{
     site::builder::{BlocksiteCall, BlocksitePtb},
     util::{self, get_struct_from_object_response},
-    walrus::Walrus,
+    walrus::{output::store_output_string, Walrus},
     Config,
 };
 
@@ -120,8 +120,10 @@ impl SiteManager {
                 unencoded_size=%resource.unencoded_size,
                 "storing new blob on Walrus"
             );
-            self.walrus
+            let output = self
+                .walrus
                 .store(resource.full_path.clone(), self.epochs, self.force)?;
+            println!("{}", store_output_string(&resource.info.path, &output));
         }
         Ok(())
     }

@@ -13,7 +13,6 @@ use sui_types::{base_types::ObjectID, event::EventID};
 use super::types::BlobId;
 
 pub type Epoch = u64;
-
 /// Result when attempting to store a blob.
 #[serde_as]
 #[derive(Debug, Clone, Deserialize)]
@@ -32,7 +31,14 @@ pub enum BlobStoreResult {
     },
     /// The blob was newly created; this contains the newly created Sui object associated with the
     /// blob.
-    NewlyCreated(Blob),
+    NewlyCreated {
+        /// The Sui blob object that holds the newly created blob.
+        blob_object: Blob,
+        /// The encoded size, including metadata.
+        encoded_size: u64,
+        /// The storage cost, excluding gas.
+        cost: u64,
+    },
     /// The blob is known to Walrus but was marked as invalid.
     ///
     /// This indicates a bug within the client, the storage nodes, or more than a third malicious
@@ -44,6 +50,21 @@ pub enum BlobStoreResult {
         /// The event where the blob was marked as invalid.
         event: EventID,
     },
+}
+
+impl BlobStoreResult {
+    /// Returns the blob ID.
+    #[allow(dead_code)]
+    pub fn blob_id(&self) -> &BlobId {
+        match self {
+            Self::AlreadyCertified { blob_id, .. } => blob_id,
+            Self::MarkedInvalid { blob_id, .. } => blob_id,
+            Self::NewlyCreated {
+                blob_object: Blob { blob_id, .. },
+                ..
+            } => blob_id,
+        }
+    }
 }
 
 /// Supported Walrus encoding types.
@@ -91,22 +112,24 @@ pub struct Blob {
     pub storage: StorageResource,
 }
 
-impl BlobStoreResult {
-    /// Returns the blob ID.
-    #[allow(dead_code)]
-    pub fn blob_id(&self) -> &BlobId {
-        match self {
-            Self::AlreadyCertified { blob_id, .. } => blob_id,
-            Self::MarkedInvalid { blob_id, .. } => blob_id,
-            Self::NewlyCreated(Blob { blob_id, .. }) => blob_id,
-        }
-    }
-}
-
 /// The output of the `store` command.
 #[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct StoreOutput(pub BlobStoreResult);
+
+pub fn store_output_string(path: &str, output: &StoreOutput) -> String {
+    let outstr = match &output.0 {
+        BlobStoreResult::AlreadyCertified { blob_id, .. } => {
+            format!("already certified with blob ID {blob_id}")
+        }
+        BlobStoreResult::NewlyCreated {
+            blob_object: Blob { blob_id, .. },
+            ..
+        } => format!("newly created blob, with ID {blob_id}",),
+        // TODO(giac): this should be handled before.
+        BlobStoreResult::MarkedInvalid { .. } => "the blob was marked invalid".to_owned(),
+    };
+    format!("Pushed resource {path} to Walrus: {outstr}")
+}
 
 /// The output of the `read` command.
 #[serde_as]
