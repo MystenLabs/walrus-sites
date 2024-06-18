@@ -325,7 +325,11 @@ async function resolveAndFetchPage(parsedUrl: Path): Promise<Response> {
 async function fetchPage(client: SuiClient, objectId: string, path: string): Promise<Response> {
     const resource = await fetchResource(client, objectId, path);
     if (resource === null || !resource.blob_id) {
-        return siteNotFound();
+        if (path !== '/404.html') {
+            return fetchPage(client, objectId, '/404.html');
+        } else {
+            return siteNotFound();
+        }
     }
 
     console.log("Fetched Resource: ", resource);
