@@ -26,35 +26,3 @@ rebuild and serve again.
 
 First, install the [Vercel CLI](https://vercel.com/docs/cli).
 Then, given access to the Mysten Vercel Team, it is sufficient to run `vercel --prod`.
-
-## Operation Diagram
-
-```mermaid
-sequenceDiagram
-title: Loading sequence dapp.walrus.site
-autonumber
-participant Browser Tab
-participant Service Worker
-participant Portal
-participant Full Node
-Note left of Browser Tab: Navigate to dapp.walrus.site
-
-opt First load: Install the Service Worker
-    Browser Tab ->> Portal: Fetch dapp.walrus.site
-    Portal ->> Browser Tab: index.html
-    Browser Tab ->> Service Worker: Install
-    Service Worker ->> Browser Tab: Done
-    Browser Tab ->> Browser Tab: Refresh
-end
-
-    Browser Tab ->> Service Worker: Fetch dapp.walrus.site
-    Service Worker ->> Full Node: Resolve SuiNs address of dapp.sui
-    Full Node ->> Service Worker: 0x1234...
-    Service Worker ->> Full Node: Get object 0x1234...
-    Full Node ->> Service Worker: Bcs bytes
-    Service Worker ->> Service Worker: Decode bytes and prepare response
-    Service Worker ->> Browser Tab: Serve response
-
-Note left of Browser Tab: Display dapp.walrus.site
-
-```
