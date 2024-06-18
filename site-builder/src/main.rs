@@ -116,7 +116,7 @@ enum Commands {
     Publish {
         /// The directory containing the site sources.
         directory: PathBuf,
-        /// The encoding for the contents of the BlockPages.
+        /// The encoding for the contents of the site's resources.
         #[clap(short = 'e', long, value_enum, default_value_t = ContentEncoding::PlainText)]
         content_encoding: ContentEncoding,
         /// The name of the site.
@@ -132,7 +132,7 @@ enum Commands {
         directory: PathBuf,
         /// The object ID of a partially published site to be completed.
         object_id: ObjectID,
-        /// The encoding for the contents of the BlockPages.
+        /// The encoding for the contents of the site's resources.
         #[clap(short = 'e', long, value_enum, default_value_t = ContentEncoding::PlainText)]
         content_encoding: ContentEncoding,
         #[clap(short, long, action)]

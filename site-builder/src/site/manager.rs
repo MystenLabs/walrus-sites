@@ -18,7 +18,7 @@ use sui_types::{
 
 use super::resource::{OperationsSummary, ResourceInfo, ResourceManager, ResourceOp, ResourceSet};
 use crate::{
-    site::builder::{BlocksiteCall, BlocksitePtb},
+    site::builder::{SiteCall, SitePtb},
     util::{self, get_struct_from_object_response},
     walrus::{output::store_output_string, Walrus},
     Config,
@@ -72,7 +72,7 @@ impl SiteManager {
         &self,
         resources: &ResourceManager,
     ) -> Result<(SuiTransactionBlockResponse, OperationsSummary)> {
-        let ptb = BlocksitePtb::new(
+        let ptb = SitePtb::new(
             self.config.package,
             Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
         )?;
@@ -130,7 +130,7 @@ impl SiteManager {
 
     async fn execute_updates<'b>(
         &self,
-        mut ptb: BlocksitePtb<Argument>,
+        mut ptb: SitePtb<Argument>,
         updates: &[ResourceOp<'b>],
         transfer: bool,
     ) -> Result<SuiTransactionBlockResponse> {
@@ -141,7 +141,7 @@ impl SiteManager {
         ptb.add_calls(
             updates
                 .iter()
-                .map(BlocksiteCall::try_from)
+                .map(SiteCall::try_from)
                 .collect::<Result<Vec<_>>>()?,
         )?;
         if transfer {
