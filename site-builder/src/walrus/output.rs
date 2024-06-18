@@ -107,7 +107,7 @@ pub struct Blob {
     /// The erasure coding type used for the blob.
     pub erasure_code_type: EncodingType,
     /// The epoch in which the blob was first certified, `None` if the blob is uncertified.
-    pub certified: Option<Epoch>,
+    pub certified_epoch: Option<Epoch>,
     /// The [`StorageResource`] used to store the blob.
     pub storage: StorageResource,
 }
