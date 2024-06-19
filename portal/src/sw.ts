@@ -83,7 +83,6 @@ self.addEventListener("activate", (_event) => {
 self.addEventListener("fetch", async (event) => {
     const urlString = event.request.url;
     const url = new URL(urlString);
-    const headers = event.request.headers;
 
     // Extract the range header from the request.
     const scopeString = self.registration.scope;
@@ -362,7 +361,7 @@ async function fetchPage(client: SuiClient, objectId: string, path: string): Pro
  * This is useful to create many objects with an associated site (e.g., NFTs), without having to
  * repeat the same resources for each object, and allowing to keep some control over the site (for
  * example, the creator can still edit the site even if the NFT is owned by someone else).
- * See the `specitalRedirectField` function for more details.
+ * See the `checkRedirect` function for more details.
  *
  * To prevent infinite loops, the recursion depth is of this function is capped to
  * `MAX_REDIRECT_DEPTH`.
