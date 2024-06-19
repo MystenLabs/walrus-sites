@@ -18,9 +18,10 @@ use sui_types::{
 
 use super::resource::{OperationsSummary, ResourceInfo, ResourceManager, ResourceOp, ResourceSet};
 use crate::{
+    display,
     site::builder::{SiteCall, SitePtb},
     util::{self, get_struct_from_object_response},
-    walrus::{output::store_output_string, Walrus},
+    walrus::Walrus,
     Config,
 };
 
@@ -97,9 +98,18 @@ impl SiteManager {
         tracing::debug!(operations=?update_operations, "list of operations computed");
 
         self.publish_to_walrus(&update_operations).await?;
+
+        if !update_operations.is_empty() {
+            display::action("Updating the Walrus Site object on Sui");
+            let result = self
+                .execute_updates(ptb, &update_operations, needs_transfer)
+                .await?;
+            display::done();
+            return Ok((result, update_operations.into()));
+        }
+        // TODO(giac) improve this return
         Ok((
-            self.execute_updates(ptb, &update_operations, needs_transfer)
-                .await?,
+            SuiTransactionBlockResponse::default(),
             update_operations.into(),
         ))
     }
@@ -120,10 +130,14 @@ impl SiteManager {
                 unencoded_size=%resource.unencoded_size,
                 "storing new blob on Walrus"
             );
-            let output = self
+            display::action(format!(
+                "Storing resource on Walrus: {}",
+                &resource.info.path
+            ));
+            let _output = self
                 .walrus
                 .store(resource.full_path.clone(), self.epochs, self.force)?;
-            println!("{}", store_output_string(&resource.info.path, &output));
+            display::done();
         }
         Ok(())
     }

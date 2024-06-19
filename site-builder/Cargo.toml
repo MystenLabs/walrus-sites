@@ -10,6 +10,7 @@ anyhow = "1.0.86"
 base64 = "0.22.1"
 bcs = "0.1.6"
 clap = { version = "4.5.7", features = ["derive"] }
+crossterm = "0.27.0"
 flate2 = "1.0.30"
 futures = "0.3.30"
 home = "0.5.9"

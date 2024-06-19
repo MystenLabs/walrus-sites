@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // mod network;
+mod display;
 mod publish;
 mod site;
 mod util;
@@ -10,6 +11,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
+use futures::TryFutureExt;
 use publish::{publish_site, update_site};
 use serde::Deserialize;
 use site::content::ContentEncoding;
@@ -204,14 +206,16 @@ mod default {
     }
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
+async fn run() -> Result<()> {
     tracing_subscriber::fmt::init();
     tracing::info!("initializing site builder");
 
     let args = Args::parse();
     let mut config: Config = std::fs::read_to_string(&args.config)
-        .context(format!("unable to read config file {:?}", args.config))
+        .context(format!(
+            "unable to read config {:?}; consider using the --config flag to point to the config",
+            args.config
+        ))
         .and_then(|s| {
             serde_yaml::from_str(&s)
                 .context(format!("unable to parse yaml in file {:?}", args.config))
@@ -262,4 +266,11 @@ async fn main() -> Result<()> {
     };
 
     Ok(())
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    run()
+        .inspect_err(|_| display::error("Error during execution"))
+        .await
 }
