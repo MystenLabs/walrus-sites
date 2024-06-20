@@ -13,7 +13,7 @@
   "outDir": "dist",
   "skipLibCheck": true,
   "include": [
-    "src/sw.ts",
+    "src/walrus-sites-sw.ts",
     "src/custom.d.ts",
     "src/constants.ts"
   ],

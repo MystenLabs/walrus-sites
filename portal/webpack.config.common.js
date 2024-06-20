@@ -7,7 +7,7 @@ const CopyPlugin = require("copy-webpack-plugin");
 module.exports = {
     watch: true,
     entry: {
-        sw: "./src/sw.ts",
+        "walrus-sites-sw": "./src/walrus-sites-sw.ts",
     },
     module: {
         rules: [
