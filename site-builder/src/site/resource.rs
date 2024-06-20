@@ -336,7 +336,7 @@ impl ResourceManager {
         let extension = full_path.extension().unwrap_or(
             full_path
                 .file_name()
-                .expect("the path should no terminate in `..`"),
+                .expect("the path should not terminate in `..`"),
         );
 
         let content_type = ContentType::try_from_extension(extension.to_str().ok_or(anyhow!(
