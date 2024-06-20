@@ -13,6 +13,7 @@ use sui_sdk::rpc_types::{
 use sui_types::base_types::{ObjectID, SuiAddress};
 
 use crate::{
+    display,
     site::{
         content::ContentEncoding,
         manager::{SiteIdentifier, SiteManager},
@@ -138,7 +139,12 @@ pub async fn edit_site(
     );
 
     let mut resource_manager = ResourceManager::new(walrus.clone())?;
+    display::action(format!(
+        "Parsing the directory {} and locally computing blob IDs",
+        directory.to_string_lossy()
+    ));
     resource_manager.read_dir(directory, content_encoding)?;
+    display::done();
     tracing::debug!(resources=%resource_manager.resources, "resources loaded from directory");
 
     let site_manager = SiteManager::new(
@@ -177,10 +183,11 @@ fn print_summary(
         }
     }
 
+    display::header("Execution completed");
     println!("{}\n", summary);
     let object_id = match site_id {
         SiteIdentifier::ExistingSite(id) => {
-            println!("Updated site at object ID: {}", id);
+            println!("Site object ID: {}", id);
             *id
         }
         SiteIdentifier::NewSite(name) => {
@@ -197,7 +204,7 @@ fn print_summary(
     };
 
     println!(
-        "\nBrowse the resulting site at: https://{}.{}",
+        "Browse the resulting site at: https://{}.{}",
         id_to_base36(&object_id)?,
         config.portal
     );

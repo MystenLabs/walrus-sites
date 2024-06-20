@@ -5,7 +5,7 @@
 
 use std::{num::NonZeroU16, path::PathBuf, process::Command as CliCommand};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use command::RpcArg;
 use output::{try_from_output, BlobIdOutput, ReadOutput, StoreOutput};
 
@@ -34,7 +34,17 @@ pub struct Walrus {
 macro_rules! create_command {
     ($self:ident, $name:ident, $($arg:expr),*) => {{
         let json_input = $self.builder().$name($($arg),*).build().to_json()?;
-        let output = $self.base_command().arg(&json_input).output()?;
+        let output = $self
+            .base_command()
+            .arg(&json_input)
+            .output()
+            .context(
+                format!(
+                    "error while executing the call to the Walrus binary; \
+                    is it available and executable? you are using: `{}`",
+                    $self.bin
+                )
+            )?;
         try_from_output(output)
     }};
 }

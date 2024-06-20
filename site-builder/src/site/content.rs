@@ -3,7 +3,7 @@
 
 use std::fmt;
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Result};
 use clap::ValueEnum;
 
 #[derive(Debug, ValueEnum, Clone, Copy, PartialEq, Eq, Ord, PartialOrd)]
@@ -121,8 +121,8 @@ pub enum ContentType {
 }
 
 impl ContentType {
-    pub fn from_extension(ext: &str) -> Self {
-        match ext {
+    pub fn try_from_extension(ext: &str) -> Result<Self> {
+        Ok(match ext {
             "aac" => ContentType::AudioAac,
             "abw" => ContentType::ApplicationXabiword,
             "apng" => ContentType::ImageApng,
@@ -203,8 +203,13 @@ impl ContentType {
             "xul" => ContentType::ApplicationVndmozillaxulxml,
             "zip" => ContentType::ApplicationZip,
             "7z" => ContentType::ApplicationX7zcompressed,
-            _ => panic!("Unknown extension {}", ext),
-        }
+            _ => {
+                return Err(anyhow!(
+                    "the content type for extension `{}` is currently not supported",
+                    ext
+                ))
+            }
+        })
     }
 }
 

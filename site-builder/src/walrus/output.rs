@@ -116,21 +116,6 @@ pub struct Blob {
 #[derive(Debug, Clone, Deserialize)]
 pub struct StoreOutput(pub BlobStoreResult);
 
-pub fn store_output_string(path: &str, output: &StoreOutput) -> String {
-    let outstr = match &output.0 {
-        BlobStoreResult::AlreadyCertified { blob_id, .. } => {
-            format!("already certified with blob ID {blob_id}")
-        }
-        BlobStoreResult::NewlyCreated {
-            blob_object: Blob { blob_id, .. },
-            ..
-        } => format!("newly created blob, with ID {blob_id}",),
-        // TODO(giac): this should be handled before.
-        BlobStoreResult::MarkedInvalid { .. } => "the blob was marked invalid".to_owned(),
-    };
-    format!("Pushed resource {path} to Walrus: {outstr}")
-}
-
 /// The output of the `read` command.
 #[serde_as]
 #[derive(Debug, Clone, Deserialize, Eq, PartialEq)]

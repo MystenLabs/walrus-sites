@@ -11,7 +11,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use flate2::{write::GzEncoder, Compression};
 use move_core_types::u256::U256;
 use sui_sdk::rpc_types::{SuiMoveStruct, SuiMoveValue};
@@ -220,6 +220,9 @@ impl<'a> From<Vec<ResourceOp<'a>>> for OperationsSummary {
 
 impl Display for OperationsSummary {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.0.is_empty() {
+            return write!(f, "No operations need to be performed.");
+        }
         let ops = self
             .0
             .iter()
@@ -330,13 +333,17 @@ impl ResourceManager {
         root: &Path,
         content_encoding: &ContentEncoding,
     ) -> Result<Option<Resource>> {
-        let content_type = ContentType::from_extension(
+        let extension = full_path.extension().unwrap_or(
             full_path
-                .extension()
-                .ok_or(anyhow!("No extension found for {:?}", full_path))?
-                .to_str()
-                .ok_or(anyhow!("Invalid extension"))?,
+                .file_name()
+                .expect("the path should not terminate in `..`"),
         );
+
+        let content_type = ContentType::try_from_extension(extension.to_str().ok_or(anyhow!(
+            "the extension {} string for file {} could not be decoded",
+            extension.to_string_lossy(),
+            full_path.to_string_lossy()
+        ))?)?;
         // TODO(giac): this could be (i) async; (ii) pre configured with the number of shards to
         //     avoid chain interaction (maybe after adding `info` to the JSON commands).
         let output = self.walrus.blob_id(full_path.to_owned(), None)?;
@@ -383,7 +390,13 @@ impl ResourceManager {
             let path = entry.path();
             if path.is_dir() {
                 resources.extend(self.iter_dir(&path, root, content_encoding)?);
-            } else if let Some(res) = self.read_resource(&path, root, content_encoding)? {
+            } else if let Some(res) =
+                self.read_resource(&path, root, content_encoding)
+                    .context(format!(
+                        "error while reading resource `{}`",
+                        path.to_string_lossy()
+                    ))?
+            {
                 resources.push(res);
             }
         }
