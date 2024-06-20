@@ -1,7 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{fmt::Display, io::stdout};
+use std::{
+    fmt::Display,
+    io::{stderr, stdout},
+};
 
 use crossterm::{
     cursor::{RestorePosition, SavePosition},
@@ -22,7 +25,7 @@ pub fn header<S: Display>(message: S) {
 pub fn error<S: Display>(message: S) {
     if cfg!(not(test)) {
         crossterm::execute!(
-            stdout(),
+            stderr(),
             PrintStyledContent(format!("\n{message}\n").red().bold()),
         )
         .unwrap();
