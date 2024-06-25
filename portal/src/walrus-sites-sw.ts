@@ -502,12 +502,12 @@ function arrayBufferToBas64(bytes: Uint8Array): string {
 
 function siteNotFound(): Response {
     return Response404(
-        "The URL provided points to an object ID, but the object does not seem to be a Walrus site."
+        "This page does not exist - the object ID is not a valid Walrus Site."
     );
 }
 
 function noObjectIdFound(): Response {
-    return Response404("The URL provided does not point to a valid object id.");
+    return Response404("This page does not exist - no object ID could be found.");
 }
 
 function fullNodeFail(): Response {
