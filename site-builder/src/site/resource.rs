@@ -6,7 +6,7 @@
 use std::{
     collections::BTreeSet,
     fmt::{self, Display},
-    fs::read_dir,
+    fs,
     io::Write,
     path::{Path, PathBuf},
 };
@@ -385,7 +385,7 @@ impl ResourceManager {
         content_encoding: &ContentEncoding,
     ) -> Result<Vec<Resource>> {
         let mut resources: Vec<Resource> = vec![];
-        let entries = read_dir(start)?;
+        let entries = fs::read_dir(start)?;
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
