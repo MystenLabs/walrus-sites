@@ -10,7 +10,7 @@ involves loading objects from chain, decoding them, and serving them as response
 
 ## Deploying the Portal
 
-### Testing on a Local Portal
+### Testing on a local Portal
 
 A local portal can be run from this directory using `pnpm`:
 
@@ -24,5 +24,11 @@ rebuild and serve again.
 
 ### Deploying the Portal to Vercel
 
+#### Manual deployment
+
 First, install the [Vercel CLI](https://vercel.com/docs/cli).
 Then, given access to the Mysten Vercel Team, it is sufficient to run `vercel --prod`.
+
+#### Automated deployment
+
+The Portal is also redeployed to Vercel every time a PR is merged into main.
