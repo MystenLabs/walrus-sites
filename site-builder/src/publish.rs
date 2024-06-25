@@ -14,6 +14,7 @@ use sui_types::base_types::{ObjectID, SuiAddress};
 
 use crate::{
     display,
+    preprocessor::Preprocessor,
     site::{
         content::ContentEncoding,
         manager::{SiteIdentifier, SiteManager},
@@ -31,6 +32,7 @@ pub async fn publish_site(
     site_name: &str,
     config: &Config,
     epochs: u64,
+    preprocess: bool,
 ) -> Result<()> {
     edit_site(
         directory,
@@ -39,6 +41,7 @@ pub async fn publish_site(
         config,
         epochs,
         false,
+        preprocess,
     )
     .await
 }
@@ -50,6 +53,7 @@ pub async fn watch_edit_site(
     config: &Config,
     epochs: u64,
     force: bool,
+    preprocess: bool,
 ) -> Result<()> {
     let (tx, rx) = channel();
     let mut watcher = notify::recommended_watcher(move |res| {
@@ -71,6 +75,7 @@ pub async fn watch_edit_site(
                     config,
                     epochs,
                     force,
+                    preprocess,
                 )
                 .await?;
             }
@@ -79,6 +84,7 @@ pub async fn watch_edit_site(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn update_site(
     directory: &Path,
     content_encoding: &ContentEncoding,
@@ -87,6 +93,7 @@ pub async fn update_site(
     watch: bool,
     epochs: u64,
     force: bool,
+    preprocess: bool,
 ) -> Result<()> {
     if watch {
         watch_edit_site(
@@ -96,6 +103,7 @@ pub async fn update_site(
             config,
             epochs,
             force,
+            preprocess,
         )
         .await
     } else {
@@ -106,6 +114,7 @@ pub async fn update_site(
             config,
             epochs,
             force,
+            preprocess,
         )
         .await
     }
@@ -118,6 +127,7 @@ pub async fn edit_site(
     config: &Config,
     epochs: u64,
     force: bool,
+    preprocess: bool,
 ) -> Result<()> {
     tracing::debug!(
         ?site_id,
@@ -127,6 +137,12 @@ pub async fn edit_site(
         ?force,
         "editing site"
     );
+
+    if preprocess {
+        display::action(format!("Preprocessing: {}", directory.display()));
+        Preprocessor::preprocess(directory)?;
+        display::done();
+    }
 
     let wallet = load_wallet_context(&config.general.wallet)?;
 
