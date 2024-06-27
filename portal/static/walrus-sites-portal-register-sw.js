@@ -50,8 +50,12 @@ function swNotLoadingNode() {
 function titleSubtitleNode(title, subtitle) {
     let h3 = document.createElement("h3");
     h3.textContent = title;
+    h3.className = "InterTightMedium";
     let p = document.createElement("p");
     p.textContent = subtitle;
+    p.className = "InterTightMedium";
+    p.style.color = "#696969";
+    p.style.fontSize = "18px";
     let div = document.createElement("div");
     div.appendChild(h3);
     div.appendChild(p);
