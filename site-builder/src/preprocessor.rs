@@ -68,7 +68,10 @@ impl DirNode {
     fn path_to_html(path: &Path, root: &Path) -> Result<String> {
         let mut link_name = path
             .file_name()
-            .ok_or(anyhow::anyhow!("no file name"))?
+            .ok_or(anyhow::anyhow!(
+                "no valid filename found for path {}; root `/` and `..` paths are not allowed",
+                path.to_string_lossy(),
+            ))?
             .to_string_lossy()
             .to_string();
 

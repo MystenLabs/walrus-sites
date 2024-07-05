@@ -131,10 +131,9 @@ enum Commands {
         #[clap(long, default_value_t = 1)]
         epochs: u64,
         /// Preprocess the directory before publishing.
-        ///
-        /// See the `preprocess` command. Warning: Rewrites all `index.html` files.
+        /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
         #[clap(long, action)]
-        preprocess: bool,
+        list_directory: bool,
     },
     /// Update an existing site
     Update {
@@ -157,10 +156,9 @@ enum Commands {
         #[clap(long, action)]
         force: bool,
         /// Preprocess the directory before updating.
-        ///
-        /// See the `preprocess` command. Warning: Rewrites all `index.html` files.
+        /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
         #[clap(long, action)]
-        preprocess: bool,
+        list_directory: bool,
     },
     /// Convert an object ID in hex format to the equivalent Base36 format.
     ///
@@ -172,10 +170,9 @@ enum Commands {
     /// Show the pages composing the site at the given object ID.
     Sitemap { object: ObjectID },
     /// Preprocess the directory, creating and linking index files.
-    ///
     /// This command allows to publish directories as sites. Warning: Rewrites all `index.html`
     /// files.
-    Preprocess { path: PathBuf },
+    ListDirectory { path: PathBuf },
 }
 
 /// The configuration for the site builder.
@@ -249,7 +246,7 @@ async fn run() -> Result<()> {
             content_encoding,
             site_name,
             epochs,
-            preprocess,
+            list_directory,
         } => {
             publish_site(
                 directory,
@@ -257,7 +254,7 @@ async fn run() -> Result<()> {
                 site_name,
                 &config,
                 *epochs,
-                *preprocess,
+                *list_directory,
             )
             .await?
         }
@@ -268,7 +265,7 @@ async fn run() -> Result<()> {
             watch,
             epochs,
             force,
-            preprocess,
+            list_directory,
         } => {
             update_site(
                 directory,
@@ -278,7 +275,7 @@ async fn run() -> Result<()> {
                 *watch,
                 *epochs,
                 *force,
-                *preprocess,
+                *list_directory,
             )
             .await?;
         }
@@ -294,7 +291,7 @@ async fn run() -> Result<()> {
             }
         }
         Commands::Convert { object_id } => println!("{}", id_to_base36(object_id)?),
-        Commands::Preprocess { path } => {
+        Commands::ListDirectory { path } => {
             Preprocessor::preprocess(path)?;
         }
     };
