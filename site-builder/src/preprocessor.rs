@@ -16,6 +16,7 @@ pub struct Preprocessor;
 impl Preprocessor {
     pub fn iter_dir(path: &Path) -> Result<Vec<DirNode>> {
         let mut nodes = vec![];
+        debug_assert!(path.is_dir());
         let items = std::fs::read_dir(path)?;
         let mut cur_node = DirNode::new(path.to_path_buf());
         for item in items.flatten() {
