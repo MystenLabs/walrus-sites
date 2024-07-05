@@ -38,8 +38,7 @@ impl Preprocessor {
     }
 
     pub fn preprocess(path: &Path) -> Result<()> {
-        let nodes = Self::iter_dir(path)?;
-        for node in nodes {
+        for node in Self::iter_dir(path)? {
             node.write_index(path)?;
         }
         Ok(())
@@ -85,30 +84,22 @@ impl DirNode {
     }
 
     fn to_html(&self, root: &Path) -> Result<String> {
-        let relative_dir_path = full_path_to_resource_path(&self.path, root)?;
-        let title_string = format!("Directory listing for {}", relative_dir_path);
-        let title = format!("<title>{}</title>", title_string);
-        let h1 = format!("<h1>{}</h1>", title_string);
+        let title_string = format!(
+            "Directory listing for {}",
+            full_path_to_resource_path(&self.path, root)?
+        );
 
         let mut contents: Vec<String> = self
             .contents
             .iter()
-            .map(|p| Self::path_to_html(p, root))
+            .map(|p| Ok(format!("<li>{}</li>", Self::path_to_html(p, root)?)))
             .collect::<Result<_>>()?;
         contents.sort();
-
-        let mut body = String::new();
-        body.push_str("<hr>\n");
-        body.push_str("<ul>\n");
-        for c in contents {
-            body.push_str(&format!("<li>{}</li>\n", c));
-        }
-        body.push_str("</ul>\n");
-        body.push_str("<hr>\n");
+        let body = contents.join("\n");
 
         Ok(format!(
-            "<!DOCTYPE html>\n<html>\n<head>\n{}\n</head>\n<body>\n{}\n{}</body>\n</html>",
-            title, h1, body
+            "<!DOCTYPE html>\n<html>\n<head>\n<title>{title_string}</title>\n</head>\n\
+            <body>\n<h1>{title_string}</h1>\n<hr>\n<ul>\n{body}\n</ul>\n<hr>\n</body>\n</html>",
         ))
     }
 
