@@ -37,6 +37,11 @@ module.exports = {
                     from: "static",
                     globOptions: { ignore: ["**/*.template.html"] },
                 },
+                {
+                    // Duplicate index.html in the destination folder as 404.html
+                    from: "static/index.html",
+                    to: "404.html",
+                }
             ],
         }),
     ],
