@@ -5,72 +5,61 @@
 
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Walrus Sites</title>
-        <link rel="icon" href="/images/favicon.ico" type="image/x-icon">
-        <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
-        <link rel="icon" sizes="32x32" href="/images/favicon-32x32.png" type="image/png">
-        <link rel="icon" sizes="16x16" href="/images/favicon-16x16.png" type="image/png">
-        <link rel="stylesheet" href="/concrete.css" />
-        <link rel="stylesheet" href="/normalize.css" />
-    </head>
-    <body>
-        <main>
-            <div class="main-div">
-                <div class="content-div">
-                    <div class="center">
-                        <div class="spinner"></div>
-                        <div class="spinner-text InterTightMedium">just a moment...</div>
-                    </div>
-                </div>
-                <footer class="InterTightBold">
-                    <div>
-                        Copyright 2024 © Mysten Labs, Inc.
-                    </div>
-                    <div class="terms-policies">
-                        <a href="https://docs.walrus.site/walrus-sites/tos.html" target="_blank" style="text-decoration: none; color: #696969;">
-                            Terms of Service
-                        </a>
-                        <a href="https://docs.walrus.site/walrus-sites/privacy.html" target="_blank" style="text-decoration: none; color: #696969;">
-                            Privacy Policy
-                        </a>
-                    </div>
-                </footer>
-            </div>
-            <script>
-                navigator.serviceWorker
-                    .register("/walrus-sites-sw.js")
-                    .then((reg) => {
-                        console.log("SW registered");
-                        if (reg.installing) {
-                            const sw = reg.installing || reg.waiting;
-                            sw.onstatechange = function () {
-                                if (sw.state === "installed") {
-                                    console.log("SW installed");
-                                    // SW installed. Refresh page so SW can respond with SW-enabled page.
-                                    window.location.reload();
-                                }
-                            };
-                        } else if (reg.active) {
-                            console.log("SW active, error?");
-                            // Previously-installed SW should have redirected this request to different page
-                            handleError(
-                                new Error(
-                                    "Service Worker is installed but not redirecting \
-                                - please try to reload twice (or unregister the service worker)."
-                                )
-                            );
-                        }
-                    })
-                    .catch(handleError);
-
-                function handleError(error) {
-                    let main = document.querySelector(".content-div");
-                    main.appendChild(document.createTextNode(error.message));
-                }
-            </script>
-        </main>
-    </body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Walrus Sites</title>
+    <link rel="icon" href="/images/favicon.ico" type="image/x-icon" />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="/images/apple-touch-icon.png"
+    />
+    <link
+      rel="icon"
+      sizes="32x32"
+      href="/images/favicon-32x32.png"
+      type="image/png"
+    />
+    <link
+      rel="icon"
+      sizes="16x16"
+      href="/images/favicon-16x16.png"
+      type="image/png"
+    />
+    <script src="/walrus-sites-portal-register-sw.js" async></script>
+    <link rel="stylesheet" href="/concrete.css" />
+    <link rel="stylesheet" href="/normalize.css" />
+  </head>
+  <body>
+    <main>
+      <div class="main-div">
+        <div class="content-div">
+          <div id="loading-message" class="center">
+            <div class="spinner"></div>
+            <div class="spinner-text InterTightMedium">just a moment...</div>
+          </div>
+        </div>
+        <footer class="InterTightBold">
+          <div>Copyright 2024 © Mysten Labs, Inc.</div>
+          <div class="terms-policies">
+            <a
+              href="https://docs.walrus.site/walrus-sites/tos.html"
+              target="_blank"
+              style="text-decoration: none; color: #696969"
+            >
+              Terms of Service
+            </a>
+            <a
+              href="https://docs.walrus.site/walrus-sites/privacy.html"
+              target="_blank"
+              style="text-decoration: none; color: #696969"
+            >
+              Privacy Policy
+            </a>
+          </div>
+        </footer>
+      </div>
+    </main>
+  </body>
 </html>
