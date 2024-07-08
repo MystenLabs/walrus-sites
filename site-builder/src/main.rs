@@ -1,8 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-// mod network;
 mod display;
+mod preprocessor;
 mod publish;
 mod site;
 mod util;
@@ -17,7 +17,10 @@ use serde::Deserialize;
 use site::content::ContentEncoding;
 use sui_types::base_types::ObjectID;
 
-use crate::util::{get_existing_resource_ids, id_to_base36, load_wallet_context};
+use crate::{
+    preprocessor::Preprocessor,
+    util::{get_existing_resource_ids, id_to_base36, load_wallet_context},
+};
 
 #[derive(Parser, Debug)]
 #[clap(rename_all = "kebab-case")]
@@ -127,6 +130,10 @@ enum Commands {
         /// The number of epochs for which to save the resources on Walrus.
         #[clap(long, default_value_t = 1)]
         epochs: u64,
+        /// Preprocess the directory before publishing.
+        /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
+        #[clap(long, action)]
+        list_directory: bool,
     },
     /// Update an existing site
     Update {
@@ -148,6 +155,10 @@ enum Commands {
         /// available on Sui.
         #[clap(long, action)]
         force: bool,
+        /// Preprocess the directory before updating.
+        /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
+        #[clap(long, action)]
+        list_directory: bool,
     },
     /// Convert an object ID in hex format to the equivalent Base36 format.
     ///
@@ -158,6 +169,10 @@ enum Commands {
     },
     /// Show the pages composing the site at the given object ID.
     Sitemap { object: ObjectID },
+    /// Preprocess the directory, creating and linking index files.
+    /// This command allows to publish directories as sites. Warning: Rewrites all `index.html`
+    /// files.
+    ListDirectory { path: PathBuf },
 }
 
 /// The configuration for the site builder.
@@ -231,7 +246,18 @@ async fn run() -> Result<()> {
             content_encoding,
             site_name,
             epochs,
-        } => publish_site(directory, content_encoding, site_name, &config, *epochs).await?,
+            list_directory,
+        } => {
+            publish_site(
+                directory,
+                content_encoding,
+                site_name,
+                &config,
+                *epochs,
+                *list_directory,
+            )
+            .await?
+        }
         Commands::Update {
             directory,
             object_id,
@@ -239,6 +265,7 @@ async fn run() -> Result<()> {
             watch,
             epochs,
             force,
+            list_directory,
         } => {
             update_site(
                 directory,
@@ -248,6 +275,7 @@ async fn run() -> Result<()> {
                 *watch,
                 *epochs,
                 *force,
+                *list_directory,
             )
             .await?;
         }
@@ -263,6 +291,9 @@ async fn run() -> Result<()> {
             }
         }
         Commands::Convert { object_id } => println!("{}", id_to_base36(object_id)?),
+        Commands::ListDirectory { path } => {
+            Preprocessor::preprocess(path)?;
+        }
     };
 
     Ok(())
