@@ -37,9 +37,6 @@ pub struct PublishOptions {
     #[clap(short = 'e', long, value_enum, default_value_t = ContentEncoding::PlainText)]
     /// The encoding for the contents of the site's resources.
     pub content_encoding: ContentEncoding,
-    /// The name of the site.
-    #[clap(short, long, default_value = "test site")]
-    pub site_name: String,
     /// The number of epochs for which to save the resources on Walrus.
     #[clap(long, default_value_t = 1)]
     pub epochs: u64,
@@ -49,11 +46,15 @@ pub struct PublishOptions {
     pub list_directory: bool,
 }
 
-pub async fn publish_site(publish_options: PublishOptions, config: &Config) -> Result<()> {
+pub async fn publish_site(
+    publish_options: PublishOptions,
+    site_name: &str,
+    config: &Config,
+) -> Result<()> {
     edit_site(
         &publish_options.directory,
         &publish_options.content_encoding,
-        SiteIdentifier::NewSite(publish_options.site_name.to_owned()),
+        SiteIdentifier::NewSite(site_name.to_owned()),
         config,
         publish_options.epochs,
         false,

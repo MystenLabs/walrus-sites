@@ -120,6 +120,9 @@ enum Commands {
     Publish {
         #[clap(flatten)]
         publish_options: PublishOptions,
+        /// The name of the site.
+        #[clap(short, long, default_value = "test site")]
+        site_name: String,
     },
     /// Update an existing site
     Update {
@@ -222,19 +225,19 @@ async fn run() -> Result<()> {
                 PublishOptions {
                     directory,
                     content_encoding,
-                    site_name,
                     epochs,
                     list_directory,
                 },
+            site_name,
         } => {
             publish_site(
                 PublishOptions {
                     directory: directory.to_path_buf(),
                     content_encoding: *content_encoding,
-                    site_name: site_name.to_string(),
                     epochs: *epochs,
                     list_directory: *list_directory,
                 },
+                site_name,
                 &config,
             )
             .await?
@@ -244,7 +247,6 @@ async fn run() -> Result<()> {
                 PublishOptions {
                     directory,
                     content_encoding,
-                    site_name,
                     epochs,
                     list_directory,
                 },
@@ -256,7 +258,6 @@ async fn run() -> Result<()> {
                 PublishOptions {
                     directory: directory.to_path_buf(),
                     content_encoding: *content_encoding,
-                    site_name: site_name.to_string(),
                     epochs: *epochs,
                     list_directory: *list_directory,
                 },
