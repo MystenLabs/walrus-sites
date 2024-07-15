@@ -228,12 +228,14 @@ async fn run() -> Result<()> {
                 },
         } => {
             publish_site(
-                directory,
-                content_encoding,
-                site_name,
+                PublishOptions {
+                    directory: directory.to_path_buf(),
+                    content_encoding: *content_encoding,
+                    site_name: site_name.to_string(),
+                    epochs: *epochs,
+                    list_directory: *list_directory,
+                },
                 &config,
-                *epochs,
-                *list_directory,
             )
             .await?
         }

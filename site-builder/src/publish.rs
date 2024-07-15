@@ -45,22 +45,15 @@ pub struct PublishOptions {
     pub list_directory: bool,
 }
 
-pub async fn publish_site(
-    directory: &Path,
-    content_encoding: &ContentEncoding,
-    site_name: &str,
-    config: &Config,
-    epochs: u64,
-    preprocess: bool,
-) -> Result<()> {
+pub async fn publish_site(publish_options: PublishOptions, config: &Config) -> Result<()> {
     edit_site(
-        directory,
-        content_encoding,
-        SiteIdentifier::NewSite(site_name.to_owned()),
+        &publish_options.directory,
+        &publish_options.content_encoding,
+        SiteIdentifier::NewSite(publish_options.site_name.to_owned()),
         config,
-        epochs,
+        publish_options.epochs,
         false,
-        preprocess,
+        publish_options.list_directory,
     )
     .await
 }
