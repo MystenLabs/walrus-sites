@@ -11,6 +11,7 @@ use sui_sdk::rpc_types::{
     SuiExecutionStatus, SuiTransactionBlockEffects, SuiTransactionBlockResponse,
 };
 use sui_types::base_types::{ObjectID, SuiAddress};
+use sui_types::crypto::PublicKey;
 
 use crate::{
     display,
@@ -98,35 +99,32 @@ pub async fn watch_edit_site(
 
 #[allow(clippy::too_many_arguments)]
 pub async fn update_site(
-    directory: &Path,
-    content_encoding: &ContentEncoding,
+    publish_options: PublishOptions,
     site_object: &ObjectID,
     config: &Config,
     watch: bool,
-    epochs: u64,
     force: bool,
-    preprocess: bool,
 ) -> Result<()> {
     if watch {
         watch_edit_site(
-            directory,
-            content_encoding,
+            publish_options.directory.as_path(),
+            &publish_options.content_encoding,
             SiteIdentifier::ExistingSite(*site_object),
             config,
-            epochs,
+            publish_options.epochs,
             force,
-            preprocess,
+            publish_options.list_directory,
         )
         .await
     } else {
         edit_site(
-            directory,
-            content_encoding,
+            publish_options.directory.as_path(),
+            &publish_options.content_encoding,
             SiteIdentifier::ExistingSite(*site_object),
             config,
-            epochs,
+            publish_options.epochs,
             force,
-            preprocess,
+            publish_options.list_directory,
         )
         .await
     }

@@ -244,7 +244,7 @@ async fn run() -> Result<()> {
                 PublishOptions {
                     directory,
                     content_encoding,
-                    site_name: _,
+                    site_name,
                     epochs,
                     list_directory,
                 },
@@ -253,14 +253,17 @@ async fn run() -> Result<()> {
             force,
         } => {
             update_site(
-                directory,
-                content_encoding,
+                PublishOptions {
+                    directory: directory.to_path_buf(),
+                    content_encoding: *content_encoding,
+                    site_name: site_name.to_string(),
+                    epochs: *epochs,
+                    list_directory: *list_directory,
+                },
                 object_id,
                 &config,
                 *watch,
-                *epochs,
                 *force,
-                *list_directory,
             )
             .await?;
         }
