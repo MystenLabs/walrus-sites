@@ -1,9 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{path::Path, sync::mpsc::channel};
+use std::{
+    path::{Path, PathBuf},
+    sync::mpsc::channel,
+};
 
 use anyhow::{anyhow, Result};
+use clap::Parser;
 use notify::{RecursiveMode, Watcher};
 use sui_sdk::rpc_types::{
     SuiExecutionStatus,
@@ -26,22 +30,35 @@ use crate::{
     Config,
 };
 
+#[derive(Parser, Debug, Clone)]
+pub struct PublishOptions {
+    /// The directory containing the site sources.
+    pub directory: PathBuf,
+    #[clap(short = 'e', long, value_enum, default_value_t = ContentEncoding::PlainText)]
+    /// The encoding for the contents of the site's resources.
+    pub content_encoding: ContentEncoding,
+    /// The number of epochs for which to save the resources on Walrus.
+    #[clap(long, default_value_t = 1)]
+    pub epochs: u64,
+    /// Preprocess the directory before publishing.
+    /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
+    #[clap(long, action)]
+    pub list_directory: bool,
+}
+
 pub async fn publish_site(
-    directory: &Path,
-    content_encoding: &ContentEncoding,
-    site_name: &str,
+    publish_options: PublishOptions,
+    site_name: String,
     config: &Config,
-    epochs: u64,
-    preprocess: bool,
 ) -> Result<()> {
     edit_site(
-        directory,
-        content_encoding,
-        SiteIdentifier::NewSite(site_name.to_owned()),
+        &publish_options.directory,
+        &publish_options.content_encoding,
+        SiteIdentifier::NewSite(site_name),
         config,
-        epochs,
+        publish_options.epochs,
         false,
-        preprocess,
+        publish_options.list_directory,
     )
     .await
 }
@@ -86,35 +103,32 @@ pub async fn watch_edit_site(
 
 #[allow(clippy::too_many_arguments)]
 pub async fn update_site(
-    directory: &Path,
-    content_encoding: &ContentEncoding,
+    publish_options: PublishOptions,
     site_object: &ObjectID,
     config: &Config,
     watch: bool,
-    epochs: u64,
     force: bool,
-    preprocess: bool,
 ) -> Result<()> {
     if watch {
         watch_edit_site(
-            directory,
-            content_encoding,
+            publish_options.directory.as_path(),
+            &publish_options.content_encoding,
             SiteIdentifier::ExistingSite(*site_object),
             config,
-            epochs,
+            publish_options.epochs,
             force,
-            preprocess,
+            publish_options.list_directory,
         )
         .await
     } else {
         edit_site(
-            directory,
-            content_encoding,
+            publish_options.directory.as_path(),
+            &publish_options.content_encoding,
             SiteIdentifier::ExistingSite(*site_object),
             config,
-            epochs,
+            publish_options.epochs,
             force,
-            preprocess,
+            publish_options.list_directory,
         )
         .await
     }

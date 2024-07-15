@@ -12,9 +12,8 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use futures::TryFutureExt;
-use publish::{publish_site, update_site};
+use publish::{publish_site, update_site, PublishOptions};
 use serde::Deserialize;
-use site::content::ContentEncoding;
 use sui_types::base_types::ObjectID;
 
 use crate::{
@@ -119,46 +118,26 @@ impl GeneralArgs {
 enum Commands {
     /// Publish a new site on Sui.
     Publish {
-        /// The directory containing the site sources.
-        directory: PathBuf,
-        /// The encoding for the contents of the site's resources.
-        #[clap(short = 'e', long, value_enum, default_value_t = ContentEncoding::PlainText)]
-        content_encoding: ContentEncoding,
+        #[clap(flatten)]
+        publish_options: PublishOptions,
         /// The name of the site.
         #[clap(short, long, default_value = "test site")]
         site_name: String,
-        /// The number of epochs for which to save the resources on Walrus.
-        #[clap(long, default_value_t = 1)]
-        epochs: u64,
-        /// Preprocess the directory before publishing.
-        /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
-        #[clap(long, action)]
-        list_directory: bool,
     },
     /// Update an existing site
     Update {
-        /// The directory containing the site sources.
-        directory: PathBuf,
+        #[clap(flatten)]
+        publish_options: PublishOptions,
         /// The object ID of a partially published site to be completed.
         object_id: ObjectID,
-        /// The encoding for the contents of the site's resources.
-        #[clap(short = 'e', long, value_enum, default_value_t = ContentEncoding::PlainText)]
-        content_encoding: ContentEncoding,
         #[clap(short, long, action)]
         watch: bool,
-        /// The number of epochs for which to save the updated resources on Walrus.
-        #[clap(long, default_value_t = 1)]
-        epochs: u64,
         /// Publish all resources to Sui and Walrus, even if they may be already present.
         ///
         /// This can be useful in case the Walrus devnet is reset, but the resources are still
         /// available on Sui.
         #[clap(long, action)]
         force: bool,
-        /// Preprocess the directory before updating.
-        /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
-        #[clap(long, action)]
-        list_directory: bool,
     },
     /// Convert an object ID in hex format to the equivalent Base36 format.
     ///
@@ -240,59 +219,33 @@ async fn run() -> Result<()> {
     config.merge(&args.general);
     tracing::info!(?config, "configuration loaded");
 
-    match &args.command {
+    match args.command {
         Commands::Publish {
-            directory,
-            content_encoding,
+            publish_options,
             site_name,
-            epochs,
-            list_directory,
-        } => {
-            publish_site(
-                directory,
-                content_encoding,
-                site_name,
-                &config,
-                *epochs,
-                *list_directory,
-            )
-            .await?
-        }
+        } => publish_site(publish_options, site_name, &config).await?,
         Commands::Update {
-            directory,
+            publish_options,
             object_id,
-            content_encoding,
             watch,
-            epochs,
             force,
-            list_directory,
         } => {
-            update_site(
-                directory,
-                content_encoding,
-                object_id,
-                &config,
-                *watch,
-                *epochs,
-                *force,
-                *list_directory,
-            )
-            .await?;
+            update_site(publish_options, &object_id, &config, watch, force).await?;
         }
         // Add a path to be watched. All files and directories at that path and
         // below will be monitored for changes.
         Commands::Sitemap { object } => {
             let wallet = load_wallet_context(&config.general.wallet)?;
             let all_dynamic_fields =
-                get_existing_resource_ids(&wallet.get_client().await?, *object).await?;
+                get_existing_resource_ids(&wallet.get_client().await?, object).await?;
             println!("Pages in site at object id: {}", object);
             for (name, id) in all_dynamic_fields {
                 println!("  - {:<40} {:?}", name, id);
             }
         }
-        Commands::Convert { object_id } => println!("{}", id_to_base36(object_id)?),
+        Commands::Convert { object_id } => println!("{}", id_to_base36(&object_id)?),
         Commands::ListDirectory { path } => {
-            Preprocessor::preprocess(path)?;
+            Preprocessor::preprocess(path.as_path())?;
         }
     };
 
