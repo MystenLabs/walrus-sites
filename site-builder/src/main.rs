@@ -12,9 +12,8 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use futures::TryFutureExt;
-use publish::{publish_site, update_site};
+use publish::{publish_site, update_site, PublishOptions};
 use serde::Deserialize;
-use site::content::ContentEncoding;
 use sui_types::base_types::ObjectID;
 
 use crate::{
@@ -119,46 +118,23 @@ impl GeneralArgs {
 enum Commands {
     /// Publish a new site on Sui.
     Publish {
-        /// The directory containing the site sources.
-        directory: PathBuf,
-        /// The encoding for the contents of the site's resources.
-        #[clap(short = 'e', long, value_enum, default_value_t = ContentEncoding::PlainText)]
-        content_encoding: ContentEncoding,
-        /// The name of the site.
-        #[clap(short, long, default_value = "test site")]
-        site_name: String,
-        /// The number of epochs for which to save the resources on Walrus.
-        #[clap(long, default_value_t = 1)]
-        epochs: u64,
-        /// Preprocess the directory before publishing.
-        /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
-        #[clap(long, action)]
-        list_directory: bool,
+        #[clap(flatten)]
+        publish_options: PublishOptions,
     },
     /// Update an existing site
     Update {
-        /// The directory containing the site sources.
-        directory: PathBuf,
+        #[clap(flatten)]
+        publish_options: PublishOptions,
         /// The object ID of a partially published site to be completed.
         object_id: ObjectID,
-        /// The encoding for the contents of the site's resources.
-        #[clap(short = 'e', long, value_enum, default_value_t = ContentEncoding::PlainText)]
-        content_encoding: ContentEncoding,
         #[clap(short, long, action)]
         watch: bool,
-        /// The number of epochs for which to save the updated resources on Walrus.
-        #[clap(long, default_value_t = 1)]
-        epochs: u64,
         /// Publish all resources to Sui and Walrus, even if they may be already present.
         ///
         /// This can be useful in case the Walrus devnet is reset, but the resources are still
         /// available on Sui.
         #[clap(long, action)]
         force: bool,
-        /// Preprocess the directory before updating.
-        /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
-        #[clap(long, action)]
-        list_directory: bool,
     },
     /// Convert an object ID in hex format to the equivalent Base36 format.
     ///
@@ -242,11 +218,14 @@ async fn run() -> Result<()> {
 
     match &args.command {
         Commands::Publish {
-            directory,
-            content_encoding,
-            site_name,
-            epochs,
-            list_directory,
+            publish_options:
+                PublishOptions {
+                    directory,
+                    content_encoding,
+                    site_name,
+                    epochs,
+                    list_directory,
+                },
         } => {
             publish_site(
                 directory,
@@ -259,13 +238,17 @@ async fn run() -> Result<()> {
             .await?
         }
         Commands::Update {
-            directory,
+            publish_options:
+                PublishOptions {
+                    directory,
+                    content_encoding,
+                    site_name: _,
+                    epochs,
+                    list_directory,
+                },
             object_id,
-            content_encoding,
             watch,
-            epochs,
             force,
-            list_directory,
         } => {
             update_site(
                 directory,

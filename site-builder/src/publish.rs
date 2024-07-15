@@ -1,14 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::path::PathBuf;
 use std::{path::Path, sync::mpsc::channel};
 
 use anyhow::{anyhow, Result};
+use clap::Parser;
 use notify::{RecursiveMode, Watcher};
 use sui_sdk::rpc_types::{
-    SuiExecutionStatus,
-    SuiTransactionBlockEffects,
-    SuiTransactionBlockResponse,
+    SuiExecutionStatus, SuiTransactionBlockEffects, SuiTransactionBlockResponse,
 };
 use sui_types::base_types::{ObjectID, SuiAddress};
 
@@ -25,6 +25,25 @@ use crate::{
     walrus::Walrus,
     Config,
 };
+
+#[derive(Parser, Debug)]
+pub struct PublishOptions {
+    /// The directory containing the site sources.
+    pub directory: PathBuf,
+    #[clap(short = 'e', long, value_enum, default_value_t = ContentEncoding::PlainText)]
+    /// The encoding for the contents of the site's resources.
+    pub content_encoding: ContentEncoding,
+    /// The name of the site.
+    #[clap(short, long, default_value = "test site")]
+    pub site_name: String,
+    /// The number of epochs for which to save the resources on Walrus.
+    #[clap(long, default_value_t = 1)]
+    pub epochs: u64,
+    /// Preprocess the directory before publishing.
+    /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
+    #[clap(long, action)]
+    pub list_directory: bool,
+}
 
 pub async fn publish_site(
     directory: &Path,
