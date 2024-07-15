@@ -230,7 +230,7 @@ async fn run() -> Result<()> {
             watch,
             force,
         } => {
-            update_site(publish_options.clone(), &object_id, &config, watch, force).await?;
+            update_site(publish_options, &object_id, &config, watch, force).await?;
         }
         // Add a path to be watched. All files and directories at that path and
         // below will be monitored for changes.
