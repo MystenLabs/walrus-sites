@@ -219,69 +219,33 @@ async fn run() -> Result<()> {
     config.merge(&args.general);
     tracing::info!(?config, "configuration loaded");
 
-    match &args.command {
+    match args.command {
         Commands::Publish {
-            publish_options:
-                PublishOptions {
-                    directory,
-                    content_encoding,
-                    epochs,
-                    list_directory,
-                },
+            publish_options,
             site_name,
-        } => {
-            publish_site(
-                PublishOptions {
-                    directory: directory.to_path_buf(),
-                    content_encoding: *content_encoding,
-                    epochs: *epochs,
-                    list_directory: *list_directory,
-                },
-                site_name,
-                &config,
-            )
-            .await?
-        }
+        } => publish_site(publish_options.clone(), site_name.to_string(), &config).await?,
         Commands::Update {
-            publish_options:
-                PublishOptions {
-                    directory,
-                    content_encoding,
-                    epochs,
-                    list_directory,
-                },
+            publish_options,
             object_id,
             watch,
             force,
         } => {
-            update_site(
-                PublishOptions {
-                    directory: directory.to_path_buf(),
-                    content_encoding: *content_encoding,
-                    epochs: *epochs,
-                    list_directory: *list_directory,
-                },
-                object_id,
-                &config,
-                *watch,
-                *force,
-            )
-            .await?;
+            update_site(publish_options.clone(), &object_id, &config, watch, force).await?;
         }
         // Add a path to be watched. All files and directories at that path and
         // below will be monitored for changes.
         Commands::Sitemap { object } => {
             let wallet = load_wallet_context(&config.general.wallet)?;
             let all_dynamic_fields =
-                get_existing_resource_ids(&wallet.get_client().await?, *object).await?;
+                get_existing_resource_ids(&wallet.get_client().await?, object).await?;
             println!("Pages in site at object id: {}", object);
             for (name, id) in all_dynamic_fields {
                 println!("  - {:<40} {:?}", name, id);
             }
         }
-        Commands::Convert { object_id } => println!("{}", id_to_base36(object_id)?),
+        Commands::Convert { object_id } => println!("{}", id_to_base36(&object_id)?),
         Commands::ListDirectory { path } => {
-            Preprocessor::preprocess(path)?;
+            Preprocessor::preprocess(path.as_path())?;
         }
     };
 

@@ -30,7 +30,7 @@ use crate::{
     Config,
 };
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 pub struct PublishOptions {
     /// The directory containing the site sources.
     pub directory: PathBuf,
@@ -46,7 +46,11 @@ pub struct PublishOptions {
     pub list_directory: bool,
 }
 
-pub async fn publish_site(publish_options: PublishOptions, site_name: String, config: &Config) -> Result<()> {
+pub async fn publish_site(
+    publish_options: PublishOptions,
+    site_name: String,
+    config: &Config,
+) -> Result<()> {
     edit_site(
         &publish_options.directory,
         &publish_options.content_encoding,
