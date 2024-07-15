@@ -223,7 +223,7 @@ async fn run() -> Result<()> {
         Commands::Publish {
             publish_options,
             site_name,
-        } => publish_site(publish_options.clone(), site_name.to_string(), &config).await?,
+        } => publish_site(publish_options, site_name, &config).await?,
         Commands::Update {
             publish_options,
             object_id,
