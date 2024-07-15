@@ -46,15 +46,11 @@ pub struct PublishOptions {
     pub list_directory: bool,
 }
 
-pub async fn publish_site(
-    publish_options: PublishOptions,
-    site_name: &str,
-    config: &Config,
-) -> Result<()> {
+pub async fn publish_site(publish_options: PublishOptions, site_name: String, config: &Config) -> Result<()> {
     edit_site(
         &publish_options.directory,
         &publish_options.content_encoding,
-        SiteIdentifier::NewSite(site_name.to_owned()),
+        SiteIdentifier::NewSite(site_name),
         config,
         publish_options.epochs,
         false,
