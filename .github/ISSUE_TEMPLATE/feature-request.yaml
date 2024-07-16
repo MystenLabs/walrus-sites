@@ -11,8 +11,10 @@ body:
     id: description
     attributes:
       label: Description
-      description: A clear and concise description of the new feature and what would be the benefit. Ex. I would like to add X in order to [...]
-      placeholder: Could you give an example of how you envision this working? This helps us understand your idea better.
+      description: A clear and concise description of the new feature
+        and what would be the benefit. Ex. I would like to add X in order to [...]
+      placeholder: Could you give an example of how you envision
+        this working? This helps us understand your idea better.
       value: "I would like this new thing to be added to the project."
     validations:
       required: true
@@ -38,7 +40,8 @@ body:
     id: terms
     attributes:
       label: Code of Conduct
-      description: By submitting this issue, you agree to follow our [Code of Conduct](https://github.com/MystenLabs/walrus-sites/blob/main/CODE_OF_CONDUCT.md).
+      description: By submitting this issue, you agree to follow our
+        [Code of Conduct](https://github.com/MystenLabs/walrus-sites/blob/main/CODE_OF_CONDUCT.md).
       options:
         - label: I agree to follow this project's Code of Conduct
           required: true
