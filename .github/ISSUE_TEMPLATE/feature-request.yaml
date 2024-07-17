@@ -30,12 +30,6 @@ body:
         - other
     validations:
       required: true
-  - type: textarea
-    id: example
-    attributes:
-      label: Example
-      description: Please provide an example of how this feature would be used.
-      placeholder: Given X, when I do Y, then the following output would occur [...]
   - type: checkboxes
     id: terms
     attributes:
