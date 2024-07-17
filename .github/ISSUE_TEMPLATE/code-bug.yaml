@@ -32,27 +32,29 @@ body:
     id: deviation-steps
     attributes:
       label: Deviation steps
-      description: If you have deviated from the 
-	[setup instructions steps](https://docs.walrus.site/walrus-sites/tutorial-install.html) 
-	please describe how.
+      description: If you have deviated from the
+        [setup instructions steps](https://docs.walrus.site/walrus-sites/tutorial-install.html)
+        please describe how.
     validations:
       required: false
   - type: textarea
     id: logs
     attributes:
       label: Relevant log output
-      description: Please copy and paste any relevant log output. To get the output from
-	the `site-builder` include in every command the following: RUST_LOG="walrus=DEBUG,site-builder=DEBUG".
-        
-	This will be automatically formatted into code, so no need for backticks.
+      description: >
+        Please copy and paste any relevant log output.
+        To get the output from the `site-builder` include in every
+        command the following: RUST_LOG="walrus=DEBUG,site-builder=DEBUG".
+        This will be automatically formatted into code, so no need for backticks.
       render: shell
   - type: checkboxes
-    id: version 
+    id: version
     attributes:
-      label: Version 
-      description: Have you made sure that you are using the latest versions of `walrus` and `site-builder`? 
+      label: Version
+      description: Have you made sure that you are using the latest versions of `walrus` and `site-builder`?
       options:
-        - label: `walrus` and `site-builder` are up to date. 
+        - label: >
+            `walrus` and `site-builder` are up to date.
           required: true
   - type: dropdown
     id: browsers
@@ -65,12 +67,11 @@ body:
         - Safari
         - Microsoft Edge
   - type: checkboxes
-   id: terms
-   attributes:
+    id: terms
+    attributes:
      label: Code of Conduct
      description: By submitting this issue, you agree to follow our
         [Code of Conduct](https://github.com/MystenLabs/walrus-sites/blob/main/CODE_OF_CONDUCT.md).
      options:
        - label: I agree to follow this project's Code of Conduct.
-         required: true 
-
+         required: true
