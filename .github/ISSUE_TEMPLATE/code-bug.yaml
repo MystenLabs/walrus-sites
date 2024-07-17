@@ -1,0 +1,87 @@
+name: Bug Report
+description: File a bug report.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! 🐞
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Also tell us, what did you expect to happen?
+      placeholder: Tell us what you see, and what you expected to see.
+    validations:
+      required: true
+  - type: textarea
+    id: search
+    attributes:
+      label: Search terms
+      description: >
+        Have you searched for similar issues before submitting this one?
+        Please provide the search terms you used.
+      placeholder: /issues?q=state:open+type:issue+sort:created-asc...
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce-steps
+    attributes:
+      label: Steps to reproduce
+      description: Please provide detailed steps for reproducing the issue.
+      placeholder: Provide a step-by-step guide on how to reproduce the issue.
+      value: |
+        Example:
+        1. Publish site with the following contents: [...]
+        2. Navigate to the site at [...]
+        3. Press [...]
+    validations:
+      required: true
+  - type: textarea
+    id: deviation-steps
+    attributes:
+      label: Deviation steps
+      description: If you have deviated from the
+        [setup instructions steps](https://docs.walrus.site/walrus-sites/tutorial-install.html)
+        please describe how.
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: >
+        Please copy and paste any relevant log output.
+        To get detailed output from the `site-builder`, set the `RUST_LOG` environment variable
+        as follows: `RUST_LOG="walrus=DEBUG,site-builder=DEBUG"`.
+        Your input will be automatically formatted as code, so no need for backticks.
+      render: shell
+  - type: checkboxes
+    id: version
+    attributes:
+      label: Version
+      description: Have you made sure that you are using the latest versions of `walrus` and `site-builder`?
+      options:
+        - label: >
+            `walrus` and `site-builder` are up to date.
+          required: true
+  - type: dropdown
+    id: browsers
+    attributes:
+      label: If applicable, what browsers are you seeing the problem on?
+      multiple: true
+      options:
+        - Firefox
+        - Chrome
+        - Safari
+        - Microsoft Edge
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our
+        [Code of Conduct](https://github.com/MystenLabs/walrus-sites/blob/main/CODE_OF_CONDUCT.md).
+      options:
+        - label: I agree to follow this project's Code of Conduct.
+          required: true
