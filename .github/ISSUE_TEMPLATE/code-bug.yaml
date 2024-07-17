@@ -43,9 +43,9 @@ body:
       label: Relevant log output
       description: >
         Please copy and paste any relevant log output.
-        To get the output from the `site-builder` include in every
-        command the following: RUST_LOG="walrus=DEBUG,site-builder=DEBUG".
-        This will be automatically formatted into code, so no need for backticks.
+        To get detailed output from the `site-builder`, set the `RUST_LOG` environment variable 
+        as follows: `RUST_LOG="walrus=DEBUG,site-builder=DEBUG"`.
+        Your input will be automatically formatted as code, so no need for backticks.
       render: shell
   - type: checkboxes
     id: version
