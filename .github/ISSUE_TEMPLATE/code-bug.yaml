@@ -13,7 +13,6 @@ body:
       label: What happened?
       description: Also tell us, what did you expect to happen?
       placeholder: Tell us what you see, and what you expected to see.
-      value: "A bug happened when I did X but I was expecting Y!"
     validations:
       required: true
   - type: textarea
@@ -24,8 +23,8 @@ body:
       placeholder: Provide a step-by-step guide on how to reproduce the issue.
       value: |
         Example:
-        1. publish site with the following contents: [...]
-        2. navigate to the site at [...]
+        1. Publish site with the following contents: [...]
+        2. Navigate to the site at [...]
         3. Press [...]
     validations:
       required: true
@@ -72,6 +71,6 @@ body:
      description: By submitting this issue, you agree to follow our
         [Code of Conduct](https://github.com/MystenLabs/walrus-sites/blob/main/CODE_OF_CONDUCT.md).
      options:
-       - label: I agree to follow this project's Code of Conduct
+       - label: I agree to follow this project's Code of Conduct.
          required: true 
 
