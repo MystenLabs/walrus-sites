@@ -16,6 +16,16 @@ body:
     validations:
       required: true
   - type: textarea
+    id: search
+    attributes:
+      label: Search terms
+      description: >
+        Have you searched for similar issues before submitting this one?
+        Please provide the search terms you used.
+      placeholder: /issues?q=state:open+type:issue+sort:created-asc...
+    validations:
+      required: true
+  - type: textarea
     id: reproduce-steps
     attributes:
       label: Steps to reproduce
@@ -43,7 +53,7 @@ body:
       label: Relevant log output
       description: >
         Please copy and paste any relevant log output.
-        To get detailed output from the `site-builder`, set the `RUST_LOG` environment variable 
+        To get detailed output from the `site-builder`, set the `RUST_LOG` environment variable
         as follows: `RUST_LOG="walrus=DEBUG,site-builder=DEBUG"`.
         Your input will be automatically formatted as code, so no need for backticks.
       render: shell
