@@ -348,7 +348,7 @@ impl ResourceManager {
                 Err(_) => {
                     tracing::warn!(
                         "The extension {} string for file {} could not be decoded.
-                        Defaulting to arbitraty binary content type: octet-stream.",
+                        Defaulting to arbitrary binary content type: octet-stream.",
                         extension.to_string_lossy(),
                         full_path.to_string_lossy()
                     );
