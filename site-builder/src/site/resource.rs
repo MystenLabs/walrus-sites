@@ -349,7 +349,7 @@ impl ResourceManager {
         if plain_content.is_empty() {
             let error_message = format!("The file {} is empty.", full_path.to_string_lossy());
             return Err(
-                anyhow!(error_message).context("Walrus sites does not support empty files.")
+                anyhow!(error_message).context("Walrus does not support empty files.")
             );
         }
         // TODO(giac): this could be (i) async; (ii) pre configured with the number of shards to
