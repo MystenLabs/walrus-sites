@@ -347,11 +347,10 @@ impl ResourceManager {
 
         let plain_content = std::fs::read(full_path)?;
         if plain_content.is_empty() {
-            let error_message = format!(
-                "The file {} is empty.",
-                full_path.to_string_lossy()
+            let error_message = format!("The file {} is empty.", full_path.to_string_lossy());
+            return Err(
+                anyhow!(error_message).context("Walrus sites does not support empty files.")
             );
-            return Err(anyhow!(error_message).context("Walrus sites does not support empty files."));
         }
         // TODO(giac): this could be (i) async; (ii) pre configured with the number of shards to
         //     avoid chain interaction (maybe after adding `info` to the JSON commands).
