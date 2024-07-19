@@ -339,11 +339,22 @@ impl ResourceManager {
                 .expect("the path should not terminate in `..`"),
         );
 
-        let content_type = ContentType::try_from_extension(extension.to_str().ok_or(anyhow!(
-            "the extension {} string for file {} could not be decoded",
-            extension.to_string_lossy(),
-            full_path.to_string_lossy()
-        ))?)?;
+        let content_type =
+            match ContentType::try_from_extension(extension.to_str().ok_or(anyhow!(
+                "Could not convert the extension {:?} to a string.",
+                extension.to_string_lossy()
+            ))?) {
+                Ok(content_type) => content_type,
+                Err(_) => {
+                    tracing::warn!(
+                        "The extension {} string for file {} could not be decoded.
+                        Defaulting to arbitrary binary content type: octet-stream.",
+                        extension.to_string_lossy(),
+                        full_path.to_string_lossy()
+                    );
+                    ContentType::ApplicationOctetstream // arbitrary binary data RFC 2046
+                }
+            };
 
         let plain_content = std::fs::read(full_path)?;
         if plain_content.is_empty() {
