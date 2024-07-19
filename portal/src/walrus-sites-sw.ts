@@ -322,7 +322,7 @@ async function resolveAndFetchPage(parsedUrl: Path): Promise<Response> {
  * Fetches a page.
  */
 async function fetchPage(client: SuiClient, objectId: string, path: string): Promise<Response> {
-    const resource = await fetchResource(client, objectId, path);
+    const resource = await fetchResource(client, objectId, path, new Set<string>);
     if (resource === null || !resource.blob_id) {
         if (path !== '/404.html') {
             return fetchPage(client, objectId, '/404.html');
@@ -365,14 +365,24 @@ async function fetchPage(client: SuiClient, objectId: string, path: string): Pro
  *
  * To prevent infinite loops, the recursion depth is of this function is capped to
  * `MAX_REDIRECT_DEPTH`.
+ *
+ * Infinite loops can also be prevented by checking if the resource has already been seen.
+ * This is done by using the `seenResources` set.
  */
 async function fetchResource(
     client: SuiClient,
     objectId: string,
     path: string,
-    depth: number = 0
+    seenResources: Set<string>,
+    depth: number = 0,
 ): Promise<Resource | null> {
-    if (depth > MAX_REDIRECT_DEPTH) {
+  if (seenResources.has(objectId)) {
+    return null;
+  } else {
+    seenResources.add(objectId);
+  }
+
+  if (depth > MAX_REDIRECT_DEPTH) {
         // TODO(giac): add return codes and return 508 "loop detected" or similar.
         return null;
     }
@@ -396,7 +406,7 @@ async function fetchResource(
             return null;
         }
         // Recurs increasing the recursion depth.
-        return fetchResource(client, redirectId, path, depth + 1);
+        return fetchResource(client, redirectId, path, seenResources, depth + 1);
     }
 
     console.log("Dynamic fields for ", objectId, dynamicFields);
