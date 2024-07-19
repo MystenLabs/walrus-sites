@@ -344,15 +344,18 @@ impl ResourceManager {
             extension.to_string_lossy(),
             full_path.to_string_lossy()
         ))?)?;
+
+        let plain_content = std::fs::read(full_path)?;
+        if plain_content.is_empty() {
+            let error_message = format!(
+                "the file {} is empty; Walrus does not support empty files",
+                full_path.to_string_lossy()
+            );
+            return Err(anyhow!(error_message));
+        }
         // TODO(giac): this could be (i) async; (ii) pre configured with the number of shards to
         //     avoid chain interaction (maybe after adding `info` to the JSON commands).
         let output = self.walrus.blob_id(full_path.to_owned(), None)?;
-        // Need to check the size to avoid calling encode on empty files.
-        let plain_content = std::fs::read(full_path)?;
-        if plain_content.is_empty() {
-            // We are ignoring empty files.
-            return Ok(None);
-        }
 
         // TODO(giac): How to encode based on the content encoding? Temporary file? No encoding?
         //     let content = match content_encoding {
