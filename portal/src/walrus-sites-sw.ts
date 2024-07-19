@@ -7,6 +7,7 @@ import { fromB64, fromHEX, isValidSuiObjectId, isValidSuiAddress, toHEX } from "
 import { AGGREGATOR, SITE_PACKAGE, SITE_NAMES, NETWORK, MAX_REDIRECT_DEPTH } from "./constants";
 import { bcs, BcsType } from "@mysten/bcs";
 import template_404 from "../static/404-page.template.html";
+import { getDomain } from "./helpers/domain_parsing"
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
@@ -127,26 +128,6 @@ self.addEventListener("fetch", async (event) => {
     const response = await fetch(event.request);
     return response;
 });
-
-// Subdomain handling.
-
-/**
- * Returns the domain ("example.com") of the given URL.
- *
- * Currently assumes that the URL "example.com", or "localhost:8080". Domains like "example.co.uk"
- * are not currently supported.
- */
-// TODO(giac): Improve support for any domain (#26).
-function getDomain(orig_url: string): string {
-    const url = new URL(orig_url);
-    // Split the hostname into parts, and return the last two.
-    // If the hostname is "localhost", return "localhost".
-    const hostname = url.hostname.split(".");
-    if (hostname[hostname.length - 1] == "localhost") {
-        return "localhost";
-    }
-    return hostname[hostname.length - 2] + "." + hostname[hostname.length - 1];
-}
 
 /**
  * Returns the url for the Portal, given a subdomain and a path.
