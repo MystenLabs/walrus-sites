@@ -348,7 +348,7 @@ impl ResourceManager {
         let plain_content = std::fs::read(full_path)?;
         if plain_content.is_empty() {
             let error_message = format!(
-                "The file {} is empty. Walrus does not support empty files.",
+                "the file {} is empty; Walrus does not support empty files",
                 full_path.to_string_lossy()
             );
             return Err(anyhow!(error_message));
