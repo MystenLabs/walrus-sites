@@ -1,7 +1,12 @@
+// Copyright (c) Mysten Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { parseDomain, ParseResultType } from "parse-domain";
 
 /**
  * Returns the domain (e.g. "example.com") of the given URL.
+ * @param orig_url The URL to extract the domain from. e.g. "https://example.com"
+ * @returns The domain of the URL. e.g. "example.com"
  */
 export function getDomain(orig_url: string): string {
     const url = new URL(orig_url);

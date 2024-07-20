@@ -1,3 +1,6 @@
+// Copyright (c) Mysten Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { describe, it, expect, test } from 'vitest'
 import { getDomain } from '../src/helpers/domain_parsing.ts'
 
