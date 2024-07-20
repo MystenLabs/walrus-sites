@@ -6,17 +6,20 @@ const testCases: [string, string][] = [
     ['https://suinsname.localhost:8080', 'localhost'],
     ['https://suinsname.subname.localhost:8080', 'localhost'],
     ['https://flatland.walrus.site/', 'walrus.site'],
-    ['https://4snh0c0o7quicfzokqpsmuchtgitnukme1q680o1s1nfn325sr.walrus.site/', 'walrus.site'],
-    ['https://4snh0c0o7quicfzokqpsmuchtgitnukme1q680o1s1nfn325sr.portalname.co.uk/', 'portalname.co.uk'],
+    ['https://4snh0c0o7quicfzokqpsmuchtgitnukme1q680o1s1nfn325sr.walrus.site/',
+        'walrus.site'],
+    ['https://4snh0c0o7quicfzokqpsmuchtgitnukme1q680o1s1nfn325sr.portalname.co.uk/',
+        'portalname.co.uk'],
     ['https://suinsname.subname.portalname.co.uk/', 'portalname.co.uk'],
-    ['https://suinsname.subname.anothersubname.portalname.co.uk/', 'portalname.co.uk']
+    ['https://suinsname.subname.anothersubname.portalname.co.uk/',
+        'portalname.co.uk']
 ]
 
 describe('getDomain', () => {
     testCases.forEach(([input, expected]) => {
-      test(`${input} -> ${expected}`, () => {
-        const domain = getDomain(input)
-        expect(domain).toEqual(expected)
+        test(`${input} -> ${expected}`, () => {
+            const domain = getDomain(input)
+                expect(domain).toEqual(expected)
+        })
     })
-  })
 })
