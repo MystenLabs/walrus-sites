@@ -7,14 +7,14 @@ import { getDomain } from '../src/helpers/domain_parsing.ts'
 const testCases: [string, string][] = [
     ['https://example.com', 'example.com'],
     ['https://suinsname.localhost:8080', 'localhost'],
-    ['https://suinsname.subname.localhost:8080', 'localhost'],
+    ['https://subname.suinsname.localhost:8080', 'localhost'],
     ['https://flatland.walrus.site/', 'walrus.site'],
     ['https://4snh0c0o7quicfzokqpsmuchtgitnukme1q680o1s1nfn325sr.walrus.site/',
         'walrus.site'],
     ['https://4snh0c0o7quicfzokqpsmuchtgitnukme1q680o1s1nfn325sr.portalname.co.uk/',
         'portalname.co.uk'],
-    ['https://suinsname.subname.portalname.co.uk/', 'portalname.co.uk'],
-    ['https://suinsname.subname.anothersubname.portalname.co.uk/',
+    ['https://subname.suinsname.portalname.co.uk/', 'portalname.co.uk'],
+    ['https://subsubname.subname.suinsname.portalname.co.uk/',
         'portalname.co.uk']
 ]
 
