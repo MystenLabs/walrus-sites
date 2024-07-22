@@ -7,6 +7,11 @@
       "esnext",
       "webworker"
     ],
+    "baseUrl": "./",
+      "paths": {
+        "@static/*": ["src/static*"],
+        "@helpers/*": ["src/helpers/*"]
+    }
   },
   "baseUrl": "./",
   "rootDir": "src",

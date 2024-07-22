@@ -6,8 +6,8 @@ import * as baseX from "base-x";
 import { fromB64, fromHEX, isValidSuiObjectId, isValidSuiAddress, toHEX } from "@mysten/sui/utils";
 import { AGGREGATOR, SITE_PACKAGE, SITE_NAMES, NETWORK, MAX_REDIRECT_DEPTH } from "./constants";
 import { bcs, BcsType } from "@mysten/bcs";
-import template_404 from "../static/404-page.template.html";
-import { getDomain } from "./helpers/domain_parsing"
+import template_404 from "@static/404-page.template.html";
+import { getDomain } from "@helpers/domain_parsing"
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
