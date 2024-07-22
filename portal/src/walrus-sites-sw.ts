@@ -397,12 +397,10 @@ async function fetchResource(
 ): Promise<Resource | HttpStatusCodes> {
     if (seenResources.has(objectId)) {
         return HttpStatusCodes.LOOP_DETECTED;
+    } else if (depth >= MAX_REDIRECT_DEPTH) {
+        return HttpStatusCodes.TOO_MANY_REDIRECTS;
     } else {
         seenResources.add(objectId);
-    }
-
-    if (depth > MAX_REDIRECT_DEPTH) {
-        return HttpStatusCodes.TOO_MANY_REDIRECTS;
     }
 
     let [redirectId, dynamicFields] = await Promise.all([
