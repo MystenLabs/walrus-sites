@@ -10,10 +10,8 @@ import { Path } from "../types/index";
  * @returns The domain of the URL. e.g. "example.com"
  */
 export function getDomain(orig_url: string): string {
-    const url = new URL(orig_url);
-    const urlWithoutProtocol = url.origin.replace(/^https?:\/\//, '');
-    const urlWithoutPort = urlWithoutProtocol.replace(/:\d+$/, '');
-    const parsed = parseDomain(urlWithoutPort);
+    const urlStripped = stripProtocolAndPort(orig_url);
+    const parsed = parseDomain(urlStripped);
     if (parsed.type === ParseResultType.Listed) {
         const domain = parsed.domain + "." + parsed.topLevelDomains.join(".");
         return domain;
@@ -25,25 +23,50 @@ export function getDomain(orig_url: string): string {
     }
 }
 
-export function getSubdomainAndPath(url: URL): Path | null {
-    // At the moment we only support one subdomain level.
-    const hostname = url.hostname.split(".");
+/**
+* Given a URL, returns the subdomain and path.
+* @param url e.g. "https://subname.name.walrus.site/"
+* @returns Path object e.g. { subdomain: "subname.name", path: "/index.html"}
+*/
 
-    // TODO(giac): This should be changed to allow for SuiNS subdomains.
-    if (hostname.length === 3 || (hostname.length === 2 && hostname[1] === "localhost")) {
-        // Accept only one level of subdomain eg `subdomain.example.com` or `subdomain.localhost` in
-        // case of local development.
-        const path = url.pathname == "/" ? "/index.html" : removeLastSlash(url.pathname);
-        return { subdomain: hostname[0], path } as Path;
+export function getSubdomainAndPath(url: URL): Path | null {
+    const urlStripped = stripProtocolAndPort(url.toString());
+    const parsed = parseDomain(urlStripped);
+    console.log('parsed', parsed)
+    let path: Path | null = null;
+    if (parsed.type === ParseResultType.Listed) {
+        return {
+          subdomain: parsed.subDomains.join("."),
+          path: url.pathname == "/" ? "/index.html" : removeLastSlash(url.pathname)
+        } as Path;
+    } else if ( parsed.type === ParseResultType.Reserved) {
+      return {
+        subdomain: parsed.labels.slice(0, parsed.labels.length-1).join('.'),
+        path: url.pathname == "/" ? "/index.html" : removeLastSlash(url.pathname)
+      } as Path;
     }
     return null;
 }
 
 /**
- * Removes the last forward-slash if present
- *
+ * Removes the last forward-slash if present.
  * Resources on chain are stored as `/path/to/resource.extension` exclusively.
+ * @param path The path to remove the last forward-slash from.
+ * @returns The path without the last forward-slash.
  */
 function removeLastSlash(path: string): string {
     return path.endsWith("/") ? path.slice(0, -1) : path;
+}
+
+/**
+* Removes the protocol and port from a URL.
+* @param url e.g. "https://example.com:8080"
+* @returns string e.g. "example.com"
+*/
+function stripProtocolAndPort(url: string): string {
+    return removeLastSlash(
+        url
+          .replace(/^https?:\/\//, '')
+          .replace(/:\d+/, '')
+    );
 }

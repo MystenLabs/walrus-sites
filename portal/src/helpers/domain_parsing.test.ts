@@ -3,6 +3,7 @@
 
 import { describe, expect, test } from 'vitest'
 import { getDomain, getSubdomainAndPath } from './domain_parsing'
+import { Path } from '../types'
 
 const getDomainTestCases: [string, string][] = [
     ['https://example.com', 'example.com'],
@@ -27,18 +28,22 @@ describe('getDomain', () => {
     })
 })
 
-const getSubdomainAndPathTestCases: [string, string, string][] = [
-  ['https://flatland.walrus.site/', 'flatland', '/index.html'],
+const getSubdomainAndPathTestCases: [string, Path][] = [
+    ['https://subname.name.walrus.site/', {subdomain: 'subname.name', path: '/index.html' }],
+    ['https://name.walrus.site/', { subdomain: 'name', path: '/index.html' }],
+    ['https://name.localhost:8080/', { subdomain: 'name', path: '/index.html' }],
+    ['https://subsubname.subname.suinsname.portalname.co.uk/',
+      { subdomain: 'subsubname.subname.suinsname', path: '/index.html' }],
 ]
 
 describe('getSubdomainAndPath', () => {
   getSubdomainAndPathTestCases.forEach(
-    ([input, expectedSubdomain, expectedPath]) => {
-    test(`${input} -> subdomain: ${expectedSubdomain}, path: ${expectedPath}`,
+    ([input, path]) => {
+    test(`${input} ->
+      subdomain: ${path.subdomain ?? "null"},
+      path: ${path.path ?? "null"}`,
       () => {
-          console.log(
-              'getSubdomainAndPath',
-              getSubdomainAndPath(new URL('https://subname.flatland.walrus.site/')))
+        expect(getSubdomainAndPath(new URL(input))).toEqual(path);
     });
   });
 })
