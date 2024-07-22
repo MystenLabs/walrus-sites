@@ -9,19 +9,20 @@ import { Path } from "../types/index";
  * @param orig_url The URL to extract the domain from. e.g. "https://example.com"
  * @returns The domain of the URL. e.g. "example.com"
  */
-export function getDomain(orig_url: string): string {
-    const urlStripped = stripProtocolAndPort(orig_url);
-    const parsed = parseDomain(urlStripped);
-    if (parsed.type === ParseResultType.Listed) {
-        const domain = parsed.domain + "." + parsed.topLevelDomains.join(".");
-        return domain;
-    } else if (parsed.type === ParseResultType.Reserved) {
-        return parsed.labels[parsed.labels.length - 1];
-    } else {
-        console.error("Error while parsing domain name:", parsed);
-        throw new Error("Error while parsing domain name");
-    }
-}
+ export function getDomain(orig_url: string): string {
+     // const urlStripped = stripProtocolAndPort(orig_url);
+     const urlStripped = new URL(orig_url).hostname;
+     const parsed = parseDomain(urlStripped);
+     if (parsed.type === ParseResultType.Listed) {
+         const domain = parsed.domain + "." + parsed.topLevelDomains.join(".");
+         return domain;
+     } else if (parsed.type === ParseResultType.Reserved) {
+         return parsed.labels[parsed.labels.length - 1];
+     } else {
+         console.error("Error while parsing domain name:", parsed);
+         throw new Error("Error while parsing domain name");
+     }
+ }
 
 /**
 * Given a URL, returns the subdomain and path.
@@ -30,9 +31,7 @@ export function getDomain(orig_url: string): string {
 */
 
 export function getSubdomainAndPath(url: URL): Path | null {
-    const urlStripped = stripProtocolAndPort(url.toString());
-    const parsed = parseDomain(urlStripped);
-    console.log('parsed', parsed)
+    const parsed = parseDomain(url.hostname);
     let path: Path | null = null;
     if (parsed.type === ParseResultType.Listed) {
         return {
