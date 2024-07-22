@@ -9,7 +9,7 @@
     ],
     "baseUrl": "./",
       "paths": {
-        "@static/*": ["src/static*"],
+        "@static/*": ["src/static/*"],
         "@helpers/*": ["src/helpers/*"]
     }
   },
