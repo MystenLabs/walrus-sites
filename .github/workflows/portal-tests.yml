@@ -35,5 +35,5 @@ jobs:
         run: pnpm install
 
       - name: Run tests
-        working-directory: portal/unit_tests
-        run: ls ../src/helpers && pnpm run test
+        working-directory: portal/
+        run: echo $(ls) && pnpm run test
