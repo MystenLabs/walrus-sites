@@ -7,7 +7,8 @@ import { fromB64, fromHEX, isValidSuiObjectId, isValidSuiAddress, toHEX } from "
 import { AGGREGATOR, SITE_PACKAGE, SITE_NAMES, NETWORK, MAX_REDIRECT_DEPTH } from "./constants";
 import { bcs, BcsType } from "@mysten/bcs";
 import template_404 from "@static/404-page.template.html";
-import { getDomain } from "@helpers/domain_parsing"
+import { getDomain } from "@helpers/domain_parsing";
+import { Path, Resource } from "./types/index";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
@@ -18,26 +19,6 @@ var BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz";
 const b36 = baseX(BASE36);
 // The string representing the ResourcePath struct in the walrus_site package.
 const RESOURCE_PATH_MOVE_TYPE = SITE_PACKAGE + "::site::ResourcePath";
-
-// Type definitions.
-
-/**
- * The origin of the request, divied into subdomain and path.
- */
-type Path = {
-    subdomain: string;
-    path: string;
-};
-
-/**
- * The metadata for a site resource, as stored on chain.
- */
-type Resource = {
-    path: string;
-    content_type: string;
-    content_encoding: string;
-    blob_id: string;
-};
 
 // Structs for parsing BCS data.
 
@@ -342,8 +323,8 @@ async function fetchPage(client: SuiClient, objectId: string, path: string): Pro
  * This is useful to create many objects with an associated site (e.g., NFTs), without having to
  * repeat the same resources for each object, and allowing to keep some control over the site (for
  * example, the creator can still edit the site even if the NFT is owned by someone else).
- * See the `checkRedirect` function for more details.
  *
+ * See the `checkRedirect` function for more details.
  * To prevent infinite loops, the recursion depth is of this function is capped to
  * `MAX_REDIRECT_DEPTH`.
  */
