@@ -337,8 +337,7 @@ async function resolveAndFetchPage(parsedUrl: Path): Promise<Response> {
  */
 async function fetchPage(client: SuiClient, objectId: string, path: string): Promise<Response> {
     const result = await fetchResource(client, objectId, path, new Set<string>);
-    const unsuccessfulResourceFetch = !isResource(result)
-    if (unsuccessfulResourceFetch) {
+    if (!isResource(result)) {
         const httpStatus = result as number;
         return new Response("Unable to fetch the site resource.", { status: result });
     }
