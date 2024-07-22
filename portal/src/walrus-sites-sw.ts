@@ -7,7 +7,7 @@ import { fromB64, fromHEX, isValidSuiObjectId, isValidSuiAddress, toHEX } from "
 import { AGGREGATOR, SITE_PACKAGE, SITE_NAMES, NETWORK, MAX_REDIRECT_DEPTH } from "./constants";
 import { bcs, BcsType } from "@mysten/bcs";
 import template_404 from "@static/404-page.template.html";
-import { getDomain } from "@helpers/domain_parsing";
+import { getDomain, getSubdomainAndPath } from "@helpers/domain_parsing";
 import { Path, Resource } from "./types/index";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
@@ -169,19 +169,7 @@ function subdomainToObjectId(subdomain: string): string | null {
     return isValidSuiObjectId(objectId) ? objectId : null;
 }
 
-function getSubdomainAndPath(url: URL): Path | null {
-    // At the moment we only support one subdomain level.
-    const hostname = url.hostname.split(".");
 
-    // TODO(giac): This should be changed to allow for SuiNS subdomains.
-    if (hostname.length === 3 || (hostname.length === 2 && hostname[1] === "localhost")) {
-        // Accept only one level of subdomain eg `subdomain.example.com` or `subdomain.localhost` in
-        // case of local development.
-        const path = url.pathname == "/" ? "/index.html" : removeLastSlash(url.pathname);
-        return { subdomain: hostname[0], path } as Path;
-    }
-    return null;
-}
 
 /**
  * Checks if there is a link to a sui resource in the path.
@@ -216,14 +204,6 @@ function getBlobIdLink(url: string): string {
     return null;
 }
 
-/**
- * Removes the last forward-slash if present
- *
- * Resources on chain are stored as `/path/to/resource.extension` exclusively.
- */
-function removeLastSlash(path: string): string {
-    return path.endsWith("/") ? path.slice(0, -1) : path;
-}
 
 // SuiNS functionality.
 
