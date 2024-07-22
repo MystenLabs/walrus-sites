@@ -35,5 +35,4 @@ jobs:
         run: pnpm install
 
       - name: Run tests
-        working-directory: portal/
-        run: echo $(ls) && pnpm run test
+        run: cd portal && pnpm run test
