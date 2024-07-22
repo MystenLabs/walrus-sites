@@ -34,22 +34,22 @@ const getSubdomainAndPathTestCases: [string, Path][] = [
     ['http://name.localhost:8080/', { subdomain: 'name', path: '/index.html' }],
     ['http://flatland.localhost:8080/', { subdomain: 'flatland', path: '/index.html' }],
     ['http://subname.suinsname.localhost:8080/',
-      { subdomain: 'subname.suinsname', path: '/index.html' }],
+        { subdomain: 'subname.suinsname', path: '/index.html' }],
     ['https://subsubname.subname.suinsname.portalname.co.uk/',
-      { subdomain: 'subsubname.subname.suinsname', path: '/index.html' }],
+        { subdomain: 'subsubname.subname.suinsname', path: '/index.html' }],
     ['http://docs.localhost/css/print.css', { subdomain: 'docs', path: '/css/print.css' }],
     ['http://docs.localhost/assets/index-a242f32b.js',
-      { subdomain: 'docs', path: '/assets/index-a242f32b.js'}]
+        { subdomain: 'docs', path: '/assets/index-a242f32b.js'}]
 ]
 
 describe('getSubdomainAndPath', () => {
-  getSubdomainAndPathTestCases.forEach(
-    ([input, path]) => {
-    test(`${input} ->
-      subdomain: ${path.subdomain ?? "null"},
-      path: ${path.path ?? "null"}`,
-      () => {
-        expect(getSubdomainAndPath(new URL(input))).toEqual(path);
-    });
-  });
+    getSubdomainAndPathTestCases.forEach(
+        ([input, path]) => {
+            test(`${input} ->
+                subdomain: ${path.subdomain ?? "null"},
+                path: ${path.path ?? "null"}`,
+                () => {
+                    expect(getSubdomainAndPath(new URL(input))).toEqual(path);
+                });
+        });
 })
