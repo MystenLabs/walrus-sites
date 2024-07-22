@@ -9,10 +9,8 @@ import { Path } from "../types/index";
  * @param orig_url The URL to extract the domain from. e.g. "https://example.com"
  * @returns The domain of the URL. e.g. "example.com"
  */
- export function getDomain(orig_url: string): string {
-     // const urlStripped = stripProtocolAndPort(orig_url);
-     const urlStripped = new URL(orig_url).hostname;
-     const parsed = parseDomain(urlStripped);
+ export function getDomain(url: URL): string {
+     const parsed = parseDomain(url.hostname);
      if (parsed.type === ParseResultType.Listed) {
          const domain = parsed.domain + "." + parsed.topLevelDomains.join(".");
          return domain;
@@ -32,7 +30,6 @@ import { Path } from "../types/index";
 
 export function getSubdomainAndPath(url: URL): Path | null {
     const parsed = parseDomain(url.hostname);
-    let path: Path | null = null;
     if (parsed.type === ParseResultType.Listed) {
         return {
           subdomain: parsed.subDomains.join("."),
@@ -55,17 +52,4 @@ export function getSubdomainAndPath(url: URL): Path | null {
  */
 function removeLastSlash(path: string): string {
     return path.endsWith("/") ? path.slice(0, -1) : path;
-}
-
-/**
-* Removes the protocol and port from a URL.
-* @param url e.g. "https://example.com:8080"
-* @returns string e.g. "example.com"
-*/
-function stripProtocolAndPort(url: string): string {
-    return removeLastSlash(
-        url
-          .replace(/^https?:\/\//, '')
-          .replace(/:\d+/, '')
-    );
 }

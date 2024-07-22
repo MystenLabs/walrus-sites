@@ -84,8 +84,8 @@ self.addEventListener("fetch", async (event) => {
 
     // Check if the request is for a site.
     const parsedUrl = getSubdomainAndPath(url);
-    const portalDomain = getDomain(scopeString);
-    const requestDomain = getDomain(urlString);
+    const portalDomain = getDomain(scope);
+    const requestDomain = getDomain(url);
 
     console.log("Portal domain and request domain: ", portalDomain, requestDomain);
     console.log("Parsed URL: ", parsedUrl);
@@ -115,7 +115,7 @@ self.addEventListener("fetch", async (event) => {
  */
 function getPortalUrl(path: Path, scope: string): string {
     const scopeUrl = new URL(scope);
-    const portalDomain = getDomain(scope);
+    const portalDomain = getDomain(scopeUrl);
     let portString = "";
     if (scopeUrl.port) {
         portString = ":" + scopeUrl.port;

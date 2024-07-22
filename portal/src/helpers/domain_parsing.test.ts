@@ -22,7 +22,7 @@ const getDomainTestCases: [string, string][] = [
 describe('getDomain', () => {
     getDomainTestCases.forEach(([input, expected]) => {
         test(`${input} -> ${expected}`, () => {
-            const domain = getDomain(input)
+            const domain = getDomain(new URL(input))
                 expect(domain).toEqual(expected)
         })
     })
