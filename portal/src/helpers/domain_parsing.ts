@@ -30,15 +30,16 @@ export function getDomain(url: URL): string {
 
 export function getSubdomainAndPath(url: URL): Path | null {
     const parsed = parseDomain(url.hostname);
+    const path = url.pathname == "/" ? "/index.html" : removeLastSlash(url.pathname)
     if (parsed.type === ParseResultType.Listed) {
         return {
             subdomain: parsed.subDomains.join("."),
-            path: url.pathname == "/" ? "/index.html" : removeLastSlash(url.pathname)
+            path
         } as Path;
     } else if ( parsed.type === ParseResultType.Reserved) {
         return {
             subdomain: parsed.labels.slice(0, parsed.labels.length-1).join('.'),
-            path: url.pathname == "/" ? "/index.html" : removeLastSlash(url.pathname)
+            path
         } as Path;
     }
     return null;
