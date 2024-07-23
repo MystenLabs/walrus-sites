@@ -10,6 +10,14 @@ export type Path = {
 };
 
 /**
+ * The extracted parts contained in a URL.
+ */
+export type UrlExtract = {
+    path: Path | null;
+    domain: string | null;
+}
+
+/**
  * The metadata for a site resource, as stored on chain.
  */
 export type Resource = {

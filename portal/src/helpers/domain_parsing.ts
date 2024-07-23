@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { parseDomain, ParseResultType } from "parse-domain";
-import { Path } from "../types/index";
+import { UrlExtract, Path } from "../types/index";
 
 /**
  * Returns the domain (e.g. "example.com") of the given URL.
@@ -10,16 +10,7 @@ import { Path } from "../types/index";
  * @returns The domain of the URL. e.g. "example.com"
  */
 export function getDomain(url: URL): string {
-    const parsed = parseDomain(url.hostname);
-    if (parsed.type === ParseResultType.Listed) {
-        const domain = parsed.domain + "." + parsed.topLevelDomains.join(".");
-        return domain;
-    } else if (parsed.type === ParseResultType.Reserved) {
-        return parsed.labels[parsed.labels.length - 1];
-    } else {
-        console.error("Error while parsing domain name:", parsed);
-        throw new Error("Error while parsing domain name");
-    }
+    return splitUrl(url).domain;
 }
 
 /**
@@ -28,21 +19,40 @@ export function getDomain(url: URL): string {
 * @returns Path object e.g. { subdomain: "subname.name", path: "/index.html"}
 */
 export function getSubdomainAndPath(url: URL): Path | null {
-    const parsed = parseDomain(url.hostname);
-    const path = url.pathname == "/" ? "/index.html" : removeLastSlash(url.pathname)
-    if (parsed.type === ParseResultType.Listed) {
-        return {
-            subdomain: parsed.subDomains.join("."),
-            path
-        } as Path;
-    } else if ( parsed.type === ParseResultType.Reserved) {
-        return {
-            subdomain: parsed.labels.slice(0, parsed.labels.length-1).join('.'),
-            path
-        } as Path;
-    }
-    return null;
+    return splitUrl(url).path;
 }
+
+/**
+* Given a URL, returns the extracted parts of it.
+* @param url e.g. "https://subname.name.walrus.site/"
+* @returns Path object e.g. { domain: name.walrus.site, {subdomain: "subname", path: "/index.html"}}
+*/
+function splitUrl(url: URL): UrlExtract {
+    const parsed = parseDomain(url.hostname);
+    let domain: string | null = null;
+    let subdomain: string | null = null;
+    if (parsed.type === ParseResultType.Listed) {
+        domain = domain = parsed.domain + "." + parsed.topLevelDomains.join(".")
+        subdomain = parsed.subDomains.join(".")
+    } else if (parsed.type === ParseResultType.Reserved) {
+        domain = parsed.labels[parsed.labels.length - 1];
+        subdomain = parsed.labels.slice(0, parsed.labels.length - 1).join('.');
+    } else {
+        return {
+            domain: null,
+            path: null
+        }
+    }
+
+    return {
+        domain,
+        path: {
+            subdomain,
+            path: url.pathname == "/" ? "/index.html" : removeLastSlash(url.pathname)
+        }
+    } as UrlExtract;
+}
+
 
 /**
  * Removes the last forward-slash if present.
