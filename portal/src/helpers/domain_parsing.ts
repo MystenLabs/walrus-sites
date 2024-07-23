@@ -27,7 +27,6 @@ export function getDomain(url: URL): string {
 * @param url e.g. "https://subname.name.walrus.site/"
 * @returns Path object e.g. { subdomain: "subname.name", path: "/index.html"}
 */
-
 export function getSubdomainAndPath(url: URL): Path | null {
     const parsed = parseDomain(url.hostname);
     const path = url.pathname == "/" ? "/index.html" : removeLastSlash(url.pathname)
