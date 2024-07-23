@@ -7,6 +7,7 @@ import { fromB64, fromHEX, isValidSuiObjectId, isValidSuiAddress, toHEX } from "
 import { AGGREGATOR, SITE_PACKAGE, SITE_NAMES, NETWORK, MAX_REDIRECT_DEPTH } from "./constants";
 import { bcs, BcsType } from "@mysten/bcs";
 import template_404 from "../static/404-page.template.html";
+import { HttpStatusCodes } from "./http_status_codes";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
@@ -37,6 +38,19 @@ type Resource = {
     content_encoding: string;
     blob_id: string;
 };
+
+/**
+ * Type guard for the Resource type.
+*/
+function isResource(obj: any): obj is Resource {
+    return (
+        obj &&
+        typeof obj.path === 'string' &&
+        typeof obj.content_type === 'string' &&
+        typeof obj.content_encoding === 'string' &&
+        typeof obj.blob_id === 'string'
+    );
+}
 
 // Structs for parsing BCS data.
 
@@ -322,8 +336,13 @@ async function resolveAndFetchPage(parsedUrl: Path): Promise<Response> {
  * Fetches a page.
  */
 async function fetchPage(client: SuiClient, objectId: string, path: string): Promise<Response> {
-    const resource = await fetchResource(client, objectId, path);
-    if (resource === null || !resource.blob_id) {
+    const result = await fetchResource(client, objectId, path, new Set<string>);
+    if (!isResource(result)) {
+        const httpStatus = result as number;
+        return new Response("Unable to fetch the site resource.", { status: httpStatus });
+    }
+
+    if (!result.blob_id) {
         if (path !== '/404.html') {
             return fetchPage(client, objectId, '/404.html');
         } else {
@@ -331,22 +350,22 @@ async function fetchPage(client: SuiClient, objectId: string, path: string): Pro
         }
     }
 
-    console.log("Fetched Resource: ", resource);
-    const contents = await fetch(aggregatorEndpoint(resource.blob_id));
+    console.log("Fetched Resource: ", result);
+    const contents = await fetch(aggregatorEndpoint(result.blob_id));
     if (!contents.ok) {
         return siteNotFound();
     }
 
     // Deserialize the bcs encoded body and decompress.
     const body = new Uint8Array(await contents.arrayBuffer());
-    const decompressed = await decompressData(body, resource.content_encoding);
+    const decompressed = await decompressData(body, result.content_encoding);
     if (!decompressed) {
         return siteNotFound();
     }
-    console.log("Returning resource: ", resource.path, resource.blob_id, resource.content_type);
+    console.log("Returning resource: ", result.path, result.blob_id, result.content_type);
     return new Response(decompressed, {
         headers: {
-            "Content-Type": resource.content_type,
+            "Content-Type": result.content_type,
         },
     });
 }
@@ -365,16 +384,23 @@ async function fetchPage(client: SuiClient, objectId: string, path: string): Pro
  *
  * To prevent infinite loops, the recursion depth is of this function is capped to
  * `MAX_REDIRECT_DEPTH`.
+ *
+ * Infinite loops can also be prevented by checking if the resource has already been seen.
+ * This is done by using the `seenResources` set.
  */
 async function fetchResource(
     client: SuiClient,
     objectId: string,
     path: string,
-    depth: number = 0
-): Promise<Resource | null> {
-    if (depth > MAX_REDIRECT_DEPTH) {
-        // TODO(giac): add return codes and return 508 "loop detected" or similar.
-        return null;
+    seenResources: Set<string>,
+    depth: number = 0,
+): Promise<Resource | HttpStatusCodes> {
+    if (seenResources.has(objectId)) {
+        return HttpStatusCodes.LOOP_DETECTED;
+    } else if (depth >= MAX_REDIRECT_DEPTH) {
+        return HttpStatusCodes.TOO_MANY_REDIRECTS;
+    } else {
+        seenResources.add(objectId);
     }
 
     let [redirectId, dynamicFields] = await Promise.all([
@@ -393,16 +419,16 @@ async function fetchResource(
         });
         console.log("Redirect page: ", redirectPage);
         if (!redirectPage.data) {
-            return null;
+            return HttpStatusCodes.NOT_FOUND;
         }
         // Recurs increasing the recursion depth.
-        return fetchResource(client, redirectId, path, depth + 1);
+        return fetchResource(client, redirectId, path, seenResources, depth + 1);
     }
 
     console.log("Dynamic fields for ", objectId, dynamicFields);
     if (!dynamicFields.data) {
         console.log("No dynamic field found");
-        return null;
+        return HttpStatusCodes.NOT_FOUND;
     }
     const pageData = await client.getObject({
         id: dynamicFields.data.objectId,
@@ -410,11 +436,11 @@ async function fetchResource(
     });
     if (!pageData.data) {
         console.log("No page data found");
-        return null;
+        return HttpStatusCodes.NOT_FOUND;
     }
     const siteResource = getResourceFields(pageData.data);
     if (!siteResource || !siteResource.blob_id) {
-        return null;
+        return HttpStatusCodes.NOT_FOUND;
     }
     return siteResource;
 }
