@@ -15,7 +15,7 @@ dependencies:
     specifier: ^4.0.0
     version: 4.0.0
   parse-domain:
-    specifier: ^8.0.2
+    specifier: 8.0.2
     version: 8.0.2
   ts-loader:
     specifier: ^9.5.1
