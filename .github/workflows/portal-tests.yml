@@ -16,23 +16,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Change directory to portal
-        run: cd portal
-
       - uses: pnpm/action-setup@v4
         name: Install pnpm
         with:
+          working-directory: portal
           version: 8
-          run_install: false
+          run_install: true
 
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      - name: Install dependencies
-        working-directory: portal
-        run: pnpm install
 
       - name: Run tests
         run: cd portal && pnpm run test
