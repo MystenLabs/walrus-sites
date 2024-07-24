@@ -4,12 +4,14 @@
 import { getFullnodeUrl, SuiClient, SuiObjectData } from "@mysten/sui/client";
 import * as baseX from "base-x";
 import { fromB64, fromHEX, isValidSuiObjectId, isValidSuiAddress, toHEX } from "@mysten/sui/utils";
-import { AGGREGATOR, SITE_PACKAGE, SITE_NAMES, NETWORK, MAX_REDIRECT_DEPTH } from "./constants";
+import { SITE_PACKAGE, SITE_NAMES, NETWORK, MAX_REDIRECT_DEPTH } from "@lib/constants";
 import template_404 from "@static/404-page.template.html";
 import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { DomainDetails, Resource, isResource } from "@lib/types/index";
 import { HttpStatusCodes } from "@lib/http_status_codes";
 import { ResourceStruct, ResourcePathStruct, DynamicFieldStruct } from "@lib/bcs_data_parsing";
+import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
+import { aggregatorEndpoint } from "@lib/aggregator";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
@@ -78,48 +80,6 @@ self.addEventListener("fetch", async (event) => {
     const response = await fetch(event.request);
     return response;
 });
-
-/**
- * Returns the url for the Portal, given a subdomain and a path.
- */
-function getPortalUrl(path: DomainDetails, scope: string): string {
-    const scopeUrl = new URL(scope);
-    const portalDomain = getDomain(scopeUrl);
-    let portString = "";
-    if (scopeUrl.port) {
-        portString = ":" + scopeUrl.port;
-    }
-    return scopeUrl.protocol + "//" + path.subdomain + "." + portalDomain + portString + path.path;
-}
-
-/**
- * Redirects to the portal URL.
- */
-function redirectToPortalURLResponse(scope: URL, path: DomainDetails): Response {
-    // Redirect to the walrus site for the specified domain and path
-    const redirectUrl = getPortalUrl(path, scope.href);
-    console.log("Redirecting to the Walrus Site link: ", path, redirectUrl);
-    return makeRedirectResponse(redirectUrl);
-}
-
-/**
- * Redirects to the aggregator URL.
- */
-function redirectToAggregatorUrlResponse(scope: URL, blobId: string): Response {
-    // Redirect to the walrus site for the specified domain and path
-    const redirectUrl = aggregatorEndpoint(blobId);
-    console.log("Redirecting to the Walrus Blob link: ", redirectUrl);
-    return makeRedirectResponse(redirectUrl.href);
-}
-
-function makeRedirectResponse(url: string): Response {
-    return new Response(null, {
-        status: 302,
-        headers: {
-            Location: url,
-        },
-    });
-}
 
 /**
  * Subdomain encoding and parsing.
@@ -393,16 +353,6 @@ async function decompressData(
     }
     return null;
 }
-
-// Walrus-specific encoding.
-
-/**
- * Returns the URL to fetch the blob of given ID from the aggregator/cache.
- */
-function aggregatorEndpoint(blob_id: string): URL {
-    return new URL(AGGREGATOR + "/v1/" + encodeURIComponent(blob_id));
-}
-
 
 // Response errors returned.
 
