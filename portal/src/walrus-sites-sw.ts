@@ -12,14 +12,13 @@ import { HttpStatusCodes } from "@lib/http_status_codes";
 import { ResourceStruct, ResourcePathStruct, DynamicFieldStruct } from "@lib/bcs_data_parsing";
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
 import { aggregatorEndpoint } from "@lib/aggregator";
+import { subdomainToObjectId, HEXtoBase36 } from "@lib/objectId_operations";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
 declare var self: ServiceWorkerGlobalScope;
 declare var clients: Clients;
 
-var BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz";
-const b36 = baseX(BASE36);
 // The string representing the ResourcePath struct in the walrus_site package.
 const RESOURCE_PATH_MOVE_TYPE = SITE_PACKAGE + "::site::ResourcePath";
 
@@ -80,24 +79,6 @@ self.addEventListener("fetch", async (event) => {
     const response = await fetch(event.request);
     return response;
 });
-
-/**
- * Subdomain encoding and parsing.
- *
- * Use base36 instead of HEX to encode object ids in the subdomain, as the subdomain must be < 64
- * characters.  The encoding must be case insensitive.
- */
-function subdomainToObjectId(subdomain: string): string | null {
-    const objectId = "0x" + toHEX(b36.decode(subdomain.toLowerCase()));
-    console.log(
-        "obtained object id: ",
-        objectId,
-        isValidSuiObjectId(objectId),
-        isValidSuiAddress(objectId)
-    );
-    return isValidSuiObjectId(objectId) ? objectId : null;
-}
-
 
 
 /**
@@ -183,7 +164,7 @@ async function resolveAndFetchPage(parsedUrl: DomainDetails): Promise<Response> 
     }
     if (objectId) {
         console.log("Object ID: ", objectId);
-        console.log("Base36 version of the object ID: ", b36.encode(fromHEX(objectId)));
+        console.log("Base36 version of the object ID: ", HEXtoBase36(objectId));
         return fetchPage(client, objectId, parsedUrl.path);
     }
     return noObjectIdFound();

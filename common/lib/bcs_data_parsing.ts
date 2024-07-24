@@ -3,7 +3,7 @@
 
 import { bcs, BcsType } from "@mysten/bcs";
 import { fromHEX, toHEX } from "@mysten/sui/utils";
-import { base64UrlSafeEncode } from "./to_base64";
+import { base64UrlSafeEncode } from "./advanced_base64";
 
 const Address = bcs.bytes(32).transform({
     input: (id: string) => fromHEX(id),
