@@ -7,8 +7,8 @@ import { fromB64, fromHEX, isValidSuiObjectId, isValidSuiAddress, toHEX } from "
 import { AGGREGATOR, SITE_PACKAGE, SITE_NAMES, NETWORK, MAX_REDIRECT_DEPTH } from "./constants";
 import { bcs, BcsType } from "@mysten/bcs";
 import template_404 from "@static/404-page.template.html";
-import { getDomain, getSubdomainAndPath } from "@helpers/domain_parsing";
-import { DomainDetails, Resource } from "./types/index";
+import { getDomain, getSubdomainAndPath } from "../../lib/helpers/domain_parsing";
+import { DomainDetails, Resource } from "../../lib/types/index";
 import { HttpStatusCodes } from "./http_status_codes";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is

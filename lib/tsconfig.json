@@ -1,32 +1,27 @@
 {
   "compilerOptions": {
+    "composite": true,
     "target": "esnext",
     "module": "esnext",
     "moduleResolution": "node",
     "lib": [
       "esnext",
-      "webworker"
     ],
     "baseUrl": "./",
       "paths": {
-        "@static/*": ["src/static/*"],
-        "@helpers/*": ["src/helpers/*"]
-    }
+        "@helpers/*": ["helpers/*"]
+    },
   },
   "baseUrl": "./",
   "rootDir": "src",
   "outDir": "dist",
   "skipLibCheck": true,
   "include": [
-    "src/**/*"
+    "helpers/**/*.ts",
+    "types/**/*.ts",
   ],
   "exclude": [
     "node_modules",
     "dist",
-  ],
-  "references": [
-      {
-          "path": "../lib/tsconfig.json"
-      }
   ]
 }
