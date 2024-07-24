@@ -17,8 +17,7 @@
   "outDir": "dist",
   "skipLibCheck": true,
   "include": [
-    "lib/**/*.ts",
-    "types/**/*.ts",
+      "lib/**/*",
   ],
   "exclude": [
     "node_modules",
