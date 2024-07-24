@@ -6,7 +6,9 @@ import * as baseX from "base-x";
 import { fromB64, fromHEX, isValidSuiObjectId, isValidSuiAddress, toHEX } from "@mysten/sui/utils";
 import { AGGREGATOR, SITE_PACKAGE, SITE_NAMES, NETWORK, MAX_REDIRECT_DEPTH } from "./constants";
 import { bcs, BcsType } from "@mysten/bcs";
-import template_404 from "../static/404-page.template.html";
+import template_404 from "@static/404-page.template.html";
+import { getDomain, getSubdomainAndPath } from "@helpers/domain_parsing";
+import { DomainDetails, Resource } from "./types/index";
 import { HttpStatusCodes } from "./http_status_codes";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
@@ -18,26 +20,6 @@ var BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz";
 const b36 = baseX(BASE36);
 // The string representing the ResourcePath struct in the walrus_site package.
 const RESOURCE_PATH_MOVE_TYPE = SITE_PACKAGE + "::site::ResourcePath";
-
-// Type definitions.
-
-/**
- * The origin of the request, divied into subdomain and path.
- */
-type Path = {
-    subdomain: string;
-    path: string;
-};
-
-/**
- * The metadata for a site resource, as stored on chain.
- */
-type Resource = {
-    path: string;
-    content_type: string;
-    content_encoding: string;
-    blob_id: string;
-};
 
 /**
  * Type guard for the Resource type.
@@ -116,8 +98,8 @@ self.addEventListener("fetch", async (event) => {
 
     // Check if the request is for a site.
     const parsedUrl = getSubdomainAndPath(url);
-    const portalDomain = getDomain(scopeString);
-    const requestDomain = getDomain(urlString);
+    const portalDomain = getDomain(scope);
+    const requestDomain = getDomain(url);
 
     console.log("Portal domain and request domain: ", portalDomain, requestDomain);
     console.log("Parsed URL: ", parsedUrl);
@@ -142,32 +124,12 @@ self.addEventListener("fetch", async (event) => {
     return response;
 });
 
-// Subdomain handling.
-
-/**
- * Returns the domain ("example.com") of the given URL.
- *
- * Currently assumes that the URL "example.com", or "localhost:8080". Domains like "example.co.uk"
- * are not currently supported.
- */
-// TODO(giac): Improve support for any domain (#26).
-function getDomain(orig_url: string): string {
-    const url = new URL(orig_url);
-    // Split the hostname into parts, and return the last two.
-    // If the hostname is "localhost", return "localhost".
-    const hostname = url.hostname.split(".");
-    if (hostname[hostname.length - 1] == "localhost") {
-        return "localhost";
-    }
-    return hostname[hostname.length - 2] + "." + hostname[hostname.length - 1];
-}
-
 /**
  * Returns the url for the Portal, given a subdomain and a path.
  */
-function getPortalUrl(path: Path, scope: string): string {
+function getPortalUrl(path: DomainDetails, scope: string): string {
     const scopeUrl = new URL(scope);
-    const portalDomain = getDomain(scope);
+    const portalDomain = getDomain(scopeUrl);
     let portString = "";
     if (scopeUrl.port) {
         portString = ":" + scopeUrl.port;
@@ -178,7 +140,7 @@ function getPortalUrl(path: Path, scope: string): string {
 /**
  * Redirects to the portal URL.
  */
-function redirectToPortalURLResponse(scope: URL, path: Path): Response {
+function redirectToPortalURLResponse(scope: URL, path: DomainDetails): Response {
     // Redirect to the walrus site for the specified domain and path
     const redirectUrl = getPortalUrl(path, scope.href);
     console.log("Redirecting to the Walrus Site link: ", path, redirectUrl);
@@ -221,19 +183,7 @@ function subdomainToObjectId(subdomain: string): string | null {
     return isValidSuiObjectId(objectId) ? objectId : null;
 }
 
-function getSubdomainAndPath(url: URL): Path | null {
-    // At the moment we only support one subdomain level.
-    const hostname = url.hostname.split(".");
 
-    // TODO(giac): This should be changed to allow for SuiNS subdomains.
-    if (hostname.length === 3 || (hostname.length === 2 && hostname[1] === "localhost")) {
-        // Accept only one level of subdomain eg `subdomain.example.com` or `subdomain.localhost` in
-        // case of local development.
-        const path = url.pathname == "/" ? "/index.html" : removeLastSlash(url.pathname);
-        return { subdomain: hostname[0], path } as Path;
-    }
-    return null;
-}
 
 /**
  * Checks if there is a link to a sui resource in the path.
@@ -242,7 +192,7 @@ function getSubdomainAndPath(url: URL): Path | null {
  * `/[suinsname.sui]/resource/path`
  *  This links to a walrus site on sui.
  */
-function getObjectIdLink(url: string): Path | null {
+function getObjectIdLink(url: string): DomainDetails | null {
     console.log("Trying to extract the sui link from:", url);
     const suiResult = /^https:\/\/(.+)\.suiobj\/(.*)$/.exec(url);
     if (suiResult) {
@@ -268,14 +218,6 @@ function getBlobIdLink(url: string): string {
     return null;
 }
 
-/**
- * Removes the last forward-slash if present
- *
- * Resources on chain are stored as `/path/to/resource.extension` exclusively.
- */
-function removeLastSlash(path: string): string {
-    return path.endsWith("/") ? path.slice(0, -1) : path;
-}
 
 // SuiNS functionality.
 
@@ -304,7 +246,7 @@ function hardcodedSubdmains(subdomain: string): string | null {
 /**
  * Resolves the subdomain to an object ID, and gets the corresponding resources.
  */
-async function resolveAndFetchPage(parsedUrl: Path): Promise<Response> {
+async function resolveAndFetchPage(parsedUrl: DomainDetails): Promise<Response> {
     const rpcUrl = getFullnodeUrl(NETWORK);
     const client = new SuiClient({ url: rpcUrl });
 
@@ -380,8 +322,8 @@ async function fetchPage(client: SuiClient, objectId: string, path: string): Pro
  * This is useful to create many objects with an associated site (e.g., NFTs), without having to
  * repeat the same resources for each object, and allowing to keep some control over the site (for
  * example, the creator can still edit the site even if the NFT is owned by someone else).
- * See the `checkRedirect` function for more details.
  *
+ * See the `checkRedirect` function for more details.
  * To prevent infinite loops, the recursion depth is of this function is capped to
  * `MAX_REDIRECT_DEPTH`.
  *
