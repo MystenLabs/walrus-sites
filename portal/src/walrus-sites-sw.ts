@@ -9,7 +9,7 @@ import { bcs, BcsType } from "@mysten/bcs";
 import template_404 from "@static/404-page.template.html";
 import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { DomainDetails, Resource } from "@lib/types/index";
-import { HttpStatusCodes } from "./http_status_codes";
+import { HttpStatusCodes } from "@lib/http_status_codes";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
