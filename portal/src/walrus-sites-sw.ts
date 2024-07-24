@@ -7,7 +7,7 @@ import { fromB64, fromHEX, isValidSuiObjectId, isValidSuiAddress, toHEX } from "
 import { AGGREGATOR, SITE_PACKAGE, SITE_NAMES, NETWORK, MAX_REDIRECT_DEPTH } from "./constants";
 import template_404 from "@static/404-page.template.html";
 import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
-import { DomainDetails, Resource } from "@lib/types/index";
+import { DomainDetails, Resource, isResource } from "@lib/types/index";
 import { HttpStatusCodes } from "@lib/http_status_codes";
 import { ResourceStruct, ResourcePathStruct, DynamicFieldStruct } from "@lib/bcs_data_parsing";
 
@@ -20,19 +20,6 @@ var BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz";
 const b36 = baseX(BASE36);
 // The string representing the ResourcePath struct in the walrus_site package.
 const RESOURCE_PATH_MOVE_TYPE = SITE_PACKAGE + "::site::ResourcePath";
-
-/**
- * Type guard for the Resource type.
-*/
-function isResource(obj: any): obj is Resource {
-    return (
-        obj &&
-        typeof obj.path === 'string' &&
-        typeof obj.content_type === 'string' &&
-        typeof obj.content_encoding === 'string' &&
-        typeof obj.blob_id === 'string'
-    );
-}
 
 // Event listeners.
 
