@@ -15,6 +15,7 @@ import { subdomainToObjectId, HEXtoBase36 } from "@lib/objectId_operations";
 import { resolveSuiNsAddress, hardcodedSubdmains } from "@lib/suins";
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import { checkRedirect } from "@lib/redirects";
+import { decompressData } from "@lib/decompress_data";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
@@ -241,30 +242,8 @@ function getResourceFields(data: SuiObjectData): Resource | null {
     return null;
 }
 
-/**
- * Decompresses the contents of the buffer according to the content encoding.
- */
-async function decompressData(
-    data: ArrayBuffer,
-    contentEncoding: string
-): Promise<ArrayBuffer | null> {
-    if (contentEncoding === "plaintext") {
-        return data;
-    }
-    // check that contentencoding is a valid CompressionFormat
-    if (["gzip", "deflate", "deflate-raw"].includes(contentEncoding)) {
-        const enc = contentEncoding as CompressionFormat;
-        const blob = new Blob([data], { type: "application/gzip" });
-        const stream = blob.stream().pipeThrough(new DecompressionStream(enc));
-        const response = await new Response(stream).arrayBuffer().catch((e) => {
-            console.error("DecompressionStream error", e);
-        });
-        if (response) return response;
-    }
-    return null;
-}
-
 // Response errors returned.
+// TODO: move to common lib. Need to resolve build error.
 
 function siteNotFound(): Response {
     return Response404(
