@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { getFullnodeUrl, SuiClient, SuiObjectData } from "@mysten/sui/client";
-import * as baseX from "base-x";
-import { fromB64, fromHEX, isValidSuiObjectId, isValidSuiAddress, toHEX } from "@mysten/sui/utils";
-import { SITE_PACKAGE, SITE_NAMES, NETWORK, MAX_REDIRECT_DEPTH } from "@lib/constants";
+import { fromB64 } from "@mysten/sui/utils";
+import { SITE_PACKAGE, NETWORK, MAX_REDIRECT_DEPTH } from "@lib/constants";
 import template_404 from "@static/404-page.template.html";
 import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { DomainDetails, Resource, isResource } from "@lib/types/index";
@@ -13,6 +12,7 @@ import { ResourceStruct, ResourcePathStruct, DynamicFieldStruct } from "@lib/bcs
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
 import { aggregatorEndpoint } from "@lib/aggregator";
 import { subdomainToObjectId, HEXtoBase36 } from "@lib/objectId_operations";
+import { resolveSuiNsAddress, hardcodedSubdmains } from "@lib/suins";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
@@ -114,28 +114,6 @@ function getBlobIdLink(url: string): string {
     return null;
 }
 
-
-// SuiNS functionality.
-
-/**
- * Resolves the subdomain to an object ID using SuiNS.
- *
- * The subdomain `example` will look up `example.sui` and return the object ID if found.
- */
-async function resolveSuiNsAddress(client: SuiClient, subdomain: string): Promise<string | null> {
-    const suiObjectId: string = await client.call("suix_resolveNameServiceAddress", [
-        subdomain + ".sui",
-    ]);
-    console.log("resolved suins name: ", subdomain, suiObjectId);
-    return suiObjectId ? suiObjectId : null;
-}
-
-function hardcodedSubdmains(subdomain: string): string | null {
-    if (subdomain in SITE_NAMES) {
-        return SITE_NAMES[subdomain];
-    }
-    return null;
-}
 
 // Fectching & decompressing on-chain data.
 
