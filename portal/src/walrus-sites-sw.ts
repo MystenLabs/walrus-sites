@@ -1,21 +1,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { getFullnodeUrl, SuiClient, SuiObjectData } from "@mysten/sui/client";
-import { fromB64 } from "@mysten/sui/utils";
-import { RESOURCE_PATH_MOVE_TYPE, NETWORK, MAX_REDIRECT_DEPTH } from "@lib/constants";
+import { getFullnodeUrl, SuiClient } from "@mysten/sui/client";
+import { NETWORK } from "@lib/constants";
 import template_404 from "@static/404-page.template.html";
 import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
-import { DomainDetails, Resource, isResource } from "@lib/types/index";
-import { HttpStatusCodes } from "@lib/http_status_codes";
-import { ResourceStruct, ResourcePathStruct, DynamicFieldStruct } from "@lib/bcs_data_parsing";
+import { DomainDetails, isResource } from "@lib/types/index";
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
 import { aggregatorEndpoint } from "@lib/aggregator";
 import { subdomainToObjectId, HEXtoBase36 } from "@lib/objectId_operations";
 import { resolveSuiNsAddress, hardcodedSubdmains } from "@lib/suins";
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
-import { checkRedirect } from "@lib/redirects";
 import { decompressData } from "@lib/decompress_data";
+import { fetchResource } from "@lib/resource";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
@@ -149,97 +146,6 @@ async function fetchPage(client: SuiClient, objectId: string, path: string): Pro
             "Content-Type": result.content_type,
         },
     });
-}
-
-/**
- * Fetches a resource of a site.
- *
- * This function is recursive, as it will follow the special redirect field if it is set. A site can
- * have a special redirect field that points to another site, where the resources to display the
- * site are found.
- *
- * This is useful to create many objects with an associated site (e.g., NFTs), without having to
- * repeat the same resources for each object, and allowing to keep some control over the site (for
- * example, the creator can still edit the site even if the NFT is owned by someone else).
- *
- * See the `checkRedirect` function for more details.
- * To prevent infinite loops, the recursion depth is of this function is capped to
- * `MAX_REDIRECT_DEPTH`.
- *
- * Infinite loops can also be prevented by checking if the resource has already been seen.
- * This is done by using the `seenResources` set.
- */
-async function fetchResource(
-    client: SuiClient,
-    objectId: string,
-    path: string,
-    seenResources: Set<string>,
-    depth: number = 0,
-): Promise<Resource | HttpStatusCodes> {
-    if (seenResources.has(objectId)) {
-        return HttpStatusCodes.LOOP_DETECTED;
-    } else if (depth >= MAX_REDIRECT_DEPTH) {
-        return HttpStatusCodes.TOO_MANY_REDIRECTS;
-    } else {
-        seenResources.add(objectId);
-    }
-
-    let [redirectId, dynamicFields] = await Promise.all([
-        checkRedirect(client, objectId),
-        client.getDynamicFieldObject({
-            parentId: objectId,
-            name: { type: RESOURCE_PATH_MOVE_TYPE, value: path },
-        }),
-    ]);
-
-    if (redirectId) {
-        console.log("Redirect found");
-        const redirectPage = await client.getObject({
-            id: redirectId,
-            options: { showBcs: true },
-        });
-        console.log("Redirect page: ", redirectPage);
-        if (!redirectPage.data) {
-            return HttpStatusCodes.NOT_FOUND;
-        }
-        // Recurs increasing the recursion depth.
-        return fetchResource(client, redirectId, path, seenResources, depth + 1);
-    }
-
-    console.log("Dynamic fields for ", objectId, dynamicFields);
-    if (!dynamicFields.data) {
-        console.log("No dynamic field found");
-        return HttpStatusCodes.NOT_FOUND;
-    }
-    const pageData = await client.getObject({
-        id: dynamicFields.data.objectId,
-        options: { showBcs: true },
-    });
-    if (!pageData.data) {
-        console.log("No page data found");
-        return HttpStatusCodes.NOT_FOUND;
-    }
-    const siteResource = getResourceFields(pageData.data);
-    if (!siteResource || !siteResource.blob_id) {
-        return HttpStatusCodes.NOT_FOUND;
-    }
-    return siteResource;
-}
-
-
-
-/**
- * Parses the resource information from the Sui object data response.
- */
-function getResourceFields(data: SuiObjectData): Resource | null {
-    // Deserialize the bcs encoded struct
-    if (data.bcs && data.bcs.dataType === "moveObject") {
-        const df = DynamicFieldStruct(ResourcePathStruct, ResourceStruct).parse(
-            fromB64(data.bcs.bcsBytes)
-        );
-        return df.value;
-    }
-    return null;
 }
 
 // Response errors returned.
