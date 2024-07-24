@@ -5,11 +5,11 @@ import { getFullnodeUrl, SuiClient, SuiObjectData } from "@mysten/sui/client";
 import * as baseX from "base-x";
 import { fromB64, fromHEX, isValidSuiObjectId, isValidSuiAddress, toHEX } from "@mysten/sui/utils";
 import { AGGREGATOR, SITE_PACKAGE, SITE_NAMES, NETWORK, MAX_REDIRECT_DEPTH } from "./constants";
-import { bcs, BcsType } from "@mysten/bcs";
 import template_404 from "@static/404-page.template.html";
 import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { DomainDetails, Resource } from "@lib/types/index";
 import { HttpStatusCodes } from "@lib/http_status_codes";
+import { ResourceStruct, ResourcePathStruct, DynamicFieldStruct } from "@lib/bcs_data_parsing";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
@@ -32,38 +32,6 @@ function isResource(obj: any): obj is Resource {
         typeof obj.content_encoding === 'string' &&
         typeof obj.blob_id === 'string'
     );
-}
-
-// Structs for parsing BCS data.
-
-const Address = bcs.bytes(32).transform({
-    input: (id: string) => fromHEX(id),
-    output: (id) => toHEX(id),
-});
-
-// Blob IDs are represented on chain as u256, but serialized in URLs as URL-safe Base64.
-const BLOB_ID = bcs.u256().transform({
-    input: (id: string) => id,
-    output: (id) => base64UrlSafeEncode(bcs.u256().serialize(id).toBytes()),
-});
-
-const ResourcePathStruct = bcs.struct("ResourcePath", {
-    path: bcs.string(),
-});
-
-const ResourceStruct = bcs.struct("Resource", {
-    path: bcs.string(),
-    content_type: bcs.string(),
-    content_encoding: bcs.string(),
-    blob_id: BLOB_ID,
-});
-
-function DynamicFieldStruct<K, V>(K: BcsType<K>, V: BcsType<V>) {
-    return bcs.struct("DynamicFieldStruct<${K.name}, ${V.name}>", {
-        parentId: Address,
-        name: K,
-        value: V,
-    });
 }
 
 // Event listeners.
@@ -448,23 +416,6 @@ function aggregatorEndpoint(blob_id: string): URL {
     return new URL(AGGREGATOR + "/v1/" + encodeURIComponent(blob_id));
 }
 
-/**
- * Converts the given bytes to Base 64, and then converts it to URL-safe Base 64.
- *
- * See [wikipedia](https://en.wikipedia.org/wiki/Base64#URL_applications).
- */
-function base64UrlSafeEncode(data: Uint8Array): string {
-    let base64 = arrayBufferToBas64(data);
-    // Use the URL-safe Base 64 encoding by removing padding and swapping characters.
-    return base64.replaceAll("/", "_").replaceAll("+", "-").replaceAll("=", "");
-}
-
-function arrayBufferToBas64(bytes: Uint8Array): string {
-    // Convert each byte in the array to the correct character
-    const binaryString = Array.from(bytes, (byte) => String.fromCharCode(byte)).join("");
-    // Encode the binary string to base64 using btoa
-    return btoa(binaryString);
-}
 
 // Response errors returned.
 
