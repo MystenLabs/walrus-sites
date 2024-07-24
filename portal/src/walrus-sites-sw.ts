@@ -3,7 +3,7 @@
 
 import { getFullnodeUrl, SuiClient, SuiObjectData } from "@mysten/sui/client";
 import { fromB64 } from "@mysten/sui/utils";
-import { SITE_PACKAGE, NETWORK, MAX_REDIRECT_DEPTH } from "@lib/constants";
+import { RESOURCE_PATH_MOVE_TYPE, NETWORK, MAX_REDIRECT_DEPTH } from "@lib/constants";
 import template_404 from "@static/404-page.template.html";
 import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { DomainDetails, Resource, isResource } from "@lib/types/index";
@@ -18,9 +18,6 @@ import { resolveSuiNsAddress, hardcodedSubdmains } from "@lib/suins";
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
 declare var self: ServiceWorkerGlobalScope;
 declare var clients: Clients;
-
-// The string representing the ResourcePath struct in the walrus_site package.
-const RESOURCE_PATH_MOVE_TYPE = SITE_PACKAGE + "::site::ResourcePath";
 
 // Event listeners.
 
