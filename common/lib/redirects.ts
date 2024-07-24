@@ -4,6 +4,7 @@
 import { DomainDetails } from "./types/index";
 import { getDomain } from "./domain_parsing";
 import { aggregatorEndpoint } from "./aggregator";
+import { SuiClient } from "@mysten/sui/client";
 
 /**
  * Redirects to the portal URL.
@@ -23,6 +24,21 @@ export function redirectToAggregatorUrlResponse(scope: URL, blobId: string): Res
     const redirectUrl = aggregatorEndpoint(blobId);
     console.log("Redirecting to the Walrus Blob link: ", redirectUrl);
     return makeRedirectResponse(redirectUrl.href);
+}
+
+/**
+ * Checks if the object has a redirect in its Display representation.
+ */
+export async function checkRedirect(client: SuiClient, objectId: string): Promise<string | null> {
+    const object = await client.getObject({ id: objectId, options: { showDisplay: true } });
+    if (object.data && object.data.display) {
+        let display = object.data.display;
+        // Check if "walrus site address" is set in the display field.
+        if (display.data && display.data["walrus site address"]) {
+            return display.data["walrus site address"];
+        }
+    }
+    return null;
 }
 
 function makeRedirectResponse(url: string): Response {

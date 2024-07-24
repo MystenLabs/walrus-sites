@@ -14,6 +14,7 @@ import { aggregatorEndpoint } from "@lib/aggregator";
 import { subdomainToObjectId, HEXtoBase36 } from "@lib/objectId_operations";
 import { resolveSuiNsAddress, hardcodedSubdmains } from "@lib/suins";
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
+import { checkRedirect } from "@lib/redirects";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
@@ -224,20 +225,7 @@ async function fetchResource(
     return siteResource;
 }
 
-/**
- * Checks if the object has a redirect in its Display representation.
- */
-async function checkRedirect(client: SuiClient, objectId: string): Promise<string | null> {
-    const object = await client.getObject({ id: objectId, options: { showDisplay: true } });
-    if (object.data && object.data.display) {
-        let display = object.data.display;
-        // Check if "walrus site address" is set in the display field.
-        if (display.data && display.data["walrus site address"]) {
-            return display.data["walrus site address"];
-        }
-    }
-    return null;
-}
+
 
 /**
  * Parses the resource information from the Sui object data response.
