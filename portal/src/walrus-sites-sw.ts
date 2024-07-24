@@ -13,6 +13,7 @@ import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@l
 import { aggregatorEndpoint } from "@lib/aggregator";
 import { subdomainToObjectId, HEXtoBase36 } from "@lib/objectId_operations";
 import { resolveSuiNsAddress, hardcodedSubdmains } from "@lib/suins";
+import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
@@ -76,41 +77,6 @@ self.addEventListener("fetch", async (event) => {
     const response = await fetch(event.request);
     return response;
 });
-
-
-/**
- * Checks if there is a link to a sui resource in the path.
- *
- * These "Walrus Site links" have the following format:
- * `/[suinsname.sui]/resource/path`
- *  This links to a walrus site on sui.
- */
-function getObjectIdLink(url: string): DomainDetails | null {
-    console.log("Trying to extract the sui link from:", url);
-    const suiResult = /^https:\/\/(.+)\.suiobj\/(.*)$/.exec(url);
-    if (suiResult) {
-        console.log("Matched sui link: ", suiResult[1], suiResult[2]);
-        return { subdomain: suiResult[1], path: "/" + suiResult[2] };
-    }
-    return null;
-}
-
-/**
- * Checks if there is a link to a walrus resource in the path.
- *
- * These "Walrus Site links" have the following format:
- * `/[blobid.walrus]`
- */
-function getBlobIdLink(url: string): string {
-    console.log("Trying to extract the walrus link from:", url);
-    const walrusResult = /^https:\/\/blobid\.walrus\/(.+)$/.exec(url);
-    if (walrusResult) {
-        console.log("Matched walrus link: ", walrusResult[1]);
-        return walrusResult[1];
-    }
-    return null;
-}
-
 
 // Fectching & decompressing on-chain data.
 
