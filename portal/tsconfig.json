@@ -10,7 +10,7 @@
     "baseUrl": "./",
       "paths": {
         "@static/*": ["src/static/*"],
-        "@helpers/*": ["src/helpers/*"]
+        "@lib/*": ["../lib/*"]
     }
   },
   "baseUrl": "./",

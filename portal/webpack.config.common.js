@@ -29,7 +29,7 @@ module.exports = {
     },
     resolve: {
         alias: {
-            "@helpers": path.resolve(__dirname, "src/helpers"),
+            "@lib": path.resolve(__dirname, "../lib"),
             "@static": path.resolve(__dirname, "static"),
         },
         extensions: [".ts", ".js"],
