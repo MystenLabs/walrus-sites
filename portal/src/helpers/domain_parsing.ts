@@ -25,7 +25,9 @@ export function getSubdomainAndPath(url: URL): DomainDetails | null {
 /**
 * Given a URL, returns the extracted parts of it.
 * @param url e.g. "https://subname.name.walrus.site/"
-* @returns extracted details of a url e.g. { domain: name.walrus.site, {subdomain: "subname", path: "/index.html"}}
+* @returns extracted details of a url e.g.
+    {domain: name.walrus.site,
+    { subdomain: "subname", path: "/index.html"}}
 */
 function splitUrl(url: URL): UrlExtract {
     const parsed = parseDomain(url.hostname);
