@@ -8,7 +8,7 @@ import { AGGREGATOR, SITE_PACKAGE, SITE_NAMES, NETWORK, MAX_REDIRECT_DEPTH } fro
 import { bcs, BcsType } from "@mysten/bcs";
 import template_404 from "@static/404-page.template.html";
 import { getDomain, getSubdomainAndPath } from "@helpers/domain_parsing";
-import { Path, Resource } from "./types/index";
+import { DomainDetails, Resource } from "./types/index";
 import { HttpStatusCodes } from "./http_status_codes";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
@@ -127,7 +127,7 @@ self.addEventListener("fetch", async (event) => {
 /**
  * Returns the url for the Portal, given a subdomain and a path.
  */
-function getPortalUrl(path: Path, scope: string): string {
+function getPortalUrl(path: DomainDetails, scope: string): string {
     const scopeUrl = new URL(scope);
     const portalDomain = getDomain(scopeUrl);
     let portString = "";
@@ -140,7 +140,7 @@ function getPortalUrl(path: Path, scope: string): string {
 /**
  * Redirects to the portal URL.
  */
-function redirectToPortalURLResponse(scope: URL, path: Path): Response {
+function redirectToPortalURLResponse(scope: URL, path: DomainDetails): Response {
     // Redirect to the walrus site for the specified domain and path
     const redirectUrl = getPortalUrl(path, scope.href);
     console.log("Redirecting to the Walrus Site link: ", path, redirectUrl);
@@ -192,7 +192,7 @@ function subdomainToObjectId(subdomain: string): string | null {
  * `/[suinsname.sui]/resource/path`
  *  This links to a walrus site on sui.
  */
-function getObjectIdLink(url: string): Path | null {
+function getObjectIdLink(url: string): DomainDetails | null {
     console.log("Trying to extract the sui link from:", url);
     const suiResult = /^https:\/\/(.+)\.suiobj\/(.*)$/.exec(url);
     if (suiResult) {
@@ -246,7 +246,7 @@ function hardcodedSubdmains(subdomain: string): string | null {
 /**
  * Resolves the subdomain to an object ID, and gets the corresponding resources.
  */
-async function resolveAndFetchPage(parsedUrl: Path): Promise<Response> {
+async function resolveAndFetchPage(parsedUrl: DomainDetails): Promise<Response> {
     const rpcUrl = getFullnodeUrl(NETWORK);
     const client = new SuiClient({ url: rpcUrl });
 

@@ -4,7 +4,7 @@
 /**
  * The origin of the request, divided into subdomain and path.
  */
-export type Path = {
+export type DomainDetails = {
     subdomain: string;
     path: string;
 };
@@ -13,7 +13,7 @@ export type Path = {
  * The extracted parts contained in a URL.
  */
 export type UrlExtract = {
-    path: Path | null;
+    details: DomainDetails | null;
     domain: string | null;
 }
 

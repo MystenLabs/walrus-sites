@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { parseDomain, ParseResultType } from "parse-domain";
-import { UrlExtract, Path } from "../types/index";
+import { UrlExtract, DomainDetails } from "../types/index";
 
 /**
  * Returns the domain (e.g. "example.com") of the given URL.
@@ -16,16 +16,16 @@ export function getDomain(url: URL): string {
 /**
 * Given a URL, returns the subdomain and path.
 * @param url e.g. "https://subname.name.walrus.site/"
-* @returns Path object e.g. { subdomain: "subname.name", path: "/index.html"}
+* @returns domain details e.g. { subdomain: "subname", path: "/index.html"}
 */
-export function getSubdomainAndPath(url: URL): Path | null {
-    return splitUrl(url).path;
+export function getSubdomainAndPath(url: URL): DomainDetails | null {
+    return splitUrl(url).details;
 }
 
 /**
 * Given a URL, returns the extracted parts of it.
 * @param url e.g. "https://subname.name.walrus.site/"
-* @returns Path object e.g. { domain: name.walrus.site, {subdomain: "subname", path: "/index.html"}}
+* @returns extracted details of a url e.g. { domain: name.walrus.site, {subdomain: "subname", path: "/index.html"}}
 */
 function splitUrl(url: URL): UrlExtract {
     const parsed = parseDomain(url.hostname);
@@ -40,13 +40,13 @@ function splitUrl(url: URL): UrlExtract {
     } else {
         return {
             domain: null,
-            path: null
+            details: null
         }
     }
 
     return {
         domain,
-        path: {
+        details: {
             subdomain,
             path: url.pathname == "/" ? "/index.html" : removeLastSlash(url.pathname)
         }
