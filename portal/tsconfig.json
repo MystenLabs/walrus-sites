@@ -9,8 +9,8 @@
     ],
     "baseUrl": "./",
       "paths": {
-        "@static/*": ["../lib/static/*"],
-        "@lib/*": ["../lib/*"]
+        "@static/*": ["../common/static/*"],
+        "@lib/*": ["../common/lib/*"]
     }
   },
   "baseUrl": "./",
@@ -26,7 +26,7 @@
   ],
   "references": [
       {
-          "path": "../lib/tsconfig.json"
+          "path": "../common/tsconfig.json"
       }
   ]
 }

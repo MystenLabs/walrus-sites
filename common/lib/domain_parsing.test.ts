@@ -3,7 +3,7 @@
 
 import { describe, expect, test } from 'vitest'
 import { getDomain, getSubdomainAndPath } from './domain_parsing'
-import { DomainDetails } from '../types'
+import { DomainDetails } from './types'
 
 const getDomainTestCases: [string, string][] = [
     ['https://example.com', 'example.com'],

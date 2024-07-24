@@ -9,7 +9,7 @@
     ],
     "baseUrl": "./",
       "paths": {
-        "@helpers/*": ["helpers/*"]
+        "@lib/*": ["lib/*"]
     },
   },
   "baseUrl": "./",
@@ -17,7 +17,7 @@
   "outDir": "dist",
   "skipLibCheck": true,
   "include": [
-    "helpers/**/*.ts",
+    "lib/**/*.ts",
     "types/**/*.ts",
   ],
   "exclude": [

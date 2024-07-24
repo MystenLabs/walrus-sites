@@ -29,8 +29,8 @@ module.exports = {
     },
     resolve: {
         alias: {
-            "@lib": path.resolve(__dirname, "../lib"),
-            "@static": path.resolve(__dirname, "../lib/static"),
+            "@lib": path.resolve(__dirname, "../common/lib"),
+            "@static": path.resolve(__dirname, "../common/static"),
         },
         extensions: [".ts", ".js", ".html"],
     },
@@ -38,12 +38,12 @@ module.exports = {
         new CopyPlugin({
             patterns: [
                 {
-                    from: "../lib/static",
+                    from: "../common/static",
                     globOptions: { ignore: ["**/*.template.html"] },
                 },
                 {
                     // Duplicate index.html in the destination folder as 404.html
-                    from: "../lib/static/index.html",
+                    from: "../common/static/index.html",
                     to: "404.html",
                 }
             ],

@@ -7,7 +7,7 @@ import { fromB64, fromHEX, isValidSuiObjectId, isValidSuiAddress, toHEX } from "
 import { AGGREGATOR, SITE_PACKAGE, SITE_NAMES, NETWORK, MAX_REDIRECT_DEPTH } from "./constants";
 import { bcs, BcsType } from "@mysten/bcs";
 import template_404 from "@static/404-page.template.html";
-import { getDomain, getSubdomainAndPath } from "@lib/helpers/domain_parsing";
+import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { DomainDetails, Resource } from "@lib/types/index";
 import { HttpStatusCodes } from "./http_status_codes";
 
