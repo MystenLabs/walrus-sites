@@ -1,70 +1,23 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { getFullnodeUrl, SuiClient, SuiObjectData } from "@mysten/sui/client";
-import * as baseX from "base-x";
-import { fromB64, fromHEX, isValidSuiObjectId, isValidSuiAddress, toHEX } from "@mysten/sui/utils";
-import { AGGREGATOR, SITE_PACKAGE, SITE_NAMES, NETWORK, MAX_REDIRECT_DEPTH } from "./constants";
-import { bcs, BcsType } from "@mysten/bcs";
-import template_404 from "@static/404-page.template.html";
-import { getDomain, getSubdomainAndPath } from "@helpers/domain_parsing";
-import { DomainDetails, Resource } from "./types/index";
-import { HttpStatusCodes } from "./http_status_codes";
+import { getFullnodeUrl, SuiClient } from "@mysten/sui/client";
+import { NETWORK } from "@lib/constants";
+import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
+import { DomainDetails, isResource } from "@lib/types/index";
+import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
+import { aggregatorEndpoint } from "@lib/aggregator";
+import { subdomainToObjectId, HEXtoBase36 } from "@lib/objectId_operations";
+import { resolveSuiNsAddress, hardcodedSubdmains } from "@lib/suins";
+import { getBlobIdLink, getObjectIdLink } from "@lib/links";
+import { fetchResource } from "@lib/resource";
+import { siteNotFound, noObjectIdFound, fullNodeFail } from "@lib/http/http_error_responses";
+import { decompressData } from "./decompress_data";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
 declare var self: ServiceWorkerGlobalScope;
 declare var clients: Clients;
-
-var BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz";
-const b36 = baseX(BASE36);
-// The string representing the ResourcePath struct in the walrus_site package.
-const RESOURCE_PATH_MOVE_TYPE = SITE_PACKAGE + "::site::ResourcePath";
-
-/**
- * Type guard for the Resource type.
-*/
-function isResource(obj: any): obj is Resource {
-    return (
-        obj &&
-        typeof obj.path === 'string' &&
-        typeof obj.content_type === 'string' &&
-        typeof obj.content_encoding === 'string' &&
-        typeof obj.blob_id === 'string'
-    );
-}
-
-// Structs for parsing BCS data.
-
-const Address = bcs.bytes(32).transform({
-    input: (id: string) => fromHEX(id),
-    output: (id) => toHEX(id),
-});
-
-// Blob IDs are represented on chain as u256, but serialized in URLs as URL-safe Base64.
-const BLOB_ID = bcs.u256().transform({
-    input: (id: string) => id,
-    output: (id) => base64UrlSafeEncode(bcs.u256().serialize(id).toBytes()),
-});
-
-const ResourcePathStruct = bcs.struct("ResourcePath", {
-    path: bcs.string(),
-});
-
-const ResourceStruct = bcs.struct("Resource", {
-    path: bcs.string(),
-    content_type: bcs.string(),
-    content_encoding: bcs.string(),
-    blob_id: BLOB_ID,
-});
-
-function DynamicFieldStruct<K, V>(K: BcsType<K>, V: BcsType<V>) {
-    return bcs.struct("DynamicFieldStruct<${K.name}, ${V.name}>", {
-        parentId: Address,
-        name: K,
-        value: V,
-    });
-}
 
 // Event listeners.
 
@@ -124,123 +77,6 @@ self.addEventListener("fetch", async (event) => {
     return response;
 });
 
-/**
- * Returns the url for the Portal, given a subdomain and a path.
- */
-function getPortalUrl(path: DomainDetails, scope: string): string {
-    const scopeUrl = new URL(scope);
-    const portalDomain = getDomain(scopeUrl);
-    let portString = "";
-    if (scopeUrl.port) {
-        portString = ":" + scopeUrl.port;
-    }
-    return scopeUrl.protocol + "//" + path.subdomain + "." + portalDomain + portString + path.path;
-}
-
-/**
- * Redirects to the portal URL.
- */
-function redirectToPortalURLResponse(scope: URL, path: DomainDetails): Response {
-    // Redirect to the walrus site for the specified domain and path
-    const redirectUrl = getPortalUrl(path, scope.href);
-    console.log("Redirecting to the Walrus Site link: ", path, redirectUrl);
-    return makeRedirectResponse(redirectUrl);
-}
-
-/**
- * Redirects to the aggregator URL.
- */
-function redirectToAggregatorUrlResponse(scope: URL, blobId: string): Response {
-    // Redirect to the walrus site for the specified domain and path
-    const redirectUrl = aggregatorEndpoint(blobId);
-    console.log("Redirecting to the Walrus Blob link: ", redirectUrl);
-    return makeRedirectResponse(redirectUrl.href);
-}
-
-function makeRedirectResponse(url: string): Response {
-    return new Response(null, {
-        status: 302,
-        headers: {
-            Location: url,
-        },
-    });
-}
-
-/**
- * Subdomain encoding and parsing.
- *
- * Use base36 instead of HEX to encode object ids in the subdomain, as the subdomain must be < 64
- * characters.  The encoding must be case insensitive.
- */
-function subdomainToObjectId(subdomain: string): string | null {
-    const objectId = "0x" + toHEX(b36.decode(subdomain.toLowerCase()));
-    console.log(
-        "obtained object id: ",
-        objectId,
-        isValidSuiObjectId(objectId),
-        isValidSuiAddress(objectId)
-    );
-    return isValidSuiObjectId(objectId) ? objectId : null;
-}
-
-
-
-/**
- * Checks if there is a link to a sui resource in the path.
- *
- * These "Walrus Site links" have the following format:
- * `/[suinsname.sui]/resource/path`
- *  This links to a walrus site on sui.
- */
-function getObjectIdLink(url: string): DomainDetails | null {
-    console.log("Trying to extract the sui link from:", url);
-    const suiResult = /^https:\/\/(.+)\.suiobj\/(.*)$/.exec(url);
-    if (suiResult) {
-        console.log("Matched sui link: ", suiResult[1], suiResult[2]);
-        return { subdomain: suiResult[1], path: "/" + suiResult[2] };
-    }
-    return null;
-}
-
-/**
- * Checks if there is a link to a walrus resource in the path.
- *
- * These "Walrus Site links" have the following format:
- * `/[blobid.walrus]`
- */
-function getBlobIdLink(url: string): string {
-    console.log("Trying to extract the walrus link from:", url);
-    const walrusResult = /^https:\/\/blobid\.walrus\/(.+)$/.exec(url);
-    if (walrusResult) {
-        console.log("Matched walrus link: ", walrusResult[1]);
-        return walrusResult[1];
-    }
-    return null;
-}
-
-
-// SuiNS functionality.
-
-/**
- * Resolves the subdomain to an object ID using SuiNS.
- *
- * The subdomain `example` will look up `example.sui` and return the object ID if found.
- */
-async function resolveSuiNsAddress(client: SuiClient, subdomain: string): Promise<string | null> {
-    const suiObjectId: string = await client.call("suix_resolveNameServiceAddress", [
-        subdomain + ".sui",
-    ]);
-    console.log("resolved suins name: ", subdomain, suiObjectId);
-    return suiObjectId ? suiObjectId : null;
-}
-
-function hardcodedSubdmains(subdomain: string): string | null {
-    if (subdomain in SITE_NAMES) {
-        return SITE_NAMES[subdomain];
-    }
-    return null;
-}
-
 // Fectching & decompressing on-chain data.
 
 /**
@@ -268,7 +104,7 @@ async function resolveAndFetchPage(parsedUrl: DomainDetails): Promise<Response> 
     }
     if (objectId) {
         console.log("Object ID: ", objectId);
-        console.log("Base36 version of the object ID: ", b36.encode(fromHEX(objectId)));
+        console.log("Base36 version of the object ID: ", HEXtoBase36(objectId));
         return fetchPage(client, objectId, parsedUrl.path);
     }
     return noObjectIdFound();
@@ -308,186 +144,6 @@ async function fetchPage(client: SuiClient, objectId: string, path: string): Pro
     return new Response(decompressed, {
         headers: {
             "Content-Type": result.content_type,
-        },
-    });
-}
-
-/**
- * Fetches a resource of a site.
- *
- * This function is recursive, as it will follow the special redirect field if it is set. A site can
- * have a special redirect field that points to another site, where the resources to display the
- * site are found.
- *
- * This is useful to create many objects with an associated site (e.g., NFTs), without having to
- * repeat the same resources for each object, and allowing to keep some control over the site (for
- * example, the creator can still edit the site even if the NFT is owned by someone else).
- *
- * See the `checkRedirect` function for more details.
- * To prevent infinite loops, the recursion depth is of this function is capped to
- * `MAX_REDIRECT_DEPTH`.
- *
- * Infinite loops can also be prevented by checking if the resource has already been seen.
- * This is done by using the `seenResources` set.
- */
-async function fetchResource(
-    client: SuiClient,
-    objectId: string,
-    path: string,
-    seenResources: Set<string>,
-    depth: number = 0,
-): Promise<Resource | HttpStatusCodes> {
-    if (seenResources.has(objectId)) {
-        return HttpStatusCodes.LOOP_DETECTED;
-    } else if (depth >= MAX_REDIRECT_DEPTH) {
-        return HttpStatusCodes.TOO_MANY_REDIRECTS;
-    } else {
-        seenResources.add(objectId);
-    }
-
-    let [redirectId, dynamicFields] = await Promise.all([
-        checkRedirect(client, objectId),
-        client.getDynamicFieldObject({
-            parentId: objectId,
-            name: { type: RESOURCE_PATH_MOVE_TYPE, value: path },
-        }),
-    ]);
-
-    if (redirectId) {
-        console.log("Redirect found");
-        const redirectPage = await client.getObject({
-            id: redirectId,
-            options: { showBcs: true },
-        });
-        console.log("Redirect page: ", redirectPage);
-        if (!redirectPage.data) {
-            return HttpStatusCodes.NOT_FOUND;
-        }
-        // Recurs increasing the recursion depth.
-        return fetchResource(client, redirectId, path, seenResources, depth + 1);
-    }
-
-    console.log("Dynamic fields for ", objectId, dynamicFields);
-    if (!dynamicFields.data) {
-        console.log("No dynamic field found");
-        return HttpStatusCodes.NOT_FOUND;
-    }
-    const pageData = await client.getObject({
-        id: dynamicFields.data.objectId,
-        options: { showBcs: true },
-    });
-    if (!pageData.data) {
-        console.log("No page data found");
-        return HttpStatusCodes.NOT_FOUND;
-    }
-    const siteResource = getResourceFields(pageData.data);
-    if (!siteResource || !siteResource.blob_id) {
-        return HttpStatusCodes.NOT_FOUND;
-    }
-    return siteResource;
-}
-
-/**
- * Checks if the object has a redirect in its Display representation.
- */
-async function checkRedirect(client: SuiClient, objectId: string): Promise<string | null> {
-    const object = await client.getObject({ id: objectId, options: { showDisplay: true } });
-    if (object.data && object.data.display) {
-        let display = object.data.display;
-        // Check if "walrus site address" is set in the display field.
-        if (display.data && display.data["walrus site address"]) {
-            return display.data["walrus site address"];
-        }
-    }
-    return null;
-}
-
-/**
- * Parses the resource information from the Sui object data response.
- */
-function getResourceFields(data: SuiObjectData): Resource | null {
-    // Deserialize the bcs encoded struct
-    if (data.bcs && data.bcs.dataType === "moveObject") {
-        const df = DynamicFieldStruct(ResourcePathStruct, ResourceStruct).parse(
-            fromB64(data.bcs.bcsBytes)
-        );
-        return df.value;
-    }
-    return null;
-}
-
-/**
- * Decompresses the contents of the buffer according to the content encoding.
- */
-async function decompressData(
-    data: ArrayBuffer,
-    contentEncoding: string
-): Promise<ArrayBuffer | null> {
-    if (contentEncoding === "plaintext") {
-        return data;
-    }
-    // check that contentencoding is a valid CompressionFormat
-    if (["gzip", "deflate", "deflate-raw"].includes(contentEncoding)) {
-        const enc = contentEncoding as CompressionFormat;
-        const blob = new Blob([data], { type: "application/gzip" });
-        const stream = blob.stream().pipeThrough(new DecompressionStream(enc));
-        const response = await new Response(stream).arrayBuffer().catch((e) => {
-            console.error("DecompressionStream error", e);
-        });
-        if (response) return response;
-    }
-    return null;
-}
-
-// Walrus-specific encoding.
-
-/**
- * Returns the URL to fetch the blob of given ID from the aggregator/cache.
- */
-function aggregatorEndpoint(blob_id: string): URL {
-    return new URL(AGGREGATOR + "/v1/" + encodeURIComponent(blob_id));
-}
-
-/**
- * Converts the given bytes to Base 64, and then converts it to URL-safe Base 64.
- *
- * See [wikipedia](https://en.wikipedia.org/wiki/Base64#URL_applications).
- */
-function base64UrlSafeEncode(data: Uint8Array): string {
-    let base64 = arrayBufferToBas64(data);
-    // Use the URL-safe Base 64 encoding by removing padding and swapping characters.
-    return base64.replaceAll("/", "_").replaceAll("+", "-").replaceAll("=", "");
-}
-
-function arrayBufferToBas64(bytes: Uint8Array): string {
-    // Convert each byte in the array to the correct character
-    const binaryString = Array.from(bytes, (byte) => String.fromCharCode(byte)).join("");
-    // Encode the binary string to base64 using btoa
-    return btoa(binaryString);
-}
-
-// Response errors returned.
-
-function siteNotFound(): Response {
-    return Response404(
-        "This page does not exist - the object ID is not a valid Walrus Site."
-    );
-}
-
-function noObjectIdFound(): Response {
-    return Response404("This page does not exist - no object ID could be found.");
-}
-
-function fullNodeFail(): Response {
-    return Response404("Failed to contact the full node.");
-}
-
-function Response404(message: String): Response {
-    console.log();
-    return new Response(template_404.replace("${message}", message), {
-        status: 404,
-        headers: {
-            "Content-Type": "text/html",
         },
     });
 }

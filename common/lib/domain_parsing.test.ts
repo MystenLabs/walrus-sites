@@ -3,7 +3,7 @@
 
 import { describe, expect, test } from 'vitest'
 import { getDomain, getSubdomainAndPath } from './domain_parsing'
-import { Path } from '../types'
+import { DomainDetails } from './types'
 
 const getDomainTestCases: [string, string][] = [
     ['https://example.com', 'example.com'],
@@ -28,7 +28,7 @@ describe('getDomain', () => {
     })
 })
 
-const getSubdomainAndPathTestCases: [string, Path][] = [
+const getSubdomainAndPathTestCases: [string, DomainDetails][] = [
     ['https://subname.name.walrus.site/', {subdomain: 'subname.name', path: '/index.html' }],
     ['https://name.walrus.site/', { subdomain: 'name', path: '/index.html' }],
     ['http://name.localhost:8080/', { subdomain: 'name', path: '/index.html' }],

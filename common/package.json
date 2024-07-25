@@ -1,0 +1,22 @@
+{
+		"dependencies": {
+				"@mysten/bcs": "^1.0.2",
+				"@mysten/sui": "^1.1.2",
+				"base-x": "^4.0.0",
+				"parse-domain": "8.0.2"
+		},
+		"devDependencies": {
+				"vitest": "^2.0.3",
+				"webpack": "^5.92.0"
+		},
+		"name": "lib",
+		"description": "A common library that is shared among the portal implementations.",
+		"main": "index.js",
+		"scripts": {
+				"build": "pnpm build:prod",
+				"dev": "pnpm build:dev",
+				"build:dev": "webpack --config webpack.config.dev.js",
+				"build:prod": "webpack --no-watch --config webpack.config.prod.js",
+				"test": "vitest"
+		}
+}

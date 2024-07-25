@@ -1,9 +1,6 @@
 {
 	"dependencies": {
-		"@mysten/bcs": "^1.0.2",
 		"@mysten/sui": "^1.1.2",
-		"base-x": "^4.0.0",
-		"parse-domain": "8.0.2",
 		"ts-loader": "^9.5.1",
 		"tsc": "^2.0.4",
 		"typescript": "^5.4.5"
