@@ -26,7 +26,7 @@ export function getObjectIdLink(url: string): DomainDetails | null {
  * These "Walrus Site links" have the following format:
  * `/[blobid.walrus]`
  */
-export function getBlobIdLink(url: string): string {
+export function getBlobIdLink(url: string): string | null {
     console.log("Trying to extract the walrus link from:", url);
     const walrusResult = /^https:\/\/blobid\.walrus\/(.+)$/.exec(url);
     if (walrusResult) {

@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { fromB64, fromHEX, isValidSuiObjectId, isValidSuiAddress, toHEX } from "@mysten/sui/utils";
-import * as baseX from "base-x";
+const baseX = require('base-x');
 
 const BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz";
 const b36 = baseX(BASE36);
+
 
 /**
  * Subdomain encoding and parsing.
