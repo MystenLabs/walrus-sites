@@ -23,7 +23,6 @@
 		"build": "pnpm build:prod",
 		"dev": "pnpm build:dev",
 		"build:dev": "webpack --config webpack.config.dev.js",
-		"build:prod": "webpack --no-watch --config webpack.config.prod.js",
-		"test": "vitest"
+		"build:prod": "webpack --no-watch --config webpack.config.prod.js"
 	}
 }

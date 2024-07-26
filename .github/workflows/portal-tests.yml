@@ -29,4 +29,4 @@ jobs:
           node-version: 20
 
       - name: Run tests
-        run: cd common && pnpm run test
+        run: cd portal && pnpm run test:common

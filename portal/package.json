@@ -7,7 +7,7 @@
     "build:dev:worker": "pnpm --filter ./worker run build:dev",
     "serve:worker": "pnpm --filter ./worker run serve",
     "serve:prod": "pnpm --filter ./worker run serve:prod",
-    "test:worker": "pnpm --filter ./worker run test"
+    "test:common": "pnpm --filter ./common run test"
   },
   "keywords": [],
   "author": "Mysten Labs",
