@@ -1,7 +1,13 @@
 {
   "name": "portal",
+  "description": "Central point of the walrus-sites portal workspace.",
   "scripts": {
-    "build": "webpack --config webpack.config.js"
+    "build:worker": "pnpm --filter ./worker run build:prod",
+    "build:prod:worker": "pnpm --filter ./worker run build:prod",
+    "build:dev:worker": "pnpm --filter ./worker run build:dev",
+    "serve:worker": "pnpm --filter ./worker run serve",
+    "serve:prod": "pnpm --filter ./worker run serve:prod",
+    "test:worker": "pnpm --filter ./worker run test"
   },
   "keywords": [],
   "author": "Mysten Labs",
