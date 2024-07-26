@@ -12,7 +12,7 @@ import { resolveSuiNsAddress, hardcodedSubdmains } from "@lib/suins";
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import { fetchResource } from "@lib/resource";
 import { siteNotFound, noObjectIdFound, fullNodeFail } from "@lib/http/http_error_responses";
-import { decompressData } from "./decompress_data";
+import { decompressData } from "@lib/decompress_data";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
