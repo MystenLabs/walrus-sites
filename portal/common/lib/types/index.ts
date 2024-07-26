@@ -26,3 +26,16 @@ export type Resource = {
     content_encoding: string;
     blob_id: string;
 };
+
+/**
+ * Type guard for the Resource type.
+*/
+export function isResource(obj: any): obj is Resource {
+    return (
+        obj &&
+        typeof obj.path === 'string' &&
+        typeof obj.content_type === 'string' &&
+        typeof obj.content_encoding === 'string' &&
+        typeof obj.blob_id === 'string'
+    );
+}

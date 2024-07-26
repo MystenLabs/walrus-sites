@@ -10,3 +10,5 @@ export const SITE_NAMES: { [key: string]: string } = {
     // e.g.,
     // landing: "0x1234..."
 };
+// The string representing the ResourcePath struct in the walrus_site package.
+export const RESOURCE_PATH_MOVE_TYPE = SITE_PACKAGE + "::site::ResourcePath";

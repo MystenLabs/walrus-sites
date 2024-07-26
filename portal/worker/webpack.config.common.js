@@ -29,21 +29,21 @@ module.exports = {
     },
     resolve: {
         alias: {
-            "@helpers": path.resolve(__dirname, "src/helpers"),
-            "@static": path.resolve(__dirname, "static"),
+            "@lib": path.resolve(__dirname, "../common/lib"),
+            "@static": path.resolve(__dirname, "../common/static"),
         },
-        extensions: [".ts", ".js"],
+        extensions: [".ts", ".js", ".html"],
     },
     plugins: [
         new CopyPlugin({
             patterns: [
                 {
-                    from: "static",
+                    from: "../common/static",
                     globOptions: { ignore: ["**/*.template.html"] },
                 },
                 {
                     // Duplicate index.html in the destination folder as 404.html
-                    from: "static/index.html",
+                    from: "../common/static/index.html",
                     to: "404.html",
                 }
             ],

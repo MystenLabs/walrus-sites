@@ -1,26 +1,23 @@
 {
   "compilerOptions": {
+    "composite": true,
     "target": "esnext",
     "module": "esnext",
     "moduleResolution": "node",
     "lib": [
       "esnext",
-      "webworker"
     ],
     "baseUrl": "./",
       "paths": {
-        "@static/*": ["src/static/*"],
-        "@helpers/*": ["src/helpers/*"]
-    }
+        "@lib/*": ["lib/*"]
+    },
   },
   "baseUrl": "./",
   "rootDir": "src",
   "outDir": "dist",
   "skipLibCheck": true,
   "include": [
-    "src/walrus-sites-sw.ts",
-    "src/custom.d.ts",
-    "src/constants.ts"
+      "lib/**/*",
   ],
   "exclude": [
     "node_modules",

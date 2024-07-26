@@ -1,30 +1,15 @@
 {
-	"dependencies": {
-		"@mysten/bcs": "^1.0.2",
-		"@mysten/sui": "^1.1.2",
-		"base-x": "^4.0.0",
-		"parse-domain": "8.0.2",
-		"ts-loader": "^9.5.1",
-		"tsc": "^2.0.4",
-		"typescript": "^5.4.5"
-	},
-	"devDependencies": {
-		"copy-webpack-plugin": "^12.0.2",
-		"css-minimizer-webpack-plugin": "^6.0.0",
-		"html-minimizer-webpack-plugin": "^5.0.0",
-		"vitest": "^2.0.3",
-		"webpack": "^5.92.0",
-		"webpack-cli": "^5.1.4",
-		"webpack-dev-server": "^4.15.2",
-		"webpack-merge": "^5.10.0"
-	},
-	"scripts": {
-		"serve": "webpack serve --config webpack.config.dev.js",
-		"serve:prod": "webpack serve --config webpack.config.prod.js",
-		"build": "pnpm build:prod",
-		"dev": "pnpm build:dev",
-		"build:dev": "webpack --config webpack.config.dev.js",
-		"build:prod": "webpack --no-watch --config webpack.config.prod.js",
-		"test": "vitest"
-	}
+  "name": "portal",
+  "description": "Central point of the walrus-sites portal workspace.",
+  "scripts": {
+    "build:worker": "pnpm --filter ./worker run build:prod",
+    "build:prod:worker": "pnpm --filter ./worker run build:prod",
+    "build:dev:worker": "pnpm --filter ./worker run build:dev",
+    "serve:worker": "pnpm --filter ./worker run serve",
+    "serve:prod": "pnpm --filter ./worker run serve:prod",
+    "test:common": "pnpm --filter ./common run test"
+  },
+  "keywords": [],
+  "author": "Mysten Labs",
+  "license": "Apache-2.0"
 }

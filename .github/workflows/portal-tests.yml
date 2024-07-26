@@ -19,7 +19,7 @@ jobs:
       - uses: pnpm/action-setup@v4
         name: Install pnpm
         with:
-          working-directory: portal
+          working-directory: common
           version: 8
           run_install: true
 
@@ -29,4 +29,4 @@ jobs:
           node-version: 20
 
       - name: Run tests
-        run: cd portal && pnpm run test
+        run: cd portal && pnpm run test:common
