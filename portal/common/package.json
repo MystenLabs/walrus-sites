@@ -9,7 +9,7 @@
 				"vitest": "^2.0.3",
 				"webpack": "^5.92.0"
 		},
-		"name": "lib",
+		"name": "common",
 		"description": "A common library that is shared among the portal implementations.",
 		"main": "index.js",
 		"scripts": {
