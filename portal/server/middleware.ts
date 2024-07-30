@@ -5,11 +5,15 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export function middleware(request: NextRequest) {
+    const urlOriginal = extractUrlFrom(request)
+    const alreadyAtRoot = request.nextUrl.pathname === '/'
+    if (alreadyAtRoot) {
+        const response = NextResponse.next()
+        response.headers.set('x-original-url', urlOriginal)
+        return response
+    }
     const urlRedirect = new URL('/', request.url)
     const response = NextResponse.rewrite(urlRedirect)
-
-    const urlOriginal = extractUrlFrom(request)
-
     response.headers.set('x-original-url', urlOriginal)
     return response
 }
