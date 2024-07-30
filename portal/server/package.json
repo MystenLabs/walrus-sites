@@ -4,7 +4,8 @@
     "private": true,
     "scripts": {
         "dev": "next dev",
-        "build": "next build",
+        "copy-static": "copyfiles -u 3 '../common/static/**/*' public/",
+        "build": "pnpm run copy-static && next build",
         "start": "next start"
     },
     "dependencies": {
@@ -16,6 +17,7 @@
     "devDependencies": {
         "@types/node": "^20",
         "@types/react": "18.3.3",
+        "copyfiles": "^2.4.1",
         "html-loader": "^5.1.0",
         "prettier": "^3.3.3",
         "tailwindcss": "^3.4.1",

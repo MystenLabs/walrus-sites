@@ -12,3 +12,4 @@ config.toml
 rustfmt.toml
 env/
 .next/
+portal/server/public/*

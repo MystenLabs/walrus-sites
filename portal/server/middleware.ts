@@ -12,6 +12,10 @@ export function middleware(request: NextRequest) {
         response.headers.set('x-original-url', urlOriginal)
         return response
     }
+    const requestedStaticFile = request.nextUrl.pathname == '/index-sw-enabled.html'
+    if (requestedStaticFile) {
+        return NextResponse.next()
+    }
     const urlRedirect = new URL('/', request.url)
     const response = NextResponse.rewrite(urlRedirect)
     response.headers.set('x-original-url', urlOriginal)

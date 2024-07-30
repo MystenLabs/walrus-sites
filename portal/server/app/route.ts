@@ -1,7 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { NextResponse } from 'next/server'
 import { getDomain, getSubdomainAndPath } from '@lib/domain_parsing'
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from '@lib/redirects'
 import { getBlobIdLink, getObjectIdLink } from '@lib/links'
@@ -42,9 +41,9 @@ export async function GET(req: Request) {
     // Handle the case in which we are at the root `BASE_URL`
     if ( onBaseURL || onBaseURLIndex ) {
         console.log('serving the landing page')
-        return // TODO: serve the landing page from /public
+        const newUrl = new URL(req.url + 'index-sw-enabled.html')
+        return fetch(newUrl)
     }
 
-    const response = await fetch(req)
-    return response
+    return new Response('Not Found', { status: 404 })
 }
