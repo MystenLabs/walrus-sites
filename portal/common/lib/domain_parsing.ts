@@ -9,7 +9,7 @@ import { UrlExtract, DomainDetails } from "./types/index";
  * @param orig_url The URL to extract the domain from. e.g. "https://example.com"
  * @returns The domain of the URL. e.g. "example.com"
  */
-export function getDomain(url: URL): string {
+export function getDomain(url: URL): string | null {
     return splitUrl(url).domain;
 }
 

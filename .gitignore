@@ -11,3 +11,4 @@ config.toml
 .vscode/
 rustfmt.toml
 env/
+.next/
