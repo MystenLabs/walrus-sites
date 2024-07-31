@@ -19,11 +19,13 @@ export async function resolveAndFetchPage(parsedUrl: DomainDetails): Promise<Res
     const client = new SuiClient({ url: rpcUrl });
 
     let objectId = hardcodedSubdmains(parsedUrl.subdomain);
-    if (!objectId) {
+    if (!objectId && !parsedUrl.subdomain.includes('.')) {
         // Try to convert the subdomain to an object ID NOTE: This effectively _disables_ any SuiNs
         // name that is the base36 encoding of an object ID (i.e., a 32-byte string). This is
         // desirable, prevents people from getting suins names that are the base36 encoding the
-        // object ID of a target site (with the goal of hijacking non-suins queries)
+        // object ID of a target site (with the goal of hijacking non-suins queries).
+        //
+        // If the subdomain contains `.`, it is a SuiNS name, and we should not convert it.
         objectId = subdomainToObjectId(parsedUrl.subdomain);
     }
     if (!objectId) {

@@ -14,14 +14,19 @@ const b36 = baseX(BASE36);
  * characters.  The encoding must be case insensitive.
  */
 export function subdomainToObjectId(subdomain: string): string | null {
-    const objectId = Base36ToHEX(subdomain.toLowerCase());
-    console.log(
-        "obtained object id: ",
-        objectId,
-        isValidSuiObjectId(objectId),
-        isValidSuiAddress(objectId)
-    );
-    return isValidSuiObjectId(objectId) ? objectId : null;
+    try{
+        const objectId = Base36ToHEX(subdomain.toLowerCase());
+        console.log(
+            "obtained object id: ",
+            objectId,
+            isValidSuiObjectId(objectId),
+            isValidSuiAddress(objectId)
+        );
+        return isValidSuiObjectId(objectId) ? objectId : null;
+    } catch (e) {
+        console.log("error converting subdomain to object id: ", e);
+        return null;
+    }
 }
 
 export function HEXtoBase36(objectId: string): string {
