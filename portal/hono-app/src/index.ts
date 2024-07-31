@@ -10,22 +10,24 @@ import { html } from 'hono/html'
 
 const app = new Hono()
 
-app.get('/', async (c) => {
-    return c.html(
-        html`
-            <h1>Welcome to Hono!</h1>
-            <p>
-                This is a simple web application built with Hono.
-            </p>
-            <p>
-                <a href="/about">About</a>
-            </p>
-        `
-    )
-})
-
 app.get('*', async (c) => {
     const url = new URL(c.req.url)
+    const {subdomain, path} = getSubdomainAndPath(url) || {subdomain: null, path: null}
+    const isAtWalrusSitesIndex = (path === '/' || path == '/index.html') && !(!!subdomain)
+    if (isAtWalrusSitesIndex) {
+        return c.html(
+            html`
+                <h1>Welcome to Walrus Sites!</h1>
+                <p>
+                    This is a simple web application built with Hono.
+                </p>
+                <p>
+                    <a href="/about">About</a>
+                </p>
+            `
+        )
+    }
+
     const objectIdPath = getObjectIdLink(url.toString())
     if (objectIdPath) {
         console.log(`Redirecting to portal url response: ${url.toString()} from ${objectIdPath}`)
