@@ -6,7 +6,7 @@ import { getDomain, getSubdomainAndPath } from '@lib/domain_parsing'
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from '@lib/redirects'
 import { getBlobIdLink, getObjectIdLink } from '@lib/links'
 import { resolveAndFetchPage } from '@lib/page_fetching'
-import { html } from 'hono/html'
+import { landingPage } from './landingPage'
 
 const app = new Hono()
 
@@ -16,15 +16,7 @@ app.get('*', async (c) => {
     const isAtWalrusSitesIndex = (path === '/' || path == '/index.html') && !(!!subdomain)
     if (isAtWalrusSitesIndex) {
         return c.html(
-            html`
-                <h1>Welcome to Walrus Sites!</h1>
-                <p>
-                    This is a simple web application built with Hono.
-                </p>
-                <p>
-                    <a href="/about">About</a>
-                </p>
-            `
+            landingPage
         )
     }
 
@@ -49,7 +41,7 @@ app.get('*', async (c) => {
         return resolveAndFetchPage(parsedUrl)
     }
 
-    return c.text('Not found', 404)
+    return c.text('Not found', 404) // TODO render a 404 template page
 })
 
 export default app
