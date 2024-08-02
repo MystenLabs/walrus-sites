@@ -12,3 +12,5 @@ config.toml
 rustfmt.toml
 env/
 .next/
+yarn.lock
+next-env.d.ts

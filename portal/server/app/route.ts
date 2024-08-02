@@ -1,12 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { getDomain, getSubdomainAndPath, removeLastSlash } from '@lib/domain_parsing'
-import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from '@lib/redirects'
-import { getBlobIdLink, getObjectIdLink } from '@lib/links'
-import { resolveAndFetchPage } from '@lib/page_fetching'
-import { NextResponse } from 'next/server'
-import path from 'path'
+import { getDomain, getSubdomainAndPath} from 'common/lib/domain_parsing'
+import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from 'common/lib/redirects'
+import { getBlobIdLink, getObjectIdLink } from 'common/lib/links'
+import { resolveAndFetchPage } from 'common/lib/page_fetching'
 
 export async function GET(req: Request) {
     const originalUrl = req.headers.get('x-original-url')
@@ -39,7 +37,7 @@ export async function GET(req: Request) {
     const atBaseUrl = portalDomain == url.host.split(':')[0]
     if (atBaseUrl) {
         console.log('serving the landing page from another service')
-        const landingPageServiceName = `https://walrus.site`
+        const landingPageServiceName = `https://walrus.site/index-sw-enabled.html`
         const response = await fetch(`${landingPageServiceName}${parsedUrl?.path}`)
         const data = await response.text()
         console.log(response.headers.get('content-type'))
