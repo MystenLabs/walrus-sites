@@ -49,12 +49,7 @@ export async function resolveAndFetchPage(parsedUrl: DomainDetails): Promise<Res
  */
 async function fetchPage(client: SuiClient, objectId: string, path: string): Promise<Response> {
     const result = await fetchResource(client, objectId, path, new Set<string>);
-    if (!isResource(result)) {
-        const httpStatus = result as number;
-        return new Response("Unable to fetch the site resource.", { status: httpStatus });
-    }
-
-    if (!result.blob_id) {
+    if (!isResource(result) || !result.blob_id) {
         if (path !== '/404.html') {
             return fetchPage(client, objectId, '/404.html');
         } else {
