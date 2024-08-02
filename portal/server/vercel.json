@@ -2,5 +2,5 @@
     "framework": null,
     "installCommand": "pnpm install",
     "buildCommand": "pnpm run build",
-    "outputDirectory": "dist"
+    "outputDirectory": ".next"
 }
