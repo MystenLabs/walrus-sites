@@ -12,7 +12,7 @@ export async function decompressData(
 ): Promise<Uint8Array | null> {
     try {
         if (contentEncoding === "plaintext") {
-            return data as Uint8Array;
+            return new Uint8Array(data);
         }
 
         const encodingIsSupported = ["gzip", "deflate", "deflate-raw"].includes(contentEncoding);
