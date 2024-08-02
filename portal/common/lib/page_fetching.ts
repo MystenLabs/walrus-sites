@@ -64,7 +64,7 @@ async function fetchPage(client: SuiClient, objectId: string, path: string): Pro
     }
 
     // Deserialize the bcs encoded body and decompress.
-    const body = new Uint8Array(await contents.arrayBuffer());
+    const body = await contents.arrayBuffer();
     const decompressed = await decompressData(body, result.content_encoding);
     if (!decompressed) {
         return siteNotFound();
