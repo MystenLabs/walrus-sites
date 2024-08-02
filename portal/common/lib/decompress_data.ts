@@ -7,29 +7,28 @@ import { ungzip, inflate, inflateRaw } from 'pako';
 * Decompresses the contents of the buffer according to the content encoding.
 */
 export async function decompressData(
-    data: ArrayBuffer,
+    data: Uint8Array,
     contentEncoding: string
 ): Promise<Uint8Array | null> {
     try {
         if (contentEncoding === "plaintext") {
-            return data as Uint8Array;
+            return data;
         }
 
         const encodingIsSupported = ["gzip", "deflate", "deflate-raw"].includes(contentEncoding);
 
         if (encodingIsSupported) {
             let decompressed: Uint8Array;
-            const uint8ArrayData = new Uint8Array(data);
 
             switch (contentEncoding) {
                 case "gzip":
-                    decompressed = ungzip(uint8ArrayData);
+                    decompressed = ungzip(data);
                     break;
                 case "deflate":
-                    decompressed = inflate(uint8ArrayData);
+                    decompressed = inflate(data);
                     break;
                 case "deflate-raw":
-                    decompressed = inflateRaw(uint8ArrayData);
+                    decompressed = inflateRaw(data);
                     break;
                 default:
                     return null; // Unsupported encoding
