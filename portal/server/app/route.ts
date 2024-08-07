@@ -37,7 +37,7 @@ export async function GET(req: Request) {
     const atBaseUrl = portalDomain == url.host.split(':')[0]
     if (atBaseUrl) {
         console.log('serving the landing page from another service')
-        const landingPageServiceName = `https://walrus.site`
+        const landingPageServiceName = `https://walrus.site/index-sw-enabled.html`
         const response = await fetch(`${landingPageServiceName}${parsedUrl?.path}`)
         const data = await response.text()
         console.log(response.headers.get('content-type'))
