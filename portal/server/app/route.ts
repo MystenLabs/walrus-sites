@@ -1,12 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { getDomain, getSubdomainAndPath, removeLastSlash } from '@lib/domain_parsing'
-import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from '@lib/redirects'
-import { getBlobIdLink, getObjectIdLink } from '@lib/links'
-import { resolveAndFetchPage } from '@lib/page_fetching'
-import { NextResponse } from 'next/server'
-import path from 'path'
+import { getDomain, getSubdomainAndPath, removeLastSlash } from 'common/lib/domain_parsing'
+import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from 'common/lib/redirects'
+import { getBlobIdLink, getObjectIdLink } from 'common/lib/links'
+import { resolveAndFetchPage } from 'common/lib/page_fetching'
 
 export async function GET(req: Request) {
     const originalUrl = req.headers.get('x-original-url')

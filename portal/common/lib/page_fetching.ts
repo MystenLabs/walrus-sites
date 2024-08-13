@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { getFullnodeUrl, SuiClient } from "@mysten/sui/client";
-import { NETWORK } from "@lib/constants";
-import { DomainDetails, isResource } from "@lib/types/index";
-import { subdomainToObjectId, HEXtoBase36 } from "@lib/objectId_operations";
-import { resolveSuiNsAddress, hardcodedSubdmains } from "@lib/suins";
-import { fetchResource } from "@lib/resource";
-import { siteNotFound, noObjectIdFound, fullNodeFail } from "@lib/http/http_error_responses";
-import { decompressData } from "@lib/decompress_data";
+import { NETWORK } from "./constants";
+import { DomainDetails, isResource } from "./types/index";
+import { subdomainToObjectId, HEXtoBase36 } from "./objectId_operations";
+import { resolveSuiNsAddress, hardcodedSubdmains } from "./suins";
+import { fetchResource } from "./resource";
+import { siteNotFound, noObjectIdFound, fullNodeFail } from "./http/http_error_responses";
+import { decompressData } from "./decompress_data";
 import { aggregatorEndpoint } from "./aggregator";
 
 /**
