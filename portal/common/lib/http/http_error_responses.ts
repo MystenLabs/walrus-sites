@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import template_404 from "@static/404-page.template.html";
+import template_404 from "../../static/404-page.template.html";
 
 export function siteNotFound(): Response {
     return Response404(
