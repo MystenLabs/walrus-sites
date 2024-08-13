@@ -62,6 +62,6 @@ function splitUrl(url: URL): UrlExtract {
  * @param path The path to remove the last forward-slash from.
  * @returns The path without the last forward-slash.
  */
-function removeLastSlash(path: string): string {
+export function removeLastSlash(path: string): string {
     return path.endsWith("/") ? path.slice(0, -1) : path;
 }
