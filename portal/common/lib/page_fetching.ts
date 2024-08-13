@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { getFullnodeUrl, SuiClient } from "@mysten/sui/client";
-import { NETWORK } from "@lib/constants";
-import { DomainDetails, isResource } from "@lib/types/index";
-import { subdomainToObjectId, HEXtoBase36 } from "@lib/objectId_operations";
-import { resolveSuiNsAddress, hardcodedSubdmains } from "@lib/suins";
-import { fetchResource } from "@lib/resource";
-import { siteNotFound, noObjectIdFound, fullNodeFail } from "@lib/http/http_error_responses";
-import { decompressData } from "@lib/decompress_data";
+import { NETWORK } from "./constants";
+import { DomainDetails, isResource } from "./types/index";
+import { subdomainToObjectId, HEXtoBase36 } from "./objectId_operations";
+import { resolveSuiNsAddress, hardcodedSubdmains } from "./suins";
+import { fetchResource } from "./resource";
+import { siteNotFound, noObjectIdFound, fullNodeFail } from "./http/http_error_responses";
+import { decompressData } from "./decompress_data";
 import { aggregatorEndpoint } from "./aggregator";
 
 /**
@@ -49,12 +49,7 @@ export async function resolveAndFetchPage(parsedUrl: DomainDetails): Promise<Res
  */
 async function fetchPage(client: SuiClient, objectId: string, path: string): Promise<Response> {
     const result = await fetchResource(client, objectId, path, new Set<string>);
-    if (!isResource(result)) {
-        const httpStatus = result as number;
-        return new Response("Unable to fetch the site resource.", { status: httpStatus });
-    }
-
-    if (!result.blob_id) {
+    if (!isResource(result) || !result.blob_id) {
         if (path !== '/404.html') {
             return fetchPage(client, objectId, '/404.html');
         } else {
