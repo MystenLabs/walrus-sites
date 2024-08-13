@@ -1,0 +1,22 @@
+{
+    "name": "server",
+    "version": "0.1.0",
+    "private": true,
+    "scripts": {
+        "dev": "next dev",
+        "build": "next build",
+        "start": "next start"
+    },
+    "dependencies": {
+        "common": "workspace:common",
+        "next": "14.2.5"
+    },
+    "devDependencies": {
+        "@types/node": "^20",
+        "@types/react": "18.3.3",
+        "html-loader": "^5.1.0",
+        "prettier": "^3.3.3",
+        "tailwindcss": "^3.4.1",
+        "typescript": "^5"
+    }
+}
