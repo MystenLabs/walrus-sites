@@ -12,3 +12,4 @@ export const SITE_NAMES: { [key: string]: string } = {
 };
 // The string representing the ResourcePath struct in the walrus_site package.
 export const RESOURCE_PATH_MOVE_TYPE = SITE_PACKAGE + "::site::ResourcePath";
+export const LANDING_PAGE_BLOB_ID = "pj45h4se9z8v2xvn2q52tclzv1emnlyyx3hq4yoh715nwgd2n";
