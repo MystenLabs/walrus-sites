@@ -5,7 +5,6 @@ import { getDomain, getSubdomainAndPath } from '@lib/domain_parsing'
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from '@lib/redirects'
 import { getBlobIdLink, getObjectIdLink } from '@lib/links'
 import { resolveAndFetchPage } from '@lib/page_fetching'
-import { LANDING_PAGE_BLOB_ID } from '@lib/constants'
 
 export async function GET(req: Request) {
     const originalUrl = req.headers.get('x-original-url')
@@ -38,8 +37,11 @@ export async function GET(req: Request) {
     const atBaseUrl = portalDomain == url.host.split(':')[0]
     if (atBaseUrl) {
         console.log('serving the landing page from walrus sites')
-        const landingPageURLString = `https://${LANDING_PAGE_BLOB_ID}.blob.store`
-        const resourcePath = parsedUrl?.path == '/index.html' ? '/index-sw-enabled.html' : parsedUrl?.path ?? '/index-sw-enabled.html'
+        const blobId = '55onty23j6xl6axb7z2o03t5zs6gmosw30qjb4lqr3t60ukc0a'
+        const landingPageURLString = `https://${blobId}.blob.store`
+        const resourcePath = parsedUrl?.path == '/index.html' ?
+            '/index-sw-enabled.html' :
+            parsedUrl?.path ?? '/index-sw-enabled.html'
         console.log(`fetching ${landingPageURLString}${resourcePath}`)
         const response = await fetch(`${landingPageURLString}${resourcePath}`)
         const data = await response.text()
