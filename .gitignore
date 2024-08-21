@@ -12,3 +12,5 @@ config.toml
 rustfmt.toml
 env/
 .next/
+*.log
+temp-landing-page/
