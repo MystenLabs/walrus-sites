@@ -53,19 +53,24 @@ self.addEventListener("fetch", async (event) => {
 
     if (requestDomain == portalDomain && parsedUrl && parsedUrl.subdomain) {
         console.log("fetching from the service worker");
-        if (('caches' in self)) {
+        if (!('caches' in self)) {
             console.warn('Cache API not available');
-        } else {
-            console.log('Cache API available');
+            const page = resolveAndFetchPage(parsedUrl)
+            event.respondWith(page)
+            return
         }
-        // const cachedResponse = await caches.match(event.request);
-        // if (cachedResponse) {
-        //     console.log("CACHE FIRED!")
-        //     event.respondWith(cachedResponse);
-        // } else {
-        const page = resolveAndFetchPage(parsedUrl)
-        event.respondWith(page);
-        // }
+
+        const cache = await caches.open(cacheName);
+        const cachedResponse = cache.match(urlString);
+        if (cachedResponse) {
+            console.log("Cache fired!")
+            event.respondWith(cachedResponse);
+        } else {
+            console.log("Cache miss!")
+            const resolvedPage = resolveAndFetchPage(parsedUrl)
+            event.respondWith(resolvedPage);
+            cache.put(urlString, (await resolvedPage));
+        }
         return;
     }
 
