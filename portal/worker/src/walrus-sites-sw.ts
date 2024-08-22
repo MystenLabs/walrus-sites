@@ -7,6 +7,7 @@ import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import { resolveAndFetchPage } from "@lib/page_fetching";
 
 const cacheName = "walrus-sites-cache";
+const CACHE_EXPIRATION_TIME = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
@@ -54,12 +55,14 @@ self.addEventListener("fetch", async (event) => {
     if (requestDomain == portalDomain && parsedUrl && parsedUrl.subdomain) {
         console.log("fetching from the service worker");
         if (!('caches' in self)) {
+            // `caches` is only available on secure contexts (https)
             console.warn('Cache API not available');
             const page = resolveAndFetchPage(parsedUrl)
             event.respondWith(page)
             return
         }
 
+        await cleanExpiredCache(); // Clean expired entries before serving
         const cache = await caches.open(cacheName);
         const cachedResponse = cache.match(urlString);
         if (cachedResponse) {
@@ -67,9 +70,19 @@ self.addEventListener("fetch", async (event) => {
             event.respondWith(cachedResponse);
         } else {
             console.log("Cache miss!")
-            const resolvedPage = resolveAndFetchPage(parsedUrl)
+            const resolvedPage = await resolveAndFetchPage(parsedUrl)
             event.respondWith(resolvedPage);
-            cache.put(urlString, (await resolvedPage));
+
+            // Cache the new response with a cache timestamp that will be used
+            // to determine when the cache entry expires.
+            const timestamp = Date.now();
+            const responseToCache = new Response(await resolvedPage.clone().blob(), {
+            headers: {
+                ...resolvedPage.headers,
+                'sw-cache-timestamp': timestamp.toString()
+            }
+            });
+            cache.put(urlString, responseToCache);
         }
         return;
     }
@@ -87,3 +100,24 @@ self.addEventListener("fetch", async (event) => {
     const response = await fetch(event.request);
     return response;
 });
+
+async function cleanExpiredCache() {
+const cache = await caches.open(cacheName);
+const keys = await cache.keys();
+const now = Date.now();
+
+for (const request of keys) {
+    const response = await cache.match(request);
+    if (response) {
+    const timestamp = parseInt(response.headers.get('sw-cache-timestamp') || '0');
+    if (now - timestamp > CACHE_EXPIRATION_TIME) {
+        await cache.delete(request);
+        console.log('Removed expired cache entry:', request.url);
+    }
+    }
+}
+}
+
+async function cleanCacheObjectVersionChanged() {
+    // TODO: clean the cache of pages where the object version has changed
+}
