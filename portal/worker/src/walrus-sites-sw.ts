@@ -6,6 +6,8 @@ import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@l
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import { resolveAndFetchPage } from "@lib/page_fetching";
 
+const cacheName = "walrus-sites-cache";
+
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
 declare var self: ServiceWorkerGlobalScope;
@@ -51,7 +53,19 @@ self.addEventListener("fetch", async (event) => {
 
     if (requestDomain == portalDomain && parsedUrl && parsedUrl.subdomain) {
         console.log("fetching from the service worker");
-        event.respondWith(resolveAndFetchPage(parsedUrl));
+        if (('caches' in self)) {
+            console.warn('Cache API not available');
+        } else {
+            console.log('Cache API available');
+        }
+        // const cachedResponse = await caches.match(event.request);
+        // if (cachedResponse) {
+        //     console.log("CACHE FIRED!")
+        //     event.respondWith(cachedResponse);
+        // } else {
+        const page = resolveAndFetchPage(parsedUrl)
+        event.respondWith(page);
+        // }
         return;
     }
 
