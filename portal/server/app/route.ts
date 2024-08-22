@@ -37,14 +37,11 @@ export async function GET(req: Request) {
     const atBaseUrl = portalDomain == url.host.split(':')[0]
     if (atBaseUrl) {
         console.log('Serving the landing page from walrus...')
-        const blobId = '55onty23j6xl6axb7z2o03t5zs6gmosw30qjb4lqr3t60ukc0a'
-        const resourcePath = parsedUrl?.path == '/index.html' ?
-            '/index-sw-enabled.html' :
-            parsedUrl?.path ?? '/index-sw-enabled.html'
+        const blobId = '60y9fj0iyk5nt1pu3uebk6ppivknyw04wvx9rbqwqpai5jjwu6'
         const response = await resolveAndFetchPage(
             {
                 subdomain: blobId,
-                path: resourcePath
+                path: parsedUrl?.path ?? '/index.html'
             }
         )
         return response
