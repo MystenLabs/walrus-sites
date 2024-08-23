@@ -65,11 +65,13 @@ self.addEventListener("fetch", async (event) => {
 
             const cache = await caches.open(cacheName);
             const cachedResponse = await cache.match(urlString);
-            let isCacheSameAsNetwork = false
+            let isCacheSameAsNetwork: boolean;
             try {
-                isCacheSameAsNetwork = await checkCachedVersionMatchesOnChain(cachedResponse)
+                if (cachedResponse) {
+                    isCacheSameAsNetwork = await checkCachedVersionMatchesOnChain(cachedResponse)
+                }
             } catch (e) {
-                console.error("Error checking cache version against chain", e);
+                console.error("Error checking cache version against chain:", e);
             }
             if (cachedResponse && isCacheSameAsNetwork) {
                 console.log("Cache hit!", urlString);
@@ -141,6 +143,9 @@ async function cleanExpiredCache() {
 * @returns true if the cached version matches the current version of the Resource object
 */
 async function checkCachedVersionMatchesOnChain(cachedResponse: Response): Promise<boolean> {
+    if (!cachedResponse){
+        throw new Error("Cached response is null!");
+    }
     const rpcUrl = getFullnodeUrl(NETWORK);
     const client = new SuiClient({ url: rpcUrl });
     const cachedVersion = cachedResponse.headers.get("x-resource-sui-object-version")
@@ -152,6 +157,8 @@ async function checkCachedVersionMatchesOnChain(cachedResponse: Response): Promi
     if (!resourceObject.data) {
         throw new Error("Could not retrieve Resource object.");
     }
+    console.log("Cached version: ", cachedVersion)
+    console.log("Current version: ", resourceObject.data?.version)
     const currentObjectVersion = resourceObject.data?.version;
     return cachedVersion === currentObjectVersion;
 }
