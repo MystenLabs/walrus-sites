@@ -17,13 +17,14 @@ import { aggregatorEndpoint } from "./aggregator";
 export async function resolveAndFetchPage(parsedUrl: DomainDetails): Promise<Response> {
     const rpcUrl = getFullnodeUrl(NETWORK);
     const client = new SuiClient({ url: rpcUrl });
-    const objectId = await resolveObjectId(parsedUrl, client);
-    if (typeof objectId == "string") {
-        console.log("Object ID: ", objectId);
-        console.log("Base36 version of the object ID: ", HEXtoBase36(objectId));
-        return fetchPage(client, objectId, parsedUrl.path);
+    const resolveObjectResult = await resolveObjectId(parsedUrl, client);
+    const isObjectId = typeof resolveObjectResult == "string";
+    if (isObjectId) {
+        console.log("Object ID: ", resolveObjectResult);
+        console.log("Base36 version of the object ID: ", HEXtoBase36(resolveObjectResult));
+        return fetchPage(client, resolveObjectResult, parsedUrl.path);
     }
-    return noObjectIdFound();
+    return resolveObjectResult;
 }
 
 export async function resolveObjectId(
