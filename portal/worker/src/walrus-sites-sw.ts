@@ -7,7 +7,8 @@ import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import { resolveAndFetchPage } from "@lib/page_fetching";
 
 const cacheName = "walrus-sites-cache";
-const CACHE_EXPIRATION_TIME = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+// TODO - move it to .env
+const CACHE_EXPIRATION_TIME = 24 * 60 * 60 * 1000 // 24 hours in milliseconds
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
@@ -54,7 +55,10 @@ self.addEventListener("fetch", async (event) => {
 
     if (requestDomain == portalDomain && parsedUrl && parsedUrl.subdomain) {
         event.respondWith((async () => {
+            // Clean the cache of expired entries
+            await cleanExpiredCache();
             if (!('caches' in self)) {
+                // When not being in a secure context, the Cache API is not available.
                 console.warn('Cache API not available');
                 return await resolveAndFetchPage(parsedUrl);
             }
@@ -67,7 +71,15 @@ self.addEventListener("fetch", async (event) => {
             } else {
                 console.log("Cache miss!", urlString);
                 const resolvedPage = await resolveAndFetchPage(parsedUrl);
-                cache.put(urlString, resolvedPage.clone());
+
+                // The urlString (i.e. the cache key) will also contain the timestamp
+                // to ensure that the cache is not stale.
+                // The delimiter used is an illegal URI character
+                // to avoid any conflicts with the actual URL.
+                const timestamp = Date.now().toString();
+                const illegalURIChar = "#"
+                cache.put(urlString + illegalURIChar + timestamp, resolvedPage.clone());
+
                 return resolvedPage;
             }
         })());
@@ -93,13 +105,13 @@ async function cleanExpiredCache() {
     const keys = await cache.keys();
     const now = Date.now();
 
-    for (const request of keys) {
-        const response = await cache.match(request);
+    for (const urlString of keys) {
+        const response = await cache.match(urlString);
         if (response) {
-            const timestamp = parseInt(response.headers.get('sw-cache-timestamp') || '0');
+            const timestamp = parseInt(urlString.url.split("#")[1]);
             if (now - timestamp > CACHE_EXPIRATION_TIME) {
-                await cache.delete(request);
-                console.log('Removed expired cache entry:', request.url);
+                await cache.delete(urlString);
+                console.log('Removed expired cache entry:', urlString.url);
             }
         }
     }
