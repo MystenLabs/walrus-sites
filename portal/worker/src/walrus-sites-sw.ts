@@ -15,8 +15,6 @@ const CACHE_EXPIRATION_TIME = 24 * 60 * 60 * 1000 // 24 hours in milliseconds
 declare var self: ServiceWorkerGlobalScope;
 declare var clients: Clients;
 
-// Event listeners.
-
 self.addEventListener("install", (_event) => {
     self.skipWaiting();
 });
@@ -100,6 +98,17 @@ self.addEventListener("fetch", async (event) => {
     return response;
 });
 
+/**
+* Clean the cache of expired entries.
+*
+* Iterates over all the cache entries and removes the ones that have expired.
+* The expiration time is set by the `CACHE_EXPIRATION_TIME` constant.
+* The cache key contains the timestamp of the entry, which is used to determine
+* if the entry has expired.
+*
+* The `CACHE_EXPIRATION_TIME` will not be large enough (usually max 24h)
+* for the O(n) complexity to affect UX.
+*/
 async function cleanExpiredCache() {
     const cache = await caches.open(cacheName);
     const keys = await cache.keys();
