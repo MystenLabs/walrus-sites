@@ -53,37 +53,24 @@ self.addEventListener("fetch", async (event) => {
     console.log("Parsed URL: ", parsedUrl);
 
     if (requestDomain == portalDomain && parsedUrl && parsedUrl.subdomain) {
-        console.log("fetching from the service worker");
-        if (!('caches' in self)) {
-            // `caches` is only available on secure contexts (https)
-            console.warn('Cache API not available');
-            const page = resolveAndFetchPage(parsedUrl)
-            event.respondWith(page)
-            return
-        }
-
-        await cleanExpiredCache(); // Clean expired entries before serving
-        const cache = await caches.open(cacheName);
-        const cachedResponse = cache.match(urlString);
-        if (cachedResponse) {
-            console.log("Cache fired!")
-            event.respondWith(cachedResponse);
-        } else {
-            console.log("Cache miss!")
-            const resolvedPage = await resolveAndFetchPage(parsedUrl)
-            event.respondWith(resolvedPage);
-
-            // Cache the new response with a cache timestamp that will be used
-            // to determine when the cache entry expires.
-            const timestamp = Date.now();
-            const responseToCache = new Response(await resolvedPage.clone().blob(), {
-            headers: {
-                ...resolvedPage.headers,
-                'sw-cache-timestamp': timestamp.toString()
+        event.respondWith((async () => {
+            if (!('caches' in self)) {
+                console.warn('Cache API not available');
+                return await resolveAndFetchPage(parsedUrl);
             }
-            });
-            cache.put(urlString, responseToCache);
-        }
+
+            const cache = await caches.open(cacheName);
+            const cachedResponse = await cache.match(urlString);
+            if (cachedResponse) {
+                console.log("Cache hit!", urlString);
+                return cachedResponse;
+            } else {
+                console.log("Cache miss!", urlString);
+                const resolvedPage = await resolveAndFetchPage(parsedUrl);
+                cache.put(urlString, resolvedPage.clone());
+                return resolvedPage;
+            }
+        })());
         return;
     }
 
@@ -102,20 +89,20 @@ self.addEventListener("fetch", async (event) => {
 });
 
 async function cleanExpiredCache() {
-const cache = await caches.open(cacheName);
-const keys = await cache.keys();
-const now = Date.now();
+    const cache = await caches.open(cacheName);
+    const keys = await cache.keys();
+    const now = Date.now();
 
-for (const request of keys) {
-    const response = await cache.match(request);
-    if (response) {
-    const timestamp = parseInt(response.headers.get('sw-cache-timestamp') || '0');
-    if (now - timestamp > CACHE_EXPIRATION_TIME) {
-        await cache.delete(request);
-        console.log('Removed expired cache entry:', request.url);
+    for (const request of keys) {
+        const response = await cache.match(request);
+        if (response) {
+            const timestamp = parseInt(response.headers.get('sw-cache-timestamp') || '0');
+            if (now - timestamp > CACHE_EXPIRATION_TIME) {
+                await cache.delete(request);
+                console.log('Removed expired cache entry:', request.url);
+            }
+        }
     }
-    }
-}
 }
 
 async function cleanCacheObjectVersionChanged() {
