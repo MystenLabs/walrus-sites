@@ -17,7 +17,18 @@ import { aggregatorEndpoint } from "./aggregator";
 export async function resolveAndFetchPage(parsedUrl: DomainDetails): Promise<Response> {
     const rpcUrl = getFullnodeUrl(NETWORK);
     const client = new SuiClient({ url: rpcUrl });
+    const objectId = await resolveObjectId(parsedUrl, client);
+    if (typeof objectId == "string") {
+        console.log("Object ID: ", objectId);
+        console.log("Base36 version of the object ID: ", HEXtoBase36(objectId));
+        return fetchPage(client, objectId, parsedUrl.path);
+    }
+    return noObjectIdFound();
+}
 
+export async function resolveObjectId(
+    parsedUrl: DomainDetails, client: SuiClient
+): Promise<string | Response> {
     let objectId = hardcodedSubdmains(parsedUrl.subdomain);
     if (!objectId && !parsedUrl.subdomain.includes('.')) {
         // Try to convert the subdomain to an object ID NOTE: This effectively _disables_ any SuiNs
@@ -32,16 +43,15 @@ export async function resolveAndFetchPage(parsedUrl: DomainDetails): Promise<Res
         // Check if there is a SuiNs name
         try {
             objectId = await resolveSuiNsAddress(client, parsedUrl.subdomain);
+            if (!objectId) {
+                return noObjectIdFound();
+            }
+            return objectId;
         } catch {
             return fullNodeFail();
         }
     }
-    if (objectId) {
-        console.log("Object ID: ", objectId);
-        console.log("Base36 version of the object ID: ", HEXtoBase36(objectId));
-        return fetchPage(client, objectId, parsedUrl.path);
-    }
-    return noObjectIdFound();
+    return objectId;
 }
 
 /**
