@@ -27,6 +27,10 @@ export type Resource = {
     blob_id: string;
 };
 
+export type VersionedResource = Resource & {
+    version: string; // the sui object version of the site
+};
+
 /**
  * Type guard for the Resource type.
 */

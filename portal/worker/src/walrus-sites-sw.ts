@@ -5,6 +5,8 @@ import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import { resolveAndFetchPage } from "@lib/page_fetching";
+import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
+import { NETWORK } from "@lib/constants";
 
 const cacheName = "walrus-sites-cache";
 // TODO - move it to .env
@@ -63,7 +65,13 @@ self.addEventListener("fetch", async (event) => {
 
             const cache = await caches.open(cacheName);
             const cachedResponse = await cache.match(urlString);
-            if (cachedResponse) {
+            let isCacheSameAsNetwork = false
+            try {
+                isCacheSameAsNetwork = await checkCachedVersionMatchesOnChain(cachedResponse)
+            } catch (e) {
+                console.error("Error checking cache version against chain", e);
+            }
+            if (cachedResponse && isCacheSameAsNetwork) {
                 console.log("Cache hit!", urlString);
                 return cachedResponse;
             } else {
@@ -126,6 +134,24 @@ async function cleanExpiredCache() {
     }
 }
 
-async function cleanCacheObjectVersionChanged() {
-    // TODO: clean the cache of pages where the object version has changed
+/**
+* Check if the cached version of the Resource object matches the current on-chain version.
+*
+* @param cachedResponse the response to check the version of
+* @returns true if the cached version matches the current version of the Resource object
+*/
+async function checkCachedVersionMatchesOnChain(cachedResponse: Response): Promise<boolean> {
+    const rpcUrl = getFullnodeUrl(NETWORK);
+    const client = new SuiClient({ url: rpcUrl });
+    const cachedVersion = cachedResponse.headers.get("x-resource-sui-object-version")
+    const objectId = cachedResponse.headers.get("x-resource-sui-object-id");
+    if (!cachedVersion || !objectId) {
+        throw new Error("Cached response does not have the required headers");
+    }
+    const resourceObject = await client.getObject({id: objectId});
+    if (!resourceObject.data) {
+        throw new Error("Could not retrieve Resource object.");
+    }
+    const currentObjectVersion = resourceObject.data?.version;
+    return cachedVersion === currentObjectVersion;
 }

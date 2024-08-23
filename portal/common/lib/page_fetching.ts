@@ -84,6 +84,8 @@ async function fetchPage(client: SuiClient, objectId: string, path: string): Pro
     return new Response(decompressed, {
         headers: {
             "Content-Type": result.content_type,
+            "x-resource-sui-object-version": result.version,
+            "x-resource-sui-object-id": objectId,
         },
     });
 }
