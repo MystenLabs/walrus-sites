@@ -124,7 +124,7 @@ async function cleanExpiredCache() {
     for (const urlString of keys) {
         const response = await cache.match(urlString);
         if (response) {
-            const timestamp = parseInt(response.headers.get("x-created-at") || "0");
+            const timestamp = parseInt(response.headers.get("x-unix-time-cached") || "0");
             if (now - timestamp > CACHE_EXPIRATION_TIME) {
                 await cache.delete(urlString);
                 console.log('Removed expired cache entry:', urlString.url);
