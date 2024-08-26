@@ -37,7 +37,7 @@ export async function GET(req: Request) {
     const atBaseUrl = portalDomain == url.host.split(':')[0]
     if (atBaseUrl) {
         console.log('Serving the landing page from walrus...')
-        const blobId = '60y9fj0iyk5nt1pu3uebk6ppivknyw04wvx9rbqwqpai5jjwu6'
+        const blobId = process.env.LANDING_PAGE_BLOB_ID!;
         const response = await resolveAndFetchPage(
             {
                 subdomain: blobId,
