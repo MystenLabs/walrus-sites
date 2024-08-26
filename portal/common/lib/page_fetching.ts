@@ -85,7 +85,8 @@ async function fetchPage(client: SuiClient, objectId: string, path: string): Pro
         headers: {
             "Content-Type": result.content_type,
             "x-resource-sui-object-version": result.version,
-            "x-resource-sui-object-id": objectId,
+            "x-resource-sui-object-id": result.objectId,
+            "x-created-at": Date.now().toString()
         },
     });
 }

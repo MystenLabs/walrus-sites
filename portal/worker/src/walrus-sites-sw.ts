@@ -84,10 +84,7 @@ self.addEventListener("fetch", async (event) => {
                 // to ensure that the cache is not stale.
                 // The delimiter used is an illegal URI character
                 // to avoid any conflicts with the actual URL.
-                const timestamp = Date.now().toString();
-                const illegalURIChar = "#"
-                cache.put(urlString + illegalURIChar + timestamp, resolvedPage.clone());
-
+                cache.put(urlString, resolvedPage.clone());
                 return resolvedPage;
             }
         })());
@@ -127,7 +124,7 @@ async function cleanExpiredCache() {
     for (const urlString of keys) {
         const response = await cache.match(urlString);
         if (response) {
-            const timestamp = parseInt(urlString.url.split("#")[1]);
+            const timestamp = parseInt(response.headers.get("x-created-at") || "0");
             if (now - timestamp > CACHE_EXPIRATION_TIME) {
                 await cache.delete(urlString);
                 console.log('Removed expired cache entry:', urlString.url);

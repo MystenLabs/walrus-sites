@@ -88,6 +88,7 @@ export async function fetchResource(
     const versionedSiteResource = {
         ...siteResource,
         version: pageData.data?.version,
+        objectId: dynamicFields.data.objectId,
     };
     return versionedSiteResource;
 }

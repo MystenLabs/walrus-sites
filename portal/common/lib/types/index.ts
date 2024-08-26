@@ -28,7 +28,8 @@ export type Resource = {
 };
 
 export type VersionedResource = Resource & {
-    version: string; // the sui object version of the site
+    version: string; // the sui object version of the site resource
+    objectId: string; // the sui object id of the site resource
 };
 
 /**
