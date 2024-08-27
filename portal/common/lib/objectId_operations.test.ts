@@ -25,7 +25,7 @@ describe('subdomainToObjectId', () => {
 const HEXtoBase36TestCases: [string, string][] = [
     ["0x5ac988828a0c9842d91e6d5bdd9552ec9fcdddf11c56bf82dff6d5566685a31e",
         "29gjzk8yjl1v7zm2etee1siyzaqfj9jaru5ufs6yyh1yqsgun2"], // Valid HEX to Base36
-    ["0x0000000000000000000000000000000000000001", "1"], // Minimal HEX to Base36
+    ["0x01", "1"], // Minimal HEX to Base36
 ];
 
 describe('HEXtoBase36 and Base36ToHEX', () => {
