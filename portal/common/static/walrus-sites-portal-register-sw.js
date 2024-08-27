@@ -24,20 +24,14 @@ function main() {
             })
             .catch(handleError);
     } else {
-        displayErrorMessage(swNotSupportedNode());
+        const currentUrl = new URL(window.location.href);
+        console.warn("This browser does not yet support Walrus Sites 💔, redirecting to blob.store");
+        window.location.href = currentUrl.toString().replace('walrus.site', 'blob.store');
     }
 }
 
 function handleError(error) {
     displayErrorMessage(swNotLoadingNode());
-}
-
-function swNotSupportedNode() {
-    return titleSubtitleNode(
-        "This browser does not yet support Walrus Sites 💔",
-        'Please try using a different browser, such as Chrome, Firefox (not in "Private mode"), \
-        or Safari.'
-    );
 }
 
 function swNotLoadingNode() {
