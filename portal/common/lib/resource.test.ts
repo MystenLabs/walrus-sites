@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Import necessary functions and types
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fetchResource } from './resource';
 import { SuiClient } from '@mysten/sui/client';
 import { HttpStatusCodes } from './http/http_status_codes';
@@ -45,7 +45,7 @@ vi.mock('./bcs_data_parsing', async (importOriginal) => {
 });
 
 describe('fetchResource', () => {
-    afterEach(() => {
+    beforeEach(() => {
         vi.clearAllMocks();
     });
 
