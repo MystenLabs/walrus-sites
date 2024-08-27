@@ -14,3 +14,4 @@ env/
 .next/
 *.log
 temp-landing-page/
+.env*.local

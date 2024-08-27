@@ -12,7 +12,7 @@
         "next": "14.2.5"
     },
     "devDependencies": {
-        "@types/node": "^20",
+        "@types/node": "^20.14.12",
         "@types/react": "18.3.3",
         "html-loader": "^5.1.0",
         "prettier": "^3.3.3",
