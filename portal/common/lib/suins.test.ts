@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, Mock, test, vi } from 'vitest';
 import { resolveSuiNsAddress } from './suins';
 import { SuiClient } from "@mysten/sui/client";
 
@@ -21,7 +21,7 @@ describe('resolveSuiNsAddress', () => {
         ];
 
         for (const [input, expected] of cases) {
-            mockClient.call.mockResolvedValueOnce(expected);
+            (mockClient.call as Mock).mockResolvedValueOnce(expected);
             const result = await resolveSuiNsAddress(mockClient, input);
             expect(result).toBe(expected);
             expect(mockClient.call).toHaveBeenCalledWith("suix_resolveNameServiceAddress",
@@ -30,7 +30,7 @@ describe('resolveSuiNsAddress', () => {
     });
 
     test('should return null for an unknown SuiNS address', async () => {
-        mockClient.call.mockResolvedValueOnce(null);
+        (mockClient.call as Mock).mockResolvedValueOnce(null);
         const result = await resolveSuiNsAddress(mockClient, "unknown");
         expect(result).toBeNull();
         expect(mockClient.call).toHaveBeenCalledWith("suix_resolveNameServiceAddress",
