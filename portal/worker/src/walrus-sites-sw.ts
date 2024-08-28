@@ -78,8 +78,6 @@ self.addEventListener("fetch", async (event) => {
 */
 async function respondUsingCache(event: FetchEvent, parsedUrl: DomainDetails, urlString: string) {
     event.respondWith((async () => {
-        // Clean the cache of expired entries
-        await cleanExpiredCache();
         if (!('caches' in self)) {
             // When not being in a secure context, the Cache API is not available.
             console.warn('Cache API not available');
@@ -88,9 +86,10 @@ async function respondUsingCache(event: FetchEvent, parsedUrl: DomainDetails, ur
 
         const cache = await caches.open(CACHE_NAME);
         const cachedResponse = await cache.match(urlString);
+        const cacheWasFresh = !(await cleanExpiredCache(cachedResponse, urlString));
         let isCacheSameAsNetwork: boolean;
         try {
-            if (cachedResponse) {
+            if (cachedResponse && cacheWasFresh) {
                 isCacheSameAsNetwork = await checkCachedVersionMatchesOnChain(cachedResponse);
             }
         } catch (e) {
@@ -110,31 +109,30 @@ async function respondUsingCache(event: FetchEvent, parsedUrl: DomainDetails, ur
 }
 
 /**
-* Clean the cache of expired entries.
+* Removes an entry of the cache, if that entry is expired.
 *
-* Iterates over all the cache entries and removes the ones that have expired.
 * The expiration time is set by the `CACHE_EXPIRATION_TIME` constant.
-* The cache key contains the timestamp of the entry, which is used to determine
-* if the entry has expired.
+* If the cached response is older than the expiration time, it's no longer
+* "fresh" and it is removed from the cache.
 *
-* The `CACHE_EXPIRATION_TIME` will not be large enough (usually max 24h)
-* for the O(n) complexity to affect UX.
+* @param urlString the key of the cached entry to check
+* @returns true if the cache entry was removed, false otherwise
 */
-async function cleanExpiredCache() {
+async function cleanExpiredCache(cachedResponse: Response, urlString: string): Promise<boolean> {
     const cache = await caches.open(CACHE_NAME);
-    const keys = await cache.keys();
     const now = Date.now();
 
-    for (const urlString of keys) {
-        const response = await cache.match(urlString);
-        if (response) {
-            const timestamp = parseInt(response.headers.get("x-unix-time-cached") || "0");
-            if (now - timestamp > CACHE_EXPIRATION_TIME) {
-                await cache.delete(urlString);
-                console.log('Removed expired cache entry:', urlString.url);
-            }
+    if (cachedResponse) { // Cache hit!
+        const timestamp = parseInt(cachedResponse.headers.get("x-unix-time-cached") || "0");
+        const hasExpired = now - timestamp > CACHE_EXPIRATION_TIME
+        if (hasExpired) {
+            await cache.delete(urlString);
+            console.log('Removed expired cache entry:', urlString);
+            return true;
         }
+        console.log('Cache entry is still fresh:', urlString)
     }
+    return false;
 }
 
 /**
