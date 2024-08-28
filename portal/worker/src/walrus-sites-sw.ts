@@ -87,24 +87,22 @@ async function respondUsingCache(event: FetchEvent, parsedUrl: DomainDetails, ur
         const cache = await caches.open(CACHE_NAME);
         const cachedResponse = await cache.match(urlString);
         const cacheWasFresh = !(await cleanExpiredCache(cachedResponse, urlString));
-        let isCacheSameAsNetwork: boolean;
-        try {
-            if (cachedResponse && cacheWasFresh) {
-                isCacheSameAsNetwork = await checkCachedVersionMatchesOnChain(cachedResponse);
-            }
-        } catch (e) {
-            console.error("Error checking cache version against chain:", e);
-        }
-        if (cachedResponse && isCacheSameAsNetwork) {
-            console.log("Cache hit!", urlString);
-            return cachedResponse;
-        } else {
-            console.log("Cache miss!", urlString);
-            const resolvedPage = await resolveAndFetchPage(parsedUrl);
 
-            cache.put(urlString, resolvedPage.clone());
-            return resolvedPage;
+        let isCacheSameAsNetwork: boolean;
+        if (cachedResponse && cacheWasFresh) {
+            console.log('Cache hit!')
+            try {
+                isCacheSameAsNetwork = await checkCachedVersionMatchesOnChain(cachedResponse);
+                if (isCacheSameAsNetwork) return cachedResponse;
+            } catch (e) {
+                console.error("Error checking cache version against chain:", e);
+            }
         }
+        console.log("Cache miss!", urlString);
+        const resolvedPage = await resolveAndFetchPage(parsedUrl);
+
+        cache.put(urlString, resolvedPage.clone());
+        return resolvedPage;
     })());
 }
 
