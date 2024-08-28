@@ -1,5 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+import { getSubdomainAndPath } from "@lib/domain_parsing";
 
 function main() {
     if ("serviceWorker" in navigator) {
@@ -26,7 +27,17 @@ function main() {
     } else {
         const currentUrl = new URL(window.location.href);
         console.warn("This browser does not yet support Walrus Sites 💔, redirecting to blob.store");
-        window.location.href = currentUrl.toString().replace('walrus.site', 'blob.store');
+        const domainDetails = getSubdomainAndPath(currentUrl)
+        console.log("DOMAIN: ", domainDetails);
+        const alternativePortal = "blob.store";
+        window.location.href = new URL(
+            `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`,
+            `https://${
+            domainDetails.subdomain ?
+            domainDetails.subdomain + '.'
+            : ''
+            }${alternativePortal}`
+        ).toString();
     }
 }
 
