@@ -8,7 +8,7 @@ import { resolveAndFetchPage } from "@lib/page_fetching";
 import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
 import { NETWORK } from "@lib/constants";
 
-const cacheName = "walrus-sites-cache";
+const CACHE_NAME = "walrus-sites-cache";
 // TODO - move it to .env
 const CACHE_EXPIRATION_TIME = 24 * 60 * 60 * 1000 // 24 hours in milliseconds
 
@@ -63,7 +63,7 @@ self.addEventListener("fetch", async (event) => {
                 return await resolveAndFetchPage(parsedUrl);
             }
 
-            const cache = await caches.open(cacheName);
+            const cache = await caches.open(CACHE_NAME);
             const cachedResponse = await cache.match(urlString);
             let isCacheSameAsNetwork: boolean;
             try {
@@ -113,7 +113,7 @@ self.addEventListener("fetch", async (event) => {
 * for the O(n) complexity to affect UX.
 */
 async function cleanExpiredCache() {
-    const cache = await caches.open(cacheName);
+    const cache = await caches.open(CACHE_NAME);
     const keys = await cache.keys();
     const now = Date.now();
 
