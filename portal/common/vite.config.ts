@@ -4,5 +4,8 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-    assetsInclude: ["**/*.html"]
+    assetsInclude: ["**/*.html"],
+    test: {
+        onConsoleLog: () => false,
+    }
 });
