@@ -41,7 +41,7 @@ function swNotLoadingNode() {
     );
 }
 
-function titleSubtitleNode(title, subtitle) {
+function titleSubtitleNode(title: string, subtitle: string) {
     let h3 = document.createElement("h3");
     h3.textContent = title;
     h3.className = "InterTightMedium";
@@ -56,7 +56,7 @@ function titleSubtitleNode(title, subtitle) {
     return div;
 }
 
-function displayErrorMessage(messageNode) {
+function displayErrorMessage(messageNode: any) {
     let messageDiv = document.getElementById("loading-message");
     messageDiv.replaceChildren(messageNode);
 }
