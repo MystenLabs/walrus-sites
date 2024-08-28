@@ -80,10 +80,6 @@ self.addEventListener("fetch", async (event) => {
                 console.log("Cache miss!", urlString);
                 const resolvedPage = await resolveAndFetchPage(parsedUrl);
 
-                // The urlString (i.e. the cache key) will also contain the timestamp
-                // to ensure that the cache is not stale.
-                // The delimiter used is an illegal URI character
-                // to avoid any conflicts with the actual URL.
                 cache.put(urlString, resolvedPage.clone());
                 return resolvedPage;
             }
