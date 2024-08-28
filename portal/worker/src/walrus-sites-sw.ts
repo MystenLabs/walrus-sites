@@ -7,6 +7,7 @@ import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import { resolveAndFetchPage } from "@lib/page_fetching";
 import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
 import { NETWORK } from "@lib/constants";
+import { DomainDetails } from "@lib/types";
 
 const CACHE_NAME = "walrus-sites-cache";
 // TODO - move it to .env
@@ -54,36 +55,7 @@ self.addEventListener("fetch", async (event) => {
     console.log("Parsed URL: ", parsedUrl);
 
     if (requestDomain == portalDomain && parsedUrl && parsedUrl.subdomain) {
-        event.respondWith((async () => {
-            // Clean the cache of expired entries
-            await cleanExpiredCache();
-            if (!('caches' in self)) {
-                // When not being in a secure context, the Cache API is not available.
-                console.warn('Cache API not available');
-                return await resolveAndFetchPage(parsedUrl);
-            }
-
-            const cache = await caches.open(CACHE_NAME);
-            const cachedResponse = await cache.match(urlString);
-            let isCacheSameAsNetwork: boolean;
-            try {
-                if (cachedResponse) {
-                    isCacheSameAsNetwork = await checkCachedVersionMatchesOnChain(cachedResponse);
-                }
-            } catch (e) {
-                console.error("Error checking cache version against chain:", e);
-            }
-            if (cachedResponse && isCacheSameAsNetwork) {
-                console.log("Cache hit!", urlString);
-                return cachedResponse;
-            } else {
-                console.log("Cache miss!", urlString);
-                const resolvedPage = await resolveAndFetchPage(parsedUrl);
-
-                cache.put(urlString, resolvedPage.clone());
-                return resolvedPage;
-            }
-        })());
+        await respondUsingCache(event, parsedUrl, urlString);
         return;
     }
 
@@ -100,6 +72,42 @@ self.addEventListener("fetch", async (event) => {
     const response = await fetch(event.request);
     return response;
 });
+
+/**
+* Respond to the request using the cache API.
+*/
+async function respondUsingCache(event: FetchEvent, parsedUrl: DomainDetails, urlString: string) {
+    event.respondWith((async () => {
+        // Clean the cache of expired entries
+        await cleanExpiredCache();
+        if (!('caches' in self)) {
+            // When not being in a secure context, the Cache API is not available.
+            console.warn('Cache API not available');
+            return await resolveAndFetchPage(parsedUrl);
+        }
+
+        const cache = await caches.open(CACHE_NAME);
+        const cachedResponse = await cache.match(urlString);
+        let isCacheSameAsNetwork: boolean;
+        try {
+            if (cachedResponse) {
+                isCacheSameAsNetwork = await checkCachedVersionMatchesOnChain(cachedResponse);
+            }
+        } catch (e) {
+            console.error("Error checking cache version against chain:", e);
+        }
+        if (cachedResponse && isCacheSameAsNetwork) {
+            console.log("Cache hit!", urlString);
+            return cachedResponse;
+        } else {
+            console.log("Cache miss!", urlString);
+            const resolvedPage = await resolveAndFetchPage(parsedUrl);
+
+            cache.put(urlString, resolvedPage.clone());
+            return resolvedPage;
+        }
+    })());
+}
 
 /**
 * Clean the cache of expired entries.
