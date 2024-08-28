@@ -6,7 +6,7 @@ import { fetchPage } from './page_fetching';
 import { SuiClient, getFullnodeUrl } from '@mysten/sui/client'
 import { NETWORK } from './constants';
 
-bench('simple benchmark', async () => {
+bench('fetch the landing page walrus site', async () => {
     const rpcUrl = getFullnodeUrl(NETWORK);
     const client = new SuiClient({ url: rpcUrl });
     const objectId = '0x5fa99da7c4af9e2e2d0fb4503b058b9181693e463998c87c40be78fa2a1ca271';
