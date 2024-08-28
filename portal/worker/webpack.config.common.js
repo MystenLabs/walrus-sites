@@ -8,6 +8,7 @@ module.exports = {
     watch: true,
     entry: {
         "walrus-sites-sw": "./src/walrus-sites-sw.ts",
+        "walrus-sites-portal-register-sw": "./src/walrus-sites-portal-register-sw.ts",
     },
     module: {
         rules: [

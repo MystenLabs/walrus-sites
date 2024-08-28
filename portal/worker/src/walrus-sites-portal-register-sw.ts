@@ -1,5 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+import { getSubdomainAndPath } from "@lib/domain_parsing";
+import { FALLBACK_PORTAL } from "@lib/constants";
 
 function main() {
     if ("serviceWorker" in navigator) {
@@ -24,20 +26,22 @@ function main() {
             })
             .catch(handleError);
     } else {
-        displayErrorMessage(swNotSupportedNode());
+        const currentUrl = new URL(window.location.href);
+        console.warn("This browser does not yet support Walrus Sites 💔, redirecting to blob.store");
+        const domainDetails = getSubdomainAndPath(currentUrl)
+        window.location.href = new URL(
+            `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`,
+            `https://${
+            domainDetails.subdomain ?
+            domainDetails.subdomain + '.'
+            : ''
+            }${FALLBACK_PORTAL}`
+        ).toString();
     }
 }
 
 function handleError(error) {
     displayErrorMessage(swNotLoadingNode());
-}
-
-function swNotSupportedNode() {
-    return titleSubtitleNode(
-        "This browser does not yet support Walrus Sites 💔",
-        'Please try using a different browser, such as Chrome, Firefox (not in "Private mode"), \
-        or Safari.'
-    );
 }
 
 function swNotLoadingNode() {
@@ -47,7 +51,7 @@ function swNotLoadingNode() {
     );
 }
 
-function titleSubtitleNode(title, subtitle) {
+function titleSubtitleNode(title: string, subtitle: string) {
     let h3 = document.createElement("h3");
     h3.textContent = title;
     h3.className = "InterTightMedium";
@@ -62,7 +66,7 @@ function titleSubtitleNode(title, subtitle) {
     return div;
 }
 
-function displayErrorMessage(messageNode) {
+function displayErrorMessage(messageNode: any) {
     let messageDiv = document.getElementById("loading-message");
     messageDiv.replaceChildren(messageNode);
 }
