@@ -68,7 +68,7 @@ self.addEventListener("fetch", async (event) => {
             let isCacheSameAsNetwork: boolean;
             try {
                 if (cachedResponse) {
-                    isCacheSameAsNetwork = await checkCachedVersionMatchesOnChain(cachedResponse)
+                    isCacheSameAsNetwork = await checkCachedVersionMatchesOnChain(cachedResponse);
                 }
             } catch (e) {
                 console.error("Error checking cache version against chain:", e);
