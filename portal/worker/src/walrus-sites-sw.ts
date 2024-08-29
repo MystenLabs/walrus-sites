@@ -4,14 +4,13 @@
 import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
+import resolveWithCache from './caching'
 import { resolveAndFetchPage } from "@lib/page_fetching";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
 declare var self: ServiceWorkerGlobalScope;
 declare var clients: Clients;
-
-// Event listeners.
 
 self.addEventListener("install", (_event) => {
     self.skipWaiting();
@@ -50,9 +49,17 @@ self.addEventListener("fetch", async (event) => {
     console.log("Parsed URL: ", parsedUrl);
 
     if (requestDomain == portalDomain && parsedUrl && parsedUrl.subdomain) {
-        console.log("fetching from the service worker");
-        event.respondWith(resolveAndFetchPage(parsedUrl));
+        let response: Promise<Response>;
+        if (!("caches" in self)) {
+            // When not being in a secure context, the Cache API is not available.
+            console.warn("Cache API not available");
+            response = resolveAndFetchPage(parsedUrl);
+        } else {
+            response = resolveWithCache(parsedUrl, urlString);
+        }
+        event.respondWith(response);
         return;
+
     }
 
     // Handle the case in which we are at the root `BASE_URL`

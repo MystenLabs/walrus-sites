@@ -3,7 +3,7 @@
 
 import { HttpStatusCodes } from "./http/http_status_codes";
 import { SuiClient, SuiObjectData } from "@mysten/sui/client";
-import { Resource } from "./types";
+import { Resource, VersionedResource } from "./types";
 import { MAX_REDIRECT_DEPTH, RESOURCE_PATH_MOVE_TYPE } from "./constants";
 import { checkRedirect } from "./redirects";
 import { fromB64 } from "@mysten/bcs";
@@ -37,7 +37,7 @@ export async function fetchResource(
     path: string,
     seenResources: Set<string>,
     depth: number = 0,
-): Promise<Resource | HttpStatusCodes> {
+): Promise<VersionedResource | HttpStatusCodes> {
     if (seenResources.has(objectId)) {
         return HttpStatusCodes.LOOP_DETECTED;
     } else if (depth >= MAX_REDIRECT_DEPTH) {
@@ -85,7 +85,12 @@ export async function fetchResource(
     if (!siteResource || !siteResource.blob_id) {
         return HttpStatusCodes.NOT_FOUND;
     }
-    return siteResource;
+    const versionedSiteResource = {
+        ...siteResource,
+        version: pageData.data?.version,
+        objectId: dynamicFields.data.objectId,
+    };
+    return versionedSiteResource;
 }
 
 /**
