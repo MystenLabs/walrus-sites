@@ -7,7 +7,6 @@ import { NETWORK } from "@lib/constants";
 import { DomainDetails } from "@lib/types";
 
 const CACHE_NAME = "walrus-sites-cache";
-// TODO - move it to .env
 const CACHE_EXPIRATION_TIME = 24 * 60 * 60 * 1000 // 24 hours in milliseconds
 
 /**
