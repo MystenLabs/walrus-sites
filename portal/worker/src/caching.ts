@@ -13,36 +13,28 @@ const CACHE_EXPIRATION_TIME = 24 * 60 * 60 * 1000 // 24 hours in milliseconds
 /**
 * Respond to the request using the cache API.
 */
-export default async function respondUsingCache(
-    event: FetchEvent, parsedUrl: DomainDetails, urlString: string
-) {
-    event.respondWith((async () => {
-        if (!('caches' in self)) {
-            // When not being in a secure context, the Cache API is not available.
-            console.warn('Cache API not available');
-            return await resolveAndFetchPage(parsedUrl);
+export default async function resolveWithCache(
+    parsedUrl: DomainDetails, urlString: string
+): Promise<Response> {
+    const cache = await caches.open(CACHE_NAME);
+    const cachedResponse = await cache.match(urlString);
+    const cacheWasFresh = !(await cleanExpiredCache(cachedResponse, urlString));
+
+    let isCacheSameAsNetwork: boolean;
+    if (cachedResponse && cacheWasFresh) {
+        console.log('Cache hit!')
+        try {
+            isCacheSameAsNetwork = await checkCachedVersionMatchesOnChain(cachedResponse);
+            if (isCacheSameAsNetwork) return cachedResponse;
+        } catch (e) {
+            console.error("Error checking cache version against chain:", e);
         }
+    }
+    console.log("Cache miss!", urlString);
+    const resolvedPage = await resolveAndFetchPage(parsedUrl);
 
-        const cache = await caches.open(CACHE_NAME);
-        const cachedResponse = await cache.match(urlString);
-        const cacheWasFresh = !(await cleanExpiredCache(cachedResponse, urlString));
-
-        let isCacheSameAsNetwork: boolean;
-        if (cachedResponse && cacheWasFresh) {
-            console.log('Cache hit!')
-            try {
-                isCacheSameAsNetwork = await checkCachedVersionMatchesOnChain(cachedResponse);
-                if (isCacheSameAsNetwork) return cachedResponse;
-            } catch (e) {
-                console.error("Error checking cache version against chain:", e);
-            }
-        }
-        console.log("Cache miss!", urlString);
-        const resolvedPage = await resolveAndFetchPage(parsedUrl);
-
-        cache.put(urlString, resolvedPage.clone());
-        return resolvedPage;
-    })());
+    cache.put(urlString, resolvedPage.clone());
+    return resolvedPage;
 }
 
 /**

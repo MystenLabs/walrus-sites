@@ -4,7 +4,8 @@
 import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
-import respondUsingCache from './caching'
+import resolveWithCache from './caching'
+import { resolveAndFetchPage } from "@lib/page_fetching";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
@@ -48,8 +49,15 @@ self.addEventListener("fetch", async (event) => {
     console.log("Parsed URL: ", parsedUrl);
 
     if (requestDomain == portalDomain && parsedUrl && parsedUrl.subdomain) {
-        await respondUsingCache(event, parsedUrl, urlString);
-        return;
+        if (!("caches" in self)) {
+            // When not being in a secure context, the Cache API is not available.
+            console.warn("Cache API not available");
+            const response = resolveAndFetchPage(parsedUrl)
+            event.respondWith(response);
+            return
+        }
+        const response = resolveWithCache(parsedUrl, urlString)
+        return event.respondWith(response);
     }
 
     // Handle the case in which we are at the root `BASE_URL`
