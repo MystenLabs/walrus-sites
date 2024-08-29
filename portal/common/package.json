@@ -8,9 +8,10 @@
 				"vite": "^5.4.2"
 		},
 		"devDependencies": {
+				"@codspeed/vitest-plugin": "^3.1.1",
 				"@types/pako": "^2.0.3",
 				"vite-plugin-html": "^3.2.2",
-				"vitest": "^2.0.3",
+				"vitest": "^2.0.4",
 				"webpack": "^5.92.0"
 		},
 		"name": "common",
