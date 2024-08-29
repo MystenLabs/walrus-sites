@@ -49,15 +49,17 @@ self.addEventListener("fetch", async (event) => {
     console.log("Parsed URL: ", parsedUrl);
 
     if (requestDomain == portalDomain && parsedUrl && parsedUrl.subdomain) {
+        let response: Promise<Response>;
         if (!("caches" in self)) {
             // When not being in a secure context, the Cache API is not available.
             console.warn("Cache API not available");
-            const response = resolveAndFetchPage(parsedUrl)
-            event.respondWith(response);
-            return
+            response = resolveAndFetchPage(parsedUrl);
+        } else {
+            response = resolveWithCache(parsedUrl, urlString);
         }
-        const response = resolveWithCache(parsedUrl, urlString)
-        return event.respondWith(response);
+        event.respondWith(response);
+        return;
+
     }
 
     // Handle the case in which we are at the root `BASE_URL`
