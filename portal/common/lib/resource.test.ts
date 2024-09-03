@@ -86,7 +86,9 @@ describe('fetchResource', () => {
 
         const result = await fetchResource(mockClient, '0xParentId', '/path', new Set());
 
-        expect(result).toEqual({ blob_id: '0xresourceBlobId' });
+        expect(result).toEqual({
+            blob_id: '0xresourceBlobId', objectId: '0xObjectId', version: undefined
+        });
         expect(checkRedirect).toHaveBeenCalledWith(mockClient, '0xParentId');
         expect(mockClient.getDynamicFieldObject).toHaveBeenCalledWith({
             parentId: '0xParentId',
@@ -141,7 +143,9 @@ describe('fetchResource', () => {
         const result = await fetchResource(mockClient, '0xParentId', '/path', new Set());
 
         // Verify the results
-        expect(result).toEqual({ blob_id: '0xresourceBlobId' });
+        expect(result).toEqual({
+            blob_id: '0xresourceBlobId', objectId: '0xFinalObjectId', version: undefined
+        });
 
         // Verify the correct sequence of calls
 
@@ -276,7 +280,11 @@ describe('fetchResource', () => {
         const result = await fetchResource(mockClient, '0xParentId', '/path', seenResources);
 
         // Validate the correct resource is returned after following the chain of redirects
-        expect(result).toEqual({ blob_id: '0xresourceBlobId' });
+        expect(result).toEqual({
+            blob_id: '0xresourceBlobId',
+            objectId: '0xFinalObjectId',
+            version: undefined
+        });
 
         // Ensure that checkRedirect was called in sequence
         expect(checkRedirect).toHaveBeenNthCalledWith(1, mockClient, '0xParentId');

@@ -4,11 +4,14 @@
 				"@mysten/sui": "^1.1.2",
 				"base-x": "^4.0.0",
 				"pako": "^2.1.0",
-				"parse-domain": "8.0.2"
+				"parse-domain": "8.0.2",
+				"vite": "^5.4.2"
 		},
 		"devDependencies": {
+				"@codspeed/vitest-plugin": "^3.1.1",
 				"@types/pako": "^2.0.3",
-				"vitest": "^2.0.3",
+				"vite-plugin-html": "^3.2.2",
+				"vitest": "^2.0.4",
 				"webpack": "^5.92.0"
 		},
 		"name": "common",
@@ -19,6 +22,7 @@
 				"dev": "pnpm build:dev",
 				"build:dev": "webpack --config webpack.config.dev.js",
 				"build:prod": "webpack --no-watch --config webpack.config.prod.js",
-				"test": "vitest"
+				"test": "vitest",
+				"bench": "vitest bench"
 		}
 }

@@ -44,3 +44,13 @@ export function isResource(obj: any): obj is Resource {
         typeof obj.blob_id === 'string'
     );
 }
+
+/**
+* Type guard for the VersionedResource type.
+*/
+export function isVersionedResource(resource: any): resource is VersionedResource {
+    return resource && isResource(resource)
+        && typeof resource === 'object'
+        && 'version' in resource
+        && 'objectId' in resource;
+}
