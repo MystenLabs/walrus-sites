@@ -10,6 +10,23 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>404 Walrus Site Not Found</title>
     </head>
+    <script>
+    function getPortalName() {
+        const url = window.location.href;
+        if (url.includes("walrus.site")) {
+            console.log("URL contains 'walrus.site'");
+            return ["https://walrus.site/", "Open walrus.site"];
+        }
+        return ["https://blob.store/", "Open blob.store"];
+    };
+
+    window.onload = function() {
+        const portalLink = document.getElementById('portalLink');
+        const [link, text] = getPortalName();
+        portalLink.href = link;
+        portalLink.textContent = text;
+    };
+    </script>
     <style>
         body {
             margin: 0;
@@ -108,7 +125,7 @@
                         <div style="font-size: 88px; line-height: 160%;">🙅🏽</div>
                         <div style="font-size: 16px; line-height: 160%;">${message}</div>
                         <div style="font-size: 16px; line-height: 160%;">${secondaryMessage}</div>
-                        <a href="https://walrus.site/" style="color: #696969; font-size: 16px; line-height: 160%;">Open Walrus.site</a>
+                        <a id="portalLink" style="color: #696969; font-size: 16px; line-height: 160%;">Open Walrus.site</a>
                     </div>
                 </div>
                 <footer class="InterTightBold">
