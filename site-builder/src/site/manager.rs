@@ -21,7 +21,7 @@ use crate::{
     display,
     site::builder::{SiteCall, SitePtb},
     util::{self, get_struct_from_object_response},
-    walrus::Walrus,
+    walrus::{output::BlobStoreResult, Walrus},
     Config,
 };
 
@@ -89,16 +89,20 @@ impl SiteManager {
                 true,
             ),
         };
+
+        // Handle existing resources separately to check their epochs and re-store if necessary
+        self.update_existing_resources(&existing_resources).await?;
+
         tracing::debug!(?existing_resources, "checked existing resources");
         let update_operations = if self.force {
             existing_resources.replace_all(&resources.resources)
         } else {
             resources.resources.diff(&existing_resources)
         };
+
         tracing::debug!(operations=?update_operations, "list of operations computed");
 
         self.publish_to_walrus(&update_operations).await?;
-
         if !update_operations.is_empty() {
             display::action("Updating the Walrus Site object on Sui");
             let result = self
@@ -138,6 +142,87 @@ impl SiteManager {
                 .walrus
                 .store(resource.full_path.clone(), self.epochs, self.force)?;
             display::done();
+        }
+        Ok(())
+    }
+
+    /// Handles the storage of existing resources on Walrus,
+    /// checking their epochs and storing if necessary.
+    async fn update_existing_resources(&self, existing_resources: &ResourceSet) -> Result<()> {
+        for resource in &existing_resources.inner {
+            let blob_id = &resource.info.blob_id;
+
+            tracing::debug!(
+                resource=?resource.full_path,
+                blob_id=%blob_id,
+                unencoded_size=%resource.unencoded_size,
+                "Checking blob on Walrus"
+            );
+
+            // Always attempt to store the resource on Walrus
+            display::action(format!(
+                "Storing existing resource on Walrus: {}",
+                &resource.info.path
+            ));
+
+            // Store the resource on Walrus and check its status
+            let store_output =
+                self.walrus
+                    .store(resource.full_path.clone(), self.epochs, self.force)?;
+            display::done();
+
+            // Handle the result of the store operation
+            match store_output.0 {
+                BlobStoreResult::AlreadyCertified { end_epoch, .. } => {
+                    if end_epoch < self.epochs {
+                        tracing::info!(
+                            "Resource {} is certified for fewer epochs ({} < {}),
+                            storing again with --force",
+                            resource.info.path,
+                            end_epoch,
+                            self.epochs
+                        );
+
+                        display::action(format!(
+                            "Re-storing resource on Walrus with --force: {}",
+                            &resource.info.path
+                        ));
+                        let _force_output =
+                            self.walrus
+                                .store(resource.full_path.clone(), self.epochs, true)?;
+                        display::done();
+                    } else {
+                        tracing::info!(
+                            "Skipping resource {} as it's already certified
+                            for the required epochs ({} >= {})",
+                            resource.info.path,
+                            end_epoch,
+                            self.epochs
+                        );
+                    }
+                }
+                BlobStoreResult::NewlyCreated { .. } => {
+                    tracing::info!(
+                        "Resource {} was newly created on Walrus",
+                        resource.info.path
+                    );
+                }
+                BlobStoreResult::MarkedInvalid { .. } => {
+                    tracing::warn!(
+                        "Resource {} is marked invalid on Walrus, re-storing with --force",
+                        resource.info.path
+                    );
+
+                    display::action(format!(
+                        "Re-storing invalid resource on Walrus with --force: {}",
+                        &resource.info.path
+                    ));
+                    let _force_output =
+                        self.walrus
+                            .store(resource.full_path.clone(), self.epochs, true)?; // Force store
+                    display::done();
+                }
+            }
         }
         Ok(())
     }
