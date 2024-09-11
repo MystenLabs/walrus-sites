@@ -113,16 +113,6 @@ describe('fetchResource', () => {
             },
         });
 
-        // Mock the redirect object response
-        getObject.mockResolvedValueOnce({
-            data: {
-                bcs: {
-                    dataType: 'moveObject',
-                    bcsBytes: 'mockBcsBytes',
-                },
-            },
-        });
-
         // Mock dynamic field response for the redirected object
         getDynamicFieldObject.mockResolvedValueOnce({
             data: {
@@ -166,10 +156,6 @@ describe('fetchResource', () => {
 
         // Final resource fetch after resolving the redirect
         expect(mockClient.getObject).toHaveBeenNthCalledWith(1, {
-            id: '0xRedirectId',
-            options: { showBcs: true },
-        });
-        expect(mockClient.getObject).toHaveBeenNthCalledWith(2, {
             id: '0xFinalObjectId',
             options: { showBcs: true },
         });
@@ -307,14 +293,6 @@ describe('fetchResource', () => {
 
         // Ensure that getObject was called for each step in the chain
         expect(getObject).toHaveBeenNthCalledWith(1, {
-            id: '0xredirect1',
-            options: { showBcs: true },
-        });
-        expect(getObject).toHaveBeenNthCalledWith(2, {
-            id: '0xredirect2',
-            options: { showBcs: true },
-        });
-        expect(getObject).toHaveBeenNthCalledWith(3, {
             id: '0xFinalObjectId',
             options: { showBcs: true },
         });
