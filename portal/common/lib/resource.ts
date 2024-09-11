@@ -42,9 +42,9 @@ export async function fetchResource(
         return HttpStatusCodes.LOOP_DETECTED;
     } else if (depth >= MAX_REDIRECT_DEPTH) {
         return HttpStatusCodes.TOO_MANY_REDIRECTS;
-    } else {
-        seenResources.add(objectId);
     }
+
+    seenResources.add(objectId);
 
     let [redirectId, dynamicFields] = await Promise.all([
         checkRedirect(client, objectId),
@@ -56,14 +56,6 @@ export async function fetchResource(
 
     if (redirectId) {
         console.log("Redirect found");
-        const redirectPage = await client.getObject({
-            id: redirectId,
-            options: { showBcs: true },
-        });
-        console.log("Redirect page: ", redirectPage);
-        if (!redirectPage.data) {
-            return HttpStatusCodes.NOT_FOUND;
-        }
         // Recurs increasing the recursion depth.
         return fetchResource(client, redirectId, path, seenResources, depth + 1);
     }
