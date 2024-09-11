@@ -12,7 +12,7 @@ export function siteNotFound(): Response {
 
 export function noObjectIdFound(): Response {
     return Response404(
-        "You have reached the end of the internet, please turn back!",
+        "You have reached the end of the Internet, please turn back!",
         "Invalid URL: No object ID could be found."
     );
 }
