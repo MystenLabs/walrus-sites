@@ -243,18 +243,6 @@ describe('fetchResource', () => {
             },
         });
 
-        getObject.mockResolvedValueOnce({
-            data: {
-                bcs: { dataType: 'moveObject', bcsBytes: 'mockBcsBytes' },
-            },
-        });
-
-        getObject.mockResolvedValueOnce({
-            data: {
-                bcs: { dataType: 'moveObject', bcsBytes: 'mockBcsBytes' },
-            },
-        });
-
         // Mock fromB64 to simulate the decoding process
         (fromB64 as any).mockReturnValueOnce('decodedBcsBytes');
 
