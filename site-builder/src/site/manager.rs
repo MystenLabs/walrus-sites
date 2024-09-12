@@ -16,12 +16,19 @@ use sui_types::{
     Identifier,
 };
 
-use super::resource::{OperationsSummary, ResourceInfo, ResourceManager, ResourceOp, ResourceSet};
+use super::resource::{
+    OperationsSummary,
+    Resource,
+    ResourceInfo,
+    ResourceManager,
+    ResourceOp,
+    ResourceSet,
+};
 use crate::{
     display,
     site::builder::{SiteCall, SitePtb},
     util::{self, get_struct_from_object_response},
-    walrus::{output::BlobStoreResult, Walrus},
+    walrus::Walrus,
     Config,
 };
 
@@ -65,7 +72,7 @@ impl SiteManager {
         })
     }
 
-    /// Updates the site with the given [`Resource`](super::resource::Resource).
+    /// Updates the site with the given [`Resource`].
     ///
     /// If the site does not exist, it is created and updated. The resources that need to be updated
     /// or created are published to Walrus.
@@ -90,19 +97,24 @@ impl SiteManager {
             ),
         };
 
-        // Handle existing resources separately to check their epochs and re-store if necessary
-        self.update_existing_resources(&existing_resources).await?;
-
         tracing::debug!(?existing_resources, "checked existing resources");
         let update_operations = if self.force {
             existing_resources.replace_all(&resources.resources)
         } else {
             resources.resources.diff(&existing_resources)
         };
-
         tracing::debug!(operations=?update_operations, "list of operations computed");
 
+        let unchanged_resources = resources
+            .resources
+            .calculate_unchanged_resources(&update_operations);
+
+        // Try to store the unchanged resources on Walrus.
+        self.store_unchanged_resources_to_walrus(&unchanged_resources)
+            .await?;
+
         self.publish_to_walrus(&update_operations).await?;
+
         if !update_operations.is_empty() {
             display::action("Updating the Walrus Site object on Sui");
             let result = self
@@ -146,84 +158,36 @@ impl SiteManager {
         Ok(())
     }
 
-    /// Handles the storage of existing resources on Walrus,
-    /// checking their epochs and storing if necessary.
-    async fn update_existing_resources(&self, existing_resources: &ResourceSet) -> Result<()> {
-        for resource in &existing_resources.inner {
-            let blob_id = &resource.info.blob_id;
+    /// Stores the unchanged resources to Walrus.
+    async fn store_unchanged_resources_to_walrus<'a>(
+        &self,
+        unchanged_resources: &[&'a Resource],
+    ) -> Result<()> {
+        // Log the resources being processed.
+        tracing::debug!(resources=?unchanged_resources, "storing unchanged resources to Walrus");
 
+        // Iterate over the unchanged resources and attempt to store each one on Walrus.
+        for resource in unchanged_resources.iter() {
             tracing::debug!(
                 resource=?resource.full_path,
-                blob_id=%blob_id,
+                blob_id=%resource.info.blob_id,
                 unencoded_size=%resource.unencoded_size,
-                "Checking blob on Walrus"
+                "storing unchanged resource on Walrus"
             );
 
-            // Always attempt to store the resource on Walrus
+            // Display action for the resource being stored.
             display::action(format!(
-                "Storing existing resource on Walrus: {}",
+                "Storing unchanged resource on Walrus: {}",
                 &resource.info.path
             ));
 
-            // Store the resource on Walrus and check its status
-            let store_output =
-                self.walrus
-                    .store(resource.full_path.clone(), self.epochs, self.force)?;
+            let _output = self
+                .walrus
+                .store(resource.full_path.clone(), self.epochs, self.force)?;
+
             display::done();
-
-            // Handle the result of the store operation
-            match store_output.0 {
-                BlobStoreResult::AlreadyCertified { end_epoch, .. } => {
-                    if end_epoch < self.epochs {
-                        tracing::info!(
-                            "Resource {} is certified for fewer epochs ({} < {}),
-                            storing again with --force",
-                            resource.info.path,
-                            end_epoch,
-                            self.epochs
-                        );
-
-                        display::action(format!(
-                            "Re-storing resource on Walrus with --force: {}",
-                            &resource.info.path
-                        ));
-                        let _force_output =
-                            self.walrus
-                                .store(resource.full_path.clone(), self.epochs, true)?;
-                        display::done();
-                    } else {
-                        tracing::info!(
-                            "Skipping resource {} as it's already certified
-                            for the required epochs ({} >= {})",
-                            resource.info.path,
-                            end_epoch,
-                            self.epochs
-                        );
-                    }
-                }
-                BlobStoreResult::NewlyCreated { .. } => {
-                    tracing::info!(
-                        "Resource {} was newly created on Walrus",
-                        resource.info.path
-                    );
-                }
-                BlobStoreResult::MarkedInvalid { .. } => {
-                    tracing::warn!(
-                        "Resource {} is marked invalid on Walrus, re-storing with --force",
-                        resource.info.path
-                    );
-
-                    display::action(format!(
-                        "Re-storing invalid resource on Walrus with --force: {}",
-                        &resource.info.path
-                    ));
-                    let _force_output =
-                        self.walrus
-                            .store(resource.full_path.clone(), self.epochs, true)?; // Force store
-                    display::done();
-                }
-            }
         }
+
         Ok(())
     }
 

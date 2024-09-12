@@ -240,6 +240,31 @@ pub(crate) struct ResourceSet {
 }
 
 impl ResourceSet {
+    /// Calculates unchanged resources from the new resources by checking
+    /// the `update_operations` for created or deleted resources.
+    ///
+    /// This approach leverages `BTreeSet` for lookups and filtering.
+    /// Calculates unchanged resources based on the new resources (passed in `self`)
+    /// and the update operations (to find which ones were not created or deleted).
+    pub fn calculate_unchanged_resources<'a>(
+        &'a self,
+        update_operations: &[ResourceOp<'a>],
+    ) -> Vec<&'a Resource> {
+        // Collect the set of created or deleted resources for fast lookup.
+        let affected_resources: BTreeSet<&Resource> = update_operations
+            .iter()
+            .map(|op| match op {
+                ResourceOp::Created(resource) | ResourceOp::Deleted(resource) => *resource,
+            })
+            .collect();
+
+        // Filter the new resources (self.inner) to find those that are not in the affected set.
+        self.inner
+            .iter()
+            .filter(|resource| !affected_resources.contains(resource))
+            .collect() // Collect unchanged resources into a Vec
+    }
+
     /// Returns a vector of deletion and creation operations to move
     /// from the current set to the target set.
     ///
@@ -276,16 +301,6 @@ impl ResourceSet {
         let create_operations = other.create_all();
         delete_operations.extend(create_operations);
         delete_operations
-    }
-}
-
-// Implement IntoIterator for ResourceSet (consuming version)
-impl IntoIterator for ResourceSet {
-    type Item = Resource;
-    type IntoIter = std::collections::btree_set::IntoIter<Resource>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.inner.into_iter()
     }
 }
 
