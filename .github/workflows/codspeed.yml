@@ -4,7 +4,7 @@ on:
   # Run on pushes to the main branch
   push:
     branches:
-      - "master" # or "main"
+      - "main"
   # Run on pull requests
   pull_request:
   # `workflow_dispatch` allows CodSpeed to trigger backtest
