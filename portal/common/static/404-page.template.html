@@ -12,19 +12,18 @@
     </head>
     <script>
     function getPortalName() {
-        const url = window.location.href;
-        if (url.includes("walrus.site")) {
-            console.log("URL contains 'walrus.site'");
-            return ["https://walrus.site/", "Open walrus.site"];
+        const url = new URL(window.location.href);
+        const domainParts = url.host.split('.');
+        const portalName = domainParts.slice(-2).join('.');
+        if (portalName.includes('localhost')) {
+            return 'http://localhost' + `:${url.port}`
         }
-        return ["https://blob.store/", "Open blob.store"];
+        return `https://${portalName}`
     };
 
     window.onload = function() {
         const portalLink = document.getElementById('portalLink');
-        const [link, text] = getPortalName();
-        portalLink.href = link;
-        portalLink.textContent = text;
+        portalLink.href = getPortalName();
     };
     </script>
     <style>
@@ -125,7 +124,7 @@
                         <div style="font-size: 88px; line-height: 160%;">🙅🏽</div>
                         <div style="font-size: 16px; line-height: 160%;">${message}</div>
                         <div style="font-size: 16px; line-height: 160%;">${secondaryMessage}</div>
-                        <a id="portalLink" style="color: #696969; font-size: 16px; line-height: 160%;">Open Walrus.site</a>
+                        <a id="portalLink" style="color: #696969; font-size: 16px; line-height: 160%;">Open the landing page</a>
                     </div>
                 </div>
                 <footer class="InterTightBold">
