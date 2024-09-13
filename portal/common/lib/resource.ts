@@ -45,6 +45,10 @@ export async function fetchResource(
         return HttpStatusCodes.TOO_MANY_REDIRECTS;
     }
 
+    // Initiate a pre-fetch for the checkRedirect operation without resolving it.
+    // We don't need the result yet, but it's useful if we will need
+    // it later, so we don't have to loose time.
+    const checkRedirectPromise = checkRedirect(client, objectId);
     seenResources.add(objectId);
 
     // Attempt to fetch dynamic field object.
@@ -58,7 +62,8 @@ export async function fetchResource(
     // If no dynamic fields found, only then attempt redirect.
     if (!dynamicFields || !dynamicFields.data) {
         console.log("No dynamic field found");
-        let redirectId = await checkRedirect(client, objectId);
+        // Resolve the checkRedirect to get the results.
+        let redirectId = await checkRedirectPromise;
         return redirectId ?
             fetchResource(client, redirectId, path, seenResources, depth + 1) :
             HttpStatusCodes.NOT_FOUND;
