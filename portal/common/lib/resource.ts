@@ -40,59 +40,52 @@ export async function fetchResource(
 ): Promise<VersionedResource | HttpStatusCodes> {
     if (seenResources.has(objectId)) {
         return HttpStatusCodes.LOOP_DETECTED;
-    } else if (depth >= MAX_REDIRECT_DEPTH) {
+    }
+    if (depth >= MAX_REDIRECT_DEPTH) {
         return HttpStatusCodes.TOO_MANY_REDIRECTS;
     }
 
     seenResources.add(objectId);
 
+    // Attempt to fetch dynamic field object.
     const dynamicFields = await client.getDynamicFieldObject({
         parentId: objectId,
         name: { type: RESOURCE_PATH_MOVE_TYPE, value: path },
-    })
-    try {
-        console.log("Dynamic fields for ", objectId, dynamicFields);
-        if (!dynamicFields.data) {
-            console.log("No dynamic field found");
-            throw new Error("Walrus site was not found!");
-        }
-    } catch (error) {
-        let redirectId  = await checkRedirect(client, objectId)
-        if (redirectId) {
-            console.log("Redirect found");
-            // Recurs increasing the recursion depth.
-            return fetchResource(client, redirectId, path, seenResources, depth + 1);
-        }
-        return HttpStatusCodes.NOT_FOUND
+    });
+
+    console.log("Dynamic fields for ", objectId, dynamicFields);
+
+    // If no dynamic fields found, only then attempt redirect.
+    if (!dynamicFields || !dynamicFields.data) {
+        console.log("No dynamic field found");
+        let redirectId = await checkRedirect(client, objectId);
+        return redirectId ?
+            fetchResource(client, redirectId, path, seenResources, depth + 1) :
+            HttpStatusCodes.NOT_FOUND;
     }
+
+    // Fetch page data.
     const pageData = await client.getObject({
         id: dynamicFields.data.objectId,
         options: { showBcs: true },
     });
-    try {
-        if (!pageData.data) {
-            console.log("No page data found");
-            throw new Error("Walrus site was not found!");
-        }
-        const siteResource = getResourceFields(pageData.data);
-        if (!siteResource || !siteResource.blob_id) {
-            throw new Error("Walrus site was not found!");
-        }
-        const versionedSiteResource = {
-            ...siteResource,
-            version: pageData.data?.version,
-            objectId: dynamicFields.data.objectId,
-        };
-        return versionedSiteResource;
-    } catch (error) {
-        let redirectId  = await checkRedirect(client, objectId)
-        if (redirectId) {
-            console.log("Redirect found");
-            // Recurs increasing the recursion depth.
-            return fetchResource(client, redirectId, path, seenResources, depth + 1);
-        }
-        return HttpStatusCodes.NOT_FOUND
+
+    // If no page data found.
+    if (!pageData.data) {
+        console.log("No page data found");
+        return HttpStatusCodes.NOT_FOUND;
     }
+
+    const siteResource = getResourceFields(pageData.data);
+    if (!siteResource || !siteResource.blob_id) {
+        return HttpStatusCodes.NOT_FOUND;
+    }
+
+    return {
+        ...siteResource,
+        version: pageData.data?.version,
+        objectId: dynamicFields.data.objectId,
+    } as VersionedResource;
 }
 
 /**
