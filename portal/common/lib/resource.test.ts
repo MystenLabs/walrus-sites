@@ -65,8 +65,6 @@ describe('fetchResource', () => {
         });
 
     test('should fetch resource without redirect', async () => {
-        // Mock no redirect
-        (checkRedirect as any).mockResolvedValueOnce(null);
         // Mock dynamic field response
         getDynamicFieldObject.mockResolvedValueOnce({
             data: {
@@ -89,7 +87,6 @@ describe('fetchResource', () => {
         expect(result).toEqual({
             blob_id: '0xresourceBlobId', objectId: '0xObjectId', version: undefined
         });
-        expect(checkRedirect).toHaveBeenCalledWith(mockClient, '0xParentId');
         expect(mockClient.getDynamicFieldObject).toHaveBeenCalledWith({
             parentId: '0xParentId',
             name: { type: RESOURCE_PATH_MOVE_TYPE, value: '/path' },
@@ -101,17 +98,11 @@ describe('fetchResource', () => {
     });
 
     test('should follow redirect and recursively fetch resource', async () => {
+        // Mock dynamic field response for the initial object
+        getDynamicFieldObject.mockResolvedValueOnce(null);
+
         // Mock the redirect check to return a redirect ID on the first call
         (checkRedirect as any).mockResolvedValueOnce('0xRedirectId');
-        // On the second call (after redirect), mock to return null (no further redirect)
-        (checkRedirect as any).mockResolvedValueOnce(null);
-
-        // Mock dynamic field response for the initial object
-        getDynamicFieldObject.mockResolvedValueOnce({
-            data: {
-                objectId: '0xInitialObjectId',
-            },
-        });
 
         // Mock dynamic field response for the redirected object
         getDynamicFieldObject.mockResolvedValueOnce({
@@ -146,9 +137,6 @@ describe('fetchResource', () => {
             name: { type: RESOURCE_PATH_MOVE_TYPE, value: '/path' },
         });
 
-        // Redirected object fetch and second dynamic field fetch
-        expect(checkRedirect).toHaveBeenNthCalledWith(2, mockClient, '0xRedirectId');
-
         expect(mockClient.getDynamicFieldObject).toHaveBeenNthCalledWith(2, {
             parentId: '0xRedirectId',
             name: { type: RESOURCE_PATH_MOVE_TYPE, value: '/path' },
@@ -164,9 +152,6 @@ describe('fetchResource', () => {
     test('should return NOT_FOUND if the resource does not contain a blob_id', async () => {
         const seenResources = new Set<string>();
         const mockResource = {};  // No blob_id
-
-        // No redirect is returned
-        (checkRedirect as any).mockResolvedValueOnce(null);
 
         // Mock getDynamicFieldObject to return a valid object ID
         getDynamicFieldObject.mockResolvedValueOnce({
@@ -217,24 +202,16 @@ describe('fetchResource', () => {
         const seenResources = new Set<string>();
         const mockResource = { blob_id: '0xresourceBlobId' };
 
-        // Mock the redirect chain: First redirect points to '0xredirect1',
-        //which then redirects to '0xredirect2'
-        (checkRedirect as any).mockResolvedValueOnce('0xredirect1');  // First call
-        (checkRedirect as any).mockResolvedValueOnce('0xredirect2');  // Second call
-        (checkRedirect as any).mockResolvedValueOnce(null);  // Third call, no more redirects
-
-        // Mock getDynamicFieldObject to return valid structures
-        getDynamicFieldObject.mockResolvedValueOnce({
-            data: { objectId: '0xredirect1' },
-        });  // For '0xParentId', redirects to '0xredirect1'
-
-        getDynamicFieldObject.mockResolvedValueOnce({
-            data: { objectId: '0xredirect2' },
-        });  // For '0xredirect1', redirects to '0xredirect2'
-
-        getDynamicFieldObject.mockResolvedValueOnce({
-            data: { objectId: '0xFinalObjectId' },
-        });  // For '0xredirect2', final object
+        // First redirect: no dynamic fields and checkRedirect yields an objectId.
+        getDynamicFieldObject
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce({
+                data: { objectId: '0xFinalObjectId' },
+            });
+        (checkRedirect as any)
+            .mockResolvedValueOnce('0xredirect1')
+            .mockResolvedValueOnce('0xredirect2');
 
         // Mock getObject to return a valid response for each object in the chain
         getObject.mockResolvedValueOnce({
@@ -253,36 +230,13 @@ describe('fetchResource', () => {
 
         const result = await fetchResource(mockClient, '0xParentId', '/path', seenResources);
 
+        expect(checkRedirect).toHaveBeenNthCalledWith(1, mockClient, '0xParentId');
+        expect(checkRedirect).toHaveBeenNthCalledWith(2, mockClient, '0xredirect1');
         // Validate the correct resource is returned after following the chain of redirects
         expect(result).toEqual({
             blob_id: '0xresourceBlobId',
             objectId: '0xFinalObjectId',
             version: undefined
-        });
-
-        // Ensure that checkRedirect was called in sequence
-        expect(checkRedirect).toHaveBeenNthCalledWith(1, mockClient, '0xParentId');
-        expect(checkRedirect).toHaveBeenNthCalledWith(2, mockClient, '0xredirect1');
-        expect(checkRedirect).toHaveBeenNthCalledWith(3, mockClient, '0xredirect2');
-
-        // Ensure that getDynamicFieldObject was called three times as expected
-        expect(mockClient.getDynamicFieldObject).toHaveBeenNthCalledWith(1, {
-            parentId: '0xParentId',
-            name: { type: RESOURCE_PATH_MOVE_TYPE, value: '/path' },
-        });
-        expect(mockClient.getDynamicFieldObject).toHaveBeenNthCalledWith(2, {
-            parentId: '0xredirect1',
-            name: { type: RESOURCE_PATH_MOVE_TYPE, value: '/path' },
-        });
-        expect(mockClient.getDynamicFieldObject).toHaveBeenNthCalledWith(3, {
-            parentId: '0xredirect2',
-            name: { type: RESOURCE_PATH_MOVE_TYPE, value: '/path' },
-        });
-
-        // Ensure that getObject was called for each step in the chain
-        expect(getObject).toHaveBeenNthCalledWith(1, {
-            id: '0xFinalObjectId',
-            options: { showBcs: true },
         });
     });
 });

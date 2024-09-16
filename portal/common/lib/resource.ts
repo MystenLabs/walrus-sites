@@ -40,49 +40,57 @@ export async function fetchResource(
 ): Promise<VersionedResource | HttpStatusCodes> {
     if (seenResources.has(objectId)) {
         return HttpStatusCodes.LOOP_DETECTED;
-    } else if (depth >= MAX_REDIRECT_DEPTH) {
+    }
+    if (depth >= MAX_REDIRECT_DEPTH) {
         return HttpStatusCodes.TOO_MANY_REDIRECTS;
     }
 
+    // Initiate a pre-fetch for the checkRedirect operation without resolving it.
+    // We don't need the result yet, but it's useful if we will need
+    // it later, so we don't have to loose time.
+    const checkRedirectPromise = checkRedirect(client, objectId);
     seenResources.add(objectId);
 
-    let [redirectId, dynamicFields] = await Promise.all([
-        checkRedirect(client, objectId),
-        client.getDynamicFieldObject({
-            parentId: objectId,
-            name: { type: RESOURCE_PATH_MOVE_TYPE, value: path },
-        }),
-    ]);
-
-    if (redirectId) {
-        console.log("Redirect found");
-        // Recurs increasing the recursion depth.
-        return fetchResource(client, redirectId, path, seenResources, depth + 1);
-    }
+    // Attempt to fetch dynamic field object.
+    const dynamicFields = await client.getDynamicFieldObject({
+        parentId: objectId,
+        name: { type: RESOURCE_PATH_MOVE_TYPE, value: path },
+    });
 
     console.log("Dynamic fields for ", objectId, dynamicFields);
-    if (!dynamicFields.data) {
+
+    // If no dynamic fields found, only then attempt redirect.
+    if (!dynamicFields || !dynamicFields.data) {
         console.log("No dynamic field found");
-        return HttpStatusCodes.NOT_FOUND;
+        // Resolve the checkRedirect to get the results.
+        let redirectId = await checkRedirectPromise;
+        return redirectId ?
+            fetchResource(client, redirectId, path, seenResources, depth + 1) :
+            HttpStatusCodes.NOT_FOUND;
     }
+
+    // Fetch page data.
     const pageData = await client.getObject({
         id: dynamicFields.data.objectId,
         options: { showBcs: true },
     });
+
+    // If no page data found.
     if (!pageData.data) {
         console.log("No page data found");
         return HttpStatusCodes.NOT_FOUND;
     }
+
     const siteResource = getResourceFields(pageData.data);
     if (!siteResource || !siteResource.blob_id) {
         return HttpStatusCodes.NOT_FOUND;
     }
-    const versionedSiteResource = {
+
+    return {
         ...siteResource,
         version: pageData.data?.version,
         objectId: dynamicFields.data.objectId,
-    };
-    return versionedSiteResource;
+    } as VersionedResource;
 }
 
 /**
