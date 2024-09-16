@@ -25,6 +25,7 @@ export type Resource = {
     content_type: string;
     content_encoding: string;
     blob_id: string;
+    blob_hash: string;
 };
 
 export type VersionedResource = Resource & {

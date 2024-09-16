@@ -76,6 +76,8 @@ export async function fetchPage(
         return siteNotFound();
     }
 
+    console.log("CONTENTS", contents);
+
     // Deserialize the bcs encoded body and decompress.
     const body = await contents.arrayBuffer();
     const decompressed = await decompressData(new Uint8Array(body), result.content_encoding);

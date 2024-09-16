@@ -10,11 +10,13 @@ const Address = bcs.bytes(32).transform({
     output: (id) => toHEX(id),
 });
 
-// Blob IDs are represented on chain as u256, but serialized in URLs as URL-safe Base64.
+// Blob IDs & hashes are represented on chain as u256, but serialized in URLs as URL-safe Base64.
 const BLOB_ID = bcs.u256().transform({
     input: (id: string) => id,
     output: (id) => base64UrlSafeEncode(bcs.u256().serialize(id).toBytes()),
 });
+
+const BLOB_HASH = BLOB_ID
 
 export const ResourcePathStruct = bcs.struct("ResourcePath", {
     path: bcs.string(),
@@ -25,6 +27,7 @@ export const ResourceStruct = bcs.struct("Resource", {
     content_type: bcs.string(),
     content_encoding: bcs.string(),
     blob_id: BLOB_ID,
+    blob_hash: BLOB_HASH
 });
 
 export function DynamicFieldStruct<K, V>(K: BcsType<K>, V: BcsType<V>) {
