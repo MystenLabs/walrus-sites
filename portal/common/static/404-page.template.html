@@ -10,6 +10,22 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>404 Walrus Site Not Found</title>
     </head>
+    <script>
+    function getPortalName() {
+        const url = new URL(window.location.href);
+        const domainParts = url.host.split('.');
+        const portalName = domainParts.slice(-2).join('.');
+        if (portalName.includes('localhost')) {
+            return 'http://localhost' + `:${url.port}`
+        }
+        return `https://${portalName}`
+    };
+
+    window.onload = function() {
+        const portalLink = document.getElementById('portalLink');
+        portalLink.href = getPortalName();
+    };
+    </script>
     <style>
         body {
             margin: 0;
@@ -108,7 +124,7 @@
                         <div style="font-size: 88px; line-height: 160%;">🙅🏽</div>
                         <div style="font-size: 16px; line-height: 160%;">${message}</div>
                         <div style="font-size: 16px; line-height: 160%;">${secondaryMessage}</div>
-                        <a href="https://walrus.site/" style="color: #696969; font-size: 16px; line-height: 160%;">Open Walrus.site</a>
+                        <a id="portalLink" style="color: #696969; font-size: 16px; line-height: 160%;">Open the landing page</a>
                     </div>
                 </div>
                 <footer class="InterTightBold">
