@@ -161,6 +161,7 @@ impl SiteCall {
                 pure_call_arg(&resource.content_type.to_string())?,
                 pure_call_arg(&resource.content_encoding.to_string())?,
                 pure_call_arg(&resource.blob_id)?,
+                pure_call_arg(&resource.blob_hash)?
             ],
         })
     }

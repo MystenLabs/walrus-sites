@@ -11,8 +11,10 @@ base64 = "0.22.1"
 bcs = "0.1.6"
 clap = { version = "4.5.7", features = ["derive"] }
 crossterm = "0.27.0"
+fastcrypto = { git = "https://github.com/MystenLabs/fastcrypto" }
 flate2 = "1.0.30"
 futures = "0.3.30"
+hex = "0.4.3"
 home = "0.5.9"
 move-core-types = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.27.2" }
 notify = "6.1.1"

@@ -173,7 +173,7 @@ pub async fn edit_site(
         "Parsing the directory {} and locally computing blob IDs",
         directory.to_string_lossy()
     ));
-    resource_manager.read_dir(directory, content_encoding)?;
+    resource_manager.read_dir(directory, content_encoding)?; // [!]
     display::done();
     tracing::debug!(resources=%resource_manager.resources, "resources loaded from directory");
 

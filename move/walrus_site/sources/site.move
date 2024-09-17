@@ -5,8 +5,6 @@ module walrus_site::site {
     use sui::tx_context::TxContext;
     use sui::dynamic_field as df;
     use std::string::String;
-    use sui::hash;
-    use sui::bcs;
 
     /// The site published on Sui.
     struct Site has key, store {
@@ -23,7 +21,7 @@ module walrus_site::site {
         blob_id: u256,
         // Contains the hash of the contents of the blob
         // to verify its integrity.
-        blob_hash: u256
+        blob_hash: String 
     }
 
     /// Representation of the resource path.
@@ -47,7 +45,7 @@ module walrus_site::site {
         content_type: String,
         content_encoding: String,
         blob_id: u256,
-        blob_hash: u256
+        blob_hash: String 
     ): Resource {
         Resource {
             path,
