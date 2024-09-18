@@ -82,9 +82,9 @@ export async function fetchPage(
     // Deserialize the bcs encoded body and decompress.
     const body = await contents.arrayBuffer();
     // Verify the integrity of the aggregator response by hashing
-    // the response contents. 
+    // the response contents.
     const h10b = blake2b(
-        new Uint8Array(body), 
+        new Uint8Array(body),
         {dkLen: 32} // output size in bytes
     );
     if (result.blob_hash != toHEX(h10b)) {
@@ -92,7 +92,7 @@ export async function fetchPage(
         console.warn('BLOB_HASH', result.blob_hash)
         console.warn('BLAKE2_BX', toHEX(h10b))
     }
-    
+
     const decompressed = await decompressData(new Uint8Array(body), result.content_encoding);
     if (!decompressed) {
         return siteNotFound();
