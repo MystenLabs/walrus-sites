@@ -2,6 +2,7 @@
 		"dependencies": {
 				"@mysten/bcs": "^1.0.2",
 				"@mysten/sui": "^1.1.2",
+				"@noble/hashes": "^1.5.0",
 				"base-x": "^4.0.0",
 				"pako": "^2.1.0",
 				"parse-domain": "8.0.2",
