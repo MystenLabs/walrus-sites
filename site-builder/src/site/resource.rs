@@ -52,9 +52,7 @@ impl TryFrom<&SuiMoveStruct> for ResourceInfo {
         let blob_id = blob_id_from_u256(
             get_dynamic_field!(source, "blob_id", SuiMoveValue::String)?.parse::<U256>()?,
         );
-        let blob_hash = (get_dynamic_field!(source, "blob_hash", SuiMoveValue::String)?
-            .parse::<U256>()?)
-        .to_le_bytes();
+        let blob_hash = get_dynamic_field!(source, "blob_hash", SuiMoveValue::String)?;
 
         Ok(Self {
             path,

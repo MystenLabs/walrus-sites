@@ -4,7 +4,7 @@
 import { getFullnodeUrl, SuiClient } from "@mysten/sui/client";
 import { NETWORK } from "./constants";
 import { DomainDetails, isResource } from "./types/index";
-import { subdomainToObjectId, HEXtoBase36, blobHashHEXtoBase64 } from "./objectId_operations";
+import { subdomainToObjectId, HEXtoBase36 } from "./objectId_operations";
 import { resolveSuiNsAddress, hardcodedSubdmains } from "./suins";
 import { fetchResource } from "./resource";
 import { siteNotFound, noObjectIdFound, fullNodeFail } from "./http/http_error_responses";
@@ -87,11 +87,10 @@ export async function fetchPage(
         new Uint8Array(body), 
         {dkLen: 32} // output size in bytes
     );
-    if (result.blob_hash != blobHashHEXtoBase64(h10b)) {
-        console.warn('[!] CHECKSUM MISMATCH [!]', result.path)
+    if (result.blob_hash != toHEX(h10b)) {
+        console.warn('[!] CHECKSUM MISMATCH [!] for', result.path)
         console.warn('BLOB_HASH', result.blob_hash)
         console.warn('BLAKE2_BX', toHEX(h10b))
-        console.warn(await decompressData(new Uint8Array(body), result.content_encoding))
     }
     
     const decompressed = await decompressData(new Uint8Array(body), result.content_encoding);
