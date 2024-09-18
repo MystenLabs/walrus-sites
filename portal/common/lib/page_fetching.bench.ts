@@ -11,7 +11,7 @@ const rpcUrl = getFullnodeUrl(NETWORK);
 const client = new SuiClient({ url: rpcUrl });
 describe('Page fetching', () => {
     SITES_USED_FOR_BENCHING.forEach(([objectId, siteName]) => {
-        bench(`fetchResource: fetch the ${siteName} walrus site`, async () => {
+        bench(`fetchPage: fetch the ${siteName} walrus site`, async () => {
             const resourcePath = '/index.html';
             const res = await fetchPage(client, objectId, resourcePath);
             expect(res.status).toEqual(200); // If this fails, then the bench will result in 0ms
