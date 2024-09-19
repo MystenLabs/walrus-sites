@@ -16,7 +16,7 @@ export const FALLBACK_PORTAL = "blob.store"
 export const RESOURCE_PATH_MOVE_TYPE = SITE_PACKAGE + "::site::ResourcePath";
 
 const LANDING_PAGE_OID = '0x77fce72aa13df139ebdd605c56c1196ad5e62c7cb8236a8c6c1cbfc3be5c7de9';
-const FLATLAND_OID = '0x72a45ae56b8e11c8f1cf8c83795af880cf76bc4a2f8fb165f41131018459849f';
+const FLATLAND_OID = '0xae89c31f06c501b453d3ed22d555d90c7029b6eb5228926fe68f33a0b033b140';
 const FLATLANDER_OID = '0x3dcce3b879a015f3e9ab8d48af76df333b4b64db59ac5a3bb8c19ff81c0ad586';
 export const SITES_USED_FOR_BENCHING = [
     [LANDING_PAGE_OID, "landing page"],
