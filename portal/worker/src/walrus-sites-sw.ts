@@ -4,7 +4,7 @@
 import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
-import resolveWithCache from './caching'
+import resolveWithCache from "./caching";
 import { resolveAndFetchPage } from "@lib/page_fetching";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
@@ -59,7 +59,6 @@ self.addEventListener("fetch", async (event) => {
         }
         event.respondWith(response);
         return;
-
     }
 
     // Handle the case in which we are at the root `BASE_URL`
@@ -72,6 +71,6 @@ self.addEventListener("fetch", async (event) => {
 
     // Default case: Fetch all other sites from the web
     console.log("forwarding the request outside of the SW:", urlString);
-    const response = await fetch(event.request);
-    return response;
+    event.respondWith(fetch(event.request));
+    return;
 });
