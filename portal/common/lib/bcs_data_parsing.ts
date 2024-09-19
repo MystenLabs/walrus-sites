@@ -16,8 +16,6 @@ const BLOB_ID = bcs.u256().transform({
     output: (id) => base64UrlSafeEncode(bcs.u256().serialize(id).toBytes()),
 });
 
-const BLOB_HASH = BLOB_ID
-
 export const ResourcePathStruct = bcs.struct("ResourcePath", {
     path: bcs.string(),
 });
@@ -27,7 +25,7 @@ export const ResourceStruct = bcs.struct("Resource", {
     content_type: bcs.string(),
     content_encoding: bcs.string(),
     blob_id: BLOB_ID,
-    blob_hash: BLOB_HASH
+    blob_hash: bcs.string()
 });
 
 export function DynamicFieldStruct<K, V>(K: BcsType<K>, V: BcsType<V>) {

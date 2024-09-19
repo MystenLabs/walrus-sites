@@ -11,7 +11,6 @@ import { siteNotFound, noObjectIdFound, fullNodeFail } from "./http/http_error_r
 import { decompressData } from "./decompress_data";
 import { aggregatorEndpoint } from "./aggregator";
 import { blake2b } from '@noble/hashes/blake2b';
-import { bytesToHex } from "@noble/hashes/utils";
 import { toHEX } from '@mysten/sui/utils'
 
 /**
