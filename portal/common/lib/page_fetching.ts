@@ -11,7 +11,7 @@ import { siteNotFound, noObjectIdFound, fullNodeFail } from "./http/http_error_r
 import { decompressData } from "./decompress_data";
 import { aggregatorEndpoint } from "./aggregator";
 import { blake2b } from '@noble/hashes/blake2b';
-import { toHEX } from '@mysten/sui/utils'
+import { toB64 } from "@mysten/bcs";
 
 /**
  * Resolves the subdomain to an object ID, and gets the corresponding resources.
@@ -86,10 +86,10 @@ export async function fetchPage(
         new Uint8Array(body),
         {dkLen: 32} // output size in bytes
     );
-    if (result.blob_hash != toHEX(h10b)) {
-        console.warn('[!] CHECKSUM MISMATCH [!] for', result.path)
-        console.warn('BLOB_HASH', result.blob_hash)
-        console.warn('BLAKE2_BX', toHEX(h10b))
+    if (result.blob_hash != toB64(h10b)) {
+        console.warn('[!] checksum mismatch [!] for', result.path)
+        console.warn('blob_hash', result.blob_hash)
+        console.warn('blake2_bx', toB64(h10b))
     }
 
     const decompressed = await decompressData(new Uint8Array(body), result.content_encoding);

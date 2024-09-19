@@ -3,7 +3,7 @@
 
 export const NETWORK = "testnet"
 export const AGGREGATOR = "https://aggregator-devnet.walrus.space:443"
-export const SITE_PACKAGE = "0x4f3a29ded7957e0b85b30c81eada8baf2b7e5439854a3acd41dd30d27a27d8f0"
+export const SITE_PACKAGE = "0x1ba588fd10c79e11a032e0947f454ced0a52f1a83c7fc4b1006bff548845e6c1"
 export const MAX_REDIRECT_DEPTH = 3
 export const SITE_NAMES: { [key: string]: string } = {
     // Any hardcoded (non suins) name -> object_id mappings go here
@@ -16,10 +16,10 @@ export const FALLBACK_PORTAL = "blob.store"
 export const RESOURCE_PATH_MOVE_TYPE = SITE_PACKAGE + "::site::ResourcePath";
 
 const LANDING_PAGE_OID = '0x78b6cbda24cd3d947bec5f3bad6961e96ba696e1612571f0d61942f24f508940';
-const FLATLAND_OID = '0x049b6d3f34789904efcc20254400b7dca5548ee35cd7b5b145a211f85b2532fa';
+const FLATLAND_OID = '0x72a45ae56b8e11c8f1cf8c83795af880cf76bc4a2f8fb165f41131018459849f';
 const FLATLANDER_OID = '0x3dcce3b879a015f3e9ab8d48af76df333b4b64db59ac5a3bb8c19ff81c0ad586';
 export const SITES_USED_FOR_BENCHING = [
     [LANDING_PAGE_OID, "landing page"],
     [FLATLAND_OID, "flatland"],
-    [FLATLANDER_OID, "flatlander"]
+    // [FLATLANDER_OID, "flatlander"]
 ]

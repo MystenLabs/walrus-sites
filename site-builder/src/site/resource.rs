@@ -14,7 +14,6 @@ use std::{
 use anyhow::{anyhow, Context, Result};
 use fastcrypto::hash::{Blake2b256, HashFunction};
 use flate2::{write::GzEncoder, Compression};
-use hex;
 use move_core_types::u256::U256;
 use sui_sdk::rpc_types::{SuiMoveStruct, SuiMoveValue};
 
@@ -37,7 +36,7 @@ pub(crate) struct ResourceInfo {
     /// The blob ID of the resource.
     pub blob_id: BlobId,
     /// The hash of the blob contents.
-    pub blob_hash: String,
+    pub blob_hash: U256,
 }
 
 impl TryFrom<&SuiMoveStruct> for ResourceInfo {
@@ -52,14 +51,15 @@ impl TryFrom<&SuiMoveStruct> for ResourceInfo {
         let blob_id = blob_id_from_u256(
             get_dynamic_field!(source, "blob_id", SuiMoveValue::String)?.parse::<U256>()?,
         );
-        let blob_hash = get_dynamic_field!(source, "blob_hash", SuiMoveValue::String)?;
+        let blob_hash =
+            get_dynamic_field!(source, "blob_hash", SuiMoveValue::String)?.parse::<U256>()?;
 
         Ok(Self {
             path,
             content_type,
             content_encoding,
             blob_id,
-            blob_hash: hex::encode(blob_hash),
+            blob_hash,
         })
     }
 }
@@ -121,7 +121,7 @@ impl Resource {
         content_type: ContentType,
         content_encoding: ContentEncoding,
         blob_id: BlobId,
-        blob_hash: String,
+        blob_hash: U256,
         unencoded_size: usize,
     ) -> Self {
         Resource {
@@ -375,7 +375,6 @@ impl ResourceManager {
         let mut hash_function = Blake2b256::default();
         hash_function.update(&plain_content);
         let blob_hash: [u8; 32] = hash_function.finalize().digest;
-        let blob_hash_string: String = hex::encode(blob_hash);
         // TODO(giac): How to encode based on the content encoding? Temporary file? No encoding?
         //     let content = match content_encoding {
         //         ContentEncoding::PlainText => plain_content,
@@ -388,7 +387,7 @@ impl ResourceManager {
             content_type,
             *content_encoding,
             output.blob_id,
-            blob_hash_string,
+            U256::from_le_bytes(&blob_hash),
             // TODO(giac): Change to `content.len()` when the problem with content encoding is
             // fixed.
             plain_content.len(),

@@ -21,7 +21,7 @@ module walrus_site::site {
         blob_id: u256,
         // Contains the hash of the contents of the blob
         // to verify its integrity.
-        blob_hash: String
+        blob_hash: u256
     }
 
     /// Representation of the resource path.
@@ -45,7 +45,7 @@ module walrus_site::site {
         content_type: String,
         content_encoding: String,
         blob_id: u256,
-        blob_hash: String
+        blob_hash: u256
     ): Resource {
         Resource {
             path,

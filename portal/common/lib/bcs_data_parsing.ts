@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { bcs, BcsType } from "@mysten/bcs";
-import { fromHEX, toHEX } from "@mysten/sui/utils";
+import { fromHEX, toHEX, toB64 } from "@mysten/sui/utils";
 import { base64UrlSafeEncode } from "./url_safe_base64";
 
 const Address = bcs.bytes(32).transform({
@@ -16,6 +16,13 @@ const BLOB_ID = bcs.u256().transform({
     output: (id) => base64UrlSafeEncode(bcs.u256().serialize(id).toBytes()),
 });
 
+// Different than BLOB_ID, because we don't want this to be URL-safe;
+// otherwise, it will mess up with the checksum results.
+const U256 = bcs.u256().transform({
+    input: (id: string) => id,
+    output: (id) => toB64(bcs.u256().serialize(id).toBytes()),
+});
+
 export const ResourcePathStruct = bcs.struct("ResourcePath", {
     path: bcs.string(),
 });
@@ -25,7 +32,7 @@ export const ResourceStruct = bcs.struct("Resource", {
     content_type: bcs.string(),
     content_encoding: bcs.string(),
     blob_id: BLOB_ID,
-    blob_hash: bcs.string()
+    blob_hash: U256
 });
 
 export function DynamicFieldStruct<K, V>(K: BcsType<K>, V: BcsType<V>) {
