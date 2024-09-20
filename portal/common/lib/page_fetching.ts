@@ -13,7 +13,7 @@ import {
 } from "./http/http_error_responses";
 import { decompressData } from "./decompress_data";
 import { aggregatorEndpoint } from "./aggregator";
-import { blake2b } from '@noble/hashes/blake2b';
+import { sha256 } from '@noble/hashes/sha256';
 import { toB64 } from "@mysten/bcs";
 
 /**
@@ -85,9 +85,8 @@ export async function fetchPage(
     const body = await contents.arrayBuffer();
     // Verify the integrity of the aggregator response by hashing
     // the response contents.
-    const h10b = blake2b(
+    const h10b = sha256(
         new Uint8Array(body),
-        {dkLen: 32} // output size in bytes
     );
     if (result.blob_hash != toB64(h10b)) {
         console.warn(

@@ -12,7 +12,7 @@ use std::{
 };
 
 use anyhow::{anyhow, Context, Result};
-use fastcrypto::hash::{Blake2b256, HashFunction};
+use fastcrypto::hash::{HashFunction, Sha256};
 use flate2::{write::GzEncoder, Compression};
 use move_core_types::u256::U256;
 use sui_sdk::rpc_types::{SuiMoveStruct, SuiMoveValue};
@@ -372,7 +372,7 @@ impl ResourceManager {
 
         // Hash the contents of the file - this will be contained in the site::Resource
         // to verify the integrity of the blob when fetched from an aggregator.
-        let mut hash_function = Blake2b256::default();
+        let mut hash_function = Sha256::default();
         hash_function.update(&plain_content);
         let blob_hash: [u8; 32] = hash_function.finalize().digest;
         // TODO(giac): How to encode based on the content encoding? Temporary file? No encoding?
