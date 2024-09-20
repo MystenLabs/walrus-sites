@@ -7,7 +7,10 @@ import { DomainDetails, isResource } from "./types/index";
 import { subdomainToObjectId, HEXtoBase36 } from "./objectId_operations";
 import { resolveSuiNsAddress, hardcodedSubdmains } from "./suins";
 import { fetchResource } from "./resource";
-import { siteNotFound, noObjectIdFound, fullNodeFail } from "./http/http_error_responses";
+import {
+    siteNotFound, noObjectIdFound, fullNodeFail,
+    generateChecksumErrorResponse
+} from "./http/http_error_responses";
 import { decompressData } from "./decompress_data";
 import { aggregatorEndpoint } from "./aggregator";
 import { blake2b } from '@noble/hashes/blake2b';
@@ -87,9 +90,11 @@ export async function fetchPage(
         {dkLen: 32} // output size in bytes
     );
     if (result.blob_hash != toB64(h10b)) {
-        console.warn('[!] checksum mismatch [!] for', result.path)
-        console.warn('blob_hash', result.blob_hash)
-        console.warn('blake2_bx', toB64(h10b))
+        console.warn(
+            '[!] checksum mismatch [!] for:', result.path, '.',
+            `blob hash: ${result.blob_hash} | aggr. hash: ${toB64(h10b)}`
+        )
+        return generateChecksumErrorResponse()
     }
 
     const decompressed = await decompressData(new Uint8Array(body), result.content_encoding);
