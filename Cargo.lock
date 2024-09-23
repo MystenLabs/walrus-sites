@@ -5350,7 +5350,6 @@ dependencies = [
  "fastcrypto 0.1.8 (git+https://github.com/MystenLabs/fastcrypto)",
  "flate2",
  "futures",
- "hex",
  "home",
  "move-core-types",
  "notify",
