@@ -13,7 +13,6 @@ import {
 } from "./http/http_error_responses";
 import { decompressData } from "./decompress_data";
 import { aggregatorEndpoint } from "./aggregator";
-import { sha256 } from '@noble/hashes/sha256';
 import { toB64 } from "@mysten/bcs";
 
 /**
@@ -85,9 +84,13 @@ export async function fetchPage(
     const body = await contents.arrayBuffer();
     // Verify the integrity of the aggregator response by hashing
     // the response contents.
-    const h10b = sha256(
-        new Uint8Array(body),
-    );
+    const { subtle } = globalThis.crypto;
+    const sha256 = async (message: ArrayBuffer) => {
+        const hash = await subtle.digest("SHA-256", message);
+        return hash;
+    }
+    const h10b = new Uint8Array(await sha256(body))
+
     if (result.blob_hash != toB64(h10b)) {
         console.warn(
             '[!] checksum mismatch [!] for:', result.path, '.',
