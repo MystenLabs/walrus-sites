@@ -9,7 +9,7 @@ import { resolveSuiNsAddress, hardcodedSubdmains } from "./suins";
 import { fetchResource } from "./resource";
 import {
     siteNotFound, noObjectIdFound, fullNodeFail,
-    generateChecksumErrorResponse
+    generateHashErrorResponse
 } from "./http/http_error_responses";
 import { decompressData } from "./decompress_data";
 import { aggregatorEndpoint } from "./aggregator";
@@ -96,7 +96,7 @@ export async function fetchPage(
             '[!] checksum mismatch [!] for:', result.path, '.',
             `blob hash: ${result.blob_hash} | aggr. hash: ${toB64(h10b)}`
         )
-        return generateChecksumErrorResponse()
+        return generateHashErrorResponse()
     }
 
     const decompressed = await decompressData(new Uint8Array(body), result.content_encoding);

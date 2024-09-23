@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import template_404 from "../../static/404-page.template.html";
-import checksum_mismatch from "../../static/checksum-mismatch.html"
+import hash_mismatch from "../../static/hash-mismatch.html"
 import { HttpStatusCodes } from "./http_status_codes";
 
 const mainNotFoundErrorMessage = "You have reached the end of the internet, please turn back!"
@@ -42,8 +42,8 @@ function Response404(message: String, secondaryMessage?: String): Response {
 * regarding a mismatch between the aggregator response and
 * the blob hash (checksum).
 */
-export function generateChecksumErrorResponse(): Response {
-    return new Response(checksum_mismatch, {
+export function generateHashErrorResponse(): Response {
+    return new Response(hash_mismatch, {
         status: HttpStatusCodes.UNPROCESSABLE_ENTITY,
         headers: {
             "Content-Type": "text/html"
