@@ -44,7 +44,7 @@ function Response404(message: String, secondaryMessage?: String): Response {
 */
 export function generateHashErrorResponse(): Response {
     return new Response(hash_mismatch, {
-        status: HttpStatusCodes.UNPROCESSABLE_ENTITY,
+        status: HttpStatusCodes.UNPROCESSABLE_CONTENT,
         headers: {
             "Content-Type": "text/html"
         }
