@@ -9,7 +9,7 @@
     },
     "dependencies": {
         "common": "workspace:common",
-        "next": "14.2.5"
+        "next": "14.2.10"
     },
     "devDependencies": {
         "@types/node": "^20.14.12",
