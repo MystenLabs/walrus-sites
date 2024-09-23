@@ -80,7 +80,6 @@ export async function fetchPage(
         return siteNotFound();
     }
 
-    // Deserialize the bcs encoded body and decompress.
     const body = await contents.arrayBuffer();
     // Verify the integrity of the aggregator response by hashing
     // the response contents.
