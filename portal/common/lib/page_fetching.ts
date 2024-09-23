@@ -81,6 +81,11 @@ export async function fetchPage(
     }
 
     const body = await contents.arrayBuffer();
+    const decompressed = await decompressData(new Uint8Array(body), result.content_encoding);
+    if (!decompressed) {
+        return siteNotFound();
+    }
+
     // Verify the integrity of the aggregator response by hashing
     // the response contents.
     const { subtle } = globalThis.crypto;
@@ -88,8 +93,7 @@ export async function fetchPage(
         const hash = await subtle.digest("SHA-256", message);
         return hash;
     }
-    const h10b = new Uint8Array(await sha256(body))
-
+    const h10b = new Uint8Array(await sha256(decompressed))
     if (result.blob_hash != toB64(h10b)) {
         console.warn(
             '[!] checksum mismatch [!] for:', result.path, '.',
@@ -98,10 +102,6 @@ export async function fetchPage(
         return generateHashErrorResponse()
     }
 
-    const decompressed = await decompressData(new Uint8Array(body), result.content_encoding);
-    if (!decompressed) {
-        return siteNotFound();
-    }
     console.log("Returning resource: ", result.path, result.blob_id, result.content_type);
     return new Response(decompressed, {
         headers: {
