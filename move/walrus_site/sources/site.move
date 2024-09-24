@@ -12,12 +12,19 @@ module walrus_site::site {
         name: String,
     }
 
+    #[allow(unused_field)]
+    struct HttpHeader has store, drop {
+        name: String,
+        value: String
+    }
+
     /// A resource in a site.
     struct Resource has store, drop {
         path: String,
-        content_type: String,
-        content_encoding: String,
-        // The walrus blob id containing the bytes for this resource
+        // Response, Representation and Payload headers
+        // regarding the contents of the resource.
+        headers: vector<HttpHeader>,
+        // The walrus blob id containing the bytes for this resource.
         blob_id: u256,
         // Contains the hash of the contents of the blob
         // to verify its integrity.
@@ -42,15 +49,13 @@ module walrus_site::site {
     /// Creates a new resource.
     public fun new_resource(
         path: String,
-        content_type: String,
-        content_encoding: String,
+        headers: vector<HttpHeader>,
         blob_id: u256,
         blob_hash: u256
     ): Resource {
         Resource {
             path,
-            content_type,
-            content_encoding,
+            headers,
             blob_id,
             blob_hash,
         }

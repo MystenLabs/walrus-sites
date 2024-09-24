@@ -29,10 +29,8 @@ use crate::{
 pub(crate) struct ResourceInfo {
     /// The relative path the resource will have on Sui.
     pub path: String,
-    /// The content (MIME) type of the reseource.
-    pub content_type: ContentType,
-    /// The encoding of the content.
-    pub content_encoding: ContentEncoding,
+    /// Response, Representation and Payload headers.
+    pub headers: HttpHeaders,
     /// The blob ID of the resource.
     pub blob_id: BlobId,
     /// The hash of the blob contents.
@@ -44,10 +42,8 @@ impl TryFrom<&SuiMoveStruct> for ResourceInfo {
 
     fn try_from(source: &SuiMoveStruct) -> Result<Self, Self::Error> {
         let path = get_dynamic_field!(source, "path", SuiMoveValue::String)?;
-        let content_type: ContentType =
-            get_dynamic_field!(source, "content_type", SuiMoveValue::String)?.try_into()?;
-        let content_encoding: ContentEncoding =
-            get_dynamic_field!(source, "content_encoding", SuiMoveValue::String)?.try_into()?;
+        let headers: HttpHeaders =
+            get_dynamic_field!(source, "headers", SuiMoveValue::Vector)?.try_into()?;
         let blob_id = blob_id_from_u256(
             get_dynamic_field!(source, "blob_id", SuiMoveValue::String)?.parse::<U256>()?,
         );
@@ -56,11 +52,37 @@ impl TryFrom<&SuiMoveStruct> for ResourceInfo {
 
         Ok(Self {
             path,
-            content_type,
-            content_encoding,
+            headers,
             blob_id,
             blob_hash,
         })
+    }
+}
+
+#[derive(serde::Serialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct HttpHeader {
+    pub name: String,
+    pub value: String,
+}
+
+#[derive(serde::Serialize, Clone, Debug, PartialEq, PartialOrd, Ord, Eq)]
+pub struct HttpHeaders(pub Vec<HttpHeader>);
+
+impl TryFrom<Vec<SuiMoveValue>> for HttpHeaders {
+    type Error = anyhow::Error;
+
+    fn try_from(values: Vec<SuiMoveValue>) -> Result<Self, Self::Error> {
+        let mut headers = Vec::new();
+        for value in values {
+            if let SuiMoveValue::Struct(header_struct) = value {
+                let name = get_dynamic_field!(header_struct, "name", SuiMoveValue::String)?;
+                let value = get_dynamic_field!(header_struct, "value", SuiMoveValue::String)?;
+                headers.push(HttpHeader { name, value });
+            } else {
+                return Err(anyhow!("Expected SuiMoveValue::Struct for HttpHeader"));
+            }
+        }
+        Ok(HttpHeaders(headers))
     }
 }
 
@@ -118,8 +140,7 @@ impl Resource {
     pub fn new(
         resource_path: String,
         full_path: PathBuf,
-        content_type: ContentType,
-        content_encoding: ContentEncoding,
+        headers: HttpHeaders,
         blob_id: BlobId,
         blob_hash: U256,
         unencoded_size: usize,
@@ -127,8 +148,7 @@ impl Resource {
         Resource {
             info: ResourceInfo {
                 path: resource_path,
-                content_type,
-                content_encoding,
+                headers,
                 blob_id,
                 blob_hash,
             },
@@ -348,22 +368,36 @@ impl ResourceManager {
                 .expect("the path should not terminate in `..`"),
         );
 
-        let content_type =
-            match ContentType::try_from_extension(extension.to_str().ok_or(anyhow!(
-                "Could not convert the extension {:?} to a string.",
-                extension.to_string_lossy()
-            ))?) {
-                Ok(content_type) => content_type,
-                Err(_) => {
-                    tracing::warn!(
-                        "The extension {} string for file {} could not be decoded.
-                        Defaulting to arbitrary binary content type: octet-stream.",
-                        extension.to_string_lossy(),
-                        full_path.to_string_lossy()
-                    );
-                    ContentType::ApplicationOctetstream // arbitrary binary data RFC 2046
-                }
-            };
+        // load ws-config.json
+        // look for the file_name inside the "headers" key {}
+        // if not found, return the defaults.
+
+        // TODO
+        // let headers = parse_headers_from_config(...)
+        // if no headers, use default
+        // content-type: "text/html; charset=utf-8"
+        // content-encoding: "plaintext"
+        let headers = HttpHeaders(vec![HttpHeader {
+            name: "Content-Type".to_string(),
+            value: "text/html; charset=utf-8".to_string(),
+        }]);
+
+        // let content_type =
+        //     match ContentType::try_from_extension(extension.to_str().ok_or(anyhow!(
+        //         "Could not convert the extension {:?} to a string.",
+        //         extension.to_string_lossy()
+        //     ))?) {
+        //         Ok(content_type) => content_type,
+        //         Err(_) => {
+        //             tracing::warn!(
+        //                 "The extension {} string for file {} could not be decoded.
+        //                 Defaulting to arbitrary binary content type: octet-stream.",
+        //                 extension.to_string_lossy(),
+        //                 full_path.to_string_lossy()
+        //             );
+        //             ContentType::ApplicationOctetstream // arbitrary binary data RFC 2046
+        //         }
+        //     };
 
         let plain_content: Vec<u8> = std::fs::read(full_path)?;
         // TODO(giac): this could be (i) async; (ii) pre configured with the number of shards to
@@ -384,8 +418,7 @@ impl ResourceManager {
         Ok(Some(Resource::new(
             full_path_to_resource_path(full_path, root)?,
             full_path.to_owned(),
-            content_type,
-            *content_encoding,
+            headers,
             output.blob_id,
             U256::from_le_bytes(&blob_hash),
             // TODO(giac): Change to `content.len()` when the problem with content encoding is

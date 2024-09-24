@@ -149,8 +149,7 @@ impl SiteCall {
     pub fn new_resource_and_add(resource: &ResourceInfo) -> Result<SiteCall> {
         tracing::debug!(
             resource=%resource.path,
-            content_type=?resource.content_type,
-            encoding=?resource.content_encoding,
+            headers=?resource.headers,
             blob_id=?resource.blob_id,
             "new Move call: creating resource"
         );
@@ -158,8 +157,7 @@ impl SiteCall {
             function: "new_resource_and_add".to_owned(),
             args: vec![
                 pure_call_arg(&resource.path)?,
-                pure_call_arg(&resource.content_type.to_string())?,
-                pure_call_arg(&resource.content_encoding.to_string())?,
+                pure_call_arg(&resource.headers)?,
                 pure_call_arg(&resource.blob_id)?,
                 pure_call_arg(&resource.blob_hash)?,
             ],
