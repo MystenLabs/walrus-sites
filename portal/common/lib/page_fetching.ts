@@ -14,6 +14,7 @@ import {
 import { decompressData } from "./decompress_data";
 import { aggregatorEndpoint } from "./aggregator";
 import { toB64 } from "@mysten/bcs";
+import { sha256 } from "./crypto";
 
 /**
  * Resolves the subdomain to an object ID, and gets the corresponding resources.
@@ -88,16 +89,13 @@ export async function fetchPage(
 
     // Verify the integrity of the aggregator response by hashing
     // the response contents.
-    const { subtle } = globalThis.crypto;
-    const sha256 = async (message: ArrayBuffer) => {
-        const hash = await subtle.digest("SHA-256", message);
-        return hash;
-    }
-    const h10b = new Uint8Array(await sha256(decompressed))
-    if (result.blob_hash != toB64(h10b)) {
+    const h10b = toB64(
+        await sha256(decompressed)
+    );
+    if (result.blob_hash != h10b) {
         console.warn(
             '[!] checksum mismatch [!] for:', result.path, '.',
-            `blob hash: ${result.blob_hash} | aggr. hash: ${toB64(h10b)}`
+            `blob hash: ${result.blob_hash} | aggr. hash: ${h10b}`
         )
         return generateHashErrorResponse()
     }
