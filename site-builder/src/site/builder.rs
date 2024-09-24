@@ -157,7 +157,7 @@ impl SiteCall {
             function: "new_resource_and_add".to_owned(),
             args: vec![
                 pure_call_arg(&resource.path)?,
-                pure_call_arg(&resource.headers)?,
+                CallArg::Object(&resource.headers)?,
                 pure_call_arg(&resource.blob_id)?,
                 pure_call_arg(&resource.blob_hash)?,
             ],
