@@ -5,6 +5,7 @@ module walrus_site::site {
     use sui::tx_context::TxContext;
     use sui::dynamic_field as df;
     use std::string::String;
+    use std::vector;
 
     /// The site published on Sui.
     struct Site has key, store {
@@ -49,16 +50,26 @@ module walrus_site::site {
     /// Creates a new resource.
     public fun new_resource(
         path: String,
-        headers: vector<HttpHeader>,
         blob_id: u256,
         blob_hash: u256
     ): Resource {
         Resource {
             path,
-            headers,
+            headers: vector::empty(),
             blob_id,
             blob_hash,
         }
+    }
+
+    /// Adds a header to the Resource's headers vector
+    public fun add_header(resource: &mut Resource, name: String, value: String) {
+        vector::push_back(
+            &mut resource.headers,
+            HttpHeader {
+                name,
+                value
+            }
+        );
     }
 
     fun new_path(path: String): ResourcePath {
