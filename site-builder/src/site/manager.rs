@@ -110,7 +110,7 @@ impl SiteManager {
             .calculate_unchanged_resources(&update_operations);
 
         // Try to store the unchanged resources on Walrus.
-        self.store_unchanged_resources_to_walrus(&unchanged_resources)
+        self.update_unchanged_resources_to_walrus(&unchanged_resources)
             .await?;
 
         self.publish_to_walrus(&update_operations).await?;
@@ -137,7 +137,6 @@ impl SiteManager {
             .filter(|u| matches!(u, ResourceOp::Created(_)))
             .collect::<Vec<_>>();
         tracing::debug!(resources=?to_update, "publishing new or updated resources to Walrus");
-
         for update in to_update.iter() {
             let resource = update.inner();
             tracing::debug!(
@@ -150,44 +149,36 @@ impl SiteManager {
                 "Storing resource on Walrus: {}",
                 &resource.info.path
             ));
-            let _output = self
-                .walrus
-                .store(resource.full_path.clone(), self.epochs, self.force)?;
+            let _output = self.walrus.store(resource.full_path.clone(), self.epochs)?;
             display::done();
         }
         Ok(())
     }
 
-    /// Stores the unchanged resources to Walrus.
-    async fn store_unchanged_resources_to_walrus<'a>(
+    /// Updates the unchanged resources to Walrus.
+    async fn update_unchanged_resources_to_walrus<'a>(
         &self,
         unchanged_resources: &[&'a Resource],
     ) -> Result<()> {
         // Log the resources being processed.
-        tracing::debug!(resources=?unchanged_resources, "storing unchanged resources to Walrus");
-
+        tracing::debug!(resources=?unchanged_resources, "updating unchanged resources to Walrus");
         // Iterate over the unchanged resources and attempt to store each one on Walrus.
         for resource in unchanged_resources.iter() {
             tracing::debug!(
                 resource=?resource.full_path,
                 blob_id=%resource.info.blob_id,
                 unencoded_size=%resource.unencoded_size,
-                "storing unchanged resource on Walrus"
+                "trying to store unchanged resource on Walrus"
             );
-
             // Display action for the resource being stored.
             display::action(format!(
-                "Storing unchanged resource on Walrus: {}",
+                "Trying to store unchanged resource on Walrus: {}",
                 &resource.info.path
             ));
-
-            let _output = self
-                .walrus
-                .store(resource.full_path.clone(), self.epochs, self.force)?;
+            let _output = self.walrus.store(resource.full_path.clone(), self.epochs)?;
 
             display::done();
         }
-
         Ok(())
     }
 

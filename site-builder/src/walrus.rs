@@ -68,8 +68,8 @@ impl Walrus {
     }
 
     /// Issues a `store` JSON command to the Walrus CLI, returning the parsed output.
-    pub fn store(&self, file: PathBuf, epochs: u64, force: bool) -> Result<StoreOutput> {
-        create_command!(self, store, file, epochs, force)
+    pub fn store(&self, file: PathBuf, epochs: u64) -> Result<StoreOutput> {
+        create_command!(self, store, file, epochs)
     }
 
     // TODO(giac): currently blocking. Parallelize reads.

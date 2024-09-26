@@ -251,18 +251,17 @@ impl ResourceSet {
         update_operations: &[ResourceOp<'a>],
     ) -> Vec<&'a Resource> {
         // Collect the set of created or deleted resources for fast lookup.
-        let affected_resources: BTreeSet<&Resource> = update_operations
-            .iter()
-            .map(|op| match op {
-                ResourceOp::Created(resource) | ResourceOp::Deleted(resource) => *resource,
-            })
-            .collect();
+        let affected_resources: BTreeSet<&Resource> =
+            update_operations.iter().map(|op| op.inner()).collect();
 
-        // Filter the new resources (self.inner) to find those that are not in the affected set.
-        self.inner
-            .iter()
-            .filter(|resource| !affected_resources.contains(resource))
-            .collect() // Collect unchanged resources into a Vec
+        // Collect references to resources in self.inner.
+        let self_resources: BTreeSet<&Resource> = self.inner.iter().collect();
+
+        // Use `difference` to find resources in self.inner that are not in affected_resources.
+        self_resources
+            .difference(&affected_resources)
+            .cloned()
+            .collect()
     }
 
     /// Returns a vector of deletion and creation operations to move
