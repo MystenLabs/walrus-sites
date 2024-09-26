@@ -5,5 +5,6 @@ pub mod builder;
 pub mod content;
 #[macro_use]
 pub mod macros;
+pub mod config_reader;
 pub mod manager;
 pub mod resource;

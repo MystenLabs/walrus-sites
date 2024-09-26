@@ -1,0 +1,9 @@
+{
+  "headers": {
+    "/index.html": {
+      "Content-Type": "text/html",
+      "Content-Encoding": "gzip",
+      "Cache-Control": "max-age=3600"
+    }
+  }
+}
