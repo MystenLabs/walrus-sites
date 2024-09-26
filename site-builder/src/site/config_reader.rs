@@ -8,6 +8,7 @@ use serde::Deserialize;
 #[derive(Deserialize, Debug)]
 struct WSConfig {
     headers: Option<HashMap<String, HashMap<String, String>>>,
+    // TODO: "routes"" for client-side routing.
 }
 
 pub fn read_ws_config<P: AsRef<Path>>(path: P) -> Result<WSConfig, Box<dyn Error>> {
@@ -24,11 +25,29 @@ pub fn read_ws_config<P: AsRef<Path>>(path: P) -> Result<WSConfig, Box<dyn Error
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
 
     #[test]
     fn test_read_ws_config() {
-        let path = "ws-config.json";
-        let result = read_ws_config(path).unwrap();
+        let data = r#"
+        {
+            "headers": {
+                "/index.html": {
+                    "Content-Type": "application/json",
+                    "Content-Encoding": "gzip",
+                    "Cache-Control": "no-cache"
+                }
+            }
+        }
+        "#;
+
+        // Create a temporary file and write the test data to it.
+        let mut temp_file = NamedTempFile::new().unwrap();
+        write!(temp_file, "{}", data).unwrap();
+
+        // Read the configuration from the temporary file.
+        let result = read_ws_config(temp_file.path()).unwrap();
         println!("{:#?}", result);
     }
 }
