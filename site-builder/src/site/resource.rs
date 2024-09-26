@@ -4,21 +4,25 @@
 //! Functionality to read and check the files in of a website.
 
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeSet, HashMap},
     fmt::{self, Display},
     fs,
     io::Write,
     path::{Path, PathBuf},
 };
-use crate::site::config_reader::{read_ws_config, WSConfig};
+
 use anyhow::{anyhow, Context, Result};
+use clap::Error;
 use fastcrypto::hash::{HashFunction, Sha256};
 use flate2::{write::GzEncoder, Compression};
 use move_core_types::u256::U256;
 use sui_sdk::rpc_types::{SuiMoveStruct, SuiMoveValue};
 
 use crate::{
-    site::content::{ContentEncoding, ContentType},
+    site::{
+        config_reader::{read_ws_config, WSConfig},
+        content::{ContentEncoding, ContentType},
+    },
     walrus::{types::BlobId, Walrus},
 };
 
@@ -67,6 +71,27 @@ pub struct HttpHeader {
 
 #[derive(serde::Serialize, Clone, Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub struct HttpHeaders(pub Vec<HttpHeader>);
+
+impl HttpHeaders {
+    pub fn new() -> Self {
+        HttpHeaders(Vec::new())
+    }
+}
+
+impl TryFrom<HashMap<String, String>> for HttpHeaders {
+    type Error = anyhow::Error;
+
+    fn try_from(values: HashMap<String, String>) -> std::result::Result<Self, Self::Error> {
+        let mut headers = Vec::new();
+        for value in values {
+            headers.push(HttpHeader {
+                name: value.0,
+                value: value.1,
+            });
+        }
+        Ok(HttpHeaders(headers))
+    }
+}
 
 impl TryFrom<Vec<SuiMoveValue>> for HttpHeaders {
     type Error = anyhow::Error;
@@ -344,7 +369,7 @@ pub(crate) struct ResourceManager {
     /// The resources in the site.
     pub resources: ResourceSet,
     /// The ws-config.json contents.
-    pub ws_config: Option<WSConfig>
+    pub ws_config: Option<WSConfig>,
 }
 
 impl ResourceManager {
@@ -352,7 +377,7 @@ impl ResourceManager {
         Ok(ResourceManager {
             walrus,
             resources: ResourceSet::default(),
-            ws_config: None
+            ws_config: None,
         })
     }
 
@@ -371,12 +396,25 @@ impl ResourceManager {
                 .expect("the path should not terminate in `..`"),
         );
 
-        // TODO(tza): remove this - it's a mock
-        let headers = HttpHeaders(vec![HttpHeader {
-            name: "Content-Type".to_string(),
-            value: "text/html; charset=utf-8".to_string(),
-        }]);
-        
+        // Get the headers of the specific resource if they exist
+        // for this specific path.
+        // 1. Is ws-config.json specified?
+        let all_headers = match &self.ws_config {
+            Some(config) => &config.headers,
+            None => return Ok(None),
+        };
+        // 2. Are "headers" included in ws-config?
+        let resource_path = full_path_to_resource_path(full_path, root)?;
+        let headers = match all_headers {
+            Some(map) => map.get(&resource_path),
+            _ => None,
+        };
+        // 3. Does the specific resource has headers defined for it? If not, use defaults.
+        let http_headers = match headers {
+            Some(h) => HttpHeaders::try_from(h.clone()),
+            _ => Ok(HttpHeaders::new()),
+        };
+
         // TODO(tza): try_from content type based on the content parsed from ws-config.
         // let content_type =
         //     match ContentType::try_from_extension(extension.to_str().ok_or(anyhow!(
@@ -414,7 +452,7 @@ impl ResourceManager {
         Ok(Some(Resource::new(
             full_path_to_resource_path(full_path, root)?,
             full_path.to_owned(),
-            headers,
+            http_headers.unwrap(),
             output.blob_id,
             U256::from_le_bytes(&blob_hash),
             // TODO(giac): Change to `content.len()` when the problem with content encoding is

@@ -7,7 +7,7 @@ use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
 pub struct WSConfig {
-    headers: Option<HashMap<String, HashMap<String, String>>>,
+    pub headers: Option<HashMap<String, HashMap<String, String>>>,
     // TODO: "routes"" for client-side routing.
 }
 
@@ -24,9 +24,11 @@ pub fn read_ws_config<P: AsRef<Path>>(path: P) -> Result<WSConfig, Box<dyn Error
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::io::Write;
+
     use tempfile::NamedTempFile;
+
+    use super::*;
 
     #[test]
     fn test_read_ws_config() {
