@@ -10,7 +10,7 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
 };
-
+use crate::site::config_reader::{read_ws_config, WSConfig};
 use anyhow::{anyhow, Context, Result};
 use fastcrypto::hash::{HashFunction, Sha256};
 use flate2::{write::GzEncoder, Compression};
@@ -343,6 +343,8 @@ pub(crate) struct ResourceManager {
     pub walrus: Walrus,
     /// The resources in the site.
     pub resources: ResourceSet,
+    /// The ws-config.json contents.
+    pub ws_config: Option<WSConfig>
 }
 
 impl ResourceManager {
@@ -350,6 +352,7 @@ impl ResourceManager {
         Ok(ResourceManager {
             walrus,
             resources: ResourceSet::default(),
+            ws_config: None
         })
     }
 
@@ -368,20 +371,13 @@ impl ResourceManager {
                 .expect("the path should not terminate in `..`"),
         );
 
-        // load ws-config.json
-        // look for the file_name inside the "headers" key {}
-        // if not found, return the defaults.
-
-        // TODO
-        // let headers = parse_headers_from_config(...)
-        // if no headers, use default
-        // content-type: "text/html; charset=utf-8"
-        // content-encoding: "plaintext"
+        // TODO(tza): remove this - it's a mock
         let headers = HttpHeaders(vec![HttpHeader {
             name: "Content-Type".to_string(),
             value: "text/html; charset=utf-8".to_string(),
         }]);
-
+        
+        // TODO(tza): try_from content type based on the content parsed from ws-config.
         // let content_type =
         //     match ContentType::try_from_extension(extension.to_str().ok_or(anyhow!(
         //         "Could not convert the extension {:?} to a string.",
@@ -429,6 +425,8 @@ impl ResourceManager {
 
     /// Recursively iterate a directory and load all [`Resources`][Resource] within.
     pub fn read_dir(&mut self, root: &Path, content_encoding: &ContentEncoding) -> Result<()> {
+        let ws_config_path = root.join("ws-config.json");
+        self.ws_config = read_ws_config(ws_config_path).ok();
         self.resources = ResourceSet::from_iter(self.iter_dir(root, root, content_encoding)?);
         Ok(())
     }

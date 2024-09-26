@@ -6,7 +6,7 @@ use std::{collections::HashMap, error::Error, fs::File, io::BufReader, path::Pat
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
-struct WSConfig {
+pub struct WSConfig {
     headers: Option<HashMap<String, HashMap<String, String>>>,
     // TODO: "routes"" for client-side routing.
 }
@@ -18,7 +18,7 @@ pub fn read_ws_config<P: AsRef<Path>>(path: P) -> Result<WSConfig, Box<dyn Error
 
     // Read the JSON contents of the file as an instance of `WSConfig`.
     let ws_config: WSConfig = serde_json::from_reader(reader)?;
-
+    println!("ws-config.json loaded! contents: {:?}", ws_config);
     Ok(ws_config)
 }
 
