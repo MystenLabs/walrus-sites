@@ -155,7 +155,12 @@ impl SiteManager {
         ptb.add_calls(
             updates
                 .iter()
-                .map(SiteCall::try_from)
+                .map(|u| match u {
+                    ResourceOp::Deleted(resource) => {
+                        SitePtb::remove_resource_if_exists(&resource.info)
+                    }
+                    ResourceOp::Created(resource) => SitePtb::new_resource_and_add(&resource.info),
+                })
                 .collect::<Result<Vec<_>>>()?,
         )?;
         if transfer {

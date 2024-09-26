@@ -11,7 +11,7 @@ use sui_types::{
     TypeTag,
 };
 
-use super::resource::{ResourceInfo, ResourceOp};
+use super::resource::{HttpHeaders, Resource, ResourceInfo};
 
 pub struct SitePtb<T = ()> {
     pt_builder: ProgrammableTransactionBuilder,
@@ -127,21 +127,14 @@ impl SitePtb<Argument> {
             args = vec![new_resource_arg];
             // Replace the call to execute the adding
             "add_resource".clone_into(&mut call.function);
+
+            // TODO(tza) add_headers iteratively
         }
         args.insert(0, self.site_argument);
         self.add_programmable_move_call(Identifier::new(call.function)?, vec![], args);
         Ok(())
     }
-}
 
-// Testing out
-#[derive(Debug)]
-pub struct SiteCall {
-    function: String,
-    args: Vec<CallArg>,
-}
-
-impl SiteCall {
     /// Creates a new resource and adds it to the site.
     ///
     /// This call results into two transactions in a PTB, one to create the resource, and one to add
@@ -149,7 +142,6 @@ impl SiteCall {
     pub fn new_resource_and_add(resource: &ResourceInfo) -> Result<SiteCall> {
         tracing::debug!(
             resource=%resource.path,
-            headers=?resource.headers,
             blob_id=?resource.blob_id,
             "new Move call: creating resource"
         );
@@ -157,7 +149,6 @@ impl SiteCall {
             function: "new_resource_and_add".to_owned(),
             args: vec![
                 pure_call_arg(&resource.path)?,
-                CallArg::Object(&resource.headers)?,
                 pure_call_arg(&resource.blob_id)?,
                 pure_call_arg(&resource.blob_hash)?,
             ],
@@ -174,25 +165,12 @@ impl SiteCall {
     }
 }
 
+#[derive(Debug)]
+pub struct SiteCall {
+    function: String,
+    args: Vec<CallArg>,
+}
+
 pub fn pure_call_arg<T: Serialize>(arg: &T) -> Result<CallArg> {
     Ok(CallArg::Pure(bcs::to_bytes(arg)?))
-}
-
-impl<'a> TryFrom<&ResourceOp<'a>> for SiteCall {
-    type Error = anyhow::Error;
-
-    fn try_from(value: &ResourceOp) -> Result<Self, Self::Error> {
-        match value {
-            ResourceOp::Deleted(resource) => SiteCall::remove_resource_if_exists(&resource.info),
-            ResourceOp::Created(resource) => SiteCall::new_resource_and_add(&resource.info),
-        }
-    }
-}
-
-impl<'a> TryFrom<ResourceOp<'a>> for SiteCall {
-    type Error = anyhow::Error;
-
-    fn try_from(value: ResourceOp) -> Result<Self, Self::Error> {
-        Self::try_from(&value)
-    }
 }
