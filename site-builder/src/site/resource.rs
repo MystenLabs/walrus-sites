@@ -12,7 +12,6 @@ use std::{
 };
 
 use anyhow::{anyhow, Context, Result};
-use clap::Error;
 use fastcrypto::hash::{HashFunction, Sha256};
 use flate2::{write::GzEncoder, Compression};
 use move_core_types::u256::U256;
@@ -21,7 +20,7 @@ use sui_sdk::rpc_types::{SuiMoveStruct, SuiMoveValue};
 use crate::{
     site::{
         config_reader::{read_ws_config, WSConfig},
-        content::{ContentEncoding, ContentType},
+        content::ContentEncoding,
     },
     walrus::{types::BlobId, Walrus},
 };
@@ -388,9 +387,11 @@ impl ResourceManager {
         &self,
         full_path: &Path,
         root: &Path,
-        content_encoding: &ContentEncoding,
+        // TODO: remove content encoding?
+        _content_encoding: &ContentEncoding,
     ) -> Result<Option<Resource>> {
-        let extension = full_path.extension().unwrap_or(
+        // TODO: move this later, and use to infer if the mime type is not provided?
+        let _extension = full_path.extension().unwrap_or(
             full_path
                 .file_name()
                 .expect("the path should not terminate in `..`"),
