@@ -74,10 +74,8 @@ impl HttpHeaders {
     }
 }
 
-impl TryFrom<HashMap<String, String>> for HttpHeaders {
-    type Error = anyhow::Error;
-
-    fn try_from(values: HashMap<String, String>) -> std::result::Result<Self, Self::Error> {
+impl From<HashMap<String, String>> for HttpHeaders {
+    fn from(values: HashMap<String, String>) -> HttpHeaders {
         let mut headers = Vec::new();
         for value in values {
             headers.push(HttpHeader {
@@ -85,7 +83,7 @@ impl TryFrom<HashMap<String, String>> for HttpHeaders {
                 value: value.1,
             });
         }
-        Ok(HttpHeaders(headers))
+        HttpHeaders(headers)
     }
 }
 
@@ -409,8 +407,8 @@ impl ResourceManager {
         };
         // 3. Does the specific resource has headers defined for it? If not, use defaults.
         let http_headers = match headers {
-            Some(h) => HttpHeaders::try_from(h.clone()),
-            _ => Ok(HttpHeaders::new()),
+            Some(h) => HttpHeaders::from(h.clone()),
+            _ => HttpHeaders::new(),
         };
 
         // TODO(tza): try_from content type based on the content parsed from ws-config.
@@ -450,7 +448,7 @@ impl ResourceManager {
         Ok(Some(Resource::new(
             full_path_to_resource_path(full_path, root)?,
             full_path.to_owned(),
-            http_headers.unwrap(),
+            http_headers,
             output.blob_id,
             U256::from_le_bytes(&blob_hash),
             // TODO(giac): Change to `content.len()` when the problem with content encoding is
