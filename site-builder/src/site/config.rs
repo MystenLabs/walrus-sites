@@ -12,7 +12,7 @@ pub struct WSConfig {
 }
 
 impl WSConfig {
-    pub fn read_ws_config<P: AsRef<Path>>(path: P) -> Result<WSConfig, Box<dyn Error>> {
+    pub fn read<P: AsRef<Path>>(path: P) -> Result<WSConfig, Box<dyn Error>> {
         // Load the JSON contents to a string.
         let file_contents = std::fs::read_to_string(path)?;
         // Read the JSON contents of the file as an instance of `WSConfig`.
@@ -49,7 +49,7 @@ mod tests {
         write!(temp_file, "{}", data).unwrap();
 
         // Read the configuration from the temporary file.
-        let result = WSConfig::read_ws_config(temp_file.path()).unwrap();
+        let result = WSConfig::read(temp_file.path()).unwrap();
         println!("{:#?}", result);
     }
 }
