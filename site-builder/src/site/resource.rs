@@ -19,7 +19,7 @@ use sui_sdk::rpc_types::{SuiMoveStruct, SuiMoveValue};
 
 use crate::{
     site::{
-        config_reader::{read_ws_config, WSConfig},
+        config::{read_ws_config, WSConfig},
         content::ContentEncoding,
     },
     walrus::{types::BlobId, Walrus},
