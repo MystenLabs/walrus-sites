@@ -397,7 +397,7 @@ impl ResourceManager {
         // 1. Is ws-config.json specified?
         let all_headers = match &self.ws_config {
             Some(config) => &config.headers,
-            None => return Ok(None),
+            None => &None,
         };
         // 2. Are "headers" included in ws-config?
         let resource_path = full_path_to_resource_path(full_path, root)?;
