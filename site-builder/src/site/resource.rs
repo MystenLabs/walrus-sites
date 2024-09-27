@@ -18,7 +18,7 @@ use move_core_types::u256::U256;
 use sui_sdk::rpc_types::{SuiMoveStruct, SuiMoveValue};
 
 use crate::{
-    site::{config::WSConfig, content::ContentEncoding},
+    site::config::WSConfig,
     walrus::{types::BlobId, Walrus},
 };
 
@@ -378,13 +378,7 @@ impl ResourceManager {
     /// Read a resource at a path.
     ///
     /// Ignores empty files.
-    pub fn read_resource(
-        &self,
-        full_path: &Path,
-        root: &Path,
-        // TODO: remove content encoding?
-        _content_encoding: &ContentEncoding,
-    ) -> Result<Option<Resource>> {
+    pub fn read_resource(&self, full_path: &Path, root: &Path) -> Result<Option<Resource>> {
         // TODO: move this later, and use to infer if the mime type is not provided?
         let _extension = full_path.extension().unwrap_or(
             full_path
@@ -458,32 +452,24 @@ impl ResourceManager {
     }
 
     /// Recursively iterate a directory and load all [`Resources`][Resource] within.
-    pub fn read_dir(&mut self, root: &Path, content_encoding: &ContentEncoding) -> Result<()> {
+    pub fn read_dir(&mut self, root: &Path) -> Result<()> {
         let ws_config_path = root.join("ws-config.json");
         self.ws_config = WSConfig::read(ws_config_path).ok();
-        self.resources = ResourceSet::from_iter(self.iter_dir(root, root, content_encoding)?);
+        self.resources = ResourceSet::from_iter(self.iter_dir(root, root)?);
         Ok(())
     }
 
-    fn iter_dir(
-        &self,
-        start: &Path,
-        root: &Path,
-        content_encoding: &ContentEncoding,
-    ) -> Result<Vec<Resource>> {
+    fn iter_dir(&self, start: &Path, root: &Path) -> Result<Vec<Resource>> {
         let mut resources: Vec<Resource> = vec![];
         let entries = fs::read_dir(start)?;
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
-                resources.extend(self.iter_dir(&path, root, content_encoding)?);
-            } else if let Some(res) =
-                self.read_resource(&path, root, content_encoding)
-                    .context(format!(
-                        "error while reading resource `{}`",
-                        path.to_string_lossy()
-                    ))?
-            {
+                resources.extend(self.iter_dir(&path, root)?);
+            } else if let Some(res) = self.read_resource(&path, root).context(format!(
+                "error while reading resource `{}`",
+                path.to_string_lossy()
+            ))? {
                 resources.push(res);
             }
         }
