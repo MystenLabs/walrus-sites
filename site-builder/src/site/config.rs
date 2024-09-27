@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::HashMap, error::Error, fs::File, io::BufReader, path::Path};
+use std::{collections::HashMap, error::Error, path::Path};
 
 use serde::Deserialize;
 
@@ -12,12 +12,10 @@ pub struct WSConfig {
 }
 
 pub fn read_ws_config<P: AsRef<Path>>(path: P) -> Result<WSConfig, Box<dyn Error>> {
-    // Open the file in read-only mode with buffer.
-    let file = File::open(path)?;
-    let reader = BufReader::new(file);
-
+    // Load the JSON contents to a string.
+    let file_contents = std::fs::read_to_string(path)?;
     // Read the JSON contents of the file as an instance of `WSConfig`.
-    let ws_config: WSConfig = serde_json::from_reader(reader)?;
+    let ws_config: WSConfig = serde_json::from_str(&file_contents)?;
     println!("ws-config.json loaded! contents: {:?}", ws_config);
     Ok(ws_config)
 }
