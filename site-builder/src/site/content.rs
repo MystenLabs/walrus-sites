@@ -121,6 +121,9 @@ pub enum ContentType {
 }
 
 impl ContentType {
+    // TODO: Remove the allow dead code as soon as we use this function again to infert the mime
+    // type.
+    #[allow(dead_code)]
     pub fn try_from_extension(ext: &str) -> Result<Self> {
         Ok(match ext {
             "aac" => ContentType::AudioAac,

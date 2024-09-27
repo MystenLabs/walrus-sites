@@ -19,7 +19,7 @@ use sui_types::{
 use super::resource::{OperationsSummary, ResourceInfo, ResourceManager, ResourceOp, ResourceSet};
 use crate::{
     display,
-    site::builder::{SiteCall, SitePtb},
+    site::builder::SitePtb,
     util::{self, get_struct_from_object_response},
     walrus::Walrus,
     Config,
@@ -152,20 +152,12 @@ impl SiteManager {
             address=?self.active_address()?,
             "starting to update site resources on chain",
         );
-        ptb.add_calls(
-            updates
-                .iter()
-                .map(|u| match u {
-                    ResourceOp::Deleted(resource) => {
-                        SitePtb::remove_resource_if_exists(&resource.info)
-                    }
-                    ResourceOp::Created(resource) => SitePtb::new_resource_and_add(&resource.info),
-                })
-                .collect::<Result<Vec<_>>>()?,
-        )?;
+
+        ptb.add_operations(updates)?;
         if transfer {
-            ptb.transfer_arg(self.active_address()?, ptb.site_argument());
+            ptb.transfer_site(self.active_address()?);
         }
+
         self.sign_and_send_ptb(ptb.finish(), self.gas_coin_ref().await?)
             .await
     }
