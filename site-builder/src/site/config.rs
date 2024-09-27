@@ -11,13 +11,15 @@ pub struct WSConfig {
     // TODO: "routes"" for client-side routing.
 }
 
-pub fn read_ws_config<P: AsRef<Path>>(path: P) -> Result<WSConfig, Box<dyn Error>> {
-    // Load the JSON contents to a string.
-    let file_contents = std::fs::read_to_string(path)?;
-    // Read the JSON contents of the file as an instance of `WSConfig`.
-    let ws_config: WSConfig = serde_json::from_str(&file_contents)?;
-    println!("ws-config.json loaded! contents: {:?}", ws_config);
-    Ok(ws_config)
+impl WSConfig {
+    pub fn read_ws_config<P: AsRef<Path>>(path: P) -> Result<WSConfig, Box<dyn Error>> {
+        // Load the JSON contents to a string.
+        let file_contents = std::fs::read_to_string(path)?;
+        // Read the JSON contents of the file as an instance of `WSConfig`.
+        let ws_config: WSConfig = serde_json::from_str(&file_contents)?;
+        println!("ws-config.json loaded! contents: {:?}", ws_config);
+        Ok(ws_config)
+    }
 }
 
 #[cfg(test)]
@@ -47,7 +49,7 @@ mod tests {
         write!(temp_file, "{}", data).unwrap();
 
         // Read the configuration from the temporary file.
-        let result = read_ws_config(temp_file.path()).unwrap();
+        let result = WSConfig::read_ws_config(temp_file.path()).unwrap();
         println!("{:#?}", result);
     }
 }

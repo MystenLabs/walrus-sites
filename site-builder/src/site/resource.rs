@@ -18,10 +18,7 @@ use move_core_types::u256::U256;
 use sui_sdk::rpc_types::{SuiMoveStruct, SuiMoveValue};
 
 use crate::{
-    site::{
-        config::{read_ws_config, WSConfig},
-        content::ContentEncoding,
-    },
+    site::{config::WSConfig, content::ContentEncoding},
     walrus::{types::BlobId, Walrus},
 };
 
@@ -465,7 +462,7 @@ impl ResourceManager {
     /// Recursively iterate a directory and load all [`Resources`][Resource] within.
     pub fn read_dir(&mut self, root: &Path, content_encoding: &ContentEncoding) -> Result<()> {
         let ws_config_path = root.join("ws-config.json");
-        self.ws_config = read_ws_config(ws_config_path).ok();
+        self.ws_config = WSConfig::read_ws_config(ws_config_path).ok();
         self.resources = ResourceSet::from_iter(self.iter_dir(root, root, content_encoding)?);
         Ok(())
     }
