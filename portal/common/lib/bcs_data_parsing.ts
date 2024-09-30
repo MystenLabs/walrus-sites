@@ -20,7 +20,7 @@ const BLOB_ID = bcs.u256().transform({
 // otherwise, it will mess up with the checksum results.
 const U256 = bcs.u256().transform({
     input: (id: string) => id,
-    output: (id) => toB64(bcs.u256().serialize(id).toBytes()),
+    output: (id) => toHEX(bcs.u256().serialize(id).toBytes()),
 });
 
 export const ResourcePathStruct = bcs.struct("ResourcePath", {
