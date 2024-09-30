@@ -129,7 +129,13 @@ impl SitePtb<Argument> {
 
         // Add the headers to the resource.
         for header in resource.info.headers.0.iter() {
-            self.add_header(new_resource_arg, header)?;
+            self.add_header(
+                new_resource_arg,
+                &HttpHeader {
+                    name: header.0.clone(),
+                    value: header.1.clone(),
+                },
+            )?;
         }
 
         // Add the resource to the site.

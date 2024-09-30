@@ -6,20 +6,22 @@ use std::{collections::HashMap, path::Path};
 use anyhow::{Context, Result};
 use serde::Deserialize;
 
+/// Deserialized object of the file's `ws-resource.json` contents.
 #[derive(Deserialize, Debug)]
-pub struct WSConfig {
+pub struct WSResources {
     pub headers: Option<HashMap<String, HashMap<String, String>>>,
     // TODO: "routes"" for client-side routing.
 }
 
-impl WSConfig {
-    pub fn read<P: AsRef<Path>>(path: P) -> Result<WSConfig> {
+impl WSResources {
+    /// Reads and parses the `ws-resources.json` file into a `WSResources` struct.
+    pub fn read<P: AsRef<Path>>(path: P) -> Result<WSResources> {
         // Load the JSON contents to a string.
         let file_contents =
             std::fs::read_to_string(path).context("Failed to read ws_config.json")?;
-        // Read the JSON contents of the file as an instance of `WSConfig`.
-        let ws_config: WSConfig = serde_json::from_str(&file_contents)?;
-        println!("ws-config.json loaded! contents: {:?}", ws_config);
+        // Read the JSON contents of the file as an instance of `WSResources`.
+        let ws_config: WSResources = serde_json::from_str(&file_contents)?;
+        println!("ws-resources.json loaded! contents: {:?}", ws_config);
         Ok(ws_config)
     }
 }
@@ -33,7 +35,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_read_ws_config() {
+    fn test_read_ws_resources() {
         let data = r#"
         {
             "headers": {
@@ -51,7 +53,7 @@ mod tests {
         write!(temp_file, "{}", data).unwrap();
 
         // Read the configuration from the temporary file.
-        let result = WSConfig::read(temp_file.path()).unwrap();
+        let result = WSResources::read(temp_file.path()).unwrap();
         println!("{:#?}", result);
     }
 }

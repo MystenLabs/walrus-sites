@@ -71,7 +71,7 @@ impl SiteManager {
     /// or created are published to Walrus.
     pub async fn update_site(
         &self,
-        resources: &ResourceManager,
+        resource_manager: &ResourceManager,
     ) -> Result<(SuiTransactionBlockResponse, OperationsSummary)> {
         let ptb = SitePtb::new(
             self.config.package,
@@ -91,9 +91,9 @@ impl SiteManager {
         };
         tracing::debug!(?existing_resources, "checked existing resources");
         let update_operations = if self.force {
-            existing_resources.replace_all(&resources.resources)
+            existing_resources.replace_all(&resource_manager.resources)
         } else {
-            resources.resources.diff(&existing_resources)
+            resource_manager.resources.diff(&existing_resources)
         };
         tracing::debug!(operations=?update_operations, "list of operations computed");
 
