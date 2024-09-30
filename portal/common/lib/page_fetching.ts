@@ -7,9 +7,14 @@ import { DomainDetails, isResource } from "./types/index";
 import { subdomainToObjectId, HEXtoBase36 } from "./objectId_operations";
 import { resolveSuiNsAddress, hardcodedSubdmains } from "./suins";
 import { fetchResource } from "./resource";
-import { siteNotFound, noObjectIdFound, fullNodeFail } from "./http/http_error_responses";
+import {
+    siteNotFound, noObjectIdFound, fullNodeFail,
+    generateHashErrorResponse
+} from "./http/http_error_responses";
 import { decompressData } from "./decompress_data";
 import { aggregatorEndpoint } from "./aggregator";
+import { toB64, toHEX } from "@mysten/bcs";
+import { sha256 } from "./crypto";
 
 /**
  * Resolves the subdomain to an object ID, and gets the corresponding resources.
@@ -76,12 +81,25 @@ export async function fetchPage(
         return siteNotFound();
     }
 
-    // Deserialize the bcs encoded body and decompress.
     const body = await contents.arrayBuffer();
     const decompressed = await decompressData(new Uint8Array(body), result.content_encoding);
     if (!decompressed) {
         return siteNotFound();
     }
+
+    // Verify the integrity of the aggregator response by hashing
+    // the response contents.
+    const h10b = toHEX(
+        await sha256(decompressed)
+    );
+    if (result.blob_hash != h10b) {
+        console.warn(
+            '[!] checksum mismatch [!] for:', result.path, '.',
+            `blob hash: ${result.blob_hash} | aggr. hash: ${h10b}`
+        )
+        return generateHashErrorResponse()
+    }
+
     console.log("Returning resource: ", result.path, result.blob_id, result.content_type);
     return new Response(decompressed, {
         headers: {

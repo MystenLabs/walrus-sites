@@ -25,6 +25,7 @@ export type Resource = {
     content_type: string;
     content_encoding: string;
     blob_id: string;
+    blob_hash: string;
 };
 
 export type VersionedResource = Resource & {
@@ -41,7 +42,8 @@ export function isResource(obj: any): obj is Resource {
         typeof obj.path === 'string' &&
         typeof obj.content_type === 'string' &&
         typeof obj.content_encoding === 'string' &&
-        typeof obj.blob_id === 'string'
+        typeof obj.blob_id === 'string' &&
+        typeof obj.blob_hash === 'string'
     );
 }
 
