@@ -8,7 +8,7 @@ const { subtle } = globalThis.crypto;
  * @param message ArrayBuffer to hash
  * @returns Promise<Uint8Array> Resulting hash as Uint8Array
  */
-export async function sha256(message: ArrayBuffer) {
+export async function sha256(message: ArrayBuffer): Promise<Uint8Array> {
     const hash = await subtle.digest("SHA-256", message);
     return new Uint8Array(hash);
 }

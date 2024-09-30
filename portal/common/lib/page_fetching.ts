@@ -13,7 +13,7 @@ import {
 } from "./http/http_error_responses";
 import { decompressData } from "./decompress_data";
 import { aggregatorEndpoint } from "./aggregator";
-import { toB64 } from "@mysten/bcs";
+import { toB64, toHEX } from "@mysten/bcs";
 import { sha256 } from "./crypto";
 
 /**
@@ -89,7 +89,7 @@ export async function fetchPage(
 
     // Verify the integrity of the aggregator response by hashing
     // the response contents.
-    const h10b = toB64(
+    const h10b = toHEX(
         await sha256(decompressed)
     );
     if (result.blob_hash != h10b) {
