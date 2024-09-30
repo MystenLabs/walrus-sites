@@ -5,5 +5,6 @@
 export enum HttpStatusCodes {
     TOO_MANY_REDIRECTS = 310,
     NOT_FOUND = 404,
+    UNPROCESSABLE_CONTENT = 422,
     LOOP_DETECTED = 508
 }
