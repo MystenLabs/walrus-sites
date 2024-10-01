@@ -21,8 +21,11 @@ use crate::{
     util::{get_existing_resource_ids, id_to_base36, load_wallet_context},
 };
 
+// Define the `GIT_REVISION` and `VERSION` consts.
+bin_version::bin_version!();
+
 #[derive(Parser, Debug)]
-#[clap(rename_all = "kebab-case")]
+#[clap(rename_all = "kebab-case", version = VERSION, propagate_version = true)]
 struct Args {
     /// The path to the configuration file for the site builder.
     #[clap(short, long, default_value = "builder.yaml")]
