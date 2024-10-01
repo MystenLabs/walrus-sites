@@ -21,7 +21,7 @@ use crate::{
     util::{get_existing_resource_ids, id_to_base36, load_wallet_context},
 };
 
-// Define the `GIT_REVISION` and `VERSION` consts
+// Define the `GIT_REVISION` and `VERSION` consts.
 bin_version::bin_version!();
 
 #[derive(Parser, Debug)]
