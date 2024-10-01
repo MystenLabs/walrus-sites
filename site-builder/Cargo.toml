@@ -25,6 +25,7 @@ shared-crypto = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.2
 sui-keys = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.27.2" }
 sui-sdk = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.27.2" }
 sui-types = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.27.2" }
+bin-version = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.27.2" }
 thiserror = "1.0.61"
 tokio = { version = "1.38.0", features = ["rt", "rt-multi-thread", "macros"] }
 toml = "0.8.14"
