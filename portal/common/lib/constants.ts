@@ -15,7 +15,7 @@ export const FALLBACK_PORTAL = "blob.store"
 // The string representing the ResourcePath struct in the walrus_site package.
 export const RESOURCE_PATH_MOVE_TYPE = SITE_PACKAGE + "::site::ResourcePath";
 
-const LANDING_PAGE_OID = '0xe5367fafb3751b34d681be31d5cd40070d6a8f55badcd606763c0e8ca5a39711';
+const LANDING_PAGE_OID = '0x2d9414edc309535bfd4cd7e80ccbc09fee18bf86b449a185b81e914096059a67';
 const FLATLAND_OID = '0xf60797491f9303de69856b7d2fc1109daf63450ec8cd7fb49f1bd4a0e7d26ae6';
 const FLATLANDER_OID = '0xd2de62949d832aea46b0eac830d9837885d419ba5b2baa7f2b95d10059573ddf';
 export const SITES_USED_FOR_BENCHING = [

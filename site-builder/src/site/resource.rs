@@ -482,10 +482,12 @@ impl ResourceManager {
     pub fn read_dir(&mut self, root: &Path) -> Result<()> {
         let cli_path = self.ws_resources_path.as_path();
         if !cli_path.exists() {
-            return Err(anyhow!(
-                "The specified ws-resources.json path does not exist: {}",
+            eprintln!(
+                "Warning: The specified ws-resources.json path does not exist: {}.
+                Continuing without it...",
                 cli_path.display()
-            ));
+            );
+            self.ws_resources = None;
         }
         self.ws_resources = WSResources::read(cli_path).ok();
         self.resources = ResourceSet::from_iter(self.iter_dir(root, root)?);
