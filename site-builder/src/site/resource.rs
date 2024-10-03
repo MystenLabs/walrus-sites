@@ -391,17 +391,14 @@ pub(crate) struct ResourceManager {
     pub resources: ResourceSet,
     /// The ws-resources.json contents.
     pub ws_resources: Option<WSResources>,
-    /// The location of the ws-resources.json.
-    pub ws_resources_path: PathBuf,
 }
 
 impl ResourceManager {
-    pub fn new(walrus: Walrus, ws_resources_path: PathBuf) -> Result<Self> {
+    pub fn new(walrus: Walrus, ws_resources: Option<WSResources>) -> Result<Self> {
         Ok(ResourceManager {
             walrus,
             resources: ResourceSet::default(),
-            ws_resources: None,
-            ws_resources_path,
+            ws_resources,
         })
     }
 
@@ -480,16 +477,6 @@ impl ResourceManager {
 
     /// Recursively iterate a directory and load all [`Resources`][Resource] within.
     pub fn read_dir(&mut self, root: &Path) -> Result<()> {
-        let cli_path = self.ws_resources_path.as_path();
-        if !cli_path.exists() {
-            eprintln!(
-                "Warning: The specified ws-resources.json path does not exist: {}.
-                Continuing without it...",
-                cli_path.display()
-            );
-            self.ws_resources = None;
-        }
-        self.ws_resources = WSResources::read(cli_path).ok();
         self.resources = ResourceSet::from_iter(self.iter_dir(root, root)?);
         Ok(())
     }

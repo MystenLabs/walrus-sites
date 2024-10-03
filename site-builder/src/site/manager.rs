@@ -19,6 +19,7 @@ use sui_types::{
 use super::resource::{OperationsSummary, ResourceInfo, ResourceManager, ResourceOp, ResourceSet};
 use crate::{
     display,
+    publish::WhenWalrusUpload,
     site::builder::SitePtb,
     util::{self, get_struct_from_object_response},
     walrus::Walrus,
@@ -42,7 +43,7 @@ pub struct SiteManager {
     pub wallet: WalletContext,
     pub site_id: SiteIdentifier,
     pub epochs: u64,
-    pub force: bool,
+    pub when_upload: WhenWalrusUpload,
 }
 
 impl SiteManager {
@@ -53,7 +54,7 @@ impl SiteManager {
         wallet: WalletContext,
         site_id: SiteIdentifier,
         epochs: u64,
-        force: bool,
+        when_upload: WhenWalrusUpload,
     ) -> Result<Self> {
         Ok(SiteManager {
             walrus,
@@ -61,7 +62,7 @@ impl SiteManager {
             config,
             site_id,
             epochs,
-            force,
+            when_upload,
         })
     }
 
@@ -90,7 +91,7 @@ impl SiteManager {
             ),
         };
         tracing::debug!(?existing_resources, "checked existing resources");
-        let update_operations = if self.force {
+        let update_operations = if self.when_upload.is_always() {
             existing_resources.replace_all(&resource_manager.resources)
         } else {
             resource_manager.resources.diff(&existing_resources)
@@ -134,9 +135,11 @@ impl SiteManager {
                 "Storing resource on Walrus: {}",
                 &resource.info.path
             ));
-            let _output = self
-                .walrus
-                .store(resource.full_path.clone(), self.epochs, self.force)?;
+            let _output = self.walrus.store(
+                resource.full_path.clone(),
+                self.epochs,
+                self.when_upload.is_always(),
+            )?;
             display::done();
         }
         Ok(())
