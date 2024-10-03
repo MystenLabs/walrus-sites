@@ -193,7 +193,7 @@ impl SiteManager {
         Ok(ResourceSet::from_iter(resources))
     }
 
-    /// Get the resources already published to the site
+    /// Get the resources already published to the site.
     async fn get_existing_resource_ids(&self, site_id: ObjectID) -> Result<Vec<ObjectID>> {
         Ok(
             util::get_existing_resource_ids(&self.sui_client().await?, site_id)
@@ -203,7 +203,7 @@ impl SiteManager {
         )
     }
 
-    /// Get the resource that is hosted on chain at the given object ID
+    /// Get the resource that is hosted on chain at the given object ID.
     async fn get_remote_resource_info(&self, object_id: ObjectID) -> Result<ResourceInfo> {
         let object = get_struct_from_object_response(
             &self

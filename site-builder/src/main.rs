@@ -128,7 +128,7 @@ enum Commands {
         #[clap(short, long, default_value = "test site")]
         site_name: String,
     },
-    /// Update an existing site
+    /// Update an existing site.
     Update {
         #[clap(flatten)]
         publish_options: PublishOptions,

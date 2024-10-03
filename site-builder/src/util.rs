@@ -67,7 +67,7 @@ where
     Ok(iterators.into_iter().flatten())
 }
 
-/// Convert the hex representation of an object id to base36
+/// Convert the hex representation of an object id to base36.
 pub fn id_to_base36(id: &ObjectID) -> Result<String> {
     const BASE36: &[u8] = "0123456789abcdefghijklmnopqrstuvwxyz".as_bytes();
     let source = id.into_bytes();
@@ -98,7 +98,7 @@ pub fn id_to_base36(id: &ObjectID) -> Result<String> {
     Ok(string)
 }
 
-/// Get the object id of the site that was published in the transaction
+/// Get the object id of the site that was published in the transaction.
 #[allow(dead_code)]
 pub fn get_site_id_from_response(
     address: SuiAddress,
