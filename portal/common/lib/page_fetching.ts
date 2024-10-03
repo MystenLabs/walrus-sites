@@ -13,7 +13,7 @@ import {
 } from "./http/http_error_responses";
 import { decompressData } from "./decompress_data";
 import { aggregatorEndpoint } from "./aggregator";
-import { toB64, toHEX } from "@mysten/bcs";
+import { toHEX } from "@mysten/bcs";
 import { sha256 } from "./crypto";
 
 /**
@@ -82,15 +82,10 @@ export async function fetchPage(
     }
 
     const body = await contents.arrayBuffer();
-    const decompressed = await decompressData(new Uint8Array(body), result.content_encoding);
-    if (!decompressed) {
-        return siteNotFound();
-    }
-
     // Verify the integrity of the aggregator response by hashing
     // the response contents.
     const h10b = toHEX(
-        await sha256(decompressed)
+        await sha256(body)
     );
     if (result.blob_hash != h10b) {
         console.warn(
@@ -100,10 +95,9 @@ export async function fetchPage(
         return generateHashErrorResponse()
     }
 
-    console.log("Returning resource: ", result.path, result.blob_id, result.content_type);
-    return new Response(decompressed, {
+    return new Response(body, {
         headers: {
-            "Content-Type": result.content_type,
+            ...Object.fromEntries(result.headers),
             "x-resource-sui-object-version": result.version,
             "x-resource-sui-object-id": result.objectId,
             "x-unix-time-cached": Date.now().toString()
