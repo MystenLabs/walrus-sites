@@ -4,7 +4,8 @@
 //! Functionality to read and check the files in of a website.
 
 use std::{
-    collections::BTreeSet,
+    cmp::Ordering,
+    collections::{BTreeSet, HashMap},
     fmt::{self, Display},
     fs,
     io::Write,
@@ -18,21 +19,19 @@ use move_core_types::u256::U256;
 use sui_sdk::rpc_types::{SuiMoveStruct, SuiMoveValue};
 
 use crate::{
-    site::content::{ContentEncoding, ContentType},
+    site::{config::WSResources, content::ContentType},
     walrus::{types::BlobId, Walrus},
 };
 
 /// Information about a resource.
 ///
 /// This struct mirrors the information that is stored on chain.
-#[derive(PartialEq, Eq, Debug, Clone, Ord, PartialOrd)]
+#[derive(PartialEq, Eq, Debug, Clone, PartialOrd, Ord)]
 pub(crate) struct ResourceInfo {
     /// The relative path the resource will have on Sui.
     pub path: String,
-    /// The content (MIME) type of the reseource.
-    pub content_type: ContentType,
-    /// The encoding of the content.
-    pub content_encoding: ContentEncoding,
+    /// Response, Representation and Payload headers.
+    pub headers: HttpHeaders,
     /// The blob ID of the resource.
     pub blob_id: BlobId,
     /// The hash of the blob contents.
@@ -44,10 +43,8 @@ impl TryFrom<&SuiMoveStruct> for ResourceInfo {
 
     fn try_from(source: &SuiMoveStruct) -> Result<Self, Self::Error> {
         let path = get_dynamic_field!(source, "path", SuiMoveValue::String)?;
-        let content_type: ContentType =
-            get_dynamic_field!(source, "content_type", SuiMoveValue::String)?.try_into()?;
-        let content_encoding: ContentEncoding =
-            get_dynamic_field!(source, "content_encoding", SuiMoveValue::String)?.try_into()?;
+        let headers: HttpHeaders =
+            get_dynamic_field!(source, "headers", SuiMoveValue::Struct)?.try_into()?;
         let blob_id = blob_id_from_u256(
             get_dynamic_field!(source, "blob_id", SuiMoveValue::String)?.parse::<U256>()?,
         );
@@ -56,11 +53,82 @@ impl TryFrom<&SuiMoveStruct> for ResourceInfo {
 
         Ok(Self {
             path,
-            content_type,
-            content_encoding,
+            headers,
             blob_id,
             blob_hash,
         })
+    }
+}
+
+#[derive(serde::Serialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct HttpHeader {
+    pub name: String,
+    pub value: String,
+}
+
+#[derive(serde::Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct HttpHeaders(pub HashMap<String, String>);
+
+impl PartialOrd for HttpHeaders {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for HttpHeaders {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let self_sorted: Vec<_> = self.0.iter().collect();
+        let other_sorted: Vec<_> = other.0.iter().collect();
+        self_sorted.cmp(&other_sorted)
+    }
+}
+
+impl From<HashMap<String, String>> for HttpHeaders {
+    fn from(values: HashMap<String, String>) -> Self {
+        Self(values)
+    }
+}
+
+#[derive(Debug)]
+struct VecMapContents {
+    pub entries: Vec<VecMapEntry>,
+}
+
+impl TryFrom<Vec<SuiMoveValue>> for VecMapContents {
+    type Error = anyhow::Error;
+
+    fn try_from(entries: Vec<SuiMoveValue>) -> std::result::Result<Self, Self::Error> {
+        let mut contents = Vec::new();
+        for entry in entries {
+            if let SuiMoveValue::Struct(s) = entry {
+                let key = get_dynamic_field!(s, "key", SuiMoveValue::String)?;
+                let value = get_dynamic_field!(s, "value", SuiMoveValue::String)?;
+                contents.push(VecMapEntry { key, value });
+            } else {
+                return Err(anyhow!("Expected SuiMoveValue::Struct"));
+            }
+        }
+        Ok(VecMapContents { entries: contents })
+    }
+}
+
+#[derive(Debug)]
+struct VecMapEntry {
+    pub key: String,
+    pub value: String,
+}
+
+impl TryFrom<SuiMoveStruct> for HttpHeaders {
+    type Error = anyhow::Error;
+
+    fn try_from(source: SuiMoveStruct) -> Result<Self, Self::Error> {
+        let contents: VecMapContents =
+            get_dynamic_field!(source, "contents", SuiMoveValue::Vector)?.try_into()?;
+        let mut headers = HashMap::new();
+        for entry in contents.entries {
+            headers.insert(entry.key, entry.value);
+        }
+        Ok(Self(headers))
     }
 }
 
@@ -118,8 +186,7 @@ impl Resource {
     pub fn new(
         resource_path: String,
         full_path: PathBuf,
-        content_type: ContentType,
-        content_encoding: ContentEncoding,
+        headers: HttpHeaders,
         blob_id: BlobId,
         blob_hash: U256,
         unencoded_size: usize,
@@ -127,8 +194,7 @@ impl Resource {
         Resource {
             info: ResourceInfo {
                 path: resource_path,
-                content_type,
-                content_encoding,
+                headers,
                 blob_id,
                 blob_hash,
             },
@@ -323,47 +389,71 @@ pub(crate) struct ResourceManager {
     pub walrus: Walrus,
     /// The resources in the site.
     pub resources: ResourceSet,
+    /// The ws-resources.json contents.
+    pub ws_resources: Option<WSResources>,
+    /// The location of the ws-resources.json.
+    pub ws_resources_path: PathBuf,
 }
 
 impl ResourceManager {
-    pub fn new(walrus: Walrus) -> Result<Self> {
+    pub fn new(walrus: Walrus, ws_resources_path: PathBuf) -> Result<Self> {
         Ok(ResourceManager {
             walrus,
             resources: ResourceSet::default(),
+            ws_resources: None,
+            ws_resources_path,
         })
     }
 
     /// Read a resource at a path.
     ///
     /// Ignores empty files.
-    pub fn read_resource(
-        &self,
-        full_path: &Path,
-        root: &Path,
-        content_encoding: &ContentEncoding,
-    ) -> Result<Option<Resource>> {
-        let extension = full_path.extension().unwrap_or(
-            full_path
-                .file_name()
-                .expect("the path should not terminate in `..`"),
-        );
+    pub fn read_resource(&self, full_path: &Path, root: &Path) -> Result<Option<Resource>> {
+        let resource_path = full_path_to_resource_path(full_path, root)?;
+        let mut http_headers: HashMap<String, String> = self
+            .ws_resources
+            .as_ref()
+            .and_then(|config| config.headers.as_ref())
+            .and_then(|headers| headers.get(&resource_path))
+            .cloned()
+            // Cast the keys to lowercase because http headers
+            //  are case-insensitive: RFC7230 sec. 2.7.3
+            .map(|headers| {
+                headers
+                    .into_iter()
+                    .map(|(k, v)| (k.to_lowercase(), v))
+                    .collect()
+            })
+            .unwrap_or_default();
 
+        let extension = full_path
+            .extension()
+            .unwrap_or(
+                full_path
+                    .file_name()
+                    .expect("the path should not terminate in `..`"),
+            )
+            .to_str();
+
+        // Is Content-Encoding specified? Else, add default to headers.
+        http_headers
+            .entry("content-encoding".to_string())
+            .or_insert_with(||
+                // Currently we only support this (plaintext) content encoding
+                // so no need to parse it as we do with content-type.
+                "identity".to_string());
+
+        // Read the content type.
         let content_type =
-            match ContentType::try_from_extension(extension.to_str().ok_or(anyhow!(
-                "Could not convert the extension {:?} to a string.",
-                extension.to_string_lossy()
-            ))?) {
-                Ok(content_type) => content_type,
-                Err(_) => {
-                    tracing::warn!(
-                        "The extension {} string for file {} could not be decoded.
-                        Defaulting to arbitrary binary content type: octet-stream.",
-                        extension.to_string_lossy(),
-                        full_path.to_string_lossy()
-                    );
-                    ContentType::ApplicationOctetstream // arbitrary binary data RFC 2046
-                }
-            };
+            ContentType::try_from_extension(extension.ok_or_else(|| {
+                anyhow!("Could not read file extension for {}", full_path.display())
+            })?)
+            .unwrap_or(ContentType::TextHtml); // Default ContentType.
+
+        // If content-type not specified in ws-resources.yaml, parse it from the extension.
+        http_headers
+            .entry("content-type".to_string())
+            .or_insert_with(|| content_type.to_string());
 
         let plain_content: Vec<u8> = std::fs::read(full_path)?;
         // TODO(giac): this could be (i) async; (ii) pre configured with the number of shards to
@@ -375,17 +465,11 @@ impl ResourceManager {
         let mut hash_function = Sha256::default();
         hash_function.update(&plain_content);
         let blob_hash: [u8; 32] = hash_function.finalize().digest;
-        // TODO(giac): How to encode based on the content encoding? Temporary file? No encoding?
-        //     let content = match content_encoding {
-        //         ContentEncoding::PlainText => plain_content,
-        //         ContentEncoding::Gzip => compress(&plain_content)?,
-        //     };
 
         Ok(Some(Resource::new(
-            full_path_to_resource_path(full_path, root)?,
+            resource_path,
             full_path.to_owned(),
-            content_type,
-            *content_encoding,
+            HttpHeaders::from(http_headers),
             output.blob_id,
             U256::from_le_bytes(&blob_hash),
             // TODO(giac): Change to `content.len()` when the problem with content encoding is
@@ -395,30 +479,32 @@ impl ResourceManager {
     }
 
     /// Recursively iterate a directory and load all [`Resources`][Resource] within.
-    pub fn read_dir(&mut self, root: &Path, content_encoding: &ContentEncoding) -> Result<()> {
-        self.resources = ResourceSet::from_iter(self.iter_dir(root, root, content_encoding)?);
+    pub fn read_dir(&mut self, root: &Path) -> Result<()> {
+        let cli_path = self.ws_resources_path.as_path();
+        if !cli_path.exists() {
+            eprintln!(
+                "Warning: The specified ws-resources.json path does not exist: {}.
+                Continuing without it...",
+                cli_path.display()
+            );
+            self.ws_resources = None;
+        }
+        self.ws_resources = WSResources::read(cli_path).ok();
+        self.resources = ResourceSet::from_iter(self.iter_dir(root, root)?);
         Ok(())
     }
 
-    fn iter_dir(
-        &self,
-        start: &Path,
-        root: &Path,
-        content_encoding: &ContentEncoding,
-    ) -> Result<Vec<Resource>> {
+    fn iter_dir(&self, start: &Path, root: &Path) -> Result<Vec<Resource>> {
         let mut resources: Vec<Resource> = vec![];
         let entries = fs::read_dir(start)?;
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
-                resources.extend(self.iter_dir(&path, root, content_encoding)?);
-            } else if let Some(res) =
-                self.read_resource(&path, root, content_encoding)
-                    .context(format!(
-                        "error while reading resource `{}`",
-                        path.to_string_lossy()
-                    ))?
-            {
+                resources.extend(self.iter_dir(&path, root)?);
+            } else if let Some(res) = self.read_resource(&path, root).context(format!(
+                "error while reading resource `{}`",
+                path.to_string_lossy()
+            ))? {
                 resources.push(res);
             }
         }

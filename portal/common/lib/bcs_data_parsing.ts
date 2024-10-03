@@ -29,8 +29,7 @@ export const ResourcePathStruct = bcs.struct("ResourcePath", {
 
 export const ResourceStruct = bcs.struct("Resource", {
     path: bcs.string(),
-    content_type: bcs.string(),
-    content_encoding: bcs.string(),
+    headers: bcs.map(bcs.string(), bcs.string()),
     blob_id: BLOB_ID,
     blob_hash: DATA_HASH
 });

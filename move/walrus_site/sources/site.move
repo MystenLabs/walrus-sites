@@ -5,6 +5,7 @@ module walrus_site::site {
     use sui::tx_context::TxContext;
     use sui::dynamic_field as df;
     use std::string::String;
+    use sui::vec_map;
 
     /// The site published on Sui.
     struct Site has key, store {
@@ -15,9 +16,10 @@ module walrus_site::site {
     /// A resource in a site.
     struct Resource has store, drop {
         path: String,
-        content_type: String,
-        content_encoding: String,
-        // The walrus blob id containing the bytes for this resource
+        // Response, Representation and Payload headers
+        // regarding the contents of the resource.
+        headers: vec_map::VecMap<String, String>,
+        // The walrus blob id containing the bytes for this resource.
         blob_id: u256,
         // Contains the hash of the contents of the blob
         // to verify its integrity.
@@ -42,18 +44,25 @@ module walrus_site::site {
     /// Creates a new resource.
     public fun new_resource(
         path: String,
-        content_type: String,
-        content_encoding: String,
         blob_id: u256,
         blob_hash: u256
     ): Resource {
         Resource {
             path,
-            content_type,
-            content_encoding,
+            headers: vec_map::empty(),
             blob_id,
             blob_hash,
         }
+    }
+
+    /// Adds a header to the Resource's headers vector
+    public fun add_header(resource: &mut Resource, name: String, value: String) {
+        // Will throw an exception if duplicate key.
+        vec_map::insert(
+            &mut resource.headers,
+            name,
+            value
+        );
     }
 
     fun new_path(path: String): ResourcePath {

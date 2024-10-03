@@ -20,7 +20,6 @@ use crate::{
     display,
     preprocessor::Preprocessor,
     site::{
-        content::ContentEncoding,
         manager::{SiteIdentifier, SiteManager},
         // manager::SiteManager,
         resource::{OperationsSummary, ResourceManager},
@@ -34,9 +33,10 @@ use crate::{
 pub struct PublishOptions {
     /// The directory containing the site sources.
     pub directory: PathBuf,
-    #[clap(short = 'e', long, value_enum, default_value_t = ContentEncoding::PlainText)]
-    /// The encoding for the contents of the site's resources.
-    pub content_encoding: ContentEncoding,
+    /// The path to the ws-resources.json file for defining HTTP resoibse headers
+    /// and other utilities for your files.
+    #[clap(long, default_value = "ws-resources.json")]
+    ws_resources: Option<PathBuf>,
     /// The number of epochs for which to save the resources on Walrus.
     #[clap(long, default_value_t = 1)]
     pub epochs: u64,
@@ -53,24 +53,27 @@ pub async fn publish_site(
 ) -> Result<()> {
     edit_site(
         &publish_options.directory,
-        &publish_options.content_encoding,
         SiteIdentifier::NewSite(site_name),
         config,
         publish_options.epochs,
         false,
         publish_options.list_directory,
+        publish_options
+            .ws_resources
+            .expect("Please provide ws-resources.")
+            .as_path(),
     )
     .await
 }
 
 pub async fn watch_edit_site(
     directory: &Path,
-    content_encoding: &ContentEncoding,
     site_id: SiteIdentifier,
     config: &Config,
     epochs: u64,
     force: bool,
     preprocess: bool,
+    ws_resources_path: &Path,
 ) -> Result<()> {
     let (tx, rx) = channel();
     let mut watcher = notify::recommended_watcher(move |res| {
@@ -87,12 +90,12 @@ pub async fn watch_edit_site(
                 tracing::info!("change detected: {:?}", event);
                 edit_site(
                     directory,
-                    content_encoding,
                     site_id.clone(),
                     config,
                     epochs,
                     force,
                     preprocess,
+                    ws_resources_path,
                 )
                 .await?;
             }
@@ -112,23 +115,27 @@ pub async fn update_site(
     if watch {
         watch_edit_site(
             publish_options.directory.as_path(),
-            &publish_options.content_encoding,
             SiteIdentifier::ExistingSite(*site_object),
             config,
             publish_options.epochs,
             force,
             publish_options.list_directory,
+            &publish_options
+                .ws_resources
+                .expect("Please provide ws-resources."),
         )
         .await
     } else {
         edit_site(
             publish_options.directory.as_path(),
-            &publish_options.content_encoding,
             SiteIdentifier::ExistingSite(*site_object),
             config,
             publish_options.epochs,
             force,
             publish_options.list_directory,
+            &publish_options
+                .ws_resources
+                .expect("Please provide ws-resources."),
         )
         .await
     }
@@ -136,21 +143,14 @@ pub async fn update_site(
 
 pub async fn edit_site(
     directory: &Path,
-    content_encoding: &ContentEncoding,
     site_id: SiteIdentifier,
     config: &Config,
     epochs: u64,
     force: bool,
     preprocess: bool,
+    ws_resources_path: &Path,
 ) -> Result<()> {
-    tracing::debug!(
-        ?site_id,
-        ?directory,
-        ?content_encoding,
-        ?epochs,
-        ?force,
-        "editing site"
-    );
+    tracing::debug!(?site_id, ?directory, ?epochs, ?force, "editing site");
 
     if preprocess {
         display::action(format!("Preprocessing: {}", directory.display()));
@@ -168,12 +168,13 @@ pub async fn edit_site(
         config.general.wallet.clone(),
     );
 
-    let mut resource_manager = ResourceManager::new(walrus.clone())?;
+    let mut resource_manager =
+        ResourceManager::new(walrus.clone(), ws_resources_path.to_path_buf())?;
     display::action(format!(
         "Parsing the directory {} and locally computing blob IDs",
         directory.to_string_lossy()
     ));
-    resource_manager.read_dir(directory, content_encoding)?;
+    resource_manager.read_dir(directory)?;
     display::done();
     tracing::debug!(resources=%resource_manager.resources, "resources loaded from directory");
 

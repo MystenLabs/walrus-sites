@@ -11,7 +11,7 @@ use sui_types::{
     TypeTag,
 };
 
-use super::resource::{ResourceInfo, ResourceOp};
+use super::resource::{HttpHeader, Resource, ResourceOp};
 
 pub struct SitePtb<T = ()> {
     pt_builder: ProgrammableTransactionBuilder,
@@ -21,9 +21,6 @@ pub struct SitePtb<T = ()> {
 }
 
 /// A PTB to update a site.
-///
-/// It is composed of a series of [`SiteCall`]s, which all have the Walrus site object id as
-/// first argument.
 impl SitePtb {
     pub fn new(package: ObjectID, module: Identifier) -> Result<Self> {
         let pt_builder = ProgrammableTransactionBuilder::new();
@@ -63,7 +60,7 @@ impl SitePtb {
 
 impl<T> SitePtb<T> {
     /// Transfer argument to address
-    pub fn transfer_arg(&mut self, recipient: SuiAddress, arg: Argument) {
+    fn transfer_arg(&mut self, recipient: SuiAddress, arg: Argument) {
         self.pt_builder.transfer_arg(recipient, arg);
     }
 
@@ -96,105 +93,90 @@ impl<T> SitePtb<T> {
 }
 
 impl SitePtb<Argument> {
-    pub fn site_argument(&self) -> Argument {
-        self.site_argument
-    }
-
-    pub fn add_calls(&mut self, calls: impl IntoIterator<Item = SiteCall>) -> Result<()> {
+    pub fn add_operations<'a>(
+        &mut self,
+        calls: impl IntoIterator<Item = &'a ResourceOp<'a>>,
+    ) -> Result<()> {
         for call in calls {
-            self.add_call(call)?;
+            match call {
+                ResourceOp::Deleted(resource) => self.remove_resource_if_exists(resource)?,
+                ResourceOp::Created(resource) => self.add_resource(resource)?,
+            }
         }
         Ok(())
     }
 
-    /// Adds a call to the PTB.
-    ///
-    /// If the `function` field of the [`SiteCall`] provided is "new_resource_and_add", this
-    /// function will create two transactions in the PTB, one to creat the resource, and one to add
-    /// it to the site.
-    pub fn add_call(&mut self, mut call: SiteCall) -> Result<()> {
-        let mut args = call
-            .args
-            .into_iter()
-            .map(|a| self.pt_builder.input(a))
-            .collect::<Result<Vec<Argument>>>()?;
-
-        if &call.function == "new_resource_and_add" {
-            // This it the call to add a new resource to the ptb.
-            // The first step is to create a new resource
-            let new_resource_arg =
-                self.add_programmable_move_call(Identifier::new("new_resource")?, vec![], args);
-            args = vec![new_resource_arg];
-            // Replace the call to execute the adding
-            "add_resource".clone_into(&mut call.function);
-        }
-        args.insert(0, self.site_argument);
-        self.add_programmable_move_call(Identifier::new(call.function)?, vec![], args);
-        Ok(())
+    pub fn transfer_site(&mut self, recipient: SuiAddress) {
+        self.transfer_arg(recipient, self.site_argument);
     }
-}
 
-// Testing out
-#[derive(Debug)]
-pub struct SiteCall {
-    function: String,
-    args: Vec<CallArg>,
-}
-
-impl SiteCall {
-    /// Creates a new resource and adds it to the site.
-    ///
-    /// This call results into two transactions in a PTB, one to create the resource, and one to add
-    /// it to the site.
-    pub fn new_resource_and_add(resource: &ResourceInfo) -> Result<SiteCall> {
-        tracing::debug!(
-            resource=%resource.path,
-            content_type=?resource.content_type,
-            encoding=?resource.content_encoding,
-            blob_id=?resource.blob_id,
-            "new Move call: creating resource"
+    /// Adds the move calls to remove a resource from the site, if the resource exists.
+    pub fn remove_resource_if_exists(&mut self, resource: &Resource) -> Result<()> {
+        tracing::debug!(resource=%resource.info.path, "new Move call: removing resource");
+        let path_input = self.pt_builder.input(pure_call_arg(&resource.info.path)?)?;
+        self.add_programmable_move_call(
+            Identifier::new("remove_resource_if_exists")?,
+            vec![],
+            vec![self.site_argument, path_input],
         );
-        Ok(SiteCall {
-            function: "new_resource_and_add".to_owned(),
-            args: vec![
-                pure_call_arg(&resource.path)?,
-                pure_call_arg(&resource.content_type.to_string())?,
-                pure_call_arg(&resource.content_encoding.to_string())?,
-                pure_call_arg(&resource.blob_id)?,
-                pure_call_arg(&resource.blob_hash)?,
-            ],
-        })
+        Ok(())
     }
 
-    /// Removes a resource from the site if it exists
-    pub fn remove_resource_if_exists(resource: &ResourceInfo) -> Result<SiteCall> {
-        tracing::debug!(resource=%resource.path, "new Move call: removing resource");
-        Ok(SiteCall {
-            function: "remove_resource_if_exists".to_owned(),
-            args: vec![pure_call_arg(&resource.path)?],
-        })
+    /// Adds the move calls to create and add a resource to the site, with the specified headers.
+    pub fn add_resource(&mut self, resource: &Resource) -> Result<()> {
+        tracing::debug!(resource=%resource.info.path, "new Move call: adding resource");
+        let new_resource_arg = self.create_resource(resource)?;
+
+        // Add the headers to the resource.
+        for header in resource.info.headers.0.iter() {
+            self.add_header(
+                new_resource_arg,
+                &HttpHeader {
+                    name: header.0.clone(),
+                    value: header.1.clone(),
+                },
+            )?;
+        }
+
+        // Add the resource to the site.
+        self.add_programmable_move_call(
+            Identifier::new("add_resource")?,
+            vec![],
+            vec![self.site_argument, new_resource_arg],
+        );
+
+        Ok(())
+    }
+
+    /// Adds the move calls to create a resource.
+    ///
+    /// Returns the [`Argument`] for the newly-created resource.
+    fn create_resource(&mut self, resource: &Resource) -> Result<Argument> {
+        let inputs = [
+            pure_call_arg(&resource.info.path)?,
+            pure_call_arg(&resource.info.blob_id)?,
+            pure_call_arg(&resource.info.blob_hash)?,
+        ]
+        .into_iter()
+        .map(|arg| self.pt_builder.input(arg))
+        .collect::<Result<Vec<_>>>()?;
+
+        Ok(self.add_programmable_move_call(Identifier::new("new_resource")?, vec![], inputs))
+    }
+
+    /// Adds the header to the given resource argument.
+    fn add_header(&mut self, resource_arg: Argument, header: &HttpHeader) -> Result<()> {
+        let name_input = self.pt_builder.input(pure_call_arg(&header.name)?)?;
+        let value_input = self.pt_builder.input(pure_call_arg(&header.value)?)?;
+        self.add_programmable_move_call(
+            Identifier::new("add_header")?,
+            vec![],
+            vec![resource_arg, name_input, value_input],
+        );
+        Ok(())
     }
 }
 
 pub fn pure_call_arg<T: Serialize>(arg: &T) -> Result<CallArg> {
     Ok(CallArg::Pure(bcs::to_bytes(arg)?))
-}
-
-impl<'a> TryFrom<&ResourceOp<'a>> for SiteCall {
-    type Error = anyhow::Error;
-
-    fn try_from(value: &ResourceOp) -> Result<Self, Self::Error> {
-        match value {
-            ResourceOp::Deleted(resource) => SiteCall::remove_resource_if_exists(&resource.info),
-            ResourceOp::Created(resource) => SiteCall::new_resource_and_add(&resource.info),
-        }
-    }
-}
-
-impl<'a> TryFrom<ResourceOp<'a>> for SiteCall {
-    type Error = anyhow::Error;
-
-    fn try_from(value: ResourceOp) -> Result<Self, Self::Error> {
-        Self::try_from(&value)
-    }
 }
