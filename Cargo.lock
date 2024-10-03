@@ -5397,6 +5397,7 @@ dependencies = [
  "sui-keys",
  "sui-sdk 1.27.2",
  "sui-types",
+ "tempfile",
  "thiserror",
  "tokio",
  "toml 0.8.19",

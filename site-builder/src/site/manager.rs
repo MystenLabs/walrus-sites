@@ -19,7 +19,7 @@ use sui_types::{
 use super::resource::{OperationsSummary, ResourceInfo, ResourceManager, ResourceOp, ResourceSet};
 use crate::{
     display,
-    site::builder::{SiteCall, SitePtb},
+    site::builder::SitePtb,
     util::{self, get_struct_from_object_response},
     walrus::Walrus,
     Config,
@@ -71,7 +71,7 @@ impl SiteManager {
     /// or created are published to Walrus.
     pub async fn update_site(
         &self,
-        resources: &ResourceManager,
+        resource_manager: &ResourceManager,
     ) -> Result<(SuiTransactionBlockResponse, OperationsSummary)> {
         let ptb = SitePtb::new(
             self.config.package,
@@ -91,9 +91,9 @@ impl SiteManager {
         };
         tracing::debug!(?existing_resources, "checked existing resources");
         let update_operations = if self.force {
-            existing_resources.replace_all(&resources.resources)
+            existing_resources.replace_all(&resource_manager.resources)
         } else {
-            resources.resources.diff(&existing_resources)
+            resource_manager.resources.diff(&existing_resources)
         };
         tracing::debug!(operations=?update_operations, "list of operations computed");
 
@@ -152,15 +152,12 @@ impl SiteManager {
             address=?self.active_address()?,
             "starting to update site resources on chain",
         );
-        ptb.add_calls(
-            updates
-                .iter()
-                .map(SiteCall::try_from)
-                .collect::<Result<Vec<_>>>()?,
-        )?;
+
+        ptb.add_operations(updates)?;
         if transfer {
-            ptb.transfer_arg(self.active_address()?, ptb.site_argument());
+            ptb.transfer_site(self.active_address()?);
         }
+
         self.sign_and_send_ptb(ptb.finish(), self.gas_coin_ref().await?)
             .await
     }
