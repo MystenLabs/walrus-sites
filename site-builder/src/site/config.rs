@@ -23,7 +23,7 @@ impl WSResources {
             std::fs::read_to_string(path).context("Failed to read ws_config.json")?;
         // Read the JSON contents of the file as an instance of `WSResources`.
         let ws_config: WSResources = serde_json::from_str(&file_contents)?;
-        println!("ws-resources.json loaded! contents: {:?}", ws_config);
+        tracing::info!(?ws_config, "ws resources configuration loaded");
         Ok(ws_config)
     }
 }

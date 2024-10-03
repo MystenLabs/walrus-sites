@@ -24,18 +24,30 @@ use crate::{
         manager::{SiteIdentifier, SiteManager},
         resource::{OperationsSummary, ResourceManager},
     },
-    util::{get_site_id_from_response, id_to_base36, load_wallet_context},
+    util::{
+        get_site_id_from_response,
+        id_to_base36,
+        load_wallet_context,
+        path_or_defaults_if_exist,
+    },
     walrus::Walrus,
     Config,
 };
+
+const DEFAULT_WS_RESOURCES_FILE: &str = "ws-resources.json";
 
 #[derive(Parser, Debug, Clone)]
 pub struct PublishOptions {
     /// The directory containing the site sources.
     pub directory: PathBuf,
-    /// The path to the ws-resources.json file for defining HTTP resoibse headers
-    /// and other utilities for your files.
-    #[clap(long, default_value = "ws-resources.json")]
+    /// The path to the Walrus sites resources file.
+    ///
+    /// This JSON configuration file defined HTTP resource headers and other utilities for your
+    /// files. By default, the file is expected to be named `ws-resources.json` and located in the
+    /// root of the site directory.
+    ///
+    /// The configuration file _will not_ be uploaded to Walrus.
+    #[clap(long)]
     ws_resources: Option<PathBuf>,
     /// The number of epochs for which to save the resources on Walrus.
     #[clap(long, default_value_t = 1)]
@@ -150,12 +162,7 @@ impl SiteEditor {
             self.config.general.wallet.clone(),
         );
 
-        let ws_resources = self
-            .publish_options
-            .ws_resources
-            .clone()
-            .map(WSResources::read)
-            .transpose()?;
+        let ws_resources = load_ws_resources(&self.publish_options.ws_resources, self.directory())?;
 
         let mut resource_manager = ResourceManager::new(walrus.clone(), ws_resources)?;
         display::action(format!(
@@ -255,4 +262,11 @@ fn print_summary(
         config.portal
     );
     Ok(())
+}
+
+/// Gets the configuration from the provided file, or looks in the default directory.
+fn load_ws_resources(path: &Option<PathBuf>, site_dir: &Path) -> Result<Option<WSResources>> {
+    let default_paths = vec![site_dir.join(DEFAULT_WS_RESOURCES_FILE)];
+    let path = path_or_defaults_if_exist(path, &default_paths);
+    path.map(WSResources::read).transpose()
 }
