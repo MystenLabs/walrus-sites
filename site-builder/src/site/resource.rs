@@ -4,8 +4,7 @@
 //! Functionality to read and check the files in of a website.
 
 use std::{
-    cmp::Ordering,
-    collections::{BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet},
     fmt::{self, Display},
     fs,
     io::Write,
@@ -61,28 +60,8 @@ impl TryFrom<&SuiMoveStruct> for ResourceInfo {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct HttpHeaders(pub HashMap<String, String>);
-
-impl PartialOrd for HttpHeaders {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for HttpHeaders {
-    fn cmp(&self, other: &Self) -> Ordering {
-        let self_sorted: Vec<_> = self.0.iter().collect();
-        let other_sorted: Vec<_> = other.0.iter().collect();
-        self_sorted.cmp(&other_sorted)
-    }
-}
-
-impl From<HashMap<String, String>> for HttpHeaders {
-    fn from(values: HashMap<String, String>) -> Self {
-        Self(values)
-    }
-}
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct HttpHeaders(pub BTreeMap<String, String>);
 
 #[derive(Debug)]
 struct VecMapContents {
@@ -119,7 +98,7 @@ impl TryFrom<SuiMoveStruct> for HttpHeaders {
     fn try_from(source: SuiMoveStruct) -> Result<Self, Self::Error> {
         let contents: VecMapContents =
             get_dynamic_field!(source, "contents", SuiMoveValue::Vector)?.try_into()?;
-        let mut headers = HashMap::new();
+        let mut headers = BTreeMap::new();
         for entry in contents.entries {
             headers.insert(entry.key, entry.value);
         }
@@ -386,14 +365,21 @@ pub(crate) struct ResourceManager {
     pub resources: ResourceSet,
     /// The ws-resources.json contents.
     pub ws_resources: Option<WSResources>,
+    /// THe ws-resource file path.
+    pub ws_resources_path: Option<PathBuf>,
 }
 
 impl ResourceManager {
-    pub fn new(walrus: Walrus, ws_resources: Option<WSResources>) -> Result<Self> {
+    pub fn new(
+        walrus: Walrus,
+        ws_resources: Option<WSResources>,
+        ws_resources_path: Option<PathBuf>,
+    ) -> Result<Self> {
         Ok(ResourceManager {
             walrus,
             resources: ResourceSet::default(),
             ws_resources,
+            ws_resources_path,
         })
     }
 
@@ -401,8 +387,15 @@ impl ResourceManager {
     ///
     /// Ignores empty files.
     pub fn read_resource(&self, full_path: &Path, root: &Path) -> Result<Option<Resource>> {
+        if let Some(ws_path) = &self.ws_resources_path {
+            if full_path == ws_path {
+                tracing::debug!(?full_path, "ignoring the ws-resources config file");
+                return Ok(None);
+            }
+        }
+
         let resource_path = full_path_to_resource_path(full_path, root)?;
-        let mut http_headers: HashMap<String, String> = self
+        let mut http_headers: BTreeMap<String, String> = self
             .ws_resources
             .as_ref()
             .and_then(|config| config.headers.as_ref())
@@ -463,7 +456,7 @@ impl ResourceManager {
         Ok(Some(Resource::new(
             resource_path,
             full_path.to_owned(),
-            HttpHeaders::from(http_headers),
+            HttpHeaders(http_headers),
             output.blob_id,
             U256::from_le_bytes(&blob_hash),
             // TODO(giac): Change to `content.len()` when the problem with content encoding is

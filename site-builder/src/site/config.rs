@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::HashMap, path::Path};
+use std::{collections::BTreeMap, path::Path};
 
 use anyhow::{Context, Result};
 use serde::Deserialize;
@@ -11,7 +11,9 @@ use super::resource::HttpHeaders;
 /// Deserialized object of the file's `ws-resource.json` contents.
 #[derive(Deserialize, Debug)]
 pub struct WSResources {
-    pub headers: Option<HashMap<String, HttpHeaders>>,
+    /// The HTTP headers to be set for the resources.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub headers: Option<BTreeMap<String, HttpHeaders>>,
     // TODO: "routes"" for client-side routing.
 }
 

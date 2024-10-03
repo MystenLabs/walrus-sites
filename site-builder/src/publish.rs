@@ -162,9 +162,11 @@ impl SiteEditor {
             self.config.general.wallet.clone(),
         );
 
-        let ws_resources = load_ws_resources(&self.publish_options.ws_resources, self.directory())?;
+        let (ws_resources, ws_resources_path) =
+            load_ws_resources(&self.publish_options.ws_resources, self.directory())?;
 
-        let mut resource_manager = ResourceManager::new(walrus.clone(), ws_resources)?;
+        let mut resource_manager =
+            ResourceManager::new(walrus.clone(), ws_resources, ws_resources_path)?;
         display::action(format!(
             "Parsing the directory {} and locally computing blob IDs",
             self.directory().to_string_lossy()
@@ -265,8 +267,11 @@ fn print_summary(
 }
 
 /// Gets the configuration from the provided file, or looks in the default directory.
-fn load_ws_resources(path: &Option<PathBuf>, site_dir: &Path) -> Result<Option<WSResources>> {
+fn load_ws_resources(
+    path: &Option<PathBuf>,
+    site_dir: &Path,
+) -> Result<(Option<WSResources>, Option<PathBuf>)> {
     let default_paths = vec![site_dir.join(DEFAULT_WS_RESOURCES_FILE)];
     let path = path_or_defaults_if_exist(path, &default_paths);
-    path.map(WSResources::read).transpose()
+    Ok((path.as_ref().map(WSResources::read).transpose()?, path))
 }
