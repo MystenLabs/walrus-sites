@@ -16,6 +16,7 @@ use anyhow::{anyhow, Context, Result};
 use fastcrypto::hash::{HashFunction, Sha256};
 use flate2::{write::GzEncoder, Compression};
 use move_core_types::u256::U256;
+use serde::{Deserialize, Serialize};
 use sui_sdk::rpc_types::{SuiMoveStruct, SuiMoveValue};
 
 use crate::{
@@ -60,13 +61,7 @@ impl TryFrom<&SuiMoveStruct> for ResourceInfo {
     }
 }
 
-#[derive(serde::Serialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct HttpHeader {
-    pub name: String,
-    pub value: String,
-}
-
-#[derive(serde::Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct HttpHeaders(pub HashMap<String, String>);
 
 impl PartialOrd for HttpHeaders {
@@ -417,6 +412,7 @@ impl ResourceManager {
             //  are case-insensitive: RFC7230 sec. 2.7.3
             .map(|headers| {
                 headers
+                    .0
                     .into_iter()
                     .map(|(k, v)| (k.to_lowercase(), v))
                     .collect()
@@ -435,22 +431,23 @@ impl ResourceManager {
         // Is Content-Encoding specified? Else, add default to headers.
         http_headers
             .entry("content-encoding".to_string())
-            .or_insert_with(||
+            .or_insert(
                 // Currently we only support this (plaintext) content encoding
                 // so no need to parse it as we do with content-type.
-                "identity".to_string());
+                "identity".to_string(),
+            );
 
         // Read the content type.
         let content_type =
             ContentType::try_from_extension(extension.ok_or_else(|| {
                 anyhow!("Could not read file extension for {}", full_path.display())
             })?)
-            .unwrap_or(ContentType::TextHtml); // Default ContentType.
+            .unwrap_or(ContentType::ApplicationOctetstream); // Default ContentType.
 
         // If content-type not specified in ws-resources.yaml, parse it from the extension.
         http_headers
             .entry("content-type".to_string())
-            .or_insert_with(|| content_type.to_string());
+            .or_insert(content_type.to_string());
 
         let plain_content: Vec<u8> = std::fs::read(full_path)?;
         // TODO(giac): this could be (i) async; (ii) pre configured with the number of shards to

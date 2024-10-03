@@ -6,10 +6,12 @@ use std::{collections::HashMap, path::Path};
 use anyhow::{Context, Result};
 use serde::Deserialize;
 
+use super::resource::HttpHeaders;
+
 /// Deserialized object of the file's `ws-resource.json` contents.
 #[derive(Deserialize, Debug)]
 pub struct WSResources {
-    pub headers: Option<HashMap<String, HashMap<String, String>>>,
+    pub headers: Option<HashMap<String, HttpHeaders>>,
     // TODO: "routes"" for client-side routing.
 }
 
@@ -28,9 +30,6 @@ impl WSResources {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Write;
-
-    use tempfile::NamedTempFile;
 
     use super::*;
 
@@ -47,13 +46,6 @@ mod tests {
             }
         }
         "#;
-
-        // Create a temporary file and write the test data to it.
-        let mut temp_file = NamedTempFile::new().unwrap();
-        write!(temp_file, "{}", data).unwrap();
-
-        // Read the configuration from the temporary file.
-        let result = WSResources::read(temp_file.path()).unwrap();
-        println!("{:#?}", result);
+        serde_json::from_str::<WSResources>(data).expect("parsing should succeed");
     }
 }
