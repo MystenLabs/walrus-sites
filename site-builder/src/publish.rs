@@ -164,6 +164,12 @@ impl SiteEditor {
 
         let (ws_resources, ws_resources_path) =
             load_ws_resources(&self.publish_options.ws_resources, self.directory())?;
+        if let Some(path) = ws_resources_path.as_ref() {
+            println!(
+                "Using the Walrus sites resources file: {}",
+                path.to_string_lossy()
+            );
+        }
 
         let mut resource_manager =
             ResourceManager::new(walrus.clone(), ws_resources, ws_resources_path)?;

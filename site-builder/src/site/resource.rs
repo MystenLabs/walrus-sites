@@ -60,57 +60,32 @@ impl TryFrom<&SuiMoveStruct> for ResourceInfo {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct HttpHeaders(pub BTreeMap<String, String>);
-
-#[derive(Debug)]
-struct VecMapContents {
-    pub entries: Vec<VecMapEntry>,
-}
-
-impl TryFrom<Vec<SuiMoveValue>> for VecMapContents {
-    type Error = anyhow::Error;
-
-    fn try_from(entries: Vec<SuiMoveValue>) -> std::result::Result<Self, Self::Error> {
-        let mut contents = Vec::new();
-        for entry in entries {
-            if let SuiMoveValue::Struct(s) = entry {
-                let key = get_dynamic_field!(s, "key", SuiMoveValue::String)?;
-                let value = get_dynamic_field!(s, "value", SuiMoveValue::String)?;
-                contents.push(VecMapEntry { key, value });
-            } else {
-                return Err(anyhow!("Expected SuiMoveValue::Struct"));
-            }
-        }
-        Ok(VecMapContents { entries: contents })
-    }
-}
-
-#[derive(Debug)]
-struct VecMapEntry {
-    pub key: String,
-    pub value: String,
-}
-
-impl TryFrom<SuiMoveStruct> for HttpHeaders {
-    type Error = anyhow::Error;
-
-    fn try_from(source: SuiMoveStruct) -> Result<Self, Self::Error> {
-        let contents: VecMapContents =
-            get_dynamic_field!(source, "contents", SuiMoveValue::Vector)?.try_into()?;
-        let mut headers = BTreeMap::new();
-        for entry in contents.entries {
-            headers.insert(entry.key, entry.value);
-        }
-        Ok(Self(headers))
-    }
-}
-
 impl TryFrom<SuiMoveStruct> for ResourceInfo {
     type Error = anyhow::Error;
 
     fn try_from(value: SuiMoveStruct) -> Result<Self, Self::Error> {
         Self::try_from(&value)
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct HttpHeaders(pub BTreeMap<String, String>);
+
+impl TryFrom<SuiMoveStruct> for HttpHeaders {
+    type Error = anyhow::Error;
+
+    fn try_from(source: SuiMoveStruct) -> Result<Self, Self::Error> {
+        let contents: Vec<_> = get_dynamic_field!(source, "contents", SuiMoveValue::Vector)?;
+        let mut headers = BTreeMap::new();
+        for entry in contents {
+            let SuiMoveValue::Struct(entry) = entry else {
+                return Err(anyhow!("expected SuiMoveValue::Struct"));
+            };
+            let key = get_dynamic_field!(entry, "key", SuiMoveValue::String)?;
+            let value = get_dynamic_field!(entry, "value", SuiMoveValue::String)?;
+            headers.insert(key, value);
+        }
+        Ok(Self(headers))
     }
 }
 
