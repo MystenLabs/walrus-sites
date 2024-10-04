@@ -11,7 +11,7 @@ use sui_types::{
     TypeTag,
 };
 
-use super::resource::{HttpHeader, Resource, ResourceOp};
+use super::resource::{Resource, ResourceOp};
 
 pub struct SitePtb<T = ()> {
     pt_builder: ProgrammableTransactionBuilder,
@@ -129,13 +129,7 @@ impl SitePtb<Argument> {
 
         // Add the headers to the resource.
         for header in resource.info.headers.0.iter() {
-            self.add_header(
-                new_resource_arg,
-                &HttpHeader {
-                    name: header.0.clone(),
-                    value: header.1.clone(),
-                },
-            )?;
+            self.add_header(new_resource_arg, header.0, header.1)?;
         }
 
         // Add the resource to the site.
@@ -165,9 +159,9 @@ impl SitePtb<Argument> {
     }
 
     /// Adds the header to the given resource argument.
-    fn add_header(&mut self, resource_arg: Argument, header: &HttpHeader) -> Result<()> {
-        let name_input = self.pt_builder.input(pure_call_arg(&header.name)?)?;
-        let value_input = self.pt_builder.input(pure_call_arg(&header.value)?)?;
+    fn add_header(&mut self, resource_arg: Argument, name: &str, value: &str) -> Result<()> {
+        let name_input = self.pt_builder.input(pure_call_arg(&name.to_owned())?)?;
+        let value_input = self.pt_builder.input(pure_call_arg(&value.to_owned())?)?;
         self.add_programmable_move_call(
             Identifier::new("add_header")?,
             vec![],

@@ -55,7 +55,7 @@ module walrus_site::site {
         }
     }
 
-    /// Adds a header to the Resource's headers vector
+    /// Adds a header to the Resource's headers vector.
     public fun add_header(resource: &mut Resource, name: String, value: String) {
         // Will throw an exception if duplicate key.
         vec_map::insert(
