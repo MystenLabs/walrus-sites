@@ -87,7 +87,6 @@ unknown-git = "deny"
 allow-git = [
     "https://github.com/wlmyng/jsonrpsee",
     "https://github.com/zhiburt/tabled",
-    "https://github.com/zhiburt/tabled",
     "https://github.com/bmwill/openapiv3",
 ]
 
