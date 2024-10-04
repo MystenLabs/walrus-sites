@@ -86,16 +86,16 @@ impl SiteManager {
         tracing::debug!(operations=?site_updates, "list of operations computed");
 
         if site_updates.has_updates() {
-            self.publish_to_walrus(&site_updates.resources).await?;
+            self.publish_to_walrus(&site_updates.resource_ops).await?;
             display::action("Updating the Walrus Site object on Sui");
             let result = self.execute_sui_updates(&site_updates).await?;
             display::done();
-            return Ok((result, site_updates.resources.into()));
+            return Ok((result, site_updates.resource_ops.into()));
         }
         // TODO(giac) improve this return
         Ok((
             SuiTransactionBlockResponse::default(),
-            site_updates.resources.into(),
+            site_updates.resource_ops.into(),
         ))
     }
 
@@ -151,7 +151,8 @@ impl SiteManager {
             SiteIdentifier::NewSite(site_name) => ptb.with_create_site(site_name)?,
         };
 
-        ptb.add_operations(&updates.resources)?;
+        ptb.add_resource_operations(&updates.resource_ops)?;
+        ptb.add_route_operations(&updates.route_ops)?;
 
         if self.needs_transfer() {
             ptb.transfer_site(self.active_address()?);

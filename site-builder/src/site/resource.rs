@@ -199,19 +199,19 @@ impl<'a> ResourceOp<'a> {
 
 /// A summary of the operations performed by the site builder.
 #[derive(Debug, Clone)]
-pub(crate) struct OperationSummary {
+pub(crate) struct ResourceOpSummary {
     operation: String,
     path: String,
     blob_id: BlobId,
 }
 
-impl<'a> From<&ResourceOp<'a>> for OperationSummary {
+impl<'a> From<&ResourceOp<'a>> for ResourceOpSummary {
     fn from(source: &ResourceOp<'a>) -> Self {
         let (op, info) = match source {
             ResourceOp::Deleted(resource) => ("deleted".to_owned(), &resource.info),
             ResourceOp::Created(resource) => ("created".to_owned(), &resource.info),
         };
-        OperationSummary {
+        ResourceOpSummary {
             operation: op,
             path: info.path.clone(),
             blob_id: info.blob_id,
@@ -219,7 +219,7 @@ impl<'a> From<&ResourceOp<'a>> for OperationSummary {
     }
 }
 
-impl Display for OperationSummary {
+impl Display for ResourceOpSummary {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -229,11 +229,11 @@ impl Display for OperationSummary {
     }
 }
 
-pub(crate) struct OperationsSummary(pub Vec<OperationSummary>);
+pub(crate) struct OperationsSummary(pub Vec<ResourceOpSummary>);
 
 impl<'a> From<&Vec<ResourceOp<'a>>> for OperationsSummary {
     fn from(source: &Vec<ResourceOp<'a>>) -> Self {
-        Self(source.iter().map(OperationSummary::from).collect())
+        Self(source.iter().map(ResourceOpSummary::from).collect())
     }
 }
 
@@ -259,7 +259,7 @@ impl Display for OperationsSummary {
 }
 
 /// A set of resources composing a site.
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ResourceSet {
     pub inner: BTreeSet<Resource>,
 }
@@ -441,9 +441,12 @@ impl ResourceManager {
 
     /// Recursively iterate a directory and load all [`Resources`][Resource] within.
     pub fn read_dir(&mut self, root: &Path) -> Result<SiteData> {
-        Ok(SiteData::new(ResourceSet::from_iter(
-            self.iter_dir(root, root)?,
-        )))
+        Ok(SiteData::new(
+            ResourceSet::from_iter(self.iter_dir(root, root)?),
+            self.ws_resources
+                .as_ref()
+                .and_then(|config| config.routes.clone()),
+        ))
     }
 
     fn iter_dir(&self, start: &Path, root: &Path) -> Result<Vec<Resource>> {

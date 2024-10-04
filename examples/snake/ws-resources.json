@@ -4,5 +4,10 @@
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "max-age=3500"
     }
+  },
+  "routes": {
+    "/path/*": "/index.html",
+    "/some/other/path/*": "/index.html",
+    "/test/*": "/index.html"
   }
 }

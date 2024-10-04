@@ -133,8 +133,8 @@ module walrus_site::site {
     }
 
     /// Remove all routes from the site.
-    public fun remove_all_routes(site: &mut Site): Routes {
-        df::remove(&mut site.id, ROUTES_FIELD)
+    public fun remove_all_routes_if_exist(site: &mut Site): Option<Routes> {
+        df::remove_if_exists(&mut site.id, ROUTES_FIELD)
     }
 
     /// Add a route to the site.
@@ -144,7 +144,7 @@ module walrus_site::site {
     /// - if the related resource path does not already exist as a dynamic field on the site.
     public fun insert_route(site: &mut Site, route: String, resource_path: String) {
         let path_obj = new_path(resource_path);
-        assert!(df::exists_<ResourcePath>(&site.id, path_obj), EResourceDoesNotExist);
+        assert!(df::exists_(&site.id, path_obj), EResourceDoesNotExist);
         let routes = df::borrow_mut(&mut site.id, ROUTES_FIELD);
         routes_insert(routes, route, resource_path);
     }
