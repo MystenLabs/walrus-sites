@@ -43,9 +43,10 @@ impl TryFrom<String> for ContentEncoding {
     }
 }
 
-/// Content types for content of a page
+/// Content types for content of a page.
+///
 /// The list is generated starting from
-/// <https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types/Common_types>
+/// <https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types/Common_types>.
 #[derive(Debug, PartialEq, Eq, Clone, Ord, PartialOrd)]
 pub enum ContentType {
     AudioAac,

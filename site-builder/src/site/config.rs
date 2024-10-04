@@ -1,15 +1,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::HashMap, path::Path};
+use std::{collections::BTreeMap, path::Path};
 
 use anyhow::{Context, Result};
 use serde::Deserialize;
 
+use super::resource::HttpHeaders;
+
 /// Deserialized object of the file's `ws-resource.json` contents.
 #[derive(Deserialize, Debug)]
 pub struct WSResources {
-    pub headers: Option<HashMap<String, HashMap<String, String>>>,
+    /// The HTTP headers to be set for the resources.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub headers: Option<BTreeMap<String, HttpHeaders>>,
     // TODO: "routes"" for client-side routing.
 }
 
@@ -21,16 +25,13 @@ impl WSResources {
             std::fs::read_to_string(path).context("Failed to read ws_config.json")?;
         // Read the JSON contents of the file as an instance of `WSResources`.
         let ws_config: WSResources = serde_json::from_str(&file_contents)?;
-        println!("ws-resources.json loaded! contents: {:?}", ws_config);
+        tracing::info!(?ws_config, "ws resources configuration loaded");
         Ok(ws_config)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::io::Write;
-
-    use tempfile::NamedTempFile;
 
     use super::*;
 
@@ -47,13 +48,6 @@ mod tests {
             }
         }
         "#;
-
-        // Create a temporary file and write the test data to it.
-        let mut temp_file = NamedTempFile::new().unwrap();
-        write!(temp_file, "{}", data).unwrap();
-
-        // Read the configuration from the temporary file.
-        let result = WSResources::read(temp_file.path()).unwrap();
-        println!("{:#?}", result);
+        serde_json::from_str::<WSResources>(data).expect("parsing should succeed");
     }
 }

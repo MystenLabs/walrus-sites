@@ -12,8 +12,9 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use futures::TryFutureExt;
-use publish::{publish_site, update_site, PublishOptions};
+use publish::{ContinuousEditing, PublishOptions, SiteEditor, WhenWalrusUpload};
 use serde::Deserialize;
+use site::manager::SiteIdentifier;
 use sui_types::base_types::ObjectID;
 
 use crate::{
@@ -127,7 +128,7 @@ enum Commands {
         #[clap(short, long, default_value = "test site")]
         site_name: String,
     },
-    /// Update an existing site
+    /// Update an existing site.
     Update {
         #[clap(flatten)]
         publish_options: PublishOptions,
@@ -226,14 +227,32 @@ async fn run() -> Result<()> {
         Commands::Publish {
             publish_options,
             site_name,
-        } => publish_site(publish_options, site_name, &config).await?,
+        } => {
+            SiteEditor::new(
+                publish_options,
+                SiteIdentifier::NewSite(site_name),
+                config,
+                ContinuousEditing::Once,
+                WhenWalrusUpload::Modified,
+            )
+            .run()
+            .await?
+        }
         Commands::Update {
             publish_options,
             object_id,
             watch,
             force,
         } => {
-            update_site(publish_options, &object_id, &config, watch, force).await?;
+            SiteEditor::new(
+                publish_options,
+                SiteIdentifier::ExistingSite(object_id),
+                config,
+                ContinuousEditing::from_watch_flag(watch),
+                WhenWalrusUpload::from_force_flag(force),
+            )
+            .run()
+            .await?
         }
         // Add a path to be watched. All files and directories at that path and
         // below will be monitored for changes.

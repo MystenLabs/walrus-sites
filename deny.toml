@@ -12,6 +12,8 @@ ignore = [
     # We have a vulnerable version of `rustls` in our dependency tree through the old version of
     # jsonrpsee used by sui.
     "RUSTSEC-2024-0336",
+    # proc-macro-error is not maintained, but is a dependency in many of our packages.
+    "RUSTSEC-2024-0370",
 ]
 
 # This section is considered when running `cargo deny check licenses`
@@ -34,7 +36,7 @@ allow = [
     "MPL-2.0",
     "Unicode-DFS-2016",
     "Unlicense",
-    "Unicode-3.0",
+    # "Unicode-3.0",
 ]
 # The confidence threshold for detecting a license from license text.
 # The higher the value, the more closely the license text must be to the
@@ -85,6 +87,7 @@ unknown-git = "deny"
 allow-git = [
     "https://github.com/wlmyng/jsonrpsee",
     "https://github.com/zhiburt/tabled",
+    "https://github.com/bmwill/openapiv3",
 ]
 
 [sources.allow-org]
