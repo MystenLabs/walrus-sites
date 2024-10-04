@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::HashMap, path::PathBuf, str};
+use std::{path::PathBuf, str};
 
 use anyhow::{anyhow, Result};
 use futures::Future;
@@ -15,26 +15,8 @@ use sui_sdk::{
         SuiTransactionBlockEffectsAPI,
     },
     wallet_context::WalletContext,
-    SuiClient,
 };
-use sui_types::{
-    base_types::{ObjectID, SuiAddress},
-    dynamic_field::DynamicFieldInfo,
-};
-
-pub async fn get_all_dynamic_field_info(
-    client: &SuiClient,
-    object_id: ObjectID,
-) -> Result<Vec<DynamicFieldInfo>> {
-    let iter = handle_pagination(|cursor| {
-        client
-            .read_api()
-            .get_dynamic_fields(object_id, cursor, None)
-    })
-    .await?
-    .collect();
-    Ok(iter)
-}
+use sui_types::base_types::{ObjectID, SuiAddress};
 
 pub async fn handle_pagination<F, T, C, Fut>(
     closure: F,
@@ -132,27 +114,6 @@ pub(crate) fn get_struct_from_object_response(
             object_response
         )),
     }
-}
-
-pub async fn get_existing_resource_ids(
-    client: &SuiClient,
-    site_id: ObjectID,
-) -> Result<HashMap<String, ObjectID>> {
-    let info = get_all_dynamic_field_info(client, site_id).await?;
-    Ok(info
-        .iter()
-        .filter_map(|d| get_path_from_info(d).map(|path| (path, d.object_id)))
-        .collect::<HashMap<String, ObjectID>>())
-}
-
-// TODO(giac): check the type of the name.
-fn get_path_from_info(info: &DynamicFieldInfo) -> Option<String> {
-    info.name
-        .value
-        .as_object()
-        .and_then(|obj| obj.get("path"))
-        .and_then(|p| p.as_str())
-        .map(|s| s.to_owned())
 }
 
 /// Returns the path if it is `Some` or any of the default paths if they exist (attempt in order).

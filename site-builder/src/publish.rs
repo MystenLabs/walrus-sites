@@ -177,9 +177,9 @@ impl SiteEditor {
             "Parsing the directory {} and locally computing blob IDs",
             self.directory().to_string_lossy()
         ));
-        resource_manager.read_dir(self.directory())?;
+        let local_site_data = resource_manager.read_dir(self.directory())?;
         display::done();
-        tracing::debug!(resources=%resource_manager.resources, "resources loaded from directory");
+        tracing::debug!(?local_site_data, "resources loaded from directory");
 
         let site_manager = SiteManager::new(
             self.config.clone(),
@@ -190,7 +190,7 @@ impl SiteEditor {
             self.when_upload.clone(),
         )
         .await?;
-        let (response, summary) = site_manager.update_site(&resource_manager).await?;
+        let (response, summary) = site_manager.update_site(&local_site_data).await?;
         Ok((site_manager.active_address()?, response, summary))
     }
 

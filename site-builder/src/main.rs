@@ -14,12 +14,12 @@ use clap::{Parser, Subcommand};
 use futures::TryFutureExt;
 use publish::{ContinuousEditing, PublishOptions, SiteEditor, WhenWalrusUpload};
 use serde::Deserialize;
-use site::manager::SiteIdentifier;
+use site::{manager::SiteIdentifier, RemoteSiteFactory};
 use sui_types::base_types::ObjectID;
 
 use crate::{
     preprocessor::Preprocessor,
-    util::{get_existing_resource_ids, id_to_base36, load_wallet_context},
+    util::{id_to_base36, load_wallet_context},
 };
 
 // Define the `GIT_REVISION` and `VERSION` consts.
@@ -258,8 +258,9 @@ async fn run() -> Result<()> {
         // below will be monitored for changes.
         Commands::Sitemap { object } => {
             let wallet = load_wallet_context(&config.general.wallet)?;
-            let all_dynamic_fields =
-                get_existing_resource_ids(&wallet.get_client().await?, object).await?;
+            let all_dynamic_fields = RemoteSiteFactory::new(&wallet.get_client().await?, object)
+                .get_existing_resources()
+                .await?;
             println!("Pages in site at object id: {}", object);
             for (name, id) in all_dynamic_fields {
                 println!("  - {:<40} {:?}", name, id);
