@@ -1,20 +1,17 @@
 /// The module exposes the functionality to create and update Walrus sites.
 module walrus_site::site {
-    use std::option::Option;
-    use sui::object::{Self, UID};
-    use sui::tx_context::TxContext;
     use sui::dynamic_field as df;
     use std::string::String;
     use sui::vec_map;
 
     /// The site published on Sui.
-    struct Site has key, store {
+    public struct Site has key, store {
         id: UID,
         name: String,
     }
 
     /// A resource in a site.
-    struct Resource has store, drop {
+    public struct Resource has store, drop {
         path: String,
         // Response, Representation and Payload headers
         // regarding the contents of the resource.
@@ -29,7 +26,7 @@ module walrus_site::site {
     /// Representation of the resource path.
     ///
     /// Ensures there are no namespace collisions in the dynamic fields.
-    struct ResourcePath has copy, store, drop {
+    public struct ResourcePath has copy, store, drop {
         path: String,
     }
 
@@ -57,12 +54,7 @@ module walrus_site::site {
 
     /// Adds a header to the Resource's headers vector.
     public fun add_header(resource: &mut Resource, name: String, value: String) {
-        // Will throw an exception if duplicate key.
-        vec_map::insert(
-            &mut resource.headers,
-            name,
-            value
-        );
+        resource.headers.insert(name, value);
     }
 
     fun new_path(path: String): ResourcePath {
@@ -96,7 +88,7 @@ module walrus_site::site {
 
     /// Changes the path of a resource on a site.
     public fun move_resource(site: &mut Site, old_path: String, new_path: String) {
-        let resource = remove_resource(site, old_path);
+        let mut resource = remove_resource(site, old_path);
         resource.path = new_path;
         add_resource(site, resource);
     }
