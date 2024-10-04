@@ -8,12 +8,13 @@ import { subdomainToObjectId, HEXtoBase36 } from "./objectId_operations";
 import { resolveSuiNsAddress, hardcodedSubdmains } from "./suins";
 import { fetchResource } from "./resource";
 import {
-    siteNotFound, noObjectIdFound, fullNodeFail,
-    generateHashErrorResponse
+    siteNotFound,
+    noObjectIdFound,
+    fullNodeFail,
+    generateHashErrorResponse,
 } from "./http/http_error_responses";
-import { decompressData } from "./decompress_data";
 import { aggregatorEndpoint } from "./aggregator";
-import { toHEX } from "@mysten/bcs";
+import { toB64 } from "@mysten/bcs";
 import { sha256 } from "./crypto";
 
 /**
@@ -33,10 +34,11 @@ export async function resolveAndFetchPage(parsedUrl: DomainDetails): Promise<Res
 }
 
 export async function resolveObjectId(
-    parsedUrl: DomainDetails, client: SuiClient
+    parsedUrl: DomainDetails,
+    client: SuiClient,
 ): Promise<string | Response> {
     let objectId = hardcodedSubdmains(parsedUrl.subdomain);
-    if (!objectId && !parsedUrl.subdomain.includes('.')) {
+    if (!objectId && !parsedUrl.subdomain.includes(".")) {
         // Try to convert the subdomain to an object ID NOTE: This effectively _disables_ any SuiNs
         // name that is the base36 encoding of an object ID (i.e., a 32-byte string). This is
         // desirable, prevents people from getting suins names that are the base36 encoding the
@@ -64,12 +66,14 @@ export async function resolveObjectId(
  * Fetches a page.
  */
 export async function fetchPage(
-    client: SuiClient, objectId: string, path: string
+    client: SuiClient,
+    objectId: string,
+    path: string,
 ): Promise<Response> {
-    const result = await fetchResource(client, objectId, path, new Set<string>);
+    const result = await fetchResource(client, objectId, path, new Set<string>());
     if (!isResource(result) || !result.blob_id) {
-        if (path !== '/404.html') {
-            return fetchPage(client, objectId, '/404.html');
+        if (path !== "/404.html") {
+            return fetchPage(client, objectId, "/404.html");
         } else {
             return siteNotFound();
         }
@@ -84,15 +88,15 @@ export async function fetchPage(
     const body = await contents.arrayBuffer();
     // Verify the integrity of the aggregator response by hashing
     // the response contents.
-    const h10b = toHEX(
-        await sha256(body)
-    );
+    const h10b = toB64(await sha256(body));
     if (result.blob_hash != h10b) {
         console.warn(
-            '[!] checksum mismatch [!] for:', result.path, '.',
-            `blob hash: ${result.blob_hash} | aggr. hash: ${h10b}`
-        )
-        return generateHashErrorResponse()
+            "[!] checksum mismatch [!] for:",
+            result.path,
+            ".",
+            `blob hash: ${result.blob_hash} | aggr. hash: ${h10b}`,
+        );
+        return generateHashErrorResponse();
     }
 
     return new Response(body, {
@@ -100,7 +104,7 @@ export async function fetchPage(
             ...Object.fromEntries(result.headers),
             "x-resource-sui-object-version": result.version,
             "x-resource-sui-object-id": result.objectId,
-            "x-unix-time-cached": Date.now().toString()
+            "x-unix-time-cached": Date.now().toString(),
         },
     });
 }

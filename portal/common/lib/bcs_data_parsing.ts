@@ -20,7 +20,7 @@ const BLOB_ID = bcs.u256().transform({
 // otherwise, it will mess up with the checksum results.
 const DATA_HASH = bcs.u256().transform({
     input: (id: string) => id,
-    output: (id) => toHEX(bcs.u256().serialize(id).toBytes()),
+    output: (id) => toB64(bcs.u256().serialize(id).toBytes()),
 });
 
 export const ResourcePathStruct = bcs.struct("ResourcePath", {
@@ -31,7 +31,7 @@ export const ResourceStruct = bcs.struct("Resource", {
     path: bcs.string(),
     headers: bcs.map(bcs.string(), bcs.string()),
     blob_id: BLOB_ID,
-    blob_hash: DATA_HASH
+    blob_hash: DATA_HASH,
 });
 
 export function DynamicFieldStruct<K, V>(K: BcsType<K>, V: BcsType<V>) {
