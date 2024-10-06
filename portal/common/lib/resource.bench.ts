@@ -5,17 +5,20 @@ import { bench, describe, expect, vi, beforeEach } from 'vitest';
 import { fetchResource } from './resource';
 import { SuiClient, SuiObjectData } from '@mysten/sui/client';
 import { isVersionedResource } from './types';
-import { SITES_USED_FOR_BENCHING } from './constants';
+import { checkRedirect } from './redirects';
 
 // Mock SuiClient methods.
 const getDynamicFieldObject = vi.fn();
 const getObject = vi.fn();
-
 const mockClient = {
     getDynamicFieldObject,
     getObject,
 } as unknown as SuiClient;
-
+// Mock `checkRedirect`.
+vi.mock('./redirects', () => ({
+    checkRedirect: vi.fn(),
+}));
+// Mock `bcs_data_parsing` to simulate parsing of the BCS data.
 vi.mock('./bcs_data_parsing', () => ({
     ResourcePathStruct: vi.fn(),
     ResourceStruct: vi.fn(),
@@ -24,51 +27,75 @@ vi.mock('./bcs_data_parsing', () => ({
             value: {
                 blob_id: '0xresourceBlobId',
                 path: '/index.html',
-                content_type: 'text/html',
-                content_encoding: 'utf8',
                 blob_hash: 'mockedBlobHash',
+                headers: [
+                    ['Content-Type', 'text/html'],
+                    ['Content-Encoding', 'utf8'],
+                ],
             },
         }),
     })),
 }));
 
 describe('Resource fetching with mocked network calls', () => {
-    beforeEach(() => {
-        vi.restoreAllMocks();
+    const landingPageObjectId = '0xLandingPage';
+    const flatlanderObjectId = '0xFlatlanderObject';
 
-        // Mock `getDynamicFieldObject` to provide data.
-        getDynamicFieldObject.mockResolvedValue({
+    beforeEach(() => {
+        getDynamicFieldObject.mockClear();
+        getObject.mockClear();
+        (checkRedirect as any).mockClear();
+    });
+
+    // 1. Benchmark for a page like the landing page (without redirects).
+    bench('fetchResource: fetch the landing page site (no redirects)', async () => {
+        const resourcePath = '/index.html';
+        getDynamicFieldObject.mockResolvedValueOnce({
             data: {
                 objectId: '0xObjectId',
-                version: '1',
                 digest: 'mocked-digest',
             },
         });
 
-        // Mock `getObject` to provide BCS data.
-        getObject.mockResolvedValue({
+        getObject.mockResolvedValueOnce({
             data: {
-                objectId: '0xObjectId',
-                version: '1',
-                digest: 'mocked-digest',
                 bcs: {
                     dataType: 'moveObject',
-                    bcsBytes: Buffer.from('valid-mocked-bcs-data', 'utf8').toString('base64'),
+                    bcsBytes: 'mockBcsBytes',
                 },
             } as SuiObjectData,
         });
+
+        const resp = await fetchResource(mockClient, landingPageObjectId, resourcePath, new Set());
+        expect(isVersionedResource(resp)).toBeTruthy();
     });
 
-    SITES_USED_FOR_BENCHING.forEach(([objectId, siteName]) => {
-        // Benchmark the performance of fetching resources.
-        bench(`fetchResource: fetch the ${siteName} site`, async () => {
-            const resourcePath = '/index.html';
+    // 2. Benchmark for a page with redirects (such as accessing a Flatlander).
+    bench('fetchResource: fetch the flatlander site (with redirects)', async () => {
+        const resourcePath = '/index.html';
 
-            // Use the mocked client and call fetchResource.
-            const resp = await fetchResource(mockClient, objectId, resourcePath, new Set());
+        getDynamicFieldObject.mockResolvedValueOnce(null);
 
-            // Validate that the fetched resource is versioned.
-            expect(isVersionedResource(resp)).toBeTruthy();
+        (checkRedirect as any).mockResolvedValueOnce('0xRedirectId');
+
+        getDynamicFieldObject.mockResolvedValueOnce({
+            data: {
+                objectId: '0xFinalObjectId',
+                digest: 'mocked-digest',
+            },
         });
+
+        getObject.mockResolvedValueOnce({
+            data: {
+                bcs: {
+                    dataType: 'moveObject',
+                    bcsBytes: 'mockBcsBytes',
+                },
+            } as SuiObjectData,
+        });
+
+        const resp = await fetchResource(mockClient, flatlanderObjectId, resourcePath, new Set());
+        expect(isVersionedResource(resp)).toBeTruthy();
+        expect(checkRedirect).toHaveBeenCalledWith(mockClient, flatlanderObjectId);
     });
 });

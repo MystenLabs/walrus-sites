@@ -4,50 +4,48 @@
 import { describe, bench, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest';
 import { fetchPage } from './page_fetching';
 import { SuiClient, SuiObjectData } from '@mysten/sui/client';
-import { SITES_USED_FOR_BENCHING } from './constants';
 import { sha256 } from './crypto';
-import { toHEX } from '@mysten/bcs';
+import { toB64 } from '@mysten/bcs';
+import { checkRedirect } from './redirects';
 
 // Mock content and expected hash.
 const mockContent = '<html>Mock Page Content</html>';
 const contentBuffer = Buffer.from(mockContent, 'utf8');
 let expectedHash: string;
 
-// Mock functions.
 const fetchMock = vi.fn();
+
 const getDynamicFieldObject = vi.fn();
 const getObject = vi.fn();
+
 const mockClient = {
     getDynamicFieldObject,
     getObject,
 } as unknown as SuiClient;
 
+vi.mock('./redirects', () => ({
+    checkRedirect: vi.fn(),
+}));
+
 describe('Page fetching with mocked network calls', () => {
     beforeAll(async () => {
-        // Set up the global fetch mock.
         globalThis.fetch = fetchMock;
 
-        // Compute expected hash.
         const decompressed = new Uint8Array(contentBuffer);
         const hashArray = await sha256(decompressed);
-        expectedHash = toHEX(hashArray);
+        expectedHash = toB64(hashArray);
 
-        // Mock fetch response.
         fetchMock.mockResolvedValue({
             ok: true,
             status: 200,
-            headers: new Headers({
-                'Content-Type': 'text/html',
-            }),
+            headers: new Headers([
+                ['Content-Type', 'text/html'],
+                ['Content-Encoding', 'utf8'],
+            ]),
             arrayBuffer: async () => contentBuffer,
             text: async () => mockContent,
             json: async () => ({ message: 'Mock Page Content' }),
         } as unknown as Response);
-
-        // Mock 'decompress_data'.
-        vi.mock('./decompress_data', () => ({
-            decompressData: vi.fn(async (data: Uint8Array) => data),
-        }));
 
         // Mock 'bcs_data_parsing'.
         vi.mock('./bcs_data_parsing', () => ({
@@ -58,9 +56,11 @@ describe('Page fetching with mocked network calls', () => {
                     value: {
                         blob_id: '0xresourceBlobId',
                         path: '/index.html',
-                        content_type: 'text/html',
-                        content_encoding: 'utf8',
                         blob_hash: expectedHash,
+                        headers: [
+                            ['Content-Type', 'text/html'],
+                            ['Content-Encoding', 'utf8'],
+                        ]
                     },
                 }),
             }),
@@ -69,31 +69,9 @@ describe('Page fetching with mocked network calls', () => {
 
     beforeEach(() => {
         // Clear mocks.
-        fetchMock.mockClear();
         getDynamicFieldObject.mockClear();
         getObject.mockClear();
 
-        // Mock 'getDynamicFieldObject'.
-        getDynamicFieldObject.mockResolvedValue({
-            data: {
-                objectId: '0xObjectId',
-                version: '1',
-                digest: 'mocked-digest',
-            },
-        });
-
-        // Mock 'getObject'.
-        getObject.mockResolvedValue({
-            data: {
-                objectId: '0xObjectId',
-                version: '1',
-                digest: 'mocked-digest',
-                bcs: {
-                    dataType: 'moveObject',
-                    bcsBytes: Buffer.from('valid-mocked-bcs-data', 'utf8').toString('base64'),
-                },
-            } as SuiObjectData,
-        });
     });
 
     afterAll(() => {
@@ -102,31 +80,58 @@ describe('Page fetching with mocked network calls', () => {
         vi.restoreAllMocks();
     });
 
-    SITES_USED_FOR_BENCHING.forEach(([objectId, siteName]) => {
-        bench(`fetchPage: should successfully fetch the ${siteName} site`, async () => {
-            const resourcePath = '/index.html';
-            const response = await fetchPage(mockClient, objectId, resourcePath);
+    const landingPageObjectId = '0xLandingPage';
+    const flatlanderObjectId = '0xFlatlanderObject';
 
-            expect(response.status).toEqual(200);
+    // 1. Benchmark for normal page fetching.
+    bench('fetchPage: should successfully fetch the mocked landing page site', async () => {
+
+        getDynamicFieldObject.mockResolvedValueOnce({
+            data: {
+                objectId: '0xObjectId',
+                digest: 'mocked-digest',
+            },
         });
 
-        bench(`fetchPage: should return 404 for non-existing ${siteName} page`, async () => {
-            // Mock fetch to return 404.
-            fetchMock.mockResolvedValueOnce({
-                ok: false,
-                status: 404,
-                headers: new Headers({
-                    'Content-Type': 'text/plain',
-                }),
-                arrayBuffer: async () => Buffer.from('Not Found', 'utf8'),
-                text: async () => 'Not Found',
-                json: async () => ({ error: 'Not Found' }),
-            } as unknown as Response);
-
-            const resourcePath = '/non-existing.html';
-            const response = await fetchPage(mockClient, objectId, resourcePath);
-
-            expect(response.status).toEqual(404);
+        getObject.mockResolvedValueOnce({
+            data: {
+                bcs: {
+                    dataType: 'moveObject',
+                    bcsBytes: 'mockBcsBytes',
+                },
+            } as SuiObjectData,
         });
+
+        const response = await fetchPage(mockClient, landingPageObjectId, '/index.html');
+        expect(response.status).toEqual(200);
     });
+
+    // 2. Benchmark for page fetching with redirect.
+    bench('fetchPage: should successfully fetch a mocked page site using redirect', async () => {
+
+        getDynamicFieldObject.mockResolvedValueOnce(null);
+
+        (checkRedirect as any).mockResolvedValueOnce('0xRedirectId');
+
+        getDynamicFieldObject.mockResolvedValueOnce({
+            data: {
+                objectId: '0xFinalObjectId',
+                digest: 'mocked-digest',
+            },
+        });
+
+        getObject.mockResolvedValueOnce({
+            data: {
+                bcs: {
+                    dataType: 'moveObject',
+                    bcsBytes: 'mockBcsBytes',
+                },
+            } as SuiObjectData,
+        });
+
+        const response = await fetchPage(mockClient, flatlanderObjectId, '/index.html');
+        expect(checkRedirect).toHaveBeenCalledWith(mockClient, flatlanderObjectId);
+        expect(response.status).toEqual(200);
+    });
+
 });
