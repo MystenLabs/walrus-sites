@@ -7,6 +7,7 @@ import { SuiClient, SuiObjectData } from '@mysten/sui/client';
 import { sha256 } from './crypto';
 import { toB64 } from '@mysten/bcs';
 import { checkRedirect } from './redirects';
+import { Resource } from './types';
 
 // Mock content and expected hash.
 const mockContent = '<html>Mock Page Content</html>';
@@ -57,11 +58,11 @@ describe('Page fetching with mocked network calls', () => {
                         blob_id: '0xresourceBlobId',
                         path: '/index.html',
                         blob_hash: expectedHash,
-                        headers: [
+                        headers: new Map([
                             ['Content-Type', 'text/html'],
                             ['Content-Encoding', 'utf8'],
-                        ]
-                    },
+                        ]),
+                    } as Resource
                 }),
             }),
         }));

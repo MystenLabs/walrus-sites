@@ -4,7 +4,7 @@
 import { bench, describe, expect, vi, beforeEach } from 'vitest';
 import { fetchResource } from './resource';
 import { SuiClient, SuiObjectData } from '@mysten/sui/client';
-import { isVersionedResource } from './types';
+import { Resource, isVersionedResource } from './types';
 import { checkRedirect } from './redirects';
 
 // Mock SuiClient methods.
@@ -28,11 +28,11 @@ vi.mock('./bcs_data_parsing', () => ({
                 blob_id: '0xresourceBlobId',
                 path: '/index.html',
                 blob_hash: 'mockedBlobHash',
-                headers: [
+                headers: new Map([
                     ['Content-Type', 'text/html'],
                     ['Content-Encoding', 'utf8'],
-                ],
-            },
+                ]),
+            } as Resource,
         }),
     })),
 }));
@@ -78,6 +78,7 @@ describe('Resource fetching with mocked network calls', () => {
 
         (checkRedirect as any).mockResolvedValueOnce('0xRedirectId');
 
+        // Found Display object.
         getDynamicFieldObject.mockResolvedValueOnce({
             data: {
                 objectId: '0xFinalObjectId',
@@ -85,6 +86,7 @@ describe('Resource fetching with mocked network calls', () => {
             },
         });
 
+        // Redirecting to the flatlander display object.
         getObject.mockResolvedValueOnce({
             data: {
                 bcs: {
