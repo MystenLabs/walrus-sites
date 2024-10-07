@@ -70,6 +70,8 @@ export async function fetchPage(
     objectId: string,
     path: string,
 ): Promise<Response> {
+    // TODO: On the portal side, fetch the route object, store it to a routes object.
+    // Then pass the routes object to the fetchPage params.
     const result = await fetchResource(client, objectId, path, new Set<string>());
     if (!isResource(result) || !result.blob_id) {
         if (path !== "/404.html") {
