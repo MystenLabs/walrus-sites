@@ -9,6 +9,8 @@ module walrus_site::site {
 
     /// An insertion of route was attempted, but the related resource does not exist.
     const EResourceDoesNotExist: u64 = 0;
+    const EIncorrectNumberOfRangeValues: u64 = 1;
+    const EIncorrectRangeBounds: u64 = 2;
 
     /// The site published on Sui.
     public struct Site has key, store {
@@ -26,7 +28,12 @@ module walrus_site::site {
         blob_id: u256,
         // Contains the hash of the contents of the blob
         // to verify its integrity.
-        blob_hash: u256
+        blob_hash: u256,
+        // Defines the byte range of the resource contents
+        // in the case where multiple resources are stored
+        // in the same blob. This way, each resource will
+        // be parsed using its' byte range in the blob.
+        range: Option<vector<u256>>,
     }
 
     /// Representation of the resource path.
@@ -53,13 +60,26 @@ module walrus_site::site {
     public fun new_resource(
         path: String,
         blob_id: u256,
-        blob_hash: u256
+        blob_hash: u256,
+        range: &mut Option<vector<u256>>
     ): Resource {
+        if (option::is_some(range)) {
+            let extracted_range = option::extract(range);
+            // Range should contain 2 values.
+            assert!(vector::length(&extracted_range) == 2, EIncorrectNumberOfRangeValues);
+            // Upper bound should be greater than lower bound.
+            assert!(
+                *vector::borrow(&extracted_range, 0) < *vector::borrow(&extracted_range, 1),
+                EIncorrectRangeBounds
+            );
+        };
+
         Resource {
             path,
             headers: vec_map::empty(),
             blob_id,
             blob_hash,
+            range: *range
         }
     }
 
