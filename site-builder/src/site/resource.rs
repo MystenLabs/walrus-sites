@@ -76,6 +76,17 @@ impl TryFrom<SuiMoveStruct> for HttpHeaders {
     type Error = anyhow::Error;
 
     fn try_from(source: SuiMoveStruct) -> Result<Self, Self::Error> {
+        let map = MapWrapper::try_from(source)?;
+        Ok(Self(map.0))
+    }
+}
+
+pub struct MapWrapper(pub BTreeMap<String, String>);
+
+impl TryFrom<SuiMoveStruct> for MapWrapper {
+    type Error = anyhow::Error;
+
+    fn try_from(source: SuiMoveStruct) -> Result<Self, Self::Error> {
         let contents: Vec<_> = get_dynamic_field!(source, "contents", SuiMoveValue::Vector)?;
         let mut headers = BTreeMap::new();
         for entry in contents {

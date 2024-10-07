@@ -6,8 +6,6 @@
     }
   },
   "routes": {
-    "/path/*": "/index.html",
-    "/some/other/path/*": "/index.html",
-    "/test/*": "/index.html"
+    "/path/*": "/index.html"
   }
 }

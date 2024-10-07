@@ -5,6 +5,7 @@ mod display;
 mod preprocessor;
 mod publish;
 mod site;
+mod summary;
 mod util;
 mod walrus;
 use std::path::PathBuf;

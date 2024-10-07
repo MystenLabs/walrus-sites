@@ -14,13 +14,19 @@ use sui_types::{
 
 use super::{
     builder::SitePtb,
-    resource::{OperationsSummary, ResourceOp},
+    resource::ResourceOp,
     RemoteSiteFactory,
     SiteData,
     SiteDataDiff,
     SITE_MODULE,
 };
-use crate::{display, publish::WhenWalrusUpload, walrus::Walrus, Config};
+use crate::{
+    display,
+    publish::WhenWalrusUpload,
+    summary::SiteDataDiffSummary,
+    walrus::Walrus,
+    Config,
+};
 
 /// The identifier for the new or existing site.
 ///
@@ -67,7 +73,7 @@ impl SiteManager {
     pub async fn update_site(
         &self,
         local_site_data: &SiteData,
-    ) -> Result<(SuiTransactionBlockResponse, OperationsSummary)> {
+    ) -> Result<(SuiTransactionBlockResponse, SiteDataDiffSummary)> {
         let existing_site = match &self.site_id {
             SiteIdentifier::ExistingSite(site_id) => {
                 RemoteSiteFactory::new(&self.sui_client().await?, self.config.package)
@@ -90,13 +96,9 @@ impl SiteManager {
             display::action("Updating the Walrus Site object on Sui");
             let result = self.execute_sui_updates(&site_updates).await?;
             display::done();
-            return Ok((result, site_updates.resource_ops.into()));
+            return Ok((result, site_updates.into()));
         }
-        // TODO(giac) improve this return
-        Ok((
-            SuiTransactionBlockResponse::default(),
-            site_updates.resource_ops.into(),
-        ))
+        Ok((SuiTransactionBlockResponse::default(), site_updates.into()))
     }
 
     /// Publishes the resources to Walrus.
