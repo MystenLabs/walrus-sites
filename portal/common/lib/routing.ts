@@ -28,7 +28,7 @@ export async function getRoutes(
     }
     const routesObj = await fetchRoutesObject(client, routesDF.data.objectId);
     const objectData = routesObj.data;
-    if (objectData && objectData.bcs.dataType === "moveObject") {
+    if (objectData && objectData.bcs && objectData.bcs.dataType === "moveObject") {
         return parseRoutesData(objectData.bcs.bcsBytes);
     }
     throw new Error("Routes object data could not be fetched.");
