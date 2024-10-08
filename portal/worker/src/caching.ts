@@ -32,7 +32,26 @@ export default async function resolveWithCache(
     console.log("Cache miss!", urlString);
     const resolvedPage = await resolveAndFetchPage(parsedUrl);
 
-    cache.put(urlString, resolvedPage.clone());
+    try {
+        await cache.put(urlString, resolvedPage.clone());
+    } catch (e) {
+        if (e.name === 'QuotaExceededError') {
+            console.warn("Cache quota exceeded, unable to store the response:", e);
+            const keys = await cache.keys();
+            // Delete at most N oldest entries.
+            for(let i = 0; i < 50; i++) {
+                if (i > keys.length) break;
+                const oldestKey = keys[i];
+                await cache.delete(oldestKey);
+                console.log('Deleted oldest cache entry:', oldestKey);
+            };
+            // Retrying...
+            await cache.put(urlString, resolvedPage.clone());
+        } else {
+            throw e;
+        }
+    }
+
     return resolvedPage;
 }
 
