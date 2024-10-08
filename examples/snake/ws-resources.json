@@ -6,6 +6,6 @@
     }
   },
   "routes": {
-    "/path/*": "/index.html"
+    "/path/*": "/file.svg"
   }
 }
