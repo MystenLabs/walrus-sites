@@ -43,5 +43,5 @@ export function DynamicFieldStruct<K, V>(K: BcsType<K>, V: BcsType<V>) {
 }
 
 export const RoutesStruct = bcs.struct("Routes", {
-    route_list: bcs.map(bcs.string(), bcs.string())
+    routes_list: bcs.map(bcs.string(), bcs.string())
 })
