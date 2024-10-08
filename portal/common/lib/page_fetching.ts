@@ -3,7 +3,7 @@
 
 import { getFullnodeUrl, SuiClient } from "@mysten/sui/client";
 import { NETWORK } from "./constants";
-import { DomainDetails, isResource } from "./types/index";
+import { DomainDetails, isResource, isRoutes } from "./types/index";
 import { subdomainToObjectId, HEXtoBase36 } from "./objectId_operations";
 import { resolveSuiNsAddress, hardcodedSubdmains } from "./suins";
 import { fetchResource } from "./resource";
@@ -17,11 +17,15 @@ import { aggregatorEndpoint } from "./aggregator";
 import { toB64 } from "@mysten/bcs";
 import { sha256 } from "./crypto";
 import { getRoutes, matchPathToRoute } from "./routing";
+import { RoutingCacheInterface } from "./routing_cache_interface";
+import { Routes, Empty, isEmpty } from "./types/index";
 
 /**
  * Resolves the subdomain to an object ID, and gets the corresponding resources.
  */
-export async function resolveAndFetchPage(parsedUrl: DomainDetails): Promise<Response> {
+export async function resolveAndFetchPage(
+    parsedUrl: DomainDetails, cache?: RoutingCacheInterface
+): Promise<Response> {
     const rpcUrl = getFullnodeUrl(NETWORK);
     const client = new SuiClient({ url: rpcUrl });
     const resolveObjectResult = await resolveObjectId(parsedUrl, client);
@@ -31,15 +35,32 @@ export async function resolveAndFetchPage(parsedUrl: DomainDetails): Promise<Res
         console.log("Base36 version of the object ID: ", HEXtoBase36(resolveObjectResult));
         // Rerouting based on the contents of the routes object,
         // constructed using the ws-resource.json.
-        const routes = await getRoutes(client, resolveObjectResult);
-        if (!routes) {
-            console.warn("No routes found for the object ID");
-            return fetchPage(client, resolveObjectResult, parsedUrl.path);
+        let routes: Routes | Empty | undefined;
+        if (cache) {
+            routes = await cache.get(resolveObjectResult);
+            if (!routes) {
+                // The routes object was not found in the cache, so we need to fetch it.
+                routes = await getRoutes(client, resolveObjectResult);
+                await cache.set(resolveObjectResult, routes ? routes : {});
+            }
+            if (isEmpty(routes)) {
+                console.warn("The routes object was already fetched, but it was empty.");
+                return fetchPage(client, resolveObjectResult, parsedUrl.path);
+            }
+        } else {
+            console.warn("No cache provided, fetching the routes object on every request.");
+            routes = await getRoutes(client, resolveObjectResult);
+            if (!routes) {
+                console.warn("No routes found for the object ID");
+                return fetchPage(client, resolveObjectResult, parsedUrl.path);
+            }
         }
         let matchingRoute: string | undefined;
-        matchingRoute = matchPathToRoute(parsedUrl.path, routes)
-        if (!matchingRoute) {
-            console.warn(`No matching route found for ${parsedUrl.path}`);
+        if (isRoutes(routes)) {
+            matchingRoute = matchPathToRoute(parsedUrl.path, routes)
+            if (!matchingRoute) {
+                console.warn(`No matching route found for ${parsedUrl.path}`);
+            }
         }
         return fetchPage(client, resolveObjectResult, matchingRoute ?? parsedUrl.path);
     }
