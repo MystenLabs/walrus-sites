@@ -13,51 +13,87 @@ import { bcs, fromB64 } from "@mysten/bcs";
 
 /**
  * Gets the Routes dynamic field of the site object.
- * Returns the extracte the routes_list map in order
- * to use it for future requests, and redirect the
- * paths matched accordingly.
+ * Returns the extracted routes_list map to use for future requests,
+ * and redirects the paths matched accordingly.
+ *
+ * @param siteObjectId - The ID of the site object.
+ * @returns The routes list.
  */
 export async function getRoutes(siteObjectId: string): Promise<Routes> {
     const rpcUrl = getFullnodeUrl(NETWORK);
     const client = new SuiClient({ url: rpcUrl });
 
-    const routesDF = await client.getDynamicFieldObject({
-        parentId: siteObjectId,
-        name: { type: "vector<u8>", value: "routes" },
-    });
-
-    const routesObj = await client.getObject({
-        id: routesDF.data.objectId,
-        options: { showBcs: true }
-    })
+    const routesDF = await fetchRoutesDynamicField(client, siteObjectId);
+    const routesObj = await fetchRoutesObject(client, routesDF.data.objectId);
 
     const objectData = routesObj.data;
     if (objectData && objectData.bcs.dataType === "moveObject") {
-        const df = DynamicFieldStruct(
-                // BCS declaration of the ROUTES_FIELD in site.move.
-                bcs.vector(bcs.u8()),
-                // The value of the df, i.e. the Routes Struct.
-                RoutesStruct
-            ).parse(
-                fromB64(objectData.bcs.bcsBytes)
-            );
-        return df.value as any as Routes;
+        return parseRoutesData(objectData.bcs.bcsBytes);
     }
+
     throw new Error("Could not parse routes DF object.");
 }
 
 /**
+ * Fetches the dynamic field object for routes.
+ *
+ * @param client - The SuiClient instance.
+ * @param siteObjectId - The ID of the site object.
+ * @returns The dynamic field object for routes.
+ */
+async function fetchRoutesDynamicField(client: SuiClient, siteObjectId: string): Promise<any> {
+    return await client.getDynamicFieldObject({
+        parentId: siteObjectId,
+        name: { type: "vector<u8>", value: "routes" },
+    });
+}
+
+/**
+ * Fetches the routes object using the dynamic field object ID.
+ *
+ * @param client - The SuiClient instance.
+ * @param objectId - The ID of the dynamic field object.
+ * @returns The routes object.
+ */
+async function fetchRoutesObject(client: SuiClient, objectId: string): Promise<any> {
+    return await client.getObject({
+        id: objectId,
+        options: { showBcs: true }
+    });
+}
+
+/**
+ * Parses the routes data from the BCS bytes.
+ *
+ * @param bcsBytes - The BCS bytes of the routes object.
+ * @returns The parsed routes data.
+ */
+function parseRoutesData(bcsBytes: string): Routes {
+    const df = DynamicFieldStruct(
+        // BCS declaration of the ROUTES_FIELD in site.move.
+        bcs.vector(bcs.u8()),
+        // The value of the df, i.e. the Routes Struct.
+        RoutesStruct
+    ).parse(fromB64(bcsBytes));
+
+    return df.value as any as Routes;
+}
+
+/**
  * Matches the path to the appropriate route.
- * Returns the path of the matched route.
- * @param path The path to match.
- * @param routes The routes to match against.
+ * Path patterns in the routes list are sorted by length in descending order.
+ * Then the first match is returned.
+ *
+ * @param path - The path to match.
+ * @param routes - The routes to match against.
  */
 export function matchPathToRoute(path: string, routes: Routes): string | undefined {
-    const routesArraySorted: Array<[string, string]> = Array.from(
+    // TODO: improve this using radix trees.
+    const sortedRoutes: Array<[string, string]> = Array.from(
         routes.routes_list.entries()
     ).sort((current, next) => next[0].length - current[0].length);
-    const res = routesArraySorted.find(
+    const matchedRoute = sortedRoutes.find(
         ([pattern, _]) => new RegExp(`^${pattern.replace('*', '.*')}$`).test(path)
     );
-    return res? res[1] : undefined
+    return matchedRoute? matchedRoute[1] : undefined
 }
