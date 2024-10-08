@@ -29,7 +29,13 @@ export async function resolveAndFetchPage(parsedUrl: DomainDetails): Promise<Res
     if (isObjectId) {
         console.log("Object ID: ", resolveObjectResult);
         console.log("Base36 version of the object ID: ", HEXtoBase36(resolveObjectResult));
+        // Rerouting based on the contents of the routes object,
+        // constructed using the ws-resource.json.
         const routes = await getRoutes(client, resolveObjectResult);
+        if (!routes) {
+            console.warn("No routes found for the object ID");
+            return fetchPage(client, resolveObjectResult, parsedUrl.path);
+        }
         let matchingRoute: string | undefined;
         matchingRoute = matchPathToRoute(parsedUrl.path, routes)
         if (!matchingRoute) {

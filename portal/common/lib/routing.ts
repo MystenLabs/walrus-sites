@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { getFullnodeUrl, SuiClient } from "@mysten/sui/client";
+import { getFullnodeUrl, SuiClient, SuiObjectResponse } from "@mysten/sui/client";
 import { Routes, } from "./types";
 import {
     DynamicFieldStruct,
@@ -18,16 +18,20 @@ import { bcs, fromB64 } from "@mysten/bcs";
  * @param siteObjectId - The ID of the site object.
  * @returns The routes list.
  */
-export async function getRoutes(client: SuiClient, siteObjectId: string): Promise<Routes> {
+export async function getRoutes(
+    client: SuiClient, siteObjectId: string
+): Promise<Routes | undefined> {
     const routesDF = await fetchRoutesDynamicField(client, siteObjectId);
+    if (!routesDF.data) {
+        console.warn("No routes dynamic field found for site object.");
+        return;
+    }
     const routesObj = await fetchRoutesObject(client, routesDF.data.objectId);
-
     const objectData = routesObj.data;
     if (objectData && objectData.bcs.dataType === "moveObject") {
         return parseRoutesData(objectData.bcs.bcsBytes);
     }
-
-    throw new Error("Could not parse routes DF object.");
+    throw new Error("Routes object data could not be fetched.");
 }
 
 /**
@@ -37,7 +41,9 @@ export async function getRoutes(client: SuiClient, siteObjectId: string): Promis
  * @param siteObjectId - The ID of the site object.
  * @returns The dynamic field object for routes.
  */
-async function fetchRoutesDynamicField(client: SuiClient, siteObjectId: string): Promise<any> {
+async function fetchRoutesDynamicField(
+    client: SuiClient, siteObjectId: string
+): Promise<SuiObjectResponse> {
     return await client.getDynamicFieldObject({
         parentId: siteObjectId,
         name: { type: "vector<u8>", value: "routes" },
@@ -51,7 +57,7 @@ async function fetchRoutesDynamicField(client: SuiClient, siteObjectId: string):
  * @param objectId - The ID of the dynamic field object.
  * @returns The routes object.
  */
-async function fetchRoutesObject(client: SuiClient, objectId: string): Promise<any> {
+async function fetchRoutesObject(client: SuiClient, objectId: string): Promise<SuiObjectResponse> {
     return await client.getObject({
         id: objectId,
         options: { showBcs: true }
