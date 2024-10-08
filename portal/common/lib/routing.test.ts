@@ -3,12 +3,16 @@
 
 import { getRoutes, matchPathToRoute } from "./routing";
 import { test, expect } from 'vitest';
+import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
+import { NETWORK } from "./constants";
 
 const snakeSiteObjectId = '0x3e01b1b8bf0e54f7843596345faff146f1047e304410ed2eb85d5f67ad404206';
 test.skip('getRoutes', async () => {
     // TODO: when you make sure get_routes fetches
     // the Routes dynamic field, mock the request.
-    const routes = await getRoutes(snakeSiteObjectId);
+    const rpcUrl = getFullnodeUrl(NETWORK);
+    const client = new SuiClient({ url: rpcUrl });
+    const routes = await getRoutes(client, snakeSiteObjectId);
     console.log(routes)
 });
 

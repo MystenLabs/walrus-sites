@@ -16,6 +16,7 @@ import {
 import { aggregatorEndpoint } from "./aggregator";
 import { toB64 } from "@mysten/bcs";
 import { sha256 } from "./crypto";
+import { getRoutes, matchPathToRoute } from "./routing";
 
 /**
  * Resolves the subdomain to an object ID, and gets the corresponding resources.
@@ -28,7 +29,13 @@ export async function resolveAndFetchPage(parsedUrl: DomainDetails): Promise<Res
     if (isObjectId) {
         console.log("Object ID: ", resolveObjectResult);
         console.log("Base36 version of the object ID: ", HEXtoBase36(resolveObjectResult));
-        return fetchPage(client, resolveObjectResult, parsedUrl.path);
+        const routes = await getRoutes(client, resolveObjectResult);
+        let matchingRoute: string | undefined;
+        matchingRoute = matchPathToRoute(parsedUrl.path, routes)
+        if (!matchingRoute) {
+            console.warn(`No matching route found for ${parsedUrl.path}`);
+        }
+        return fetchPage(client, resolveObjectResult, matchingRoute ?? parsedUrl.path);
     }
     return resolveObjectResult;
 }

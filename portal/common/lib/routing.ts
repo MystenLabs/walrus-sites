@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { getFullnodeUrl, SuiClient } from "@mysten/sui/client";
-import { NETWORK } from "./constants";
 import { Routes, } from "./types";
 import {
     DynamicFieldStruct,
@@ -19,10 +18,7 @@ import { bcs, fromB64 } from "@mysten/bcs";
  * @param siteObjectId - The ID of the site object.
  * @returns The routes list.
  */
-export async function getRoutes(siteObjectId: string): Promise<Routes> {
-    const rpcUrl = getFullnodeUrl(NETWORK);
-    const client = new SuiClient({ url: rpcUrl });
-
+export async function getRoutes(client: SuiClient, siteObjectId: string): Promise<Routes> {
     const routesDF = await fetchRoutesDynamicField(client, siteObjectId);
     const routesObj = await fetchRoutesObject(client, routesDF.data.objectId);
 
