@@ -1,14 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { getFullnodeUrl, SuiClient, SuiObjectData } from "@mysten/sui/client";
+import { getFullnodeUrl, SuiClient } from "@mysten/sui/client";
 import { NETWORK } from "./constants";
 import { Routes, } from "./types";
 import {
     DynamicFieldStruct,
     RoutesStruct,
 } from "./bcs_data_parsing";
-import { bcs, BcsType, fromB64 } from "@mysten/bcs";
+import { bcs, fromB64 } from "@mysten/bcs";
 
 
 /**
@@ -17,7 +17,7 @@ import { bcs, BcsType, fromB64 } from "@mysten/bcs";
  * to use it for future requests, and redirect the
  * paths matched accordingly.
  */
-export async function getRoutes(siteObjectId: string) {
+export async function getRoutes(siteObjectId: string): Promise<Routes> {
     const rpcUrl = getFullnodeUrl(NETWORK);
     const client = new SuiClient({ url: rpcUrl });
 
@@ -34,12 +34,14 @@ export async function getRoutes(siteObjectId: string) {
     const objectData = routesObj.data;
     if (objectData && objectData.bcs.dataType === "moveObject") {
         const df = DynamicFieldStruct(
+                // BCS declaration of the ROUTES_FIELD in site.move.
                 bcs.vector(bcs.u8()),
+                // The value of the df, i.e. the Routes Struct.
                 RoutesStruct
             ).parse(
                 fromB64(objectData.bcs.bcsBytes)
             );
-        return df.value;
+        return df.value as any as Routes;
     }
     throw new Error("Could not parse routes DF object.");
 }
@@ -50,6 +52,12 @@ export async function getRoutes(siteObjectId: string) {
  * @param path The path to match.
  * @param routes The routes to match against.
  */
-export function matchRoutes(path: string, routes: Routes): string {
-    return "TODO"
+export function matchPathToRoute(path: string, routes: Routes): string | undefined {
+    const routesArraySorted: Array<[string, string]> = Array.from(
+        routes.routes_list.entries()
+    ).sort((current, next) => next[0].length - current[0].length);
+    const res = routesArraySorted.find(
+        ([pattern, _]) => new RegExp(`^${pattern.replace('*', '.*')}$`).test(path)
+    );
+    return res? res[1] : undefined
 }
