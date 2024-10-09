@@ -37,8 +37,10 @@ export async function resolveAndFetchPage(
         // constructed using the ws-resource.json.
         let routes: Routes | Empty | undefined;
         if (cache) {
+            console.log("Cache provided, fetching the routes object from the cache.")
             routes = await cache.get(resolveObjectResult);
             if (!routes) {
+                console.warn("The routes object was not found in the cache.");
                 // The routes object was not found in the cache, so we need to fetch it.
                 routes = await getRoutes(client, resolveObjectResult);
                 await cache.set(resolveObjectResult, routes ? routes : {});

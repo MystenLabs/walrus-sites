@@ -5,6 +5,7 @@ import { resolveAndFetchPage } from "@lib/page_fetching";
 import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
 import { NETWORK } from "@lib/constants";
 import { DomainDetails } from "@lib/types";
+import { RoutingCacheInterface } from "@lib/routing_cache_interface";
 
 const CACHE_NAME = "walrus-sites-cache";
 const CACHE_EXPIRATION_TIME = 24 * 60 * 60 * 1000 // 24 hours in milliseconds
@@ -13,7 +14,7 @@ const CACHE_EXPIRATION_TIME = 24 * 60 * 60 * 1000 // 24 hours in milliseconds
 * Respond to the request using the cache API.
 */
 export default async function resolveWithCache(
-    parsedUrl: DomainDetails, urlString: string
+    parsedUrl: DomainDetails, urlString: string, routingCache: RoutingCacheInterface
 ): Promise<Response> {
     const cache = await caches.open(CACHE_NAME);
     const cachedResponse = await cache.match(urlString);
@@ -30,7 +31,7 @@ export default async function resolveWithCache(
         }
     }
     console.log("Cache miss!", urlString);
-    const resolvedPage = await resolveAndFetchPage(parsedUrl);
+    const resolvedPage = await resolveAndFetchPage(parsedUrl, routingCache);
 
     cache.put(urlString, resolvedPage.clone());
     return resolvedPage;
