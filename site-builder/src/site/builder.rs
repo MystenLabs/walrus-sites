@@ -104,6 +104,7 @@ impl SitePtb<Argument> {
             match call {
                 ResourceOp::Deleted(resource) => self.remove_resource_if_exists(resource)?,
                 ResourceOp::Created(resource) => self.add_resource(resource)?,
+                ResourceOp::Unchanged(_) => (),
             }
         }
         Ok(())

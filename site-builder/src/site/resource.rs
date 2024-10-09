@@ -183,6 +183,7 @@ impl Display for Resource {
 pub enum ResourceOp<'a> {
     Deleted(&'a Resource),
     Created(&'a Resource),
+    Unchanged(&'a Resource),
 }
 
 impl<'a> fmt::Debug for ResourceOp<'a> {
@@ -190,6 +191,7 @@ impl<'a> fmt::Debug for ResourceOp<'a> {
         let (op, path) = match self {
             ResourceOp::Deleted(resource) => ("delete", &resource.info.path),
             ResourceOp::Created(resource) => ("create", &resource.info.path),
+            ResourceOp::Unchanged(resource) => ("unchanged", &resource.info.path),
         };
         f.debug_struct("ResourceOp")
             .field("operation", &op)
@@ -204,6 +206,7 @@ impl<'a> ResourceOp<'a> {
         match self {
             ResourceOp::Deleted(resource) => resource,
             ResourceOp::Created(resource) => resource,
+            ResourceOp::Unchanged(resource) => resource,
         }
     }
 }
@@ -221,6 +224,7 @@ impl<'a> From<&ResourceOp<'a>> for ResourceOpSummary {
         let (op, info) = match source {
             ResourceOp::Deleted(resource) => ("deleted".to_owned(), &resource.info),
             ResourceOp::Created(resource) => ("created".to_owned(), &resource.info),
+            ResourceOp::Unchanged(resource) => ("unchanged".to_owned(), &resource.info),
         };
         ResourceOpSummary {
             operation: op,
@@ -289,10 +293,20 @@ impl ResourceSet {
     /// The deletions are always before the creation operations, such
     /// that if two resources have the same path but different
     /// contents they are first deleted and then created anew.
-    pub fn diff<'a>(&'a self, start: &'a ResourceSet) -> Vec<ResourceOp<'a>> {
-        let create = self.inner.difference(&start.inner).map(ResourceOp::Created);
-        let delete = start.inner.difference(&self.inner).map(ResourceOp::Deleted);
-        delete.chain(create).collect()
+    pub fn diff<'a>(&'a self, target: &'a ResourceSet) -> Vec<ResourceOp<'a>> {
+        let create = self
+            .inner
+            .difference(&target.inner)
+            .map(ResourceOp::Created);
+        let delete = target
+            .inner
+            .difference(&self.inner)
+            .map(ResourceOp::Deleted);
+        let unchanged = self
+            .inner
+            .intersection(&target.inner)
+            .map(ResourceOp::Unchanged);
+        delete.chain(create).chain(unchanged).collect()
     }
 
     /// Returns a vector of operations to delete all resources in the set.
