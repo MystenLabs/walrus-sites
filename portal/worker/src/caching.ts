@@ -32,8 +32,43 @@ export default async function resolveWithCache(
     console.log("Cache miss!", urlString);
     const resolvedPage = await resolveAndFetchPage(parsedUrl);
 
-    cache.put(urlString, resolvedPage.clone());
+    await tryCachePut(cache, urlString, resolvedPage);
+
     return resolvedPage;
+}
+
+async function tryCachePut(cache: Cache, urlString: string, resolvedPage: Response) {
+    try {
+        await cache.put(urlString, resolvedPage.clone());
+    } catch (e) {
+        if (e.name === 'QuotaExceededError') {
+            const keys = await cache.keys();
+            if (keys.length === 0) {
+                const breakRecursionError = new Error(
+                    "Cache quota exceeded, and there are no entries to delete.",
+                    {
+                        cause: "HumongousEntriesError",
+                    }
+                )
+                throw breakRecursionError;
+            }
+            console.warn("Cache quota exceeded. Deleting older entries...");
+            // Delete at most N oldest entries if available.
+            for(let i = 0; i < 50; i++) {
+                if (i > keys.length) break;
+                const oldestKey = keys[i];
+                await cache.delete(oldestKey);
+                console.log('Deleted cache entry:', oldestKey);
+            };
+            // Retrying...
+            await tryCachePut(cache, urlString, resolvedPage)
+        } else {
+            // If not a QuotaExceededError, log the error.
+            // No need to rethrow, as the error is not critical.
+            // It's just about caching.
+            console.error("Error caching the response:", e)
+        }
+    }
 }
 
 /**
