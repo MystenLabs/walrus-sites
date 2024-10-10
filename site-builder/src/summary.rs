@@ -24,6 +24,7 @@ impl From<&ResourceOp<'_>> for ResourceOpSummary {
         let (operation, info) = match value {
             ResourceOp::Deleted(resource) => ("deleted".to_owned(), &resource.info),
             ResourceOp::Created(resource) => ("created".to_owned(), &resource.info),
+            ResourceOp::Unchanged(resource) => ("unchanged".to_owned(), &resource.info),
         };
         ResourceOpSummary {
             operation,

@@ -105,7 +105,9 @@ impl SiteManager {
     async fn publish_to_walrus<'b>(&self, updates: &[ResourceOp<'b>]) -> Result<()> {
         let to_update = updates
             .iter()
-            .filter(|u| matches!(u, ResourceOp::Created(_)))
+            .filter(|u| {
+                matches!(u, ResourceOp::Created(_)) || matches!(u, ResourceOp::Unchanged(_))
+            })
             .collect::<Vec<_>>();
         tracing::debug!(resources=?to_update, "publishing new or updated resources to Walrus");
 
