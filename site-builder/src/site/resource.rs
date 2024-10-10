@@ -18,6 +18,7 @@ use move_core_types::u256::U256;
 use serde::{Deserialize, Serialize};
 use sui_sdk::rpc_types::{SuiMoveStruct, SuiMoveValue};
 
+use super::SiteData;
 use crate::{
     site::{config::WSResources, content::ContentType},
     walrus::{types::BlobId, Walrus},
@@ -72,6 +73,17 @@ impl TryFrom<SuiMoveStruct> for ResourceInfo {
 pub struct HttpHeaders(pub BTreeMap<String, String>);
 
 impl TryFrom<SuiMoveStruct> for HttpHeaders {
+    type Error = anyhow::Error;
+
+    fn try_from(source: SuiMoveStruct) -> Result<Self, Self::Error> {
+        let map = MapWrapper::try_from(source)?;
+        Ok(Self(map.0))
+    }
+}
+
+pub struct MapWrapper(pub BTreeMap<String, String>);
+
+impl TryFrom<SuiMoveStruct> for MapWrapper {
     type Error = anyhow::Error;
 
     fn try_from(source: SuiMoveStruct) -> Result<Self, Self::Error> {
@@ -198,19 +210,19 @@ impl<'a> ResourceOp<'a> {
 
 /// A summary of the operations performed by the site builder.
 #[derive(Debug, Clone)]
-pub(crate) struct OperationSummary {
+pub(crate) struct ResourceOpSummary {
     operation: String,
     path: String,
     blob_id: BlobId,
 }
 
-impl<'a> From<&ResourceOp<'a>> for OperationSummary {
+impl<'a> From<&ResourceOp<'a>> for ResourceOpSummary {
     fn from(source: &ResourceOp<'a>) -> Self {
         let (op, info) = match source {
             ResourceOp::Deleted(resource) => ("deleted".to_owned(), &resource.info),
             ResourceOp::Created(resource) => ("created".to_owned(), &resource.info),
         };
-        OperationSummary {
+        ResourceOpSummary {
             operation: op,
             path: info.path.clone(),
             blob_id: info.blob_id,
@@ -218,7 +230,7 @@ impl<'a> From<&ResourceOp<'a>> for OperationSummary {
     }
 }
 
-impl Display for OperationSummary {
+impl Display for ResourceOpSummary {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -228,11 +240,11 @@ impl Display for OperationSummary {
     }
 }
 
-pub(crate) struct OperationsSummary(pub Vec<OperationSummary>);
+pub(crate) struct OperationsSummary(pub Vec<ResourceOpSummary>);
 
 impl<'a> From<&Vec<ResourceOp<'a>>> for OperationsSummary {
     fn from(source: &Vec<ResourceOp<'a>>) -> Self {
-        Self(source.iter().map(OperationSummary::from).collect())
+        Self(source.iter().map(ResourceOpSummary::from).collect())
     }
 }
 
@@ -258,27 +270,28 @@ impl Display for OperationsSummary {
 }
 
 /// A set of resources composing a site.
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ResourceSet {
     pub inner: BTreeSet<Resource>,
 }
 
 impl ResourceSet {
+    /// Creates an empty resource set.
+    pub fn empty() -> Self {
+        Self {
+            inner: BTreeSet::new(),
+        }
+    }
+
     /// Returns a vector of deletion and creation operations to move
-    /// from the current set to the target set.
+    /// from the start set to the current set.
     ///
     /// The deletions are always before the creation operations, such
     /// that if two resources have the same path but different
     /// contents they are first deleted and then created anew.
-    pub fn diff<'a>(&'a self, target: &'a ResourceSet) -> Vec<ResourceOp<'a>> {
-        let create = self
-            .inner
-            .difference(&target.inner)
-            .map(ResourceOp::Created);
-        let delete = target
-            .inner
-            .difference(&self.inner)
-            .map(ResourceOp::Deleted);
+    pub fn diff<'a>(&'a self, start: &'a ResourceSet) -> Vec<ResourceOp<'a>> {
+        let create = self.inner.difference(&start.inner).map(ResourceOp::Created);
+        let delete = start.inner.difference(&self.inner).map(ResourceOp::Deleted);
         delete.chain(create).collect()
     }
 
@@ -336,11 +349,9 @@ impl Display for ResourceSet {
 pub(crate) struct ResourceManager {
     /// The controller for the Walrus CLI.
     pub walrus: Walrus,
-    /// The resources in the site.
-    pub resources: ResourceSet,
     /// The ws-resources.json contents.
     pub ws_resources: Option<WSResources>,
-    /// THe ws-resource file path.
+    /// The ws-resource file path.
     pub ws_resources_path: Option<PathBuf>,
 }
 
@@ -352,7 +363,6 @@ impl ResourceManager {
     ) -> Result<Self> {
         Ok(ResourceManager {
             walrus,
-            resources: ResourceSet::default(),
             ws_resources,
             ws_resources_path,
         })
@@ -441,9 +451,13 @@ impl ResourceManager {
     }
 
     /// Recursively iterate a directory and load all [`Resources`][Resource] within.
-    pub fn read_dir(&mut self, root: &Path) -> Result<()> {
-        self.resources = ResourceSet::from_iter(self.iter_dir(root, root)?);
-        Ok(())
+    pub fn read_dir(&mut self, root: &Path) -> Result<SiteData> {
+        Ok(SiteData::new(
+            ResourceSet::from_iter(self.iter_dir(root, root)?),
+            self.ws_resources
+                .as_ref()
+                .and_then(|config| config.routes.clone()),
+        ))
     }
 
     fn iter_dir(&self, start: &Path, root: &Path) -> Result<Vec<Resource>> {

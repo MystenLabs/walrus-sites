@@ -5,28 +5,28 @@ use std::{collections::BTreeSet, str::FromStr};
 
 use anyhow::{anyhow, Result};
 use sui_keys::keystore::AccountKeystore;
-use sui_sdk::{
-    rpc_types::{SuiMoveValue, SuiObjectDataOptions, SuiTransactionBlockResponse},
-    wallet_context::WalletContext,
-    SuiClient,
-};
+use sui_sdk::{rpc_types::SuiTransactionBlockResponse, wallet_context::WalletContext, SuiClient};
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
-    transaction::{Argument, ProgrammableTransaction, TransactionData},
+    transaction::{ProgrammableTransaction, TransactionData},
     Identifier,
 };
 
-use super::resource::{OperationsSummary, ResourceInfo, ResourceManager, ResourceOp, ResourceSet};
+use super::{
+    builder::SitePtb,
+    resource::ResourceOp,
+    RemoteSiteFactory,
+    SiteData,
+    SiteDataDiff,
+    SITE_MODULE,
+};
 use crate::{
     display,
     publish::WhenWalrusUpload,
-    site::builder::SitePtb,
-    util::{self, get_struct_from_object_response},
+    summary::SiteDataDiffSummary,
     walrus::Walrus,
     Config,
 };
-
-const SITE_MODULE: &str = "site";
 
 /// The identifier for the new or existing site.
 ///
@@ -72,47 +72,33 @@ impl SiteManager {
     /// or created are published to Walrus.
     pub async fn update_site(
         &self,
-        resource_manager: &ResourceManager,
-    ) -> Result<(SuiTransactionBlockResponse, OperationsSummary)> {
-        let ptb = SitePtb::new(
-            self.config.package,
-            Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
-        )?;
-        let (ptb, existing_resources, needs_transfer) = match &self.site_id {
-            SiteIdentifier::ExistingSite(site_id) => (
-                ptb.with_call_arg(&self.wallet.get_object_ref(*site_id).await?.into())?,
-                self.get_existing_resources(*site_id).await?,
-                false,
-            ),
-            SiteIdentifier::NewSite(site_name) => (
-                ptb.with_create_site(site_name)?,
-                ResourceSet::default(),
-                true,
-            ),
+        local_site_data: &SiteData,
+    ) -> Result<(SuiTransactionBlockResponse, SiteDataDiffSummary)> {
+        let existing_site = match &self.site_id {
+            SiteIdentifier::ExistingSite(site_id) => {
+                RemoteSiteFactory::new(&self.sui_client().await?, self.config.package)
+                    .get_from_chain(*site_id)
+                    .await?
+            }
+            SiteIdentifier::NewSite(_) => SiteData::empty(),
         };
-        tracing::debug!(?existing_resources, "checked existing resources");
-        let update_operations = if self.when_upload.is_always() {
-            existing_resources.replace_all(&resource_manager.resources)
+        tracing::debug!(?existing_site, "checked existing site");
+
+        let site_updates = if self.when_upload.is_always() {
+            existing_site.replace_all(local_site_data)
         } else {
-            resource_manager.resources.diff(&existing_resources)
+            local_site_data.diff(&existing_site)
         };
-        tracing::debug!(operations=?update_operations, "list of operations computed");
+        tracing::debug!(operations=?site_updates, "list of operations computed");
 
-        self.publish_to_walrus(&update_operations).await?;
-
-        if !update_operations.is_empty() {
+        if site_updates.has_updates() {
+            self.publish_to_walrus(&site_updates.resource_ops).await?;
             display::action("Updating the Walrus Site object on Sui");
-            let result = self
-                .execute_updates(ptb, &update_operations, needs_transfer)
-                .await?;
+            let result = self.execute_sui_updates(&site_updates).await?;
             display::done();
-            return Ok((result, update_operations.into()));
+            return Ok((result, site_updates.into()));
         }
-        // TODO(giac) improve this return
-        Ok((
-            SuiTransactionBlockResponse::default(),
-            update_operations.into(),
-        ))
+        Ok((SuiTransactionBlockResponse::default(), site_updates.into()))
     }
 
     /// Publishes the resources to Walrus.
@@ -145,19 +131,32 @@ impl SiteManager {
         Ok(())
     }
 
-    async fn execute_updates<'b>(
+    /// Executes the updates on Sui.
+    async fn execute_sui_updates<'b>(
         &self,
-        mut ptb: SitePtb<Argument>,
-        updates: &[ResourceOp<'b>],
-        transfer: bool,
+        updates: &SiteDataDiff<'b>,
     ) -> Result<SuiTransactionBlockResponse> {
         tracing::debug!(
             address=?self.active_address()?,
             "starting to update site resources on chain",
         );
+        let ptb = SitePtb::new(
+            self.config.package,
+            Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
+        )?;
 
-        ptb.add_operations(updates)?;
-        if transfer {
+        // Add the call arg if we are updating a site, or add the command to create a new site.
+        let mut ptb = match &self.site_id {
+            SiteIdentifier::ExistingSite(site_id) => {
+                ptb.with_call_arg(&self.wallet.get_object_ref(*site_id).await?.into())?
+            }
+            SiteIdentifier::NewSite(site_name) => ptb.with_create_site(site_name)?,
+        };
+
+        ptb.add_resource_operations(&updates.resource_ops)?;
+        ptb.add_route_operations(&updates.route_ops)?;
+
+        if self.needs_transfer() {
             ptb.transfer_site(self.active_address()?);
         }
 
@@ -180,40 +179,6 @@ impl SiteManager {
         );
         let transaction = self.wallet.sign_transaction(&transaction);
         self.wallet.execute_transaction_may_fail(transaction).await
-    }
-
-    async fn get_existing_resources(&self, site_id: ObjectID) -> Result<ResourceSet> {
-        let resource_ids = self.get_existing_resource_ids(site_id).await?;
-        let resources = futures::future::try_join_all(
-            resource_ids
-                .into_iter()
-                .map(|id| self.get_remote_resource_info(id)),
-        )
-        .await?;
-        Ok(ResourceSet::from_iter(resources))
-    }
-
-    /// Get the resources already published to the site.
-    async fn get_existing_resource_ids(&self, site_id: ObjectID) -> Result<Vec<ObjectID>> {
-        Ok(
-            util::get_existing_resource_ids(&self.sui_client().await?, site_id)
-                .await?
-                .into_values()
-                .collect(),
-        )
-    }
-
-    /// Get the resource that is hosted on chain at the given object ID.
-    async fn get_remote_resource_info(&self, object_id: ObjectID) -> Result<ResourceInfo> {
-        let object = get_struct_from_object_response(
-            &self
-                .sui_client()
-                .await?
-                .read_api()
-                .get_object_with_options(object_id, SuiObjectDataOptions::new().with_content())
-                .await?,
-        )?;
-        get_dynamic_field!(object, "value", SuiMoveValue::Struct)?.try_into()
     }
 
     async fn sui_client(&self) -> Result<SuiClient> {
@@ -251,5 +216,12 @@ impl SiteManager {
             .await?
             .1
             .object_ref())
+    }
+
+    /// Returns whether the site needs to be transferred to the active address.
+    ///
+    /// A new site needs to be transferred to the active address.
+    fn needs_transfer(&self) -> bool {
+        matches!(self.site_id, SiteIdentifier::NewSite(_))
     }
 }

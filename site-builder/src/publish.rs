@@ -22,8 +22,9 @@ use crate::{
     site::{
         config::WSResources,
         manager::{SiteIdentifier, SiteManager},
-        resource::{OperationsSummary, ResourceManager},
+        resource::ResourceManager,
     },
+    summary::{SiteDataDiffSummary, Summarizable},
     util::{
         get_site_id_from_response,
         id_to_base36,
@@ -145,7 +146,7 @@ impl SiteEditor {
 
     async fn run_single_edit(
         &self,
-    ) -> Result<(SuiAddress, SuiTransactionBlockResponse, OperationsSummary)> {
+    ) -> Result<(SuiAddress, SuiTransactionBlockResponse, SiteDataDiffSummary)> {
         if self.publish_options.list_directory {
             display::action(format!("Preprocessing: {}", self.directory().display()));
             Preprocessor::preprocess(self.directory())?;
@@ -177,9 +178,9 @@ impl SiteEditor {
             "Parsing the directory {} and locally computing blob IDs",
             self.directory().to_string_lossy()
         ));
-        resource_manager.read_dir(self.directory())?;
+        let local_site_data = resource_manager.read_dir(self.directory())?;
         display::done();
-        tracing::debug!(resources=%resource_manager.resources, "resources loaded from directory");
+        tracing::debug!(?local_site_data, "resources loaded from directory");
 
         let site_manager = SiteManager::new(
             self.config.clone(),
@@ -190,7 +191,7 @@ impl SiteEditor {
             self.when_upload.clone(),
         )
         .await?;
-        let (response, summary) = site_manager.update_site(&resource_manager).await?;
+        let (response, summary) = site_manager.update_site(&local_site_data).await?;
         Ok((site_manager.active_address()?, response, summary))
     }
 
@@ -233,7 +234,7 @@ fn print_summary(
     address: &SuiAddress,
     site_id: &SiteIdentifier,
     response: &SuiTransactionBlockResponse,
-    summary: &OperationsSummary,
+    summary: &impl Summarizable,
 ) -> Result<()> {
     if let Some(SuiTransactionBlockEffects::V1(eff)) = response.effects.as_ref() {
         if let SuiExecutionStatus::Failure { error } = &eff.status {
@@ -245,7 +246,7 @@ fn print_summary(
     }
 
     display::header("Execution completed");
-    println!("{}\n", summary);
+    println!("{}\n", summary.to_summary());
     let object_id = match site_id {
         SiteIdentifier::ExistingSite(id) => {
             println!("Site object ID: {}", id);

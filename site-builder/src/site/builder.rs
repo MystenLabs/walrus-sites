@@ -11,7 +11,10 @@ use sui_types::{
     TypeTag,
 };
 
-use super::resource::{Resource, ResourceOp};
+use super::{
+    resource::{Resource, ResourceOp},
+    RouteOps,
+};
 
 pub struct SitePtb<T = ()> {
     pt_builder: ProgrammableTransactionBuilder,
@@ -93,7 +96,7 @@ impl<T> SitePtb<T> {
 }
 
 impl SitePtb<Argument> {
-    pub fn add_operations<'a>(
+    pub fn add_resource_operations<'a>(
         &mut self,
         calls: impl IntoIterator<Item = &'a ResourceOp<'a>>,
     ) -> Result<()> {
@@ -101,6 +104,20 @@ impl SitePtb<Argument> {
             match call {
                 ResourceOp::Deleted(resource) => self.remove_resource_if_exists(resource)?,
                 ResourceOp::Created(resource) => self.add_resource(resource)?,
+            }
+        }
+        Ok(())
+    }
+
+    /// Adds move calls to update the routes on the object.
+    pub fn add_route_operations(&mut self, route_ops: &RouteOps) -> Result<()> {
+        if let RouteOps::Replace(new_routes) = route_ops {
+            self.remove_routes()?;
+            if !new_routes.is_empty() {
+                self.create_routes()?;
+                for (name, value) in new_routes.0.iter() {
+                    self.add_route(name, value)?;
+                }
             }
         }
         Ok(())
@@ -160,14 +177,53 @@ impl SitePtb<Argument> {
 
     /// Adds the header to the given resource argument.
     fn add_header(&mut self, resource_arg: Argument, name: &str, value: &str) -> Result<()> {
-        let name_input = self.pt_builder.input(pure_call_arg(&name.to_owned())?)?;
+        self.add_key_value_to_argument("add_header", resource_arg, name, value)
+    }
+
+    /// Adds the move calls to add key and value to the argument.
+    fn add_key_value_to_argument(
+        &mut self,
+        fn_name: &str,
+        arg: Argument,
+        key: &str,
+        value: &str,
+    ) -> Result<()> {
+        let name_input = self.pt_builder.input(pure_call_arg(&key.to_owned())?)?;
         let value_input = self.pt_builder.input(pure_call_arg(&value.to_owned())?)?;
         self.add_programmable_move_call(
-            Identifier::new("add_header")?,
+            Identifier::new(fn_name)?,
             vec![],
-            vec![resource_arg, name_input, value_input],
+            vec![arg, name_input, value_input],
         );
         Ok(())
+    }
+
+    // Routes
+
+    /// Adds the move calls to create a new routes object.
+    fn create_routes(&mut self) -> Result<()> {
+        self.add_programmable_move_call(
+            Identifier::new("create_routes")?,
+            vec![],
+            vec![self.site_argument],
+        );
+        Ok(())
+    }
+
+    /// Adds the move calls to remove the routes object.
+    fn remove_routes(&mut self) -> Result<()> {
+        self.add_programmable_move_call(
+            Identifier::new("remove_all_routes_if_exist")?,
+            vec![],
+            vec![self.site_argument],
+        );
+        Ok(())
+    }
+
+    /// Adds the move calls add a route to the routes object.
+    fn add_route(&mut self, name: &str, value: &str) -> Result<()> {
+        tracing::debug!(name=%name, value=%value, "new Move call: adding route");
+        self.add_key_value_to_argument("insert_route", self.site_argument, name, value)
     }
 }
 
