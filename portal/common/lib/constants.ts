@@ -3,7 +3,7 @@
 
 export const NETWORK = "testnet";
 export const AGGREGATOR = "https://aggregator-devnet.walrus.space:443";
-export const SITE_PACKAGE = "0xc10bee83d35e0ab09b8cd77108c9175074e0b96e6b89469c79960bb0b6d1b918";
+export const SITE_PACKAGE = "0xf70286e7349836f6ba8817dde1cd6921478d5585a0c122c0defd7e6ed8f87d0c";
 export const MAX_REDIRECT_DEPTH = 3;
 export const SITE_NAMES: { [key: string]: string } = {
     // Any hardcoded (non suins) name -> object_id mappings go here
