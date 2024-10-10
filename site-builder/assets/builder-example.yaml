@@ -1,6 +1,6 @@
 # module: site
 # portal: walrus.site
-package: 0xee40a3dddc38e3c9f594f74f85ae3bda75b0ed05c6f2359554126409cf7e8e9d
+package: 0xc10bee83d35e0ab09b8cd77108c9175074e0b96e6b89469c79960bb0b6d1b918
 # general:
 #   rpc_url: https://fullnode.testnet.sui.io:443
 #   wallet: /path/to/.sui/sui_config/client.yaml
