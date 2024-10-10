@@ -89,13 +89,11 @@ function parseRoutesData(bcsBytes: string): Routes {
  * @param path - The path to match.
  * @param routes - The routes to match against.
  */
-export function matchPathToRoute(path: string, routes: Routes): string | undefined {
+export function matchPathToRoute(path: string, routes: Routes) {
     // TODO: improve this using radix trees.
-    const sortedRoutes: Array<[string, string]> = Array.from(
-        routes.routes_list.entries()
-    ).sort((current, next) => next[0].length - current[0].length);
-    const matchedRoute = sortedRoutes.find(
-        ([pattern, _]) => new RegExp(`^${pattern.replace('*', '.*')}$`).test(path)
-    );
-    return matchedRoute? matchedRoute[1] : undefined
+    const res = Array
+        .from(routes.routes_list.entries())
+        .filter(([pattern, _]) => new RegExp(`^${pattern.replace('*', '.*')}$`).test(path))
+        .reduce((a, b) => a[0].length >= b[0].length ? a : b)
+    return res ? res[1] : undefined;
 }
