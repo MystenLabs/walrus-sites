@@ -19,19 +19,19 @@ test.skip('getRoutes', async () => {
 const routesExample = {
     routes_list: new Map<string, string>([
         ['/*', '/default.html'],
-        ['/somewhere/else', 'else.jpeg'],
-        ['/somewhere/else/*', 'star-else.gif'],
+        ['/somewhere/else', '/else.jpeg'],
+        ['/somewhere/else/*', '/star-else.gif'],
         ['/path/to/*', '/somewhere.html'],
     ])
 };
 
 const testCases = [
     ["/path/to/somewhere/", "/somewhere.html"],
-    ["/somewhere/else", 'else.jpeg'],
+    ["/somewhere/else", '/else.jpeg'],
     ["/", "/default.html"],
     ["/somewhere", "/default.html"],
-    ["/somewhere/else/star", "star-else.gif"],
-    ["/somewhere/else/", 'star-else.gif'],
+    ["/somewhere/else/star", "/star-else.gif"],
+    ["/somewhere/else/", '/star-else.gif'],
 ]
 
 testCases.forEach(([requestPath, expected]) => {
