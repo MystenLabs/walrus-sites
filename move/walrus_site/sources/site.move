@@ -10,7 +10,7 @@ module walrus_site::site {
     /// An insertion of route was attempted, but the related resource does not exist.
     const EResourceDoesNotExist: u64 = 0;
     const ERangeStartGreaterThanRangeEnd: u64 = 1;
-    const ERangeEndNotPositive: u64 = 2;
+    const ERangeEndShouldNotBeZero: u64 = 2;
 
     /// The site published on Sui.
     public struct Site has key, store {
@@ -72,7 +72,7 @@ module walrus_site::site {
         // If defined, upper range bound should be positive (zero excluded).
         if (end_is_defined) {
             let end = option::borrow(&range_end);
-            assert!( *end > 0, ERangeEndNotPositive);
+            assert!( *end != 0, ERangeEndShouldNotBeZero);
         };
         // If both range bounds are defined, the upper bound should be greater than the lower.
         if (start_is_defined && end_is_defined) {

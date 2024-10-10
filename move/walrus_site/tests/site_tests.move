@@ -2,7 +2,7 @@
 module walrus_site::site_tests {
     use walrus_site::site::{
         ERangeEndNotPositive,
-        ERangeStartGreaterThanRangeEnd
+        ERangeEndShouldNotBeZero
     };
     #[test]
     fun test_new_range_no_bounds_defined() {
