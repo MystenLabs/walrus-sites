@@ -70,7 +70,7 @@ impl SiteManager {
     /// If the site does not exist, it is created and updated. The resources that need to be updated
     /// or created are published to Walrus.
     pub async fn update_site(
-        &self,
+        &mut self,
         resources: &ResourceManager,
     ) -> Result<(SuiTransactionBlockResponse, OperationsSummary)> {
         let ptb = SitePtb::new(
@@ -115,7 +115,7 @@ impl SiteManager {
     }
 
     /// Publishes the resources to Walrus.
-    async fn publish_to_walrus<'b>(&self, updates: &[ResourceOp<'b>]) -> Result<()> {
+    async fn publish_to_walrus<'b>(&mut self, updates: &[ResourceOp<'b>]) -> Result<()> {
         let to_update = updates
             .iter()
             .filter(|u| matches!(u, ResourceOp::Created(_)))
@@ -136,7 +136,8 @@ impl SiteManager {
             ));
             let _output = self
                 .walrus
-                .store(resource.full_path.clone(), self.epochs, self.force)?;
+                .store(resource.full_path.clone(), self.epochs, self.force)
+                .await?;
             display::done();
         }
         Ok(())

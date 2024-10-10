@@ -168,16 +168,18 @@ pub async fn edit_site(
         config.general.wallet.clone(),
     );
 
-    let mut resource_manager = ResourceManager::new(walrus.clone())?;
+    let mut resource_manager = ResourceManager::new(walrus.clone()).await?;
     display::action(format!(
         "Parsing the directory {} and locally computing blob IDs",
         directory.to_string_lossy()
     ));
-    resource_manager.read_dir(directory, content_encoding)?;
+    resource_manager
+        .read_dir(directory, content_encoding)
+        .await?;
     display::done();
     tracing::debug!(resources=%resource_manager.resources, "resources loaded from directory");
 
-    let site_manager = SiteManager::new(
+    let mut site_manager = SiteManager::new(
         config.clone(),
         walrus,
         wallet,

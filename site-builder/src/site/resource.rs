@@ -8,11 +8,13 @@ use std::{
     fmt::{self, Display},
     fs,
     io::Write,
+    num::NonZeroU16,
     path::{Path, PathBuf},
 };
 
 use anyhow::{anyhow, Context, Result};
 use flate2::{write::GzEncoder, Compression};
+use futures::future::try_join_all;
 use move_core_types::u256::U256;
 use sui_sdk::rpc_types::{SuiMoveStruct, SuiMoveValue};
 
@@ -314,25 +316,32 @@ pub(crate) struct ResourceManager {
     pub walrus: Walrus,
     /// The resources in the site.
     pub resources: ResourceSet,
+    /// The number of shards of the Walrus system.
+    pub n_shards: NonZeroU16,
 }
 
 impl ResourceManager {
-    pub fn new(walrus: Walrus) -> Result<Self> {
+    /// Creates a new resource manager.
+    ///
+    /// Requests the `info` from the walrus CLI, to obtain the number of shards.
+    pub async fn new(walrus: Walrus) -> Result<Self> {
+        let n_shards = walrus.info(false).await?.n_shards;
         Ok(ResourceManager {
             walrus,
             resources: ResourceSet::default(),
+            n_shards,
         })
     }
 
     /// Read a resource at a path.
     ///
     /// Ignores empty files.
-    pub fn read_resource(
+    pub async fn read_resource(
         &self,
         full_path: &Path,
         root: &Path,
         content_encoding: &ContentEncoding,
-    ) -> Result<Option<Resource>> {
+    ) -> Result<Resource> {
         let extension = full_path.extension().unwrap_or(
             full_path
                 .file_name()
@@ -341,13 +350,13 @@ impl ResourceManager {
 
         let content_type =
             match ContentType::try_from_extension(extension.to_str().ok_or(anyhow!(
-                "Could not convert the extension {:?} to a string.",
+                "could not convert the extension {:?} to a string.",
                 extension.to_string_lossy()
             ))?) {
                 Ok(content_type) => content_type,
                 Err(_) => {
                     tracing::warn!(
-                        "The extension {} string for file {} could not be decoded.
+                        "the extension {} string for file {} could not be decoded.
                         Defaulting to arbitrary binary content type: octet-stream.",
                         extension.to_string_lossy(),
                         full_path.to_string_lossy()
@@ -357,9 +366,14 @@ impl ResourceManager {
             };
 
         let plain_content = std::fs::read(full_path)?;
-        // TODO(giac): this could be (i) async; (ii) pre configured with the number of shards to
-        //     avoid chain interaction (maybe after adding `info` to the JSON commands).
-        let output = self.walrus.blob_id(full_path.to_owned(), None)?;
+        let output = self
+            .walrus
+            .blob_id(full_path.to_owned(), Some(self.n_shards))
+            .await
+            .context(format!(
+                "error while computing the blob id for path: {}",
+                full_path.to_string_lossy()
+            ))?;
 
         // TODO(giac): How to encode based on the content encoding? Temporary file? No encoding?
         //     let content = match content_encoding {
@@ -367,7 +381,7 @@ impl ResourceManager {
         //         ContentEncoding::Gzip => compress(&plain_content)?,
         //     };
 
-        Ok(Some(Resource::new(
+        Ok(Resource::new(
             full_path_to_resource_path(full_path, root)?,
             full_path.to_owned(),
             content_type,
@@ -376,35 +390,40 @@ impl ResourceManager {
             // TODO(giac): Change to `content.len()` when the problem with content encoding is
             // fixed.
             plain_content.len(),
-        )))
+        ))
     }
 
     /// Recursively iterate a directory and load all [`Resources`][Resource] within.
-    pub fn read_dir(&mut self, root: &Path, content_encoding: &ContentEncoding) -> Result<()> {
-        self.resources = ResourceSet::from_iter(self.iter_dir(root, root, content_encoding)?);
+    pub async fn read_dir(
+        &mut self,
+        root: &Path,
+        content_encoding: &ContentEncoding,
+    ) -> Result<()> {
+        let resource_paths = Self::iter_dir(root, root, content_encoding)?;
+        self.resources =
+            ResourceSet::from_iter(
+                try_join_all(resource_paths.iter().map(|(full_path, root)| {
+                    self.read_resource(full_path, root, content_encoding)
+                }))
+                .await
+                .context("error in loading one of the resources")?,
+            );
         Ok(())
     }
 
     fn iter_dir(
-        &self,
         start: &Path,
         root: &Path,
-        content_encoding: &ContentEncoding,
-    ) -> Result<Vec<Resource>> {
-        let mut resources: Vec<Resource> = vec![];
+        _content_encoding: &ContentEncoding,
+    ) -> Result<Vec<(PathBuf, PathBuf)>> {
+        let mut resources = vec![];
         let entries = fs::read_dir(start)?;
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
-                resources.extend(self.iter_dir(&path, root, content_encoding)?);
-            } else if let Some(res) =
-                self.read_resource(&path, root, content_encoding)
-                    .context(format!(
-                        "error while reading resource `{}`",
-                        path.to_string_lossy()
-                    ))?
-            {
-                resources.push(res);
+                resources.extend(Self::iter_dir(&path, root, _content_encoding)?);
+            } else {
+                resources.push((path.to_owned(), root.to_owned()));
             }
         }
         Ok(resources)
