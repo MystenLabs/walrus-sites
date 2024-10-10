@@ -9,8 +9,9 @@ module walrus_site::site {
 
     /// An insertion of route was attempted, but the related resource does not exist.
     const EResourceDoesNotExist: u64 = 0;
-    const EIncorrectNumberOfRangeValues: u64 = 1;
-    const EIncorrectRangeBounds: u64 = 2;
+    const ERangeStartGreaterThanRangeEnd: u64 = 1;
+    const ERangeStartIsNegative: u64 = 2;
+    const ERangeEndNotPositive: u64 = 3;
 
     /// The site published on Sui.
     public struct Site has key, store {
@@ -33,7 +34,12 @@ module walrus_site::site {
         // in the case where multiple resources are stored
         // in the same blob. This way, each resource will
         // be parsed using its' byte range in the blob.
-        range: Option<vector<u256>>,
+        range: Option<Range>,
+    }
+
+    public struct Range has store, drop {
+        start: Option<u256>, // inclusive lower bound
+        end: Option<u256> // exclusive upper bound
     }
 
     /// Representation of the resource path.
@@ -61,25 +67,44 @@ module walrus_site::site {
         path: String,
         blob_id: u256,
         blob_hash: u256,
-        range: &mut Option<vector<u256>>
+        range_start: Option<u256>,
+        range_end: Option<u256>
     ): Resource {
-        if (option::is_some(range)) {
-            let extracted_range = option::extract(range);
-            // Range should contain 2 values.
-            assert!(vector::length(&extracted_range) == 2, EIncorrectNumberOfRangeValues);
-            // Upper bound should be greater than lower bound.
-            assert!(
-                *vector::borrow(&extracted_range, 0) < *vector::borrow(&extracted_range, 1),
-                EIncorrectRangeBounds
-            );
+        let start_is_defined = option::is_some(&range_start);
+        let end_is_defined = option::is_some(&range_end);
+        // If defined, lower range bound should not be negative.
+        if (start_is_defined) {
+            let start = option::borrow(&range_start);
+            assert!( !(*start < 0), ERangeStartIsNegative);
         };
-
+        // If defined, upper range bound should be positive (zero excluded).
+        if (end_is_defined) {
+            let end = option::borrow(&range_end);
+            assert!( *end > 0, ERangeEndNotPositive);
+        };
+        // If both range bounds are defined, the upper bound should be greater than the lower.
+        if (start_is_defined && end_is_defined) {
+            let start = option::borrow(&range_start);
+            let end = option::borrow(&range_end);
+            assert!(*end > *start, ERangeStartGreaterThanRangeEnd);
+        };
+        // Range is some, only if at least one of the range bounds is defined.
+        let range: Option<Range> = if (!start_is_defined && !end_is_defined) {
+            option::none()
+        } else {
+            option::some(
+                Range {
+                    start: range_start,
+                    end: range_end
+                }
+            )
+        };
         Resource {
             path,
             headers: vec_map::empty(),
             blob_id,
             blob_hash,
-            range: *range
+            range
         }
     }
 
