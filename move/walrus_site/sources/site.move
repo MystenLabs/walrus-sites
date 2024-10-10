@@ -61,14 +61,12 @@ module walrus_site::site {
         }
     }
 
-    /// Creates a new resource.
-    public fun new_resource(
-        path: String,
-        blob_id: u256,
-        blob_hash: u256,
+    /// Used to create a Range object in order to pass it
+    /// to the new_resource.
+    public fun new_range(
         range_start: Option<u256>,
         range_end: Option<u256>
-    ): Resource {
+    ): Option<Range> {
         let start_is_defined = option::is_some(&range_start);
         let end_is_defined = option::is_some(&range_end);
         // If defined, upper range bound should be positive (zero excluded).
@@ -83,7 +81,7 @@ module walrus_site::site {
             assert!(*end > *start, ERangeStartGreaterThanRangeEnd);
         };
         // Range is some, only if at least one of the range bounds is defined.
-        let range: Option<Range> = if (!start_is_defined && !end_is_defined) {
+        if (!start_is_defined && !end_is_defined) {
             option::none()
         } else {
             option::some(
@@ -92,7 +90,16 @@ module walrus_site::site {
                     end: range_end
                 }
             )
-        };
+        }
+    }
+
+    /// Creates a new resource.
+    public fun new_resource(
+        path: String,
+        blob_id: u256,
+        blob_hash: u256,
+        range: Option<Range>
+    ): Resource {
         Resource {
             path,
             headers: vec_map::empty(),
