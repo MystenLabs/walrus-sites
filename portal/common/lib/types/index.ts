@@ -72,3 +72,15 @@ export function isRoutes(obj: any): obj is Routes {
         obj.routes_list instanceof Map
     );
 }
+
+/// An empty object that cannot have any properties.
+export type Empty = Record<string, never>;
+
+/**
+ * Checks if an object is of type Empty.
+ * @param obj The object to check.
+ * @returns True if the object is Empty, false otherwise.
+ */
+export function isEmpty(obj: any): obj is Empty {
+    return Object.keys(obj).length === 0;
+}

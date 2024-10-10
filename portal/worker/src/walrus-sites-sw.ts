@@ -6,6 +6,7 @@ import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@l
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import resolveWithCache from "./caching";
 import { resolveAndFetchPage } from "@lib/page_fetching";
+import { ServiceWorkerRoutingCache } from "./routing_cache";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
@@ -55,7 +56,11 @@ self.addEventListener("fetch", async (event) => {
             console.warn("Cache API not available");
             response = resolveAndFetchPage(parsedUrl);
         } else {
-            response = resolveWithCache(parsedUrl, urlString);
+            const swRoutingCache = new ServiceWorkerRoutingCache();
+            // window is not available in SW. Use self instead
+            // https://stackoverflow.com/a/11237259
+            swRoutingCache.init(self);
+            response = resolveWithCache(parsedUrl, urlString, swRoutingCache);
         }
         event.respondWith(response);
         return;
