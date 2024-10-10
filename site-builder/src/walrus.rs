@@ -3,11 +3,12 @@
 
 //! High-level controller for the Walrus binary through the JSON interface.
 
-use std::{num::NonZeroU16, path::PathBuf, process::Command as CliCommand};
+use std::{num::NonZeroU16, path::PathBuf};
 
 use anyhow::{Context, Result};
 use command::RpcArg;
-use output::{try_from_output, BlobIdOutput, ReadOutput, StoreOutput};
+use output::{try_from_output, BlobIdOutput, InfoOutput, ReadOutput, StoreOutput};
+use tokio::process::Command as CliCommand;
 
 use self::types::BlobId;
 use crate::walrus::command::WalrusCmdBuilder;
@@ -38,6 +39,7 @@ macro_rules! create_command {
             .base_command()
             .arg(&json_input)
             .output()
+            .await
             .context(
                 format!(
                     "error while executing the call to the Walrus binary; \
@@ -68,22 +70,31 @@ impl Walrus {
     }
 
     /// Issues a `store` JSON command to the Walrus CLI, returning the parsed output.
-    pub fn store(&self, file: PathBuf, epochs: u64, force: bool) -> Result<StoreOutput> {
+    // NOTE: takes a mutable reference to ensure that only one store command is executed at every
+    // time. The issue is that the inner wallet may lock coins if called in parallel.
+    pub async fn store(&mut self, file: PathBuf, epochs: u64, force: bool) -> Result<StoreOutput> {
         create_command!(self, store, file, epochs, force)
     }
 
-    // TODO(giac): currently blocking. Parallelize reads.
     /// Issues a `read` JSON command to the Walrus CLI, returning the parsed output.
     #[allow(dead_code)]
-    pub fn read(&self, blob_id: BlobId, out: Option<PathBuf>) -> Result<ReadOutput> {
+    pub async fn read(&self, blob_id: BlobId, out: Option<PathBuf>) -> Result<ReadOutput> {
         create_command!(self, read, blob_id, out, self.rpc_arg())
     }
 
-    // TODO(giac): currently blocking. Parallelize reads.
     // TODO(giac): maybe preconfigure the `n_shards` to avid repeating `None`.
     /// Issues a `blob_id` JSON command to the Walrus CLI, returning the parsed output.
-    pub fn blob_id(&self, file: PathBuf, n_shards: Option<NonZeroU16>) -> Result<BlobIdOutput> {
+    pub async fn blob_id(
+        &self,
+        file: PathBuf,
+        n_shards: Option<NonZeroU16>,
+    ) -> Result<BlobIdOutput> {
         create_command!(self, blob_id, file, n_shards, self.rpc_arg())
+    }
+
+    /// Issues a `info` JSON command to the Walrus CLI, returning the parsed output.
+    pub async fn info(&self, dev: bool) -> Result<InfoOutput> {
+        create_command!(self, info, self.rpc_arg(), dev)
     }
 
     fn base_command(&self) -> CliCommand {

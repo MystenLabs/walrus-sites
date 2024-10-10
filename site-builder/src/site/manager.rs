@@ -71,9 +71,10 @@ impl SiteManager {
     /// If the site does not exist, it is created and updated. The resources that need to be updated
     /// or created are published to Walrus.
     pub async fn update_site(
-        &self,
+        &mut self,
         local_site_data: &SiteData,
     ) -> Result<(SuiTransactionBlockResponse, SiteDataDiffSummary)> {
+        tracing::debug!(?self.site_id, "creating or updating site");
         let existing_site = match &self.site_id {
             SiteIdentifier::ExistingSite(site_id) => {
                 RemoteSiteFactory::new(&self.sui_client().await?, self.config.package)
@@ -102,7 +103,7 @@ impl SiteManager {
     }
 
     /// Publishes the resources to Walrus.
-    async fn publish_to_walrus<'b>(&self, updates: &[ResourceOp<'b>]) -> Result<()> {
+    async fn publish_to_walrus<'b>(&mut self, updates: &[ResourceOp<'b>]) -> Result<()> {
         let to_update = updates
             .iter()
             .filter(|u| {
@@ -123,11 +124,14 @@ impl SiteManager {
                 "Storing resource on Walrus: {}",
                 &resource.info.path
             ));
-            let _output = self.walrus.store(
-                resource.full_path.clone(),
-                self.epochs,
-                self.when_upload.is_always(),
-            )?;
+            let _output = self
+                .walrus
+                .store(
+                    resource.full_path.clone(),
+                    self.epochs,
+                    self.when_upload.is_always(),
+                )
+                .await?;
             display::done();
         }
         Ok(())
