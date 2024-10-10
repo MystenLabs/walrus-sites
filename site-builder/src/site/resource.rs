@@ -293,18 +293,18 @@ impl ResourceSet {
     /// The deletions are always before the creation operations, such
     /// that if two resources have the same path but different
     /// contents they are first deleted and then created anew.
-    pub fn diff<'a>(&'a self, target: &'a ResourceSet) -> Vec<ResourceOp<'a>> {
+    pub fn diff<'a>(&'a self, start: &'a ResourceSet) -> Vec<ResourceOp<'a>> {
         let create = self
             .inner
-            .difference(&target.inner)
+            .difference(&start.inner)
             .map(ResourceOp::Created);
-        let delete = target
+        let delete = start
             .inner
             .difference(&self.inner)
             .map(ResourceOp::Deleted);
         let unchanged = self
             .inner
-            .intersection(&target.inner)
+            .intersection(&start.inner)
             .map(ResourceOp::Unchanged);
         delete.chain(create).chain(unchanged).collect()
     }
