@@ -9,6 +9,7 @@ module walrus_site::site {
 
     /// An insertion of route was attempted, but the related resource does not exist.
     const EResourceDoesNotExist: u64 = 0;
+    const ERangeStartGreaterThanRangeEnd: u64 = 1;
 
     /// The site published on Sui.
     public struct Site has key, store {
@@ -26,7 +27,17 @@ module walrus_site::site {
         blob_id: u256,
         // Contains the hash of the contents of the blob
         // to verify its integrity.
-        blob_hash: u256
+        blob_hash: u256,
+        // Defines the byte range of the resource contents
+        // in the case where multiple resources are stored
+        // in the same blob. This way, each resource will
+        // be parsed using its' byte range in the blob.
+        range: Option<Range>,
+    }
+
+    public struct Range has store, drop {
+        start: Option<u256>, // inclusive lower bound
+        end: Option<u256> // exclusive upper bound
     }
 
     /// Representation of the resource path.
@@ -49,17 +60,46 @@ module walrus_site::site {
         }
     }
 
+    /// Used to create a Range object in order to pass it
+    /// to the new_resource.
+    public fun new_range(
+        range_start: Option<u256>,
+        range_end: Option<u256>
+    ): Option<Range> {
+        let start_is_defined = option::is_some(&range_start);
+        let end_is_defined = option::is_some(&range_end);
+        // If both range bounds are defined, the upper bound should be greater than the lower.
+        if (start_is_defined && end_is_defined) {
+            let start = option::borrow(&range_start);
+            let end = option::borrow(&range_end);
+            assert!(*end > *start, ERangeStartGreaterThanRangeEnd);
+        };
+        // Range is some, only if at least one of the range bounds is defined.
+        if (!start_is_defined && !end_is_defined) {
+            option::none()
+        } else {
+            option::some(
+                Range {
+                    start: range_start,
+                    end: range_end
+                }
+            )
+        }
+    }
+
     /// Creates a new resource.
     public fun new_resource(
         path: String,
         blob_id: u256,
-        blob_hash: u256
+        blob_hash: u256,
+        range: Option<Range>
     ): Resource {
         Resource {
             path,
             headers: vec_map::empty(),
             blob_id,
             blob_hash,
+            range
         }
     }
 
