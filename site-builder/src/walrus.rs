@@ -48,6 +48,7 @@ macro_rules! create_command {
                 )
             )?;
         try_from_output(output)
+            .inspect(|output| tracing::debug!(?output, "Walrus CLI parsed output"))
     }};
 }
 

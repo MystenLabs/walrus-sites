@@ -22,6 +22,7 @@ use sui_sdk::rpc_types::{SuiMoveStruct, SuiMoveValue};
 
 use super::SiteData;
 use crate::{
+    publish::WhenWalrusUpload,
     site::{config::WSResources, content::ContentType},
     walrus::{types::BlobId, Walrus},
 };
@@ -210,6 +211,17 @@ impl<'a> ResourceOp<'a> {
             ResourceOp::Created(resource) => resource,
             ResourceOp::Unchanged(resource) => resource,
         }
+    }
+
+    /// Returns if the operation needs to be uploaded to Walrus.
+    pub fn is_walrus_update(&self, when_upload: &WhenWalrusUpload) -> bool {
+        matches!(self, ResourceOp::Created(_))
+            || (when_upload.is_always() && !matches!(self, ResourceOp::Unchanged(_)))
+    }
+
+    /// Returns true if the operation modifies a resource.
+    pub fn is_change(&self) -> bool {
+        matches!(self, ResourceOp::Created(_) | ResourceOp::Deleted(_))
     }
 }
 

@@ -27,7 +27,11 @@ use sui_types::{
     TypeTag,
 };
 
-use crate::util::{get_struct_from_object_response, handle_pagination};
+use crate::{
+    publish::WhenWalrusUpload,
+    summary::SiteDataDiffSummary,
+    util::{get_struct_from_object_response, handle_pagination},
+};
 
 pub const SITE_MODULE: &str = "site";
 
@@ -87,8 +91,33 @@ pub struct SiteDataDiff<'a> {
 
 impl SiteDataDiff<'_> {
     /// Returns `true` if there are updates to be made.
+    #[cfg(test)]
     pub fn has_updates(&self) -> bool {
         !self.resource_ops.is_empty() || !self.route_ops.is_unchanged()
+    }
+
+    /// Returns the resources that need to be updated on Walrus.
+    pub fn get_walrus_updates(&self, when_upload: &WhenWalrusUpload) -> Vec<&ResourceOp> {
+        self.resource_ops
+            .iter()
+            .filter(|u| u.is_walrus_update(when_upload))
+            .collect::<Vec<_>>()
+    }
+
+    /// Returns the summary of the operations in the diff.
+    pub fn summary(&self, when_upload: &WhenWalrusUpload) -> SiteDataDiffSummary {
+        if when_upload.is_always() {
+            return SiteDataDiffSummary::from(self);
+        }
+        SiteDataDiffSummary {
+            resource_ops: self
+                .resource_ops
+                .iter()
+                .filter(|op| op.is_change())
+                .map(|op| op.into())
+                .collect(),
+            route_ops: self.route_ops.clone(),
+        }
     }
 }
 
