@@ -21,33 +21,33 @@ function main() {
                 } else if (reg.active) {
                     console.log("SW active, error?");
                     // Previously-installed SW should have redirected this request to different page
-                    handleError(new Error("Service Worker is installed but not redirecting"));
+                    handleError();
                 }
             })
             .catch(handleError);
     } else {
         const currentUrl = new URL(window.location.href);
-        console.warn("This browser does not yet support Walrus Sites 💔, redirecting to blob.store");
-        const domainDetails = getSubdomainAndPath(currentUrl)
+        console.warn(
+            "This browser does not yet support Walrus Sites 💔, redirecting to blob.store",
+        );
+        const domainDetails = getSubdomainAndPath(currentUrl);
         window.location.href = new URL(
             `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`,
             `https://${
-            domainDetails.subdomain ?
-            domainDetails.subdomain + '.'
-            : ''
-            }${FALLBACK_PORTAL}`
+                domainDetails.subdomain ? domainDetails.subdomain + "." : ""
+            }${FALLBACK_PORTAL}`,
         ).toString();
     }
 }
 
-function handleError(error) {
+function handleError() {
     displayErrorMessage(swNotLoadingNode());
 }
 
 function swNotLoadingNode() {
     return titleSubtitleNode(
         "Oh! Something's not right 🚧",
-        "Please try refreshing the page or unregistering the service worker."
+        "Please try refreshing the page or unregistering the service worker.",
     );
 }
 

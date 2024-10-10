@@ -4,17 +4,19 @@
 use std::{collections::BTreeMap, path::Path};
 
 use anyhow::{Context, Result};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-use super::resource::HttpHeaders;
+use super::{resource::HttpHeaders, Routes};
 
 /// Deserialized object of the file's `ws-resource.json` contents.
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WSResources {
     /// The HTTP headers to be set for the resources.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub headers: Option<BTreeMap<String, HttpHeaders>>,
-    // TODO: "routes"" for client-side routing.
+    /// The HTTP headers to be set for the resources.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub routes: Option<Routes>,
 }
 
 impl WSResources {
@@ -35,10 +37,7 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn test_read_ws_resources() {
-        let data = r#"
-        {
+    const HEADER_DATA: &str = r#"
             "headers": {
                 "/index.html": {
                     "Content-Type": "application/json",
@@ -46,8 +45,21 @@ mod tests {
                     "Cache-Control": "no-cache"
                 }
             }
-        }
         "#;
-        serde_json::from_str::<WSResources>(data).expect("parsing should succeed");
+
+    const ROUTE_DATA: &str = r#"
+            "routes": {
+                "/*": "/index.html"
+            }
+        "#;
+
+    #[test]
+    fn test_read_ws_resources() {
+        let header_data = format!("{{{}}}", HEADER_DATA);
+        serde_json::from_str::<WSResources>(&header_data).expect("parsing should succeed");
+        let route_data = format!("{{{}}}", ROUTE_DATA);
+        serde_json::from_str::<WSResources>(&route_data).expect("parsing should succeed");
+        let route_header_data = format!("{{{},{}}}", HEADER_DATA, ROUTE_DATA);
+        serde_json::from_str::<WSResources>(&route_header_data).expect("parsing should succeed");
     }
 }
