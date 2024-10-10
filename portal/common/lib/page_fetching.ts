@@ -17,6 +17,7 @@ import { aggregatorEndpoint } from "./aggregator";
 import { toB64 } from "@mysten/bcs";
 import { sha256 } from "./crypto";
 import { getRoutes, matchPathToRoute } from "./routing";
+import { HttpStatusCodes } from "./http/http_status_codes";
 
 /**
  * Resolves the subdomain to an object ID, and gets the corresponding resources.
@@ -31,17 +32,31 @@ export async function resolveAndFetchPage(parsedUrl: DomainDetails): Promise<Res
         console.log("Base36 version of the object ID: ", HEXtoBase36(resolveObjectResult));
         // Rerouting based on the contents of the routes object,
         // constructed using the ws-resource.json.
-        const routes = await getRoutes(client, resolveObjectResult);
-        if (!routes) {
-            console.warn("No routes found for the object ID");
-            return fetchPage(client, resolveObjectResult, parsedUrl.path);
+
+        // Initiate a fetch request to get the Routes object in case the request
+        // to the initial unfiltered path fails.
+        const routesPromise = getRoutes(client, resolveObjectResult);
+
+        // Fetch the page using the initial path.
+        const fetchPromise = await fetchPage(client, resolveObjectResult, parsedUrl.path)
+
+        // If the fetch fails, check if the path can be matched using
+        // the Routes DF and fetch the redirected path.
+        if (fetchPromise.status == HttpStatusCodes.NOT_FOUND) {
+            const routes = await routesPromise;
+            if (!routes) {
+                console.warn("No routes found for the object ID");
+                return siteNotFound();
+            }
+            let matchingRoute: string | undefined;
+            matchingRoute = matchPathToRoute(parsedUrl.path, routes)
+            if (!matchingRoute) {
+                console.warn(`No matching route found for ${parsedUrl.path}`);
+                return siteNotFound();
+            }
+            return fetchPage(client, resolveObjectResult, matchingRoute);
         }
-        let matchingRoute: string | undefined;
-        matchingRoute = matchPathToRoute(parsedUrl.path, routes)
-        if (!matchingRoute) {
-            console.warn(`No matching route found for ${parsedUrl.path}`);
-        }
-        return fetchPage(client, resolveObjectResult, matchingRoute ?? parsedUrl.path);
+        return fetchPromise;
     }
     return resolveObjectResult;
 }
