@@ -48,30 +48,31 @@ self.addEventListener("fetch", async (event) => {
     console.log("Portal domain and request domain: ", portalDomain, requestDomain);
     console.log("Parsed URL: ", parsedUrl);
 
-    const forwardToFallback = async () => {
-        // Fallback portal that supports walrus devnet deployments.
-        const fallbackDevnetPortal = "blocksite.net"
-        return fetch(`${parsedUrl.subdomain}.${fallbackDevnetPortal}`)
-    };
-    if (requestDomain == portalDomain && parsedUrl && parsedUrl.subdomain) {
-        event.respondWith(
-            (async () => {
-                let response: Response;
-                try {
-                    if (!("caches" in self)) {
-                        // When not being in a secure context, the Cache API is not available.
-                        console.warn("Cache API not available");
-                        response = await resolveAndFetchPage(parsedUrl);
-                    } else {
-                        response = await resolveWithCache(parsedUrl, urlString);
-                    }
-                } catch (error) {
-                    console.error("Error in resolving the request:", error);
-                    return forwardToFallback();
+    if (requestDomain === portalDomain && parsedUrl && parsedUrl.subdomain) {
+        // Fetches the page resources.
+        const handleFetchRequest = async (): Promise<Response> => {
+            try {
+                if (!("caches" in self)) {
+                    console.warn("Cache API not available");
+                    return await resolveAndFetchPage(parsedUrl);
                 }
-                if (response.status == 400) return forwardToFallback();
-                return response;
-            })()
+                return await resolveWithCache(parsedUrl, urlString);
+            } catch (error) {
+                console.error("Error resolving the request:", error);
+                return forwardToFallback();
+            }
+        };
+        // If the original request fails, forward to the fallback portal.
+        const forwardToFallback = async () => {
+            // Fallback portal that supports walrus devnet deployments.
+            const fallbackDevnetPortal = "blocksite.net"
+            return fetch(`${parsedUrl.subdomain}.${fallbackDevnetPortal}`)
+        };
+        event.respondWith(
+            handleFetchRequest()
+                .then(response =>
+                    response.status === 400 ? forwardToFallback() : response
+                )
         );
         return;
     }
