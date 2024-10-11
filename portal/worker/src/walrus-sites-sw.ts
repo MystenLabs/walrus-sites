@@ -6,7 +6,6 @@ import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@l
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import resolveWithCache from "./caching";
 import { resolveAndFetchPage } from "@lib/page_fetching";
-import { FALLBACK_DEVNET_PORTAL } from "@lib/constants";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
@@ -65,7 +64,7 @@ self.addEventListener("fetch", async (event) => {
         };
         // If the original request fails, forward to the fallback portal.
         const forwardToFallback = async () => {
-            return fetch(`${parsedUrl.subdomain}.${FALLBACK_DEVNET_PORTAL}`)
+            return fetch(`${parsedUrl.subdomain}.${process.env.FALLBACK_DEVNET_PORTAL}`)
         };
         event.respondWith(
             handleFetchRequest()
