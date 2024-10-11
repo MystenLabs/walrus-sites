@@ -6,14 +6,7 @@ use std::{path::PathBuf, str};
 use anyhow::{anyhow, Result};
 use futures::Future;
 use sui_sdk::{
-    rpc_types::{
-        Page,
-        SuiMoveStruct,
-        SuiObjectResponse,
-        SuiParsedData,
-        SuiTransactionBlockEffects,
-        SuiTransactionBlockEffectsAPI,
-    },
+    rpc_types::{Page, SuiTransactionBlockEffects, SuiTransactionBlockEffectsAPI},
     wallet_context::WalletContext,
 };
 use sui_types::base_types::{ObjectID, SuiAddress};
@@ -93,27 +86,6 @@ pub fn get_site_id_from_response(
         .expect("Could not find the object ID for the created Walrus site.")
         .reference
         .object_id)
-}
-
-pub(crate) fn get_struct_from_object_response(
-    object_response: &SuiObjectResponse,
-) -> Result<SuiMoveStruct> {
-    match object_response {
-        SuiObjectResponse {
-            data: Some(data),
-            error: None,
-        } => match &data.content {
-            Some(SuiParsedData::MoveObject(parsed_object)) => Ok(parsed_object.fields.clone()),
-            _ => Err(anyhow!("Unexpected data in ObjectResponse: {:?}", data)),
-        },
-        SuiObjectResponse {
-            error: Some(error), ..
-        } => Err(anyhow!("Error in ObjectResponse: {:?}", error)),
-        SuiObjectResponse { .. } => Err(anyhow!(
-            "ObjectResponse contains data and error: {:?}",
-            object_response
-        )),
-    }
 }
 
 /// Returns the path if it is `Some` or any of the default paths if they exist (attempt in order).

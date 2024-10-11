@@ -93,7 +93,7 @@ impl SiteManager {
         tracing::debug!(operations=?site_updates, "list of operations computed");
 
         let walrus_updates = site_updates.get_walrus_updates(&self.when_upload);
-        let result = if !walrus_updates.is_empty() {
+        let result = if !walrus_updates.is_empty() || !site_updates.route_ops.is_unchanged() {
             self.publish_to_walrus(&walrus_updates).await?;
             display::action("Updating the Walrus Site object on Sui");
             let result = self.execute_sui_updates(&site_updates).await?;

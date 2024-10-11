@@ -2,84 +2,28 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod builder;
-pub mod content;
-#[macro_use]
-pub mod macros;
 pub mod config;
+pub mod content;
+pub mod contracts;
 pub mod manager;
 pub mod resource;
 
-use std::{
-    collections::{BTreeMap, HashMap},
-    str::FromStr,
-};
+use std::{collections::HashMap, str::FromStr};
 
-use anyhow::{anyhow, Context, Result};
-use resource::{MapWrapper, ResourceInfo, ResourceOp, ResourceSet};
-use serde::{Deserialize, Serialize};
-use sui_sdk::{
-    rpc_types::{SuiMoveStruct, SuiMoveValue, SuiObjectDataOptions},
-    SuiClient,
-};
-use sui_types::{
-    base_types::ObjectID,
-    dynamic_field::{DynamicFieldInfo, DynamicFieldName},
-    TypeTag,
-};
+use anyhow::Result;
+use contracts::get_sui_object;
+use resource::{ResourceOp, ResourceSet};
+use sui_sdk::SuiClient;
+use sui_types::{base_types::ObjectID, dynamic_field::DynamicFieldInfo, TypeTag};
 
 use crate::{
     publish::WhenWalrusUpload,
     summary::SiteDataDiffSummary,
-    util::{get_struct_from_object_response, handle_pagination},
+    types::{ResourceDynamicField, RouteOps, Routes, SuiDynamicField},
+    util::handle_pagination,
 };
 
 pub const SITE_MODULE: &str = "site";
-
-/// The routes of a site.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Routes(pub BTreeMap<String, String>);
-
-impl Routes {
-    pub fn empty() -> Self {
-        Routes(BTreeMap::new())
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-
-    /// Checks if the routes are different.
-    pub fn diff(&self, start: &Self) -> RouteOps {
-        tracing::debug!(?self, ?start, "diffing routes INNER");
-        if self.0 == start.0 {
-            RouteOps::Unchanged
-        } else {
-            RouteOps::Replace(self.clone())
-        }
-    }
-}
-
-impl TryFrom<SuiMoveStruct> for Routes {
-    type Error = anyhow::Error;
-
-    fn try_from(source: SuiMoveStruct) -> Result<Self, Self::Error> {
-        let routes: MapWrapper =
-            get_dynamic_field!(source, "route_list", SuiMoveValue::Struct)?.try_into()?;
-        Ok(Self(routes.0))
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum RouteOps {
-    Unchanged,
-    Replace(Routes),
-}
-
-impl RouteOps {
-    pub fn is_unchanged(&self) -> bool {
-        matches!(self, RouteOps::Unchanged)
-    }
-}
 
 /// The diff between two site data.
 #[derive(Debug)]
@@ -158,7 +102,6 @@ impl SiteData {
     }
 
     fn routes_diff(&self, start: &Self) -> RouteOps {
-        tracing::debug!(?self.routes, ?start.routes, "diffing routes");
         match (&self.routes, &start.routes) {
             (Some(r), Some(s)) => r.diff(s),
             (None, Some(_)) => RouteOps::Replace(Routes::empty()),
@@ -185,57 +128,51 @@ impl RemoteSiteFactory<'_> {
 
     /// Gets the remote site representation stored on chain
     pub async fn get_from_chain(&self, site_id: ObjectID) -> Result<SiteData> {
-        let dynamic_fields = self.get_all_dynamic_field_info(site_id).await?;
-        let resource_ids = self.resources_from_dynamic_fields(&dynamic_fields)?;
-        let resources = futures::future::try_join_all(
-            resource_ids
-                .into_values()
-                .map(|id| self.get_remote_resource_info(id)),
-        )
-        .await?;
-        let routes = self.get_routes(site_id).await?;
+        let dynamic_fields = self.get_all_dynamic_fields(site_id).await?;
+        let resources = ResourceSet::from_iter(
+            futures::future::try_join_all(
+                dynamic_fields
+                    .iter()
+                    // Try to extract the resources.
+                    .filter(|field| field.name.type_ == self.resource_path_tag())
+                    .map(|field| {
+                        get_sui_object::<ResourceDynamicField>(self.sui_client, field.object_id)
+                    }),
+            )
+            .await?
+            .into_iter()
+            .map(|field| field.value),
+        );
 
-        Ok(SiteData {
-            resources: ResourceSet::from_iter(resources),
-            routes,
-        })
+        let routes = self.get_routes(&dynamic_fields).await?;
+
+        Ok(SiteData { resources, routes })
     }
 
-    async fn get_routes(&self, site_id: ObjectID) -> Result<Option<Routes>> {
-        tracing::debug!(?site_id, "getting routes");
-        let response = self
-            .sui_client
-            .read_api()
-            .get_dynamic_field_object(
-                site_id,
-                DynamicFieldName {
-                    type_: TypeTag::Vector(Box::new(TypeTag::U8)),
-                    value: "routes".into(),
-                },
+    async fn get_routes(&self, dynamic_fields: &[DynamicFieldInfo]) -> Result<Option<Routes>> {
+        if let Some(routes_field) = dynamic_fields
+            .iter()
+            .find(|field| field.name.type_ == TypeTag::Vector(Box::new(TypeTag::U8)))
+        {
+            let routes = get_sui_object::<SuiDynamicField<Vec<u8>, Routes>>(
+                self.sui_client,
+                routes_field.object_id,
             )
-            .await?;
-
-        let Ok(dynamic_field) = get_struct_from_object_response(&response) else {
-            // TODO: improve error matching: check that it is dynamic field not found.
-            tracing::info!("no routes found for site {}", site_id);
-            return Ok(None);
-        };
-
-        let routes =
-            get_dynamic_field!(dynamic_field, "value", SuiMoveValue::Struct)?.try_into()?;
-        Ok(Some(routes))
+            .await?
+            .value;
+            Ok(Some(routes))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Gets all the resources and their object ids from chain.
     pub async fn get_existing_resources(&self) -> Result<HashMap<String, ObjectID>> {
-        let dynamic_fields = self.get_all_dynamic_field_info(self.package_id).await?;
+        let dynamic_fields = self.get_all_dynamic_fields(self.package_id).await?;
         self.resources_from_dynamic_fields(&dynamic_fields)
     }
 
-    async fn get_all_dynamic_field_info(
-        &self,
-        object_id: ObjectID,
-    ) -> Result<Vec<DynamicFieldInfo>> {
+    async fn get_all_dynamic_fields(&self, object_id: ObjectID) -> Result<Vec<DynamicFieldInfo>> {
         let iter = handle_pagination(|cursor| {
             self.sui_client
                 .read_api()
@@ -244,21 +181,6 @@ impl RemoteSiteFactory<'_> {
         .await?
         .collect();
         Ok(iter)
-    }
-
-    /// Get the resource that is hosted on chain at the given object ID.
-    async fn get_remote_resource_info(&self, object_id: ObjectID) -> Result<ResourceInfo> {
-        let object = &self
-            .sui_client
-            .read_api()
-            .get_object_with_options(object_id, SuiObjectDataOptions::new().with_content())
-            .await?;
-        let move_struct = get_struct_from_object_response(object).context(format!(
-            "error in getting the struct for object id: {}",
-            object_id
-        ))?;
-
-        get_dynamic_field!(move_struct, "value", SuiMoveValue::Struct)?.try_into()
     }
 
     /// Filters the dynamic fields to get the resource object IDs.
@@ -299,8 +221,8 @@ impl RemoteSiteFactory<'_> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Routes, SiteData};
-    use crate::site::resource::ResourceSet;
+    use super::SiteData;
+    use crate::{site::resource::ResourceSet, types::Routes};
 
     fn routes_from_pair(key: &str, value: &str) -> Option<Routes> {
         Some(Routes(
