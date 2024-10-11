@@ -10,6 +10,7 @@ module walrus_site::site {
     /// An insertion of route was attempted, but the related resource does not exist.
     const EResourceDoesNotExist: u64 = 0;
     const ERangeStartGreaterThanRangeEnd: u64 = 1;
+    const EStartAndEndRangeAreNone: u64 = 2;
 
     /// The site published on Sui.
     public struct Site has key, store {
@@ -60,30 +61,37 @@ module walrus_site::site {
         }
     }
 
-    /// Used to create a Range object in order to pass it
-    /// to the new_resource.
+    /// Optionally creates a new Range object.
+    public fun new_range_option(range_start: Option<u64>, range_end: Option<u64>): Option<Range> {
+        if (range_start.is_none() && range_end.is_none()) {
+            return option::none<Range>()
+        };
+        option::some(new_range(range_start, range_end))
+    }
+
+    /// Creates a new Range object.
+    ///
+    /// aborts if both range_start and range_end are none.
     public fun new_range(
         range_start: Option<u64>,
         range_end: Option<u64>
-    ): Option<Range> {
-        let start_is_defined = option::is_some(&range_start);
-        let end_is_defined = option::is_some(&range_end);
+    ): Range {
+        let start_is_defined = range_start.is_some();
+        let end_is_defined = range_end.is_some();
+
+        // At least one of the range bounds should be defined.
+        assert!(start_is_defined || end_is_defined, EStartAndEndRangeAreNone);
+
         // If both range bounds are defined, the upper bound should be greater than the lower.
         if (start_is_defined && end_is_defined) {
             let start = option::borrow(&range_start);
             let end = option::borrow(&range_end);
             assert!(*end > *start, ERangeStartGreaterThanRangeEnd);
         };
-        // Range is some, only if at least one of the range bounds is defined.
-        if (!start_is_defined && !end_is_defined) {
-            option::none()
-        } else {
-            option::some(
-                Range {
-                    start: range_start,
-                    end: range_end
-                }
-            )
+
+        Range {
+            start: range_start,
+            end: range_end
         }
     }
 

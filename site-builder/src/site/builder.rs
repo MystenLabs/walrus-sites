@@ -199,13 +199,11 @@ impl SitePtb<Argument> {
         .map(|arg| self.pt_builder.input(arg))
         .collect::<Result<Vec<_>>>()?;
 
-        Ok(
-            self.add_programmable_move_call(
-                contracts::site::new_range.identifier(),
-                vec![],
-                inputs,
-            ),
-        )
+        Ok(self.add_programmable_move_call(
+            contracts::site::new_range_option.identifier(),
+            vec![],
+            inputs,
+        ))
     }
 
     /// Adds the header to the given resource argument.
