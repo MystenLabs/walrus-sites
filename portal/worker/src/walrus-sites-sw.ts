@@ -65,7 +65,9 @@ self.addEventListener("fetch", async (event) => {
         };
         // If the original request fails, forward to the fallback portal.
         const forwardToFallback = async () => {
-            return fetch(`${parsedUrl.subdomain}.${process.env.FALLBACK_DEVNET_PORTAL}`)
+            const fallbackportaldomain = "blocksite.net"
+            const forwarded = await fetch(`https://${parsedUrl.subdomain}.${fallbackportaldomain}`)
+            return forwarded;
         };
         event.respondWith(
             handleFetchRequest()

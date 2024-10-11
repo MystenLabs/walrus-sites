@@ -32,7 +32,7 @@ export async function GET(req: Request) {
 
     if (requestDomain == portalDomain && parsedUrl && parsedUrl.subdomain) {
         const forwardToFallback = async () => {
-            return fetch(`${parsedUrl.subdomain}.${process.env.FALLBACK_DEVNET_PORTAL}`)
+            return fetch(`https://${parsedUrl.subdomain}.${process.env.FALLBACK_DEVNET_PORTAL}`)
         };
         try {
             const fetchPageResponse = await resolveAndFetchPage(parsedUrl)
