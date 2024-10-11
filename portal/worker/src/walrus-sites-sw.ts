@@ -55,25 +55,32 @@ self.addEventListener("fetch", async (event) => {
             try {
                 if (!("caches" in self)) {
                     console.warn("Cache API not available");
-                    return await resolveAndFetchPage(parsedUrl);
+                    const initialResponse = await resolveAndFetchPage(parsedUrl);
+                    if (initialResponse.status === HttpStatusCodes.NOT_FOUND) {
+                        return proxyFetch();
+                    }
+                    return initialResponse;
                 }
-                return await resolveWithCache(parsedUrl, urlString);
+                const initialCachedResponse = await resolveWithCache(parsedUrl, urlString);
+                if (initialCachedResponse.status === HttpStatusCodes.NOT_FOUND) {
+                    return proxyFetch();
+                }
+                return initialCachedResponse;
             } catch (error) {
-                console.error("Error resolving the request:", error);
-                return forwardToFallback();
+                console.error("Error resolving request to testnet:", error);
+                console.log("Retrying to fetch from the devnet fallback portal.");
+                return proxyFetch();
             }
         };
         // If the original request fails, forward to the fallback portal.
-        const forwardToFallback = async () => {
-            const fallbackportaldomain = "blocksite.net"
-            const forwarded = await fetch(`https://${parsedUrl.subdomain}.${fallbackportaldomain}`)
-            return forwarded;
+        const proxyFetch = async (): Promise<Response> => {
+            const fallbackDomain = "blocksite.net";
+            const fallbackUrl = `https://${parsedUrl.subdomain}.${fallbackDomain}${parsedUrl.path}`;
+            console.log("Proxy fetching from fallback URL:", fallbackUrl);
+            return fetch(fallbackUrl);
         };
         event.respondWith(
             handleFetchRequest()
-                .then(response =>
-                    response.status === HttpStatusCodes.NOT_FOUND ? forwardToFallback() : response
-                )
         );
         return;
     }
