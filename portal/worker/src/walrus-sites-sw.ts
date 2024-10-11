@@ -6,6 +6,7 @@ import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@l
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import resolveWithCache from "./caching";
 import { resolveAndFetchPage } from "@lib/page_fetching";
+import { HttpStatusCodes } from "@lib/http/http_status_codes";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
@@ -69,7 +70,7 @@ self.addEventListener("fetch", async (event) => {
         event.respondWith(
             handleFetchRequest()
                 .then(response =>
-                    response.status === 400 ? forwardToFallback() : response
+                    response.status === HttpStatusCodes.NOT_FOUND ? forwardToFallback() : response
                 )
         );
         return;
