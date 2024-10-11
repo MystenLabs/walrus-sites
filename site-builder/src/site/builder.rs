@@ -12,9 +12,11 @@ use sui_types::{
 };
 
 use super::{
+    contracts::FunctionTag,
     resource::{Resource, ResourceOp},
     RouteOps,
 };
+use crate::site::contracts;
 
 pub struct SitePtb<T = ()> {
     pt_builder: ProgrammableTransactionBuilder,
@@ -71,7 +73,11 @@ impl<T> SitePtb<T> {
     pub fn create_site(&mut self, site_name: &str) -> Result<Argument> {
         tracing::debug!(site=%site_name, "new Move call: creating site");
         let name_arg = self.pt_builder.input(pure_call_arg(&site_name)?)?;
-        Ok(self.add_programmable_move_call(Identifier::new("new_site")?, vec![], vec![name_arg]))
+        Ok(self.add_programmable_move_call(
+            contracts::site::new_site.identifier(),
+            vec![],
+            vec![name_arg],
+        ))
     }
 
     pub fn add_programmable_move_call(
@@ -133,7 +139,7 @@ impl SitePtb<Argument> {
         tracing::debug!(resource=%resource.info.path, "new Move call: removing resource");
         let path_input = self.pt_builder.input(pure_call_arg(&resource.info.path)?)?;
         self.add_programmable_move_call(
-            Identifier::new("remove_resource_if_exists")?,
+            contracts::site::remove_resource_if_exists.identifier(),
             vec![],
             vec![self.site_argument, path_input],
         );
@@ -152,7 +158,7 @@ impl SitePtb<Argument> {
 
         // Add the resource to the site.
         self.add_programmable_move_call(
-            Identifier::new("add_resource")?,
+            contracts::site::add_resource.identifier(),
             vec![],
             vec![self.site_argument, new_resource_arg],
         );
@@ -173,18 +179,22 @@ impl SitePtb<Argument> {
         .map(|arg| self.pt_builder.input(arg))
         .collect::<Result<Vec<_>>>()?;
 
-        Ok(self.add_programmable_move_call(Identifier::new("new_resource")?, vec![], inputs))
+        Ok(self.add_programmable_move_call(
+            contracts::site::new_resource.identifier(),
+            vec![],
+            inputs,
+        ))
     }
 
     /// Adds the header to the given resource argument.
     fn add_header(&mut self, resource_arg: Argument, name: &str, value: &str) -> Result<()> {
-        self.add_key_value_to_argument("add_header", resource_arg, name, value)
+        self.add_key_value_to_argument(contracts::site::add_header, resource_arg, name, value)
     }
 
     /// Adds the move calls to add key and value to the argument.
     fn add_key_value_to_argument(
         &mut self,
-        fn_name: &str,
+        fn_name: FunctionTag,
         arg: Argument,
         key: &str,
         value: &str,
@@ -192,7 +202,7 @@ impl SitePtb<Argument> {
         let name_input = self.pt_builder.input(pure_call_arg(&key.to_owned())?)?;
         let value_input = self.pt_builder.input(pure_call_arg(&value.to_owned())?)?;
         self.add_programmable_move_call(
-            Identifier::new(fn_name)?,
+            fn_name.identifier(),
             vec![],
             vec![arg, name_input, value_input],
         );
@@ -204,7 +214,7 @@ impl SitePtb<Argument> {
     /// Adds the move calls to create a new routes object.
     fn create_routes(&mut self) -> Result<()> {
         self.add_programmable_move_call(
-            Identifier::new("create_routes")?,
+            contracts::site::create_routes.identifier(),
             vec![],
             vec![self.site_argument],
         );
@@ -214,7 +224,7 @@ impl SitePtb<Argument> {
     /// Adds the move calls to remove the routes object.
     fn remove_routes(&mut self) -> Result<()> {
         self.add_programmable_move_call(
-            Identifier::new("remove_all_routes_if_exist")?,
+            contracts::site::remove_all_routes_if_exist.identifier(),
             vec![],
             vec![self.site_argument],
         );
@@ -224,7 +234,12 @@ impl SitePtb<Argument> {
     /// Adds the move calls add a route to the routes object.
     fn add_route(&mut self, name: &str, value: &str) -> Result<()> {
         tracing::debug!(name=%name, value=%value, "new Move call: adding route");
-        self.add_key_value_to_argument("insert_route", self.site_argument, name, value)
+        self.add_key_value_to_argument(
+            contracts::site::insert_route,
+            self.site_argument,
+            name,
+            value,
+        )
     }
 }
 

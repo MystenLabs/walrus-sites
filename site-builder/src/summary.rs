@@ -4,7 +4,8 @@
 //! Summaries of the run results.
 
 use crate::{
-    site::{resource::ResourceOp, RouteOps, SiteDataDiff},
+    site::{resource::ResourceOp, SiteDataDiff},
+    types::RouteOps,
     walrus::types::BlobId,
 };
 
