@@ -27,9 +27,14 @@ export const ResourcePathStruct = bcs.struct("ResourcePath", {
     path: bcs.string(),
 });
 
+export const OPTION_U64 = bcs.option(bcs.u64()).transform({
+    input: (value: number | null) => value,
+    output: (value) => (value ? Number(value) : null),
+});
+
 export const RangeStruct = bcs.struct("Range", {
-    start: bcs.option(bcs.u64()),
-    end: bcs.option(bcs.u64()),
+    start: OPTION_U64,
+    end: OPTION_U64,
 });
 
 export const ResourceStruct = bcs.struct("Resource", {

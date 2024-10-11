@@ -3,7 +3,11 @@
 
 import { getFullnodeUrl, SuiClient } from "@mysten/sui/client";
 import { NETWORK } from "./constants";
-import { DomainDetails, isResource } from "./types/index";
+import {
+    DomainDetails,
+    isResource,
+    optionalRangeToHeaders as optionalRangeToRequestHeaders,
+} from "./types/index";
 import { subdomainToObjectId, HEXtoBase36 } from "./objectId_operations";
 import { resolveSuiNsAddress, hardcodedSubdmains } from "./suins";
 import { fetchResource } from "./resource";
@@ -48,7 +52,6 @@ export async function resolveAndFetchPage(parsedUrl: DomainDetails): Promise<Res
                 console.warn("No routes found for the object ID");
                 return siteNotFound();
             }
-            console.log(">>>>>>>> Routes: ", routes);
             let matchingRoute: string | undefined;
             matchingRoute = matchPathToRoute(parsedUrl.path, routes);
             if (!matchingRoute) {
@@ -109,7 +112,11 @@ export async function fetchPage(
     }
 
     console.log("Fetched Resource: ", result);
-    const contents = await fetch(aggregatorEndpoint(result.blob_id));
+
+    // We have a resource, get the range header.
+    let range_header = optionalRangeToRequestHeaders(result.range);
+    const contents = await fetch(aggregatorEndpoint(result.blob_id), { headers: range_header });
+
     if (!contents.ok) {
         return siteNotFound();
     }

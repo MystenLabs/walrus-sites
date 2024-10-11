@@ -7,11 +7,7 @@ import { Resource, VersionedResource } from "./types";
 import { MAX_REDIRECT_DEPTH, RESOURCE_PATH_MOVE_TYPE } from "./constants";
 import { checkRedirect } from "./redirects";
 import { fromB64 } from "@mysten/bcs";
-import {
-    ResourcePathStruct,
-    DynamicFieldStruct,
-    ResourceStruct
-} from "./bcs_data_parsing";
+import { ResourcePathStruct, DynamicFieldStruct, ResourceStruct } from "./bcs_data_parsing";
 
 /**
  * Fetches a resource of a site.
@@ -64,9 +60,9 @@ export async function fetchResource(
         console.log("No dynamic field found");
         // Resolve the checkRedirect to get the results.
         let redirectId = await checkRedirectPromise;
-        return redirectId ?
-            fetchResource(client, redirectId, path, seenResources, depth + 1) :
-            HttpStatusCodes.NOT_FOUND;
+        return redirectId
+            ? fetchResource(client, redirectId, path, seenResources, depth + 1)
+            : HttpStatusCodes.NOT_FOUND;
     }
 
     // Fetch page data.
@@ -100,8 +96,9 @@ function getResourceFields(data: SuiObjectData): Resource | null {
     // Deserialize the bcs encoded struct
     if (data.bcs && data.bcs.dataType === "moveObject") {
         const df = DynamicFieldStruct(ResourcePathStruct, ResourceStruct).parse(
-            fromB64(data.bcs.bcsBytes)
+            fromB64(data.bcs.bcsBytes),
         );
+        console.log("ASDF Resource fields: ", df.value);
         return df.value;
     }
     return null;

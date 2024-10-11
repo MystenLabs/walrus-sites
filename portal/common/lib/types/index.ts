@@ -15,7 +15,7 @@ export type DomainDetails = {
 export type UrlExtract = {
     details: DomainDetails | null;
     domain: string | null;
-}
+};
 
 /**
  * The metadata for a site resource, as stored on chain.
@@ -25,7 +25,25 @@ export type Resource = {
     headers: Map<string, string>;
     blob_id: string;
     blob_hash: string;
+    range: Range;
 };
+
+export type Range = {
+    start: number | null;
+    end: number | null;
+};
+
+function rangeToHttpHeader(range: Range): string {
+    return `bytes=${range.start || ""}-${range.end || ""}`;
+}
+
+export function optionalRangeToHeaders(range: Range | null): { [key: string]: string } {
+    let headers = {};
+    if (range) {
+        headers["Range"] = rangeToHttpHeader(range);
+    }
+    return headers;
+}
 
 export type VersionedResource = Resource & {
     version: string; // the sui object version of the site resource
@@ -34,25 +52,29 @@ export type VersionedResource = Resource & {
 
 /**
  * Type guard for the Resource type.
-*/
+ */
 export function isResource(obj: any): obj is Resource {
     return (
         obj &&
-        typeof obj.path === 'string' &&
-        typeof obj.headers === 'object' &&
-        typeof obj.blob_id === 'string' &&
-        typeof obj.blob_hash === 'string'
+        typeof obj.path === "string" &&
+        typeof obj.headers === "object" &&
+        typeof obj.blob_id === "string" &&
+        typeof obj.blob_hash === "string" &&
+        typeof obj.range === "object"
     );
 }
 
 /**
-* Type guard for the VersionedResource type.
-*/
+ * Type guard for the VersionedResource type.
+ */
 export function isVersionedResource(resource: any): resource is VersionedResource {
-    return resource && isResource(resource)
-        && typeof resource === 'object'
-        && 'version' in resource
-        && 'objectId' in resource;
+    return (
+        resource &&
+        isResource(resource) &&
+        typeof resource === "object" &&
+        "version" in resource &&
+        "objectId" in resource
+    );
 }
 
 /**
@@ -60,15 +82,11 @@ export function isVersionedResource(resource: any): resource is VersionedResourc
  */
 export type Routes = {
     routes_list: Map<string, string>;
-}
+};
 
 /**
  * Type guard for the Routes type.
  */
 export function isRoutes(obj: any): obj is Routes {
-    return (
-        obj &&
-        typeof obj.routes_list === 'object' &&
-        obj.routes_list instanceof Map
-    );
+    return obj && typeof obj.routes_list === "object" && obj.routes_list instanceof Map;
 }
