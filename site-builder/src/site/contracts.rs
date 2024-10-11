@@ -201,7 +201,7 @@ pub mod site {
     contract_ident!(fn site::remove_all_routes_if_exist, 1);
     // Range functions
     //contract_ident!(struct site::Range);
-    //contract_ident!(fn site::new_range, 1);
+    contract_ident!(fn site::new_range, 1);
 }
 
 pub mod dynamic_field {
