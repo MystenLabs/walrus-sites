@@ -82,6 +82,14 @@ pub enum Command {
         #[serde(skip_serializing_if = "RpcArg::is_none")]
         rpc_arg: RpcArg,
     },
+    Info {
+        /// The URL of the Sui RPC node to use.
+        #[serde(default)]
+        rpc_arg: RpcArg,
+        /// Print extended information for developers.
+        #[serde(default)]
+        dev: bool,
+    },
 }
 
 /// Represents the Sui RPC endpoint argument.
@@ -184,6 +192,12 @@ impl WalrusCmdBuilder {
             n_shards,
             rpc_arg,
         };
+        self.with_command(command)
+    }
+
+    /// Adds a [`Command::Info`] command to the builder.
+    pub fn info(self, rpc_arg: RpcArg, dev: bool) -> WalrusCmdBuilder<Command> {
+        let command = Command::Info { rpc_arg, dev };
         self.with_command(command)
     }
 }

@@ -63,8 +63,8 @@ impl Summarizable for Vec<ResourceOpSummary> {
 }
 
 pub struct SiteDataDiffSummary {
-    resource_ops: Vec<ResourceOpSummary>,
-    route_ops: RouteOps,
+    pub resource_ops: Vec<ResourceOpSummary>,
+    pub route_ops: RouteOps,
 }
 
 impl From<&SiteDataDiff<'_>> for SiteDataDiffSummary {

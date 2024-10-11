@@ -173,16 +173,16 @@ impl SiteEditor {
         }
 
         let mut resource_manager =
-            ResourceManager::new(walrus.clone(), ws_resources, ws_resources_path)?;
+            ResourceManager::new(walrus.clone(), ws_resources, ws_resources_path).await?;
         display::action(format!(
             "Parsing the directory {} and locally computing blob IDs",
             self.directory().to_string_lossy()
         ));
-        let local_site_data = resource_manager.read_dir(self.directory())?;
+        let local_site_data = resource_manager.read_dir(self.directory()).await?;
         display::done();
         tracing::debug!(?local_site_data, "resources loaded from directory");
 
-        let site_manager = SiteManager::new(
+        let mut site_manager = SiteManager::new(
             self.config.clone(),
             walrus,
             wallet,

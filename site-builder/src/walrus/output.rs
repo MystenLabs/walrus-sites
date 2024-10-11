@@ -3,7 +3,7 @@
 
 //! The output of running commands on the Walrus CLI.
 
-use std::{path::PathBuf, process::Output};
+use std::{num::NonZeroU16, path::PathBuf, process::Output};
 
 use anyhow::{anyhow, Context, Result};
 use serde::{de::DeserializeOwned, Deserialize};
@@ -138,6 +138,26 @@ pub struct BlobIdOutput {
     pub blob_id: BlobId,
     pub file: PathBuf,
     pub unencoded_length: u64,
+}
+
+/// The output of the `info` command.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
+pub(crate) struct InfoOutput {
+    pub(crate) current_epoch: Epoch,
+    pub(crate) n_shards: NonZeroU16,
+    pub(crate) n_nodes: usize,
+    pub(crate) storage_unit_size: u64,
+    pub(crate) price_per_unit_size: u64,
+    pub(crate) max_blob_size: u64,
+    pub(crate) marginal_size: u64,
+    pub(crate) metadata_price: u64,
+    pub(crate) marginal_price: u64,
+    #[serde(skip_deserializing)]
+    pub(crate) example_blobs: String,
+    #[serde(skip_deserializing)]
+    pub(crate) dev_info: String,
 }
 
 pub fn try_from_output<T: DeserializeOwned>(output: Output) -> Result<T> {

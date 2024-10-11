@@ -14,7 +14,7 @@ use std::{
     str::FromStr,
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use resource::{MapWrapper, ResourceInfo, ResourceOp, ResourceSet};
 use serde::{Deserialize, Serialize};
 use sui_sdk::{
@@ -27,7 +27,11 @@ use sui_types::{
     TypeTag,
 };
 
-use crate::util::{get_struct_from_object_response, handle_pagination};
+use crate::{
+    publish::WhenWalrusUpload,
+    summary::SiteDataDiffSummary,
+    util::{get_struct_from_object_response, handle_pagination},
+};
 
 pub const SITE_MODULE: &str = "site";
 
@@ -87,8 +91,33 @@ pub struct SiteDataDiff<'a> {
 
 impl SiteDataDiff<'_> {
     /// Returns `true` if there are updates to be made.
+    #[cfg(test)]
     pub fn has_updates(&self) -> bool {
         !self.resource_ops.is_empty() || !self.route_ops.is_unchanged()
+    }
+
+    /// Returns the resources that need to be updated on Walrus.
+    pub fn get_walrus_updates(&self, when_upload: &WhenWalrusUpload) -> Vec<&ResourceOp> {
+        self.resource_ops
+            .iter()
+            .filter(|u| u.is_walrus_update(when_upload))
+            .collect::<Vec<_>>()
+    }
+
+    /// Returns the summary of the operations in the diff.
+    pub fn summary(&self, when_upload: &WhenWalrusUpload) -> SiteDataDiffSummary {
+        if when_upload.is_always() {
+            return SiteDataDiffSummary::from(self);
+        }
+        SiteDataDiffSummary {
+            resource_ops: self
+                .resource_ops
+                .iter()
+                .filter(|op| op.is_change())
+                .map(|op| op.into())
+                .collect(),
+            route_ops: self.route_ops.clone(),
+        }
     }
 }
 
@@ -173,6 +202,7 @@ impl RemoteSiteFactory<'_> {
     }
 
     async fn get_routes(&self, site_id: ObjectID) -> Result<Option<Routes>> {
+        tracing::debug!(?site_id, "getting routes");
         let response = self
             .sui_client
             .read_api()
@@ -184,7 +214,13 @@ impl RemoteSiteFactory<'_> {
                 },
             )
             .await?;
-        let dynamic_field = get_struct_from_object_response(&response)?;
+
+        let Ok(dynamic_field) = get_struct_from_object_response(&response) else {
+            // TODO: improve error matching: check that it is dynamic field not found.
+            tracing::info!("no routes found for site {}", site_id);
+            return Ok(None);
+        };
+
         let routes =
             get_dynamic_field!(dynamic_field, "value", SuiMoveValue::Struct)?.try_into()?;
         Ok(Some(routes))
@@ -212,14 +248,17 @@ impl RemoteSiteFactory<'_> {
 
     /// Get the resource that is hosted on chain at the given object ID.
     async fn get_remote_resource_info(&self, object_id: ObjectID) -> Result<ResourceInfo> {
-        let object = get_struct_from_object_response(
-            &self
-                .sui_client
-                .read_api()
-                .get_object_with_options(object_id, SuiObjectDataOptions::new().with_content())
-                .await?,
-        )?;
-        get_dynamic_field!(object, "value", SuiMoveValue::Struct)?.try_into()
+        let object = &self
+            .sui_client
+            .read_api()
+            .get_object_with_options(object_id, SuiObjectDataOptions::new().with_content())
+            .await?;
+        let move_struct = get_struct_from_object_response(object).context(format!(
+            "error in getting the struct for object id: {}",
+            object_id
+        ))?;
+
+        get_dynamic_field!(move_struct, "value", SuiMoveValue::Struct)?.try_into()
     }
 
     /// Filters the dynamic fields to get the resource object IDs.

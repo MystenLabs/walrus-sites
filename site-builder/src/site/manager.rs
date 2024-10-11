@@ -71,9 +71,10 @@ impl SiteManager {
     /// If the site does not exist, it is created and updated. The resources that need to be updated
     /// or created are published to Walrus.
     pub async fn update_site(
-        &self,
+        &mut self,
         local_site_data: &SiteData,
     ) -> Result<(SuiTransactionBlockResponse, SiteDataDiffSummary)> {
+        tracing::debug!(?self.site_id, "creating or updating site");
         let existing_site = match &self.site_id {
             SiteIdentifier::ExistingSite(site_id) => {
                 RemoteSiteFactory::new(&self.sui_client().await?, self.config.package)
@@ -91,27 +92,22 @@ impl SiteManager {
         };
         tracing::debug!(operations=?site_updates, "list of operations computed");
 
-        if site_updates.has_updates() {
-            self.publish_to_walrus(&site_updates.resource_ops).await?;
+        let walrus_updates = site_updates.get_walrus_updates(&self.when_upload);
+        let result = if !walrus_updates.is_empty() {
+            self.publish_to_walrus(&walrus_updates).await?;
             display::action("Updating the Walrus Site object on Sui");
             let result = self.execute_sui_updates(&site_updates).await?;
             display::done();
-            return Ok((result, site_updates.into()));
-        }
-        Ok((SuiTransactionBlockResponse::default(), site_updates.into()))
+            result
+        } else {
+            SuiTransactionBlockResponse::default()
+        };
+        Ok((result, site_updates.summary(&self.when_upload)))
     }
 
     /// Publishes the resources to Walrus.
-    async fn publish_to_walrus<'b>(&self, updates: &[ResourceOp<'b>]) -> Result<()> {
-        let to_update = updates
-            .iter()
-            .filter(|u| {
-                matches!(u, ResourceOp::Created(_)) || matches!(u, ResourceOp::Unchanged(_))
-            })
-            .collect::<Vec<_>>();
-        tracing::debug!(resources=?to_update, "publishing new or updated resources to Walrus");
-
-        for update in to_update.iter() {
+    async fn publish_to_walrus<'b>(&mut self, updates: &[&ResourceOp<'b>]) -> Result<()> {
+        for update in updates.iter() {
             let resource = update.inner();
             tracing::debug!(
                 resource=?resource.full_path,
@@ -123,11 +119,14 @@ impl SiteManager {
                 "Storing resource on Walrus: {}",
                 &resource.info.path
             ));
-            let _output = self.walrus.store(
-                resource.full_path.clone(),
-                self.epochs,
-                self.when_upload.is_always(),
-            )?;
+            let _output = self
+                .walrus
+                .store(
+                    resource.full_path.clone(),
+                    self.epochs,
+                    self.when_upload.is_always(),
+                )
+                .await?;
             display::done();
         }
         Ok(())
