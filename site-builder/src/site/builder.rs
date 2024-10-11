@@ -16,7 +16,7 @@ use super::{
     resource::{Resource, ResourceOp},
     RouteOps,
 };
-use crate::site::contracts;
+use crate::{site::contracts, types::Range};
 
 pub struct SitePtb<T = ()> {
     pt_builder: ProgrammableTransactionBuilder,
@@ -170,7 +170,9 @@ impl SitePtb<Argument> {
     ///
     /// Returns the [`Argument`] for the newly-created resource.
     fn create_resource(&mut self, resource: &Resource) -> Result<Argument> {
-        let inputs = [
+        let new_range_arg = self.create_range(&resource.info.range)?;
+
+        let mut inputs = [
             pure_call_arg(&resource.info.path)?,
             pure_call_arg(&resource.info.blob_id)?,
             pure_call_arg(&resource.info.blob_hash)?,
@@ -179,11 +181,31 @@ impl SitePtb<Argument> {
         .map(|arg| self.pt_builder.input(arg))
         .collect::<Result<Vec<_>>>()?;
 
+        inputs.push(new_range_arg);
+
         Ok(self.add_programmable_move_call(
             contracts::site::new_resource.identifier(),
             vec![],
             inputs,
         ))
+    }
+
+    fn create_range(&mut self, range: &Option<Range>) -> Result<Argument> {
+        let inputs = [
+            pure_call_arg(&range.as_ref().and_then(|r| r.start))?,
+            pure_call_arg(&range.as_ref().and_then(|r| r.end))?,
+        ]
+        .into_iter()
+        .map(|arg| self.pt_builder.input(arg))
+        .collect::<Result<Vec<_>>>()?;
+
+        Ok(
+            self.add_programmable_move_call(
+                contracts::site::new_range.identifier(),
+                vec![],
+                inputs,
+            ),
+        )
     }
 
     /// Adds the header to the given resource argument.

@@ -54,8 +54,8 @@ pub(crate) struct SuiResource {
     pub blob_id: BlobId,
     /// The hash of the blob contents.
     pub blob_hash: U256,
-    //// Byte ranges for the resource.
-    // range: Option<Range>,
+    /// Byte ranges for the resource.
+    pub range: Option<Range>,
 }
 
 fn deserialize_http_headers<'de, D>(deserializer: D) -> Result<HttpHeaders, D::Error>
@@ -118,4 +118,11 @@ impl RouteOps {
     pub fn is_unchanged(&self) -> bool {
         matches!(self, RouteOps::Unchanged)
     }
+}
+
+/// Range of bytes for a resource.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, PartialOrd, Ord)]
+pub struct Range {
+    pub start: Option<u64>,
+    pub end: Option<u64>,
 }
