@@ -38,7 +38,7 @@ export async function resolveAndFetchPage(parsedUrl: DomainDetails): Promise<Res
         const routesPromise = getRoutes(client, resolveObjectResult);
 
         // Fetch the page using the initial path.
-        const fetchPromise = await fetchPage(client, resolveObjectResult, parsedUrl.path)
+        const fetchPromise = await fetchPage(client, resolveObjectResult, parsedUrl.path);
 
         // If the fetch fails, check if the path can be matched using
         // the Routes DF and fetch the redirected path.
@@ -48,8 +48,9 @@ export async function resolveAndFetchPage(parsedUrl: DomainDetails): Promise<Res
                 console.warn("No routes found for the object ID");
                 return siteNotFound();
             }
+            console.log(">>>>>>>> Routes: ", routes);
             let matchingRoute: string | undefined;
-            matchingRoute = matchPathToRoute(parsedUrl.path, routes)
+            matchingRoute = matchPathToRoute(parsedUrl.path, routes);
             if (!matchingRoute) {
                 console.warn(`No matching route found for ${parsedUrl.path}`);
                 return siteNotFound();

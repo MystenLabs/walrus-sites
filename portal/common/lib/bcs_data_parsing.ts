@@ -27,11 +27,17 @@ export const ResourcePathStruct = bcs.struct("ResourcePath", {
     path: bcs.string(),
 });
 
+export const RangeStruct = bcs.struct("Range", {
+    start: bcs.option(bcs.u64()),
+    end: bcs.option(bcs.u64()),
+});
+
 export const ResourceStruct = bcs.struct("Resource", {
     path: bcs.string(),
     headers: bcs.map(bcs.string(), bcs.string()),
     blob_id: BLOB_ID,
     blob_hash: DATA_HASH,
+    range: bcs.option(RangeStruct),
 });
 
 export function DynamicFieldStruct<K, V>(K: BcsType<K>, V: BcsType<V>) {
@@ -43,5 +49,5 @@ export function DynamicFieldStruct<K, V>(K: BcsType<K>, V: BcsType<V>) {
 }
 
 export const RoutesStruct = bcs.struct("Routes", {
-    routes_list: bcs.map(bcs.string(), bcs.string())
-})
+    routes_list: bcs.map(bcs.string(), bcs.string()),
+});
