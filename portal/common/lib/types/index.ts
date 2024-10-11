@@ -54,3 +54,21 @@ export function isVersionedResource(resource: any): resource is VersionedResourc
         && 'version' in resource
         && 'objectId' in resource;
 }
+
+/**
+ * Routes is an opitonal dynamic field object belonging to each site.
+ */
+export type Routes = {
+    routes_list: Map<string, string>;
+}
+
+/**
+ * Type guard for the Routes type.
+ */
+export function isRoutes(obj: any): obj is Routes {
+    return (
+        obj &&
+        typeof obj.routes_list === 'object' &&
+        obj.routes_list instanceof Map
+    );
+}
