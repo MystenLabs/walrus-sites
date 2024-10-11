@@ -8,18 +8,21 @@ use std::{
     fmt::{self, Display},
     fs,
     io::Write,
+    num::NonZeroU16,
     path::{Path, PathBuf},
 };
 
 use anyhow::{anyhow, Context, Result};
 use fastcrypto::hash::{HashFunction, Sha256};
 use flate2::{write::GzEncoder, Compression};
+use futures::future::try_join_all;
 use move_core_types::u256::U256;
 use serde::{Deserialize, Serialize};
 use sui_sdk::rpc_types::{SuiMoveStruct, SuiMoveValue};
 
 use super::SiteData;
 use crate::{
+    publish::WhenWalrusUpload,
     site::{config::WSResources, content::ContentType},
     walrus::{types::BlobId, Walrus},
 };
@@ -209,6 +212,17 @@ impl<'a> ResourceOp<'a> {
             ResourceOp::Unchanged(resource) => resource,
         }
     }
+
+    /// Returns if the operation needs to be uploaded to Walrus.
+    pub fn is_walrus_update(&self, when_upload: &WhenWalrusUpload) -> bool {
+        matches!(self, ResourceOp::Created(_))
+            || (when_upload.is_always() && !matches!(self, ResourceOp::Unchanged(_)))
+    }
+
+    /// Returns true if the operation modifies a resource.
+    pub fn is_change(&self) -> bool {
+        matches!(self, ResourceOp::Created(_) | ResourceOp::Deleted(_))
+    }
 }
 
 /// A summary of the operations performed by the site builder.
@@ -361,25 +375,29 @@ pub(crate) struct ResourceManager {
     pub ws_resources: Option<WSResources>,
     /// The ws-resource file path.
     pub ws_resources_path: Option<PathBuf>,
+    /// The number of shards of the Walrus system.
+    pub n_shards: NonZeroU16,
 }
 
 impl ResourceManager {
-    pub fn new(
+    pub async fn new(
         walrus: Walrus,
         ws_resources: Option<WSResources>,
         ws_resources_path: Option<PathBuf>,
     ) -> Result<Self> {
+        let n_shards = walrus.info(false).await?.n_shards;
         Ok(ResourceManager {
             walrus,
             ws_resources,
             ws_resources_path,
+            n_shards,
         })
     }
 
     /// Read a resource at a path.
     ///
     /// Ignores empty files.
-    pub fn read_resource(&self, full_path: &Path, root: &Path) -> Result<Option<Resource>> {
+    pub async fn read_resource(&self, full_path: &Path, root: &Path) -> Result<Option<Resource>> {
         if let Some(ws_path) = &self.ws_resources_path {
             if full_path == ws_path {
                 tracing::debug!(?full_path, "ignoring the ws-resources config file");
@@ -436,9 +454,14 @@ impl ResourceManager {
             .or_insert(content_type.to_string());
 
         let plain_content: Vec<u8> = std::fs::read(full_path)?;
-        // TODO(giac): this could be (i) async; (ii) pre configured with the number of shards to
-        //     avoid chain interaction (maybe after adding `info` to the JSON commands).
-        let output = self.walrus.blob_id(full_path.to_owned(), None)?;
+        let output = self
+            .walrus
+            .blob_id(full_path.to_owned(), Some(self.n_shards))
+            .await
+            .context(format!(
+                "error while computing the blob id for path: {}",
+                full_path.to_string_lossy()
+            ))?;
 
         // Hash the contents of the file - this will be contained in the site::Resource
         // to verify the integrity of the blob when fetched from an aggregator.
@@ -452,41 +475,48 @@ impl ResourceManager {
             HttpHeaders(http_headers),
             output.blob_id,
             U256::from_le_bytes(&blob_hash),
-            // TODO(giac): Change to `content.len()` when the problem with content encoding is
-            // fixed.
             plain_content.len(),
         )))
     }
 
     /// Recursively iterate a directory and load all [`Resources`][Resource] within.
-    pub fn read_dir(&mut self, root: &Path) -> Result<SiteData> {
+    pub async fn read_dir(&mut self, root: &Path) -> Result<SiteData> {
+        let resource_paths = Self::iter_dir(root, root)?;
+        let resources = ResourceSet::from_iter(
+            try_join_all(
+                resource_paths
+                    .iter()
+                    .map(|(full_path, root)| self.read_resource(full_path, root)),
+            )
+            .await
+            .context("error in loading one of the resources")?
+            .into_iter()
+            .flatten(),
+        );
+
         Ok(SiteData::new(
-            ResourceSet::from_iter(self.iter_dir(root, root)?),
+            resources,
             self.ws_resources
                 .as_ref()
                 .and_then(|config| config.routes.clone()),
         ))
     }
 
-    fn iter_dir(&self, start: &Path, root: &Path) -> Result<Vec<Resource>> {
-        let mut resources: Vec<Resource> = vec![];
+    fn iter_dir(start: &Path, root: &Path) -> Result<Vec<(PathBuf, PathBuf)>> {
+        let mut resources = vec![];
         let entries = fs::read_dir(start)?;
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
-                resources.extend(self.iter_dir(&path, root)?);
-            } else if let Some(res) = self.read_resource(&path, root).context(format!(
-                "error while reading resource `{}`",
-                path.to_string_lossy()
-            ))? {
-                resources.push(res);
+                resources.extend(Self::iter_dir(&path, root)?);
+            } else {
+                resources.push((path.to_owned(), root.to_owned()));
             }
         }
         Ok(resources)
     }
 }
 
-// TODO(giac): remove allow after getting compression back.
 #[allow(dead_code)]
 fn compress(content: &[u8]) -> Result<Vec<u8>> {
     if content.is_empty() {
