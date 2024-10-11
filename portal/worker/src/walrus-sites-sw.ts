@@ -48,16 +48,31 @@ self.addEventListener("fetch", async (event) => {
     console.log("Portal domain and request domain: ", portalDomain, requestDomain);
     console.log("Parsed URL: ", parsedUrl);
 
+    const forwardToFallback = async () => {
+        // Fallback portal that supports walrus devnet deployments.
+        const fallbackDevnetPortal = "blocksite.net"
+        return fetch(`${parsedUrl.subdomain}.${fallbackDevnetPortal}`)
+    };
     if (requestDomain == portalDomain && parsedUrl && parsedUrl.subdomain) {
-        let response: Promise<Response>;
-        if (!("caches" in self)) {
-            // When not being in a secure context, the Cache API is not available.
-            console.warn("Cache API not available");
-            response = resolveAndFetchPage(parsedUrl);
-        } else {
-            response = resolveWithCache(parsedUrl, urlString);
-        }
-        event.respondWith(response);
+        event.respondWith(
+            (async () => {
+                let response: Response;
+                try {
+                    if (!("caches" in self)) {
+                        // When not being in a secure context, the Cache API is not available.
+                        console.warn("Cache API not available");
+                        response = await resolveAndFetchPage(parsedUrl);
+                    } else {
+                        response = await resolveWithCache(parsedUrl, urlString);
+                    }
+                } catch (error) {
+                    console.error("Error in resolving the request:", error);
+                    return forwardToFallback();
+                }
+                if (response.status == 400) return forwardToFallback();
+                return response;
+            })()
+        );
         return;
     }
 
