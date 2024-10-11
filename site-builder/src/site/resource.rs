@@ -17,107 +17,25 @@ use fastcrypto::hash::{HashFunction, Sha256};
 use flate2::{write::GzEncoder, Compression};
 use futures::future::try_join_all;
 use move_core_types::u256::U256;
-use serde::{Deserialize, Serialize};
-use sui_sdk::rpc_types::{SuiMoveStruct, SuiMoveValue};
 
 use super::SiteData;
 use crate::{
     publish::WhenWalrusUpload,
     site::{config::WSResources, content::ContentType},
+    types::{HttpHeaders, SuiResource},
     walrus::{types::BlobId, Walrus},
 };
-
-/// Information about a resource.
-///
-/// This struct mirrors the information that is stored on chain.
-#[derive(PartialEq, Eq, Debug, Clone, PartialOrd, Ord)]
-pub(crate) struct ResourceInfo {
-    /// The relative path the resource will have on Sui.
-    pub path: String,
-    /// Response, Representation and Payload headers.
-    pub headers: HttpHeaders,
-    /// The blob ID of the resource.
-    pub blob_id: BlobId,
-    /// The hash of the blob contents.
-    pub blob_hash: U256,
-}
-
-impl TryFrom<&SuiMoveStruct> for ResourceInfo {
-    type Error = anyhow::Error;
-
-    fn try_from(source: &SuiMoveStruct) -> Result<Self, Self::Error> {
-        let path = get_dynamic_field!(source, "path", SuiMoveValue::String)?;
-        let headers: HttpHeaders =
-            get_dynamic_field!(source, "headers", SuiMoveValue::Struct)?.try_into()?;
-        let blob_id = blob_id_from_u256(
-            get_dynamic_field!(source, "blob_id", SuiMoveValue::String)?.parse::<U256>()?,
-        );
-        let blob_hash =
-            get_dynamic_field!(source, "blob_hash", SuiMoveValue::String)?.parse::<U256>()?;
-
-        Ok(Self {
-            path,
-            headers,
-            blob_id,
-            blob_hash,
-        })
-    }
-}
-
-impl TryFrom<SuiMoveStruct> for ResourceInfo {
-    type Error = anyhow::Error;
-
-    fn try_from(value: SuiMoveStruct) -> Result<Self, Self::Error> {
-        Self::try_from(&value)
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct HttpHeaders(pub BTreeMap<String, String>);
-
-impl TryFrom<SuiMoveStruct> for HttpHeaders {
-    type Error = anyhow::Error;
-
-    fn try_from(source: SuiMoveStruct) -> Result<Self, Self::Error> {
-        let map = MapWrapper::try_from(source)?;
-        Ok(Self(map.0))
-    }
-}
-
-pub struct MapWrapper(pub BTreeMap<String, String>);
-
-impl TryFrom<SuiMoveStruct> for MapWrapper {
-    type Error = anyhow::Error;
-
-    fn try_from(source: SuiMoveStruct) -> Result<Self, Self::Error> {
-        let contents: Vec<_> = get_dynamic_field!(source, "contents", SuiMoveValue::Vector)?;
-        let mut headers = BTreeMap::new();
-        for entry in contents {
-            let SuiMoveValue::Struct(entry) = entry else {
-                return Err(anyhow!("expected SuiMoveValue::Struct"));
-            };
-            let key = get_dynamic_field!(entry, "key", SuiMoveValue::String)?;
-            let value = get_dynamic_field!(entry, "value", SuiMoveValue::String)?;
-            headers.insert(key, value);
-        }
-        Ok(Self(headers))
-    }
-}
-
-pub(crate) fn blob_id_from_u256(input: U256) -> BlobId {
-    BlobId(input.to_le_bytes())
-}
 
 /// The resource that is to be created or updated on Sui.
 ///
 /// This struct contains additional information that is not stored on chain, compared to
-/// [`ResourceInfo`] (`unencoded_size`, `full_path`).
+/// [`SuiResource`] (`unencoded_size`, `full_path`).
 ///
 /// [`Resource`] objects are always compared on their `info` field
-/// ([`ResourceInfo`]), and never on their `unencoded_size` or `full_path`.
+/// ([`SuiResource`]), and never on their `unencoded_size` or `full_path`.
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub(crate) struct Resource {
-    pub info: ResourceInfo,
+    pub info: SuiResource,
     /// The unencoded length of the resource.
     pub unencoded_size: usize,
     /// The full path of the resource on disk.
@@ -136,8 +54,8 @@ impl Ord for Resource {
     }
 }
 
-impl From<ResourceInfo> for Resource {
-    fn from(source: ResourceInfo) -> Self {
+impl From<SuiResource> for Resource {
+    fn from(source: SuiResource) -> Self {
         Self {
             info: source,
             unencoded_size: 0,
@@ -156,7 +74,7 @@ impl Resource {
         unencoded_size: usize,
     ) -> Self {
         Resource {
-            info: ResourceInfo {
+            info: SuiResource {
                 path: resource_path,
                 headers,
                 blob_id,
@@ -182,7 +100,7 @@ impl Display for Resource {
 ///
 /// Updates to resources are implemented as deleting the outdated
 /// resource and adding a new one. Two [`Resources`][Resource] are
-/// different if their respective [`ResourceInfo`] differ.
+/// different if their respective [`SuiResource`] differ.
 pub enum ResourceOp<'a> {
     Deleted(&'a Resource),
     Created(&'a Resource),
@@ -346,8 +264,8 @@ impl FromIterator<Resource> for ResourceSet {
     }
 }
 
-impl FromIterator<ResourceInfo> for ResourceSet {
-    fn from_iter<I: IntoIterator<Item = ResourceInfo>>(source: I) -> Self {
+impl FromIterator<SuiResource> for ResourceSet {
+    fn from_iter<I: IntoIterator<Item = SuiResource>>(source: I) -> Self {
         Self::from_iter(source.into_iter().map(Resource::from))
     }
 }

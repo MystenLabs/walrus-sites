@@ -6,7 +6,8 @@ use std::{collections::BTreeMap, path::Path};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-use super::{resource::HttpHeaders, Routes};
+use super::Routes;
+use crate::types::HttpHeaders;
 
 /// Deserialized object of the file's `ws-resource.json` contents.
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -6,6 +6,7 @@ mod preprocessor;
 mod publish;
 mod site;
 mod summary;
+mod types;
 mod util;
 mod walrus;
 use std::path::PathBuf;
