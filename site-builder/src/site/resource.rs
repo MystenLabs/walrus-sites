@@ -79,6 +79,8 @@ impl Resource {
                 headers,
                 blob_id,
                 blob_hash,
+                // TODO(giac): eventually implement resource bundling.
+                range: None,
             },
             unencoded_size,
             full_path,

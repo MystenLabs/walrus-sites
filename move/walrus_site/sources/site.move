@@ -36,8 +36,8 @@ module walrus_site::site {
     }
 
     public struct Range has store, drop {
-        start: Option<u256>, // inclusive lower bound
-        end: Option<u256> // exclusive upper bound
+        start: Option<u64>, // inclusive lower bound
+        end: Option<u64> // exclusive upper bound
     }
 
     /// Representation of the resource path.
@@ -63,8 +63,8 @@ module walrus_site::site {
     /// Used to create a Range object in order to pass it
     /// to the new_resource.
     public fun new_range(
-        range_start: Option<u256>,
-        range_end: Option<u256>
+        range_start: Option<u64>,
+        range_end: Option<u64>
     ): Option<Range> {
         let start_is_defined = option::is_some(&range_start);
         let end_is_defined = option::is_some(&range_end);
