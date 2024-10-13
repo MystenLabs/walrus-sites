@@ -6,6 +6,7 @@ import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@l
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import resolveWithCache from "./caching";
 import { resolveAndFetchPage } from "@lib/page_fetching";
+import { HttpStatusCodes } from "@lib/http/http_status_codes";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
@@ -48,16 +49,59 @@ self.addEventListener("fetch", async (event) => {
     console.log("Portal domain and request domain: ", portalDomain, requestDomain);
     console.log("Parsed URL: ", parsedUrl);
 
-    if (requestDomain == portalDomain && parsedUrl && parsedUrl.subdomain) {
-        let response: Promise<Response>;
-        if (!("caches" in self)) {
-            // When not being in a secure context, the Cache API is not available.
-            console.warn("Cache API not available");
-            response = resolveAndFetchPage(parsedUrl);
-        } else {
-            response = resolveWithCache(parsedUrl, urlString);
-        }
-        event.respondWith(response);
+    if (requestDomain === portalDomain && parsedUrl && parsedUrl.subdomain) {
+        // Fetches the page resources.
+        const handleFetchRequest = async (): Promise<Response> => {
+            try {
+                return await fetchWithCacheSupport();
+            } catch (error) {
+                return handleFetchError(error);
+            }
+        };
+
+        // Handle caching and fetching based on cache availability
+        const fetchWithCacheSupport = async (): Promise<Response> => {
+            if ("caches" in self) {
+                return await fetchFromCache();
+            } else {
+                console.warn("Cache API not available");
+                return await fetchDirectlyOrProxy();
+            }
+        };
+
+        // Attempt to fetch from cache
+        const fetchFromCache = async (): Promise<Response> => {
+            const cachedResponse = await resolveWithCache(parsedUrl, urlString);
+            return cachedResponse.status === HttpStatusCodes.NOT_FOUND
+                ? proxyFetch()
+                : cachedResponse;
+        };
+
+        // Fetch directly and fallback if necessary
+        const fetchDirectlyOrProxy = async (): Promise<Response> => {
+            const response = await resolveAndFetchPage(parsedUrl);
+            return response.status === HttpStatusCodes.NOT_FOUND
+                ? proxyFetch()
+                : response;
+        };
+
+        // Handle error during fetching
+        const handleFetchError = (error: any): Promise<Response> => {
+            console.error("Error resolving request:", error);
+            console.log("Retrying from the fallback portal.");
+            return proxyFetch();
+        };
+
+        // Fetch from the fallback URL
+        const proxyFetch = async (): Promise<Response> => {
+            const fallbackDomain = "blocksite.net";
+            const fallbackUrl = `https://${parsedUrl.subdomain}.${fallbackDomain}${parsedUrl.path}`;
+            console.log("Proxy fetching from fallback URL:", fallbackUrl);
+            return fetch(fallbackUrl);
+        };
+        event.respondWith(
+            handleFetchRequest()
+        );
         return;
     }
 
