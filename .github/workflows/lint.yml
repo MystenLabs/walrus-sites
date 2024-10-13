@@ -22,7 +22,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   editorconfig:
-    runs-on: ubuntu-latest
+    runs-on: "ubuntu-22.04"
     name: Check editorconfig
     steps:
       - uses: actions/checkout@v4
