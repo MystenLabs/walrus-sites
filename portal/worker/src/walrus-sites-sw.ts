@@ -53,26 +53,46 @@ self.addEventListener("fetch", async (event) => {
         // Fetches the page resources.
         const handleFetchRequest = async (): Promise<Response> => {
             try {
-                if (!("caches" in self)) {
-                    console.warn("Cache API not available");
-                    const initialResponse = await resolveAndFetchPage(parsedUrl);
-                    if (initialResponse.status === HttpStatusCodes.NOT_FOUND) {
-                        return proxyFetch();
-                    }
-                    return initialResponse;
-                }
-                const initialCachedResponse = await resolveWithCache(parsedUrl, urlString);
-                if (initialCachedResponse.status === HttpStatusCodes.NOT_FOUND) {
-                    return proxyFetch();
-                }
-                return initialCachedResponse;
+                return await fetchWithCacheSupport();
             } catch (error) {
-                console.error("Error resolving request to testnet:", error);
-                console.log("Retrying to fetch from the devnet fallback portal.");
-                return proxyFetch();
+                return handleFetchError(error);
             }
         };
-        // If the original request fails, forward to the fallback portal.
+
+        // Handle caching and fetching based on cache availability
+        const fetchWithCacheSupport = async (): Promise<Response> => {
+            if ("caches" in self) {
+                return await fetchFromCache();
+            } else {
+                console.warn("Cache API not available");
+                return await fetchDirectlyOrProxy();
+            }
+        };
+
+        // Attempt to fetch from cache
+        const fetchFromCache = async (): Promise<Response> => {
+            const cachedResponse = await resolveWithCache(parsedUrl, urlString);
+            return cachedResponse.status === HttpStatusCodes.NOT_FOUND
+                ? proxyFetch()
+                : cachedResponse;
+        };
+
+        // Fetch directly and fallback if necessary
+        const fetchDirectlyOrProxy = async (): Promise<Response> => {
+            const response = await resolveAndFetchPage(parsedUrl);
+            return response.status === HttpStatusCodes.NOT_FOUND
+                ? proxyFetch()
+                : response;
+        };
+
+        // Handle error during fetching
+        const handleFetchError = (error: any): Promise<Response> => {
+            console.error("Error resolving request:", error);
+            console.log("Retrying from the fallback portal.");
+            return proxyFetch();
+        };
+
+        // Fetch from the fallback URL
         const proxyFetch = async (): Promise<Response> => {
             const fallbackDomain = "blocksite.net";
             const fallbackUrl = `https://${parsedUrl.subdomain}.${fallbackDomain}${parsedUrl.path}`;
