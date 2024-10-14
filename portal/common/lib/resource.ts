@@ -98,7 +98,6 @@ function getResourceFields(data: SuiObjectData): Resource | null {
         const df = DynamicFieldStruct(ResourcePathStruct, ResourceStruct).parse(
             fromB64(data.bcs.bcsBytes),
         );
-        console.log("ASDF Resource fields: ", df.value);
         return df.value;
     }
     return null;

@@ -87,11 +87,16 @@ function parseRoutesData(bcsBytes: string): Routes {
  * @param path - The path to match.
  * @param routes - The routes to match against.
  */
-export function matchPathToRoute(path: string, routes: Routes) {
+export function matchPathToRoute(path: string, routes: Routes): string | undefined {
+    if (routes.routes_list.size == 0) {
+        // If the map is empty there is no match.
+        return undefined;
+    }
+
     // TODO: improve this using radix trees.
     const res = Array.from(routes.routes_list.entries())
         .filter(([pattern, _]) => new RegExp(`^${pattern.replace("*", ".*")}$`).test(path))
-        // Need the `[[]]` default here, otherwise the reduce will fail if the filter is empty.
-        .reduce((a, b) => (a[0].length >= b[0].length ? a : b), [[]]);
+        .reduce((a, b) => (a[0].length >= b[0].length ? a : b));
+
     return res ? res[1] : undefined;
 }
