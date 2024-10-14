@@ -33,7 +33,34 @@ export type Range = {
     end: number | null;
 };
 
+/**
+ * Checks if the range is well formed.
+ */
+function isRangeValid(range: Range): boolean {
+    if (!range.start !== null && !range.end !== null) {
+        return false;
+    }
+    if (range.start !== null && range.start < 0) {
+        return false;
+    }
+    if (range.end !== null && range.end < 0) {
+        return false;
+    }
+    if (range.start !== null && range.end !== null && range.start > range.end) {
+        return false;
+    }
+    return true;
+}
+
+/**
+ * Creates an HTTP range header from the given range.
+ *
+ * Checks if the range is valid and returns the range header.
+ */
 function rangeToHttpHeader(range: Range): string {
+    if (!isRangeValid(range)) {
+        throw new Error(`Invalid range: start ${range.start} end ${range.end}`);
+    }
     return `bytes=${range.start || ""}-${range.end || ""}`;
 }
 
