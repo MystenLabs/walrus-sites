@@ -13,6 +13,31 @@ use sui_types::{base_types::ObjectID, event::EventID};
 use super::types::BlobId;
 
 pub type Epoch = u64;
+pub type EpochCount = u32;
+
+/// Either an event ID or an object ID.
+#[derive(Debug, Clone, Deserialize)]
+pub enum EventOrObjectId {
+    /// The variant representing an event ID.
+    Event(EventID),
+    /// The variant representing an object ID.
+    Object(ObjectID),
+}
+
+/// The operation performed on blob and storage resources to register a blob.
+#[derive(Debug, Clone, Deserialize)]
+pub enum RegisterBlobOp {
+    /// The storage and blob resources are purchased from scratch.
+    RegisterFromScratch {
+        encoded_length: u64,
+        epochs_ahead: EpochCount,
+    },
+    /// The storage is reused, but the blob was not registered.
+    ReuseStorage { encoded_length: u64 },
+    /// A registration was already present.
+    ReuseRegistration { encoded_length: u64 },
+}
+
 /// Result when attempting to store a blob.
 #[serde_as]
 #[derive(Debug, Clone, Deserialize)]
@@ -25,7 +50,7 @@ pub enum BlobStoreResult {
         #[serde_as(as = "DisplayFromStr")]
         blob_id: BlobId,
         /// The event where the blob was certified.
-        event: EventID,
+        event_or_object: EventOrObjectId,
         /// The epoch until which the blob is stored (exclusive).
         end_epoch: Epoch,
     },
@@ -35,7 +60,7 @@ pub enum BlobStoreResult {
         /// The Sui blob object that holds the newly created blob.
         blob_object: Blob,
         /// The encoded size, including metadata.
-        encoded_size: u64,
+        resource_operation: RegisterBlobOp,
         /// The storage cost, excluding gas.
         cost: u64,
     },
@@ -98,18 +123,20 @@ pub struct Blob {
     /// Object ID of the Sui object.
     pub id: ObjectID,
     /// The epoch in which the blob has been registered.
-    pub stored_epoch: Epoch,
+    pub registered_epoch: Epoch,
     /// The blob ID.
     #[serde_as(as = "DisplayFromStr")]
     pub blob_id: BlobId,
     /// The (unencoded) size of the blob.
     pub size: u64,
     /// The erasure coding type used for the blob.
-    pub erasure_code_type: EncodingType,
+    pub encoding_type: EncodingType,
     /// The epoch in which the blob was first certified, `None` if the blob is uncertified.
     pub certified_epoch: Option<Epoch>,
     /// The [`StorageResource`] used to store the blob.
     pub storage: StorageResource,
+    /// Marks the blob as deletable.
+    pub deletable: bool,
 }
 
 /// The output of the `store` command.
