@@ -6,7 +6,7 @@ import { test, expect } from "vitest";
 import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
 import { NETWORK } from "./constants";
 
-const snakeSiteObjectId = "0x3e01b1b8bf0e54f7843596345faff146f1047e304410ed2eb85d5f67ad404206";
+const snakeSiteObjectId = "0x7a95e4be3948415b852fb287d455166a276d7a52f1a567b4a26b6b5e9c753158";
 test.skip("getRoutes", async () => {
     // TODO: when you make sure get_routes fetches
     // the Routes dynamic field, mock the request.
