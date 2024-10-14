@@ -25,7 +25,7 @@ export type Resource = {
     headers: Map<string, string>;
     blob_id: string;
     blob_hash: string;
-    range: Range;
+    range: Range | null;
 };
 
 export type Range = {
@@ -38,11 +38,11 @@ function rangeToHttpHeader(range: Range): string {
 }
 
 export function optionalRangeToHeaders(range: Range | null): { [key: string]: string } {
-    let headers = {};
     if (range) {
-        headers["Range"] = rangeToHttpHeader(range);
+        return { range: rangeToHttpHeader(range) };
+    } else {
+        return {};
     }
-    return headers;
 }
 
 export type VersionedResource = Resource & {

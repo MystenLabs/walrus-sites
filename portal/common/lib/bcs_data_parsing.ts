@@ -4,6 +4,7 @@
 import { bcs, BcsType } from "@mysten/bcs";
 import { fromHEX, toHEX, toB64 } from "@mysten/sui/utils";
 import { base64UrlSafeEncode } from "./url_safe_base64";
+import { Range } from "./types";
 
 const Address = bcs.bytes(32).transform({
     input: (id: string) => fromHEX(id),
@@ -29,7 +30,7 @@ export const ResourcePathStruct = bcs.struct("ResourcePath", {
 
 export const OPTION_U64 = bcs.option(bcs.u64()).transform({
     input: (value: number | null) => value,
-    output: (value) => (value ? Number(value) : null),
+    output: (value: string | null) => (value ? Number(value) : null),
 });
 
 export const RangeStruct = bcs.struct("Range", {
@@ -37,12 +38,17 @@ export const RangeStruct = bcs.struct("Range", {
     end: OPTION_U64,
 });
 
+export const OptionalRangeStruct = bcs.option(RangeStruct).transform({
+    input: (value: Range | null) => value,
+    output: (value) => (value ? value : null),
+});
+
 export const ResourceStruct = bcs.struct("Resource", {
     path: bcs.string(),
     headers: bcs.map(bcs.string(), bcs.string()),
     blob_id: BLOB_ID,
     blob_hash: DATA_HASH,
-    range: bcs.option(RangeStruct),
+    range: OptionalRangeStruct,
 });
 
 export function DynamicFieldStruct<K, V>(K: BcsType<K>, V: BcsType<V>) {
