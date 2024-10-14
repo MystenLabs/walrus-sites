@@ -3,7 +3,11 @@
 
 import { getFullnodeUrl, SuiClient } from "@mysten/sui/client";
 import { NETWORK } from "./constants";
-import { DomainDetails, isResource } from "./types/index";
+import {
+    DomainDetails,
+    isResource,
+    optionalRangeToHeaders as optionalRangeToRequestHeaders,
+} from "./types/index";
 import { subdomainToObjectId, HEXtoBase36 } from "./objectId_operations";
 import { resolveSuiNsAddress, hardcodedSubdmains } from "./suins";
 import { fetchResource } from "./resource";
@@ -38,7 +42,7 @@ export async function resolveAndFetchPage(parsedUrl: DomainDetails): Promise<Res
         const routesPromise = getRoutes(client, resolveObjectResult);
 
         // Fetch the page using the initial path.
-        const fetchPromise = await fetchPage(client, resolveObjectResult, parsedUrl.path)
+        const fetchPromise = await fetchPage(client, resolveObjectResult, parsedUrl.path);
 
         // If the fetch fails, check if the path can be matched using
         // the Routes DF and fetch the redirected path.
@@ -49,7 +53,7 @@ export async function resolveAndFetchPage(parsedUrl: DomainDetails): Promise<Res
                 return siteNotFound();
             }
             let matchingRoute: string | undefined;
-            matchingRoute = matchPathToRoute(parsedUrl.path, routes)
+            matchingRoute = matchPathToRoute(parsedUrl.path, routes);
             if (!matchingRoute) {
                 console.warn(`No matching route found for ${parsedUrl.path}`);
                 return siteNotFound();
@@ -108,7 +112,11 @@ export async function fetchPage(
     }
 
     console.log("Fetched Resource: ", result);
-    const contents = await fetch(aggregatorEndpoint(result.blob_id));
+
+    // We have a resource, get the range header.
+    let range_header = optionalRangeToRequestHeaders(result.range);
+    const contents = await fetch(aggregatorEndpoint(result.blob_id), { headers: range_header });
+
     if (!contents.ok) {
         return siteNotFound();
     }

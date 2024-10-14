@@ -2,13 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { getFullnodeUrl, SuiClient, SuiObjectResponse } from "@mysten/sui/client";
-import { Routes, } from "./types";
-import {
-    DynamicFieldStruct,
-    RoutesStruct,
-} from "./bcs_data_parsing";
+import { Routes } from "./types";
+import { DynamicFieldStruct, RoutesStruct } from "./bcs_data_parsing";
 import { bcs, fromB64 } from "@mysten/bcs";
-
 
 /**
  * Gets the Routes dynamic field of the site object.
@@ -19,7 +15,8 @@ import { bcs, fromB64 } from "@mysten/bcs";
  * @returns The routes list.
  */
 export async function getRoutes(
-    client: SuiClient, siteObjectId: string
+    client: SuiClient,
+    siteObjectId: string,
 ): Promise<Routes | undefined> {
     const routesDF = await fetchRoutesDynamicField(client, siteObjectId);
     if (!routesDF.data) {
@@ -42,7 +39,8 @@ export async function getRoutes(
  * @returns The dynamic field object for routes.
  */
 async function fetchRoutesDynamicField(
-    client: SuiClient, siteObjectId: string
+    client: SuiClient,
+    siteObjectId: string,
 ): Promise<SuiObjectResponse> {
     return await client.getDynamicFieldObject({
         parentId: siteObjectId,
@@ -60,7 +58,7 @@ async function fetchRoutesDynamicField(
 async function fetchRoutesObject(client: SuiClient, objectId: string): Promise<SuiObjectResponse> {
     return await client.getObject({
         id: objectId,
-        options: { showBcs: true }
+        options: { showBcs: true },
     });
 }
 
@@ -75,7 +73,7 @@ function parseRoutesData(bcsBytes: string): Routes {
         // BCS declaration of the ROUTES_FIELD in site.move.
         bcs.vector(bcs.u8()),
         // The value of the df, i.e. the Routes Struct.
-        RoutesStruct
+        RoutesStruct,
     ).parse(fromB64(bcsBytes));
 
     return df.value as any as Routes;
@@ -89,11 +87,16 @@ function parseRoutesData(bcsBytes: string): Routes {
  * @param path - The path to match.
  * @param routes - The routes to match against.
  */
-export function matchPathToRoute(path: string, routes: Routes) {
+export function matchPathToRoute(path: string, routes: Routes): string | undefined {
+    if (routes.routes_list.size == 0) {
+        // If the map is empty there is no match.
+        return undefined;
+    }
+
     // TODO: improve this using radix trees.
-    const res = Array
-        .from(routes.routes_list.entries())
-        .filter(([pattern, _]) => new RegExp(`^${pattern.replace('*', '.*')}$`).test(path))
-        .reduce((a, b) => a[0].length >= b[0].length ? a : b)
+    const res = Array.from(routes.routes_list.entries())
+        .filter(([pattern, _]) => new RegExp(`^${pattern.replace("*", ".*")}$`).test(path))
+        .reduce((a, b) => (a[0].length >= b[0].length ? a : b));
+
     return res ? res[1] : undefined;
 }
