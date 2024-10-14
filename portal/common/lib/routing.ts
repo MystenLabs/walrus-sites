@@ -91,7 +91,7 @@ export function matchPathToRoute(path: string, routes: Routes) {
     // TODO: improve this using radix trees.
     const res = Array.from(routes.routes_list.entries())
         .filter(([pattern, _]) => new RegExp(`^${pattern.replace("*", ".*")}$`).test(path))
-        // Need the undefined default here, otherwise the reduce will fail if the filter is empty.
-        .reduce((a, b) => (a[0].length >= b[0].length ? a : b), undefined);
+        // Need the `[[]]` default here, otherwise the reduce will fail if the filter is empty.
+        .reduce((a, b) => (a[0].length >= b[0].length ? a : b), [[]]);
     return res ? res[1] : undefined;
 }
