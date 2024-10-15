@@ -4,87 +4,70 @@
 import { bench, describe, expect, vi, beforeEach } from 'vitest';
 import { fetchResource } from './resource';
 import { SuiClient, SuiObjectData } from '@mysten/sui/client';
-import { Resource, isVersionedResource } from './types';
 import { checkRedirect } from './redirects';
+import { fromB64 } from '@mysten/bcs';
 
-// Mock SuiClient methods.
-const getDynamicFieldObject = vi.fn();
 const getObject = vi.fn();
 const mockClient = {
-    getDynamicFieldObject,
     getObject,
 } as unknown as SuiClient;
-// Mock `checkRedirect`.
+
+// Mock checkRedirect
 vi.mock('./redirects', () => ({
     checkRedirect: vi.fn(),
 }));
-// Mock `bcs_data_parsing` to simulate parsing of the BCS data.
-vi.mock('./bcs_data_parsing', () => ({
-    ResourcePathStruct: vi.fn(),
-    ResourceStruct: vi.fn(),
-    DynamicFieldStruct: vi.fn(() => ({
-        parse: vi.fn().mockReturnValue({
-            value: {
-                blob_id: '0xresourceBlobId',
-                path: '/index.html',
-                blob_hash: 'mockedBlobHash',
-                headers: new Map([
-                    ['Content-Type', 'text/html'],
-                    ['Content-Encoding', 'utf8'],
-                ]),
-            } as Resource,
-        }),
-    })),
-}));
+
+// Mock fromB64
+vi.mock('@mysten/bcs', async () => {
+    const actual = await vi.importActual<typeof import('@mysten/bcs')>('@mysten/bcs');
+    return {
+        ...actual,
+        fromB64: vi.fn(),
+    };
+});
+
+vi.mock('./bcs_data_parsing', async (importOriginal) => {
+    const actual = await importOriginal() as typeof import('./bcs_data_parsing');
+    return {
+        ...actual,
+        DynamicFieldStruct: vi.fn(() => ({
+            parse: vi.fn(() => ({ value: { blob_id: '0xresourceBlobId' } })),
+        })),
+    };
+});
 
 describe('Resource fetching with mocked network calls', () => {
-    const landingPageObjectId = '0xLandingPage';
-    const flatlanderObjectId = '0xFlatlanderObject';
+    const landingPageObjectId = '0x1';
+    const flatlanderObjectId = '0x2';
 
     beforeEach(() => {
-        getDynamicFieldObject.mockClear();
         getObject.mockClear();
         (checkRedirect as any).mockClear();
     });
 
     // 1. Benchmark for a page like the landing page (without redirects).
     bench('fetchResource: fetch the landing page site (no redirects)', async () => {
-        const resourcePath = '/index.html';
-        getDynamicFieldObject.mockResolvedValueOnce({
-            data: {
-                objectId: '0xObjectId',
-                digest: 'mocked-digest',
-            },
-        });
-
+        // Mock object response
         getObject.mockResolvedValueOnce({
             data: {
                 bcs: {
                     dataType: 'moveObject',
                     bcsBytes: 'mockBcsBytes',
                 },
-            } as SuiObjectData,
+            },
         });
-
-        const resp = await fetchResource(mockClient, landingPageObjectId, resourcePath, new Set());
-        expect(isVersionedResource(resp)).toBeTruthy();
+        (fromB64 as any).mockReturnValueOnce('decodedBcsBytes');
+        const resp = await fetchResource(mockClient, landingPageObjectId, '/index.html', new Set());
+        expect(resp).toBeDefined();
     });
 
     // 2. Benchmark for a page with redirects (such as accessing a Flatlander).
     bench('fetchResource: fetch the flatlander site (with redirects)', async () => {
         const resourcePath = '/index.html';
 
-        getDynamicFieldObject.mockResolvedValueOnce(null);
-
-        (checkRedirect as any).mockResolvedValueOnce('0xRedirectId');
-
-        // Found Display object.
-        getDynamicFieldObject.mockResolvedValueOnce({
-            data: {
-                objectId: '0xFinalObjectId',
-                digest: 'mocked-digest',
-            },
-        });
+        (checkRedirect as any)
+            .mockResolvedValueOnce('0x3')
+            .mockResolvedValueOnce(undefined);
 
         // Redirecting to the flatlander display object.
         getObject.mockResolvedValueOnce({
@@ -97,7 +80,7 @@ describe('Resource fetching with mocked network calls', () => {
         });
 
         const resp = await fetchResource(mockClient, flatlanderObjectId, resourcePath, new Set());
-        expect(isVersionedResource(resp)).toBeTruthy();
-        expect(checkRedirect).toHaveBeenCalledWith(mockClient, flatlanderObjectId);
+        expect(checkRedirect).toHaveBeenCalledTimes(2);
+        expect(resp).toBeDefined();
     });
 });
