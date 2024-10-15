@@ -47,10 +47,7 @@ export async function fetchResource(
         return HttpStatusCodes.TOO_MANY_REDIRECTS;
     }
 
-    let redirectId  = await checkRedirect(client, objectId);
-    if (redirectId) {
-        fetchResource(client, redirectId, path, seenResources, depth + 1)
-    }
+    const redirectPromise  = checkRedirect(client, objectId);
     seenResources.add(objectId);
 
     const dynamicFieldId = deriveDynamicFieldID(
@@ -66,6 +63,10 @@ export async function fetchResource(
 
     // If no page data found.
     if (!pageData || !( pageData.data )) {
+        const redirectId = await redirectPromise;
+        if (redirectId) {
+            fetchResource(client, redirectId, path, seenResources, depth + 1)
+        }
         console.log("No page data found");
         return HttpStatusCodes.NOT_FOUND;
     }
