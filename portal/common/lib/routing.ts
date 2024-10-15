@@ -4,7 +4,7 @@
 import { getFullnodeUrl, SuiClient, SuiObjectResponse } from "@mysten/sui/client";
 import { Routes } from "./types";
 import { DynamicFieldStruct, RoutesStruct } from "./bcs_data_parsing";
-import { bcs, fromB64 } from "@mysten/bcs";
+import { bcs, fromBase64 } from "@mysten/bcs";
 
 /**
  * Gets the Routes dynamic field of the site object.
@@ -74,7 +74,7 @@ function parseRoutesData(bcsBytes: string): Routes {
         bcs.vector(bcs.u8()),
         // The value of the df, i.e. the Routes Struct.
         RoutesStruct,
-    ).parse(fromB64(bcsBytes));
+    ).parse(fromBase64(bcsBytes));
 
     return df.value as any as Routes;
 }

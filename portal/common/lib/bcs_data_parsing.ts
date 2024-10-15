@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { bcs, BcsType } from "@mysten/bcs";
-import { fromHEX, toHEX, toB64 } from "@mysten/sui/utils";
+import { fromHex, toHex, toBase64 } from "@mysten/sui/utils";
 import { base64UrlSafeEncode } from "./url_safe_base64";
 import { Range } from "./types";
 
 const Address = bcs.bytes(32).transform({
-    input: (id: string) => fromHEX(id),
-    output: (id) => toHEX(id),
+    input: (id: string) => fromHex(id),
+    output: (id) => toHex(id),
 });
 
 // Blob IDs & hashes are represented on chain as u256, but serialized in URLs as URL-safe Base64.
@@ -21,7 +21,7 @@ const BLOB_ID = bcs.u256().transform({
 // otherwise, it will mess up with the checksum results.
 const DATA_HASH = bcs.u256().transform({
     input: (id: string) => id,
-    output: (id) => toB64(bcs.u256().serialize(id).toBytes()),
+    output: (id) => toBase64(bcs.u256().serialize(id).toBytes()),
 });
 
 export const ResourcePathStruct = bcs.struct("ResourcePath", {
