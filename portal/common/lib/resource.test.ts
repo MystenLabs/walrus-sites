@@ -176,20 +176,20 @@ describe('fetchResource', () => {
     });
 
 
-    // test('should return NOT_FOUND if dynamic fields are not found', async () => {
-    //     const seenResources = new Set<string>();
+    test('should return NOT_FOUND if dynamic fields are not found', async () => {
+        const seenResources = new Set<string>();
 
-    //     // Mock to return no redirect
-    //     (checkRedirect as any).mockResolvedValueOnce(null);
+        // Mock to return no redirect
+        (checkRedirect as any).mockResolvedValueOnce(null);
 
-    //     // Mock to simulate that dynamic fields are not found
-    //     getDynamicFieldObject.mockResolvedValueOnce({ data: null });
+        // Mock to simulate that dynamic fields are not found
+        getObject.mockResolvedValueOnce(undefined);
 
-    //     const result = await fetchResource(mockClient, '0xParentId', '/path', seenResources);
+        const result = await fetchResource(mockClient, '0x1', '/path', seenResources);
 
-    //     // Check that the function returns NOT_FOUND
-    //     expect(result).toBe(HttpStatusCodes.NOT_FOUND);
-    // });
+        // Check that the function returns NOT_FOUND
+        expect(result).toBe(HttpStatusCodes.NOT_FOUND);
+    });
 
     // test('should correctly handle a chain of redirects', async () => {
     //     const seenResources = new Set<string>();
