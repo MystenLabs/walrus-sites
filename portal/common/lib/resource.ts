@@ -6,8 +6,14 @@ import { SuiClient, SuiObjectData } from "@mysten/sui/client";
 import { Resource, VersionedResource } from "./types";
 import { MAX_REDIRECT_DEPTH, RESOURCE_PATH_MOVE_TYPE } from "./constants";
 import { checkRedirect } from "./redirects";
-import { fromB64 } from "@mysten/bcs";
-import { ResourcePathStruct, DynamicFieldStruct, ResourceStruct } from "./bcs_data_parsing";
+import { fromBase64 } from "@mysten/bcs";
+import {
+    ResourcePathStruct,
+    DynamicFieldStruct,
+    ResourceStruct
+} from "./bcs_data_parsing";
+import { deriveDynamicFieldID } from "@mysten/sui/utils";
+import { bcs } from "@mysten/bcs";
 
 /**
  * Fetches a resource of a site.
@@ -41,38 +47,26 @@ export async function fetchResource(
         return HttpStatusCodes.TOO_MANY_REDIRECTS;
     }
 
-    // Initiate a pre-fetch for the checkRedirect operation without resolving it.
-    // We don't need the result yet, but it's useful if we will need
-    // it later, so we don't have to loose time.
-    const checkRedirectPromise = checkRedirect(client, objectId);
+    const redirectPromise  = checkRedirect(client, objectId);
     seenResources.add(objectId);
 
-    // Attempt to fetch dynamic field object.
-    const dynamicFields = await client.getDynamicFieldObject({
-        parentId: objectId,
-        name: { type: RESOURCE_PATH_MOVE_TYPE, value: path },
-    });
-
-    console.log("Dynamic fields for ", objectId, dynamicFields);
-
-    // If no dynamic fields found, only then attempt redirect.
-    if (!dynamicFields || !dynamicFields.data) {
-        console.log("No dynamic field found");
-        // Resolve the checkRedirect to get the results.
-        let redirectId = await checkRedirectPromise;
-        return redirectId
-            ? fetchResource(client, redirectId, path, seenResources, depth + 1)
-            : HttpStatusCodes.NOT_FOUND;
-    }
+    const dynamicFieldId = deriveDynamicFieldID(
+        objectId, RESOURCE_PATH_MOVE_TYPE, bcs.string().serialize(path).toBytes()
+    );
+    console.log("Derived dynamic field objectID: ", dynamicFieldId);
 
     // Fetch page data.
     const pageData = await client.getObject({
-        id: dynamicFields.data.objectId,
+        id: dynamicFieldId,
         options: { showBcs: true },
     });
 
     // If no page data found.
-    if (!pageData.data) {
+    if (!pageData || !( pageData.data )) {
+        const redirectId = await redirectPromise;
+        if (redirectId) {
+            fetchResource(client, redirectId, path, seenResources, depth + 1)
+        }
         console.log("No page data found");
         return HttpStatusCodes.NOT_FOUND;
     }
@@ -85,7 +79,7 @@ export async function fetchResource(
     return {
         ...siteResource,
         version: pageData.data?.version,
-        objectId: dynamicFields.data.objectId,
+        objectId: dynamicFieldId,
     } as VersionedResource;
 }
 
@@ -96,7 +90,7 @@ function getResourceFields(data: SuiObjectData): Resource | null {
     // Deserialize the bcs encoded struct
     if (data.bcs && data.bcs.dataType === "moveObject") {
         const df = DynamicFieldStruct(ResourcePathStruct, ResourceStruct).parse(
-            fromB64(data.bcs.bcsBytes),
+            fromBase64(data.bcs.bcsBytes),
         );
         return df.value;
     }

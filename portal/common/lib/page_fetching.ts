@@ -18,7 +18,7 @@ import {
     generateHashErrorResponse,
 } from "./http/http_error_responses";
 import { aggregatorEndpoint } from "./aggregator";
-import { toB64 } from "@mysten/bcs";
+import { toBase64 } from "@mysten/bcs";
 import { sha256 } from "./crypto";
 import { getRoutes, matchPathToRoute } from "./routing";
 import { HttpStatusCodes } from "./http/http_status_codes";
@@ -124,7 +124,7 @@ export async function fetchPage(
     const body = await contents.arrayBuffer();
     // Verify the integrity of the aggregator response by hashing
     // the response contents.
-    const h10b = toB64(await sha256(body));
+    const h10b = toBase64(await sha256(body));
     if (result.blob_hash != h10b) {
         console.warn(
             "[!] checksum mismatch [!] for:",
