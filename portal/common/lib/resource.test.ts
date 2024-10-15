@@ -13,7 +13,6 @@ import { RESOURCE_PATH_MOVE_TYPE } from './constants';
 
 // Mock SuiClient methods
 const getObject = vi.fn();
-
 const mockClient = {
     getObject,
 } as unknown as SuiClient;
