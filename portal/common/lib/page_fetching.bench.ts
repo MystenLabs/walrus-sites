@@ -5,7 +5,7 @@ import { describe, bench, expect, vi, beforeAll, beforeEach, afterAll } from 'vi
 import { fetchPage } from './page_fetching';
 import { SuiClient, SuiObjectData } from '@mysten/sui/client';
 import { sha256 } from './crypto';
-import { toB64 } from '@mysten/bcs';
+import { toBase64 } from '@mysten/bcs';
 import { checkRedirect } from './redirects';
 import { Resource } from './types';
 
@@ -32,7 +32,7 @@ describe('Page fetching with mocked network calls', () => {
 
         const decompressed = new Uint8Array(contentBuffer);
         const hashArray = await sha256(decompressed);
-        expectedHash = toB64(hashArray);
+        expectedHash = toBase64(hashArray);
 
         fetchMock.mockResolvedValue({
             ok: true,

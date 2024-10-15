@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { fromB64, fromHEX, isValidSuiObjectId, isValidSuiAddress, toHEX } from "@mysten/sui/utils";
+import { fromB64, fromHex, isValidSuiObjectId, isValidSuiAddress, toHex } from "@mysten/sui/utils";
 const baseX = require('base-x');
 
 const BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz";
@@ -16,7 +16,7 @@ const b36 = baseX(BASE36);
  */
 export function subdomainToObjectId(subdomain: string): string | null {
     try{
-        const objectId = Base36ToHEX(subdomain.toLowerCase());
+        const objectId = Base36toHex(subdomain.toLowerCase());
         console.log(
             "obtained object id: ",
             objectId,
@@ -31,9 +31,9 @@ export function subdomainToObjectId(subdomain: string): string | null {
 }
 
 export function HEXtoBase36(objectId: string): string {
-    return b36.encode(fromHEX(objectId.slice(2))).toLowerCase();
+    return b36.encode(fromHex(objectId.slice(2))).toLowerCase();
 }
 
-export function Base36ToHEX(objectId: string): string {
-    return "0x" + toHEX(b36.decode(objectId.toLowerCase()));
+export function Base36toHex(objectId: string): string {
+    return "0x" + toHex(b36.decode(objectId.toLowerCase()));
 }
