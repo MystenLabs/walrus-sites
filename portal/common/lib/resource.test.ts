@@ -190,46 +190,4 @@ describe('fetchResource', () => {
         // Check that the function returns NOT_FOUND
         expect(result).toBe(HttpStatusCodes.NOT_FOUND);
     });
-
-    // test('should correctly handle a chain of redirects', async () => {
-    //     const seenResources = new Set<string>();
-    //     const mockResource = { blob_id: '0xresourceBlobId' };
-
-    //     // First redirect: no dynamic fields and checkRedirect yields an objectId.
-    //     getDynamicFieldObject
-    //         .mockResolvedValueOnce(null)
-    //         .mockResolvedValueOnce(null)
-    //         .mockResolvedValueOnce({
-    //             data: { objectId: '0xFinalObjectId' },
-    //         });
-    //     (checkRedirect as any)
-    //         .mockResolvedValueOnce('0xredirect1')
-    //         .mockResolvedValueOnce('0xredirect2');
-
-    //     // Mock getObject to return a valid response for each object in the chain
-    //     getObject.mockResolvedValueOnce({
-    //         data: {
-    //             bcs: { dataType: 'moveObject', bcsBytes: 'mockBcsBytes' },
-    //         },
-    //     });
-
-    //     // Mock fromB64 to simulate the decoding process
-    //     (fromB64 as any).mockReturnValueOnce('decodedBcsBytes');
-
-    //     // Mock DynamicFieldStruct to parse the BCS data and return the mock resource
-    //     (DynamicFieldStruct as any).mockImplementation(() => ({
-    //         parse: () => ({ value: mockResource }),
-    //     }));
-
-    //     const result = await fetchResource(mockClient, '0xParentId', '/path', seenResources);
-
-    //     expect(checkRedirect).toHaveBeenNthCalledWith(1, mockClient, '0xParentId');
-    //     expect(checkRedirect).toHaveBeenNthCalledWith(2, mockClient, '0xredirect1');
-    //     // Validate the correct resource is returned after following the chain of redirects
-    //     expect(result).toEqual({
-    //         blob_id: '0xresourceBlobId',
-    //         objectId: '0xFinalObjectId',
-    //         version: undefined
-    //     });
-    // });
 });
