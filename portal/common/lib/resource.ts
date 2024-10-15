@@ -65,7 +65,7 @@ export async function fetchResource(
     });
 
     // If no page data found.
-    if (!pageData.data) {
+    if (!pageData || !( pageData.data )) {
         console.log("No page data found");
         return HttpStatusCodes.NOT_FOUND;
     }
