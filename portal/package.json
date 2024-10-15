@@ -8,8 +8,9 @@
     "build:server": "pnpm --filter ./server run build",
     "serve:dev:server": "pnpm --filter ./server run dev",
     "serve:prod:server": "pnpm --filter ./server run start",
-    "serve:worker": "pnpm --filter ./worker run serve",
-    "serve:prod": "pnpm --filter ./worker run serve:prod",
+    "serve": "pnpm serve:dev:worker",
+    "serve:dev:worker": "pnpm --filter ./worker run serve",
+    "serve:prod:worker": "pnpm --filter ./worker run serve:prod",
     "test:common": "pnpm --filter ./common run test"
   },
   "keywords": [],
