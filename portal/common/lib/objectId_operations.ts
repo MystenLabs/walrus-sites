@@ -1,7 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { fromB64, fromHex, isValidSuiObjectId, isValidSuiAddress, toHex } from "@mysten/sui/utils";
+import {
+    fromHex,
+    isValidSuiObjectId,
+    isValidSuiAddress,
+    toHex
+} from "@mysten/sui/utils";
 const baseX = require('base-x');
 
 const BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz";

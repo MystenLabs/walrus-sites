@@ -5,7 +5,7 @@ import { bench, describe, expect, vi, beforeEach } from 'vitest';
 import { fetchResource } from './resource';
 import { SuiClient, SuiObjectData } from '@mysten/sui/client';
 import { checkRedirect } from './redirects';
-import { fromB64 } from '@mysten/bcs';
+import { fromBase64 } from '@mysten/bcs';
 
 const getObject = vi.fn();
 const mockClient = {
@@ -17,12 +17,12 @@ vi.mock('./redirects', () => ({
     checkRedirect: vi.fn(),
 }));
 
-// Mock fromB64
+// Mock fromBase64
 vi.mock('@mysten/bcs', async () => {
     const actual = await vi.importActual<typeof import('@mysten/bcs')>('@mysten/bcs');
     return {
         ...actual,
-        fromB64: vi.fn(),
+        fromBase64: vi.fn(),
     };
 });
 
@@ -56,7 +56,7 @@ describe('Resource fetching with mocked network calls', () => {
                 },
             },
         });
-        (fromB64 as any).mockReturnValueOnce('decodedBcsBytes');
+        (fromBase64 as any).mockReturnValueOnce('decodedBcsBytes');
         const resp = await fetchResource(mockClient, landingPageObjectId, '/index.html', new Set());
         expect(resp).toBeDefined();
     });

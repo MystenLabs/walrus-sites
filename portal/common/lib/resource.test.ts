@@ -7,7 +7,7 @@ import { fetchResource } from './resource';
 import { SuiClient } from '@mysten/sui/client';
 import { HttpStatusCodes } from './http/http_status_codes';
 import { checkRedirect } from './redirects';
-import { fromB64 } from '@mysten/bcs';
+import { fromBase64 } from '@mysten/bcs';
 import { DynamicFieldStruct } from './bcs_data_parsing';
 import { RESOURCE_PATH_MOVE_TYPE } from './constants';
 
@@ -22,12 +22,12 @@ vi.mock('./redirects', () => ({
     checkRedirect: vi.fn(),
 }));
 
-// Mock fromB64
+// Mock fromBase64
 vi.mock('@mysten/bcs', async () => {
     const actual = await vi.importActual<typeof import('@mysten/bcs')>('@mysten/bcs');
     return {
         ...actual,
-        fromB64: vi.fn(),
+        fromBase64: vi.fn(),
     };
 });
 
@@ -75,7 +75,7 @@ describe('fetchResource', () => {
                 },
             },
         });
-        (fromB64 as any).mockReturnValueOnce('decodedBcsBytes');
+        (fromBase64 as any).mockReturnValueOnce('decodedBcsBytes');
 
         const result = await fetchResource(mockClient, '0x1', '/path', new Set());
         expect(result).toEqual({
@@ -160,8 +160,8 @@ describe('fetchResource', () => {
             },
         });
 
-        // Mock fromB64 to simulate the decoding process
-        (fromB64 as any).mockReturnValueOnce('decodedBcsBytes');
+        // Mock fromBase64 to simulate the decoding process
+        (fromBase64 as any).mockReturnValueOnce('decodedBcsBytes');
 
         // Mock DynamicFieldStruct to return a resource without a blob_id
         (DynamicFieldStruct as any).mockImplementation(() => ({

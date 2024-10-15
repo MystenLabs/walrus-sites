@@ -6,7 +6,7 @@ import { SuiClient, SuiObjectData } from "@mysten/sui/client";
 import { Resource, VersionedResource } from "./types";
 import { MAX_REDIRECT_DEPTH, RESOURCE_PATH_MOVE_TYPE } from "./constants";
 import { checkRedirect } from "./redirects";
-import { fromB64 } from "@mysten/bcs";
+import { fromBase64 } from "@mysten/bcs";
 import {
     ResourcePathStruct,
     DynamicFieldStruct,
@@ -90,7 +90,7 @@ function getResourceFields(data: SuiObjectData): Resource | null {
     // Deserialize the bcs encoded struct
     if (data.bcs && data.bcs.dataType === "moveObject") {
         const df = DynamicFieldStruct(ResourcePathStruct, ResourceStruct).parse(
-            fromB64(data.bcs.bcsBytes),
+            fromBase64(data.bcs.bcsBytes),
         );
         return df.value;
     }
