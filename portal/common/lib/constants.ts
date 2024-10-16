@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 export const NETWORK = "testnet";
-export const AGGREGATOR = "https://aggregator-devnet.walrus.space:443";
+export const AGGREGATOR = "https://aggregator.walrus-testnet.walrus.space";
 export const SITE_PACKAGE = "0x24b252c1c3613b2128e60f6b43ae6012c81f078eea2cea7eaec7df5a753e6f4b";
 export const MAX_REDIRECT_DEPTH = 3;
 export const SITE_NAMES: { [key: string]: string } = {
