@@ -12,7 +12,7 @@
 				"@types/pako": "^2.0.3",
 				"vite-plugin-html": "^3.2.2",
 				"vitest": "^2.0.4",
-				"webpack": "^5.92.0"
+				"webpack": "^5.94.0"
 		},
 		"name": "common",
 		"description": "A common library that is shared among the portal implementations.",
