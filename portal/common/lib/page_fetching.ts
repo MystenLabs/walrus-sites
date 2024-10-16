@@ -25,44 +25,55 @@ import { HttpStatusCodes } from "./http/http_status_codes";
 
 /**
  * Resolves the subdomain to an object ID, and gets the corresponding resources.
+ *
+ * The `resolvedObjectId` variable is the object ID of the site that was previously resolved. If
+ * `null`, the object ID is resolved again.
  */
-export async function resolveAndFetchPage(parsedUrl: DomainDetails): Promise<Response> {
+export async function resolveAndFetchPage(
+    parsedUrl: DomainDetails,
+    resolvedObjectId: string | null,
+): Promise<Response> {
     const rpcUrl = getFullnodeUrl(NETWORK);
     const client = new SuiClient({ url: rpcUrl });
-    const resolveObjectResult = await resolveObjectId(parsedUrl, client);
-    const isObjectId = typeof resolveObjectResult == "string";
-    if (isObjectId) {
-        console.log("Object ID: ", resolveObjectResult);
-        console.log("Base36 version of the object ID: ", HEXtoBase36(resolveObjectResult));
-        // Rerouting based on the contents of the routes object,
-        // constructed using the ws-resource.json.
 
-        // Initiate a fetch request to get the Routes object in case the request
-        // to the initial unfiltered path fails.
-        const routesPromise = getRoutes(client, resolveObjectResult);
-
-        // Fetch the page using the initial path.
-        const fetchPromise = await fetchPage(client, resolveObjectResult, parsedUrl.path);
-
-        // If the fetch fails, check if the path can be matched using
-        // the Routes DF and fetch the redirected path.
-        if (fetchPromise.status == HttpStatusCodes.NOT_FOUND) {
-            const routes = await routesPromise;
-            if (!routes) {
-                console.warn("No routes found for the object ID");
-                return siteNotFound();
-            }
-            let matchingRoute: string | undefined;
-            matchingRoute = matchPathToRoute(parsedUrl.path, routes);
-            if (!matchingRoute) {
-                console.warn(`No matching route found for ${parsedUrl.path}`);
-                return siteNotFound();
-            }
-            return fetchPage(client, resolveObjectResult, matchingRoute);
+    if (!resolvedObjectId) {
+        const resolveObjectResult = await resolveObjectId(parsedUrl, client);
+        const isObjectId = typeof resolveObjectResult == "string";
+        if (!isObjectId) {
+            return resolveObjectResult;
         }
-        return fetchPromise;
+        resolvedObjectId = resolveObjectResult;
     }
-    return resolveObjectResult;
+
+    console.log("Object ID: ", resolvedObjectId);
+    console.log("Base36 version of the object ID: ", HEXtoBase36(resolvedObjectId));
+    // Rerouting based on the contents of the routes object,
+    // constructed using the ws-resource.json.
+
+    // Initiate a fetch request to get the Routes object in case the request
+    // to the initial unfiltered path fails.
+    const routesPromise = getRoutes(client, resolvedObjectId);
+
+    // Fetch the page using the initial path.
+    const fetchPromise = await fetchPage(client, resolvedObjectId, parsedUrl.path);
+
+    // If the fetch fails, check if the path can be matched using
+    // the Routes DF and fetch the redirected path.
+    if (fetchPromise.status == HttpStatusCodes.NOT_FOUND) {
+        const routes = await routesPromise;
+        if (!routes) {
+            console.warn("No routes found for the object ID");
+            return siteNotFound();
+        }
+        let matchingRoute: string | undefined;
+        matchingRoute = matchPathToRoute(parsedUrl.path, routes);
+        if (!matchingRoute) {
+            console.warn(`No matching route found for ${parsedUrl.path}`);
+            return siteNotFound();
+        }
+        return fetchPage(client, resolvedObjectId, matchingRoute);
+    }
+    return fetchPromise;
 }
 
 export async function resolveObjectId(
