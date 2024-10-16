@@ -51,10 +51,13 @@ export async function GET(req: Request) {
     if (atBaseUrl) {
         console.log("Serving the landing page from walrus...");
         const blobId = process.env.LANDING_PAGE_OID_B36!;
-        const response = await resolveAndFetchPage({
-            subdomain: blobId,
-            path: parsedUrl?.path ?? "/index.html",
-        });
+        const response = await resolveAndFetchPage(
+            {
+                subdomain: blobId,
+                path: parsedUrl?.path ?? "/index.html",
+            },
+            null,
+        );
         return response;
     }
 
