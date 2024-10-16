@@ -31,7 +31,7 @@ bin_version::bin_version!();
 #[clap(rename_all = "kebab-case", version = VERSION, propagate_version = true)]
 struct Args {
     /// The path to the configuration file for the site builder.
-    #[clap(short, long, default_value = "builder.yaml")]
+    #[clap(short, long, default_value = "sites-config.yaml")]
     config: PathBuf,
     #[clap(flatten)]
     general: GeneralArgs,
