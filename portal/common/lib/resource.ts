@@ -7,11 +7,7 @@ import { Resource, VersionedResource } from "./types";
 import { MAX_REDIRECT_DEPTH, RESOURCE_PATH_MOVE_TYPE } from "./constants";
 import { checkRedirect } from "./redirects";
 import { fromBase64 } from "@mysten/bcs";
-import {
-    ResourcePathStruct,
-    DynamicFieldStruct,
-    ResourceStruct
-} from "./bcs_data_parsing";
+import { ResourcePathStruct, DynamicFieldStruct, ResourceStruct } from "./bcs_data_parsing";
 import { deriveDynamicFieldID } from "@mysten/sui/utils";
 import { bcs } from "@mysten/bcs";
 
@@ -47,11 +43,13 @@ export async function fetchResource(
         return HttpStatusCodes.TOO_MANY_REDIRECTS;
     }
 
-    const redirectPromise  = checkRedirect(client, objectId);
+    const redirectPromise = checkRedirect(client, objectId);
     seenResources.add(objectId);
 
     const dynamicFieldId = deriveDynamicFieldID(
-        objectId, RESOURCE_PATH_MOVE_TYPE, bcs.string().serialize(path).toBytes()
+        objectId,
+        RESOURCE_PATH_MOVE_TYPE,
+        bcs.string().serialize(path).toBytes(),
     );
     console.log("Derived dynamic field objectID: ", dynamicFieldId);
 
@@ -62,10 +60,10 @@ export async function fetchResource(
     });
 
     // If no page data found.
-    if (!pageData || !( pageData.data )) {
+    if (!pageData || !pageData.data) {
         const redirectId = await redirectPromise;
         if (redirectId) {
-            fetchResource(client, redirectId, path, seenResources, depth + 1)
+            return fetchResource(client, redirectId, path, seenResources, depth + 1);
         }
         console.log("No page data found");
         return HttpStatusCodes.NOT_FOUND;
