@@ -30,9 +30,9 @@ describe('redirectToPortalURLResponse', () => {
 });
 
 const redirectToAggregatorUrlTestCases: [string, string, string][] = [
-    ['https://example.com', '12345', 'https://aggregator-devnet.walrus.space/v1/12345'],
-    ['https://walrus.site', 'blob-id', 'https://aggregator-devnet.walrus.space/v1/blob-id'],
-    ['http://localhost:8080', 'abcde', 'https://aggregator-devnet.walrus.space/v1/abcde'],
+    ['https://example.com', '12345', 'https://aggregator.walrus-testnet.walrus.space/v1/12345'],
+    ['https://walrus.site', 'blob-id', 'https://aggregator.walrus-testnet.walrus.space/v1/blob-id'],
+    ['http://localhost:8080', 'abcde', 'https://aggregator.walrus-testnet.walrus.space/v1/abcde'],
 ];
 
 describe('redirectToAggregatorUrlResponse', () => {
