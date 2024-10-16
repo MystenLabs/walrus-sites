@@ -80,11 +80,11 @@ describe('fetchResource', () => {
         const result = await fetchResource(mockClient, '0x1', '/path', new Set());
         expect(result).toEqual({
             blob_id: '0xresourceBlobId',
-            objectId: '0x51813e7d4040265af8bd6c757f52accbe11e6df5b9cf3d6696a96e3f54fad096',
+            objectId: '0x3cf9bff169db6f780a0a3cae7b3b770097c26342ad0c08604bc80728cfa37bdc',
             version: undefined
         });
         expect(mockClient.getObject).toHaveBeenCalledWith({
-            id: '0x51813e7d4040265af8bd6c757f52accbe11e6df5b9cf3d6696a96e3f54fad096',
+            id: '0x3cf9bff169db6f780a0a3cae7b3b770097c26342ad0c08604bc80728cfa37bdc',
             options: { showBcs: true },
         });
     });
@@ -127,10 +127,10 @@ describe('fetchResource', () => {
         // Verify the results
         expect(result).toEqual({
             blob_id: '0xresourceBlobId',
-            objectId: '0x51813e7d4040265af8bd6c757f52accbe11e6df5b9cf3d6696a96e3f54fad096',
+            objectId: '0x3cf9bff169db6f780a0a3cae7b3b770097c26342ad0c08604bc80728cfa37bdc',
             version: undefined
         });
-        expect(checkRedirect).toHaveBeenCalledTimes(2);
+        expect(checkRedirect).toHaveBeenCalledTimes(1);
     });
 
     test('should return NOT_FOUND if the resource does not contain a blob_id', async () => {
