@@ -1,11 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+import { NETWORK } from "@lib/constants";
+import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
 import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import resolveWithCache from "./caching";
-import { resolveAndFetchPage } from "@lib/page_fetching";
+import { resolveAndFetchPage, resolveObjectId } from "@lib/page_fetching";
 import { HttpStatusCodes } from "@lib/http/http_status_codes";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
@@ -71,7 +73,14 @@ self.addEventListener("fetch", async (event) => {
 
         // Attempt to fetch from cache
         const fetchFromCache = async (): Promise<Response> => {
-            const cachedResponse = await resolveWithCache(parsedUrl, urlString);
+            const rpcUrl = getFullnodeUrl(NETWORK);
+            const client = new SuiClient({ url: rpcUrl });
+            console.log("Pre-fetching the sui object ID");
+            const resolvedObjectId = await resolveObjectId(parsedUrl, client);
+            if (typeof resolvedObjectId !== "string") {
+                return resolvedObjectId;
+            }
+            const cachedResponse = await resolveWithCache(resolvedObjectId, parsedUrl, urlString);
             return cachedResponse.status === HttpStatusCodes.NOT_FOUND
                 ? proxyFetch()
                 : cachedResponse;
@@ -79,10 +88,8 @@ self.addEventListener("fetch", async (event) => {
 
         // Fetch directly and fallback if necessary
         const fetchDirectlyOrProxy = async (): Promise<Response> => {
-            const response = await resolveAndFetchPage(parsedUrl);
-            return response.status === HttpStatusCodes.NOT_FOUND
-                ? proxyFetch()
-                : response;
+            const response = await resolveAndFetchPage(parsedUrl, null);
+            return response.status === HttpStatusCodes.NOT_FOUND ? proxyFetch() : response;
         };
 
         // Handle error during fetching
@@ -99,9 +106,7 @@ self.addEventListener("fetch", async (event) => {
             console.log("Proxy fetching from fallback URL:", fallbackUrl);
             return fetch(fallbackUrl);
         };
-        event.respondWith(
-            handleFetchRequest()
-        );
+        event.respondWith(handleFetchRequest());
         return;
     }
 
