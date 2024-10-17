@@ -136,7 +136,7 @@ impl<'a> ResourceOp<'a> {
     /// Returns if the operation needs to be uploaded to Walrus.
     pub fn is_walrus_update(&self, when_upload: &WhenWalrusUpload) -> bool {
         matches!(self, ResourceOp::Created(_))
-            || (when_upload.is_always() && !matches!(self, ResourceOp::Unchanged(_)))
+            || (when_upload.is_always() && matches!(self, ResourceOp::Unchanged(_)))
     }
 
     /// Returns true if the operation modifies a resource.
