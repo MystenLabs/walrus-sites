@@ -121,11 +121,7 @@ impl SiteManager {
             ));
             let _output = self
                 .walrus
-                .store(
-                    resource.full_path.clone(),
-                    self.epochs,
-                    self.when_upload.is_always(),
-                )
+                .store(resource.full_path.clone(), self.epochs, false)
                 .await?;
             display::done();
         }
