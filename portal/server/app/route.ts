@@ -34,8 +34,17 @@ export async function GET(req: Request) {
         const forwardToFallback = async () => {
             const subdomain = parsedUrl.subdomain;
             const fallbackDomain = process.env.FALLBACK_DEVNET_PORTAL;
-            return fetch(`https://${subdomain}.${fallbackDomain}${parsedUrl.path}`);
+            const fallbackUrl = `https://${subdomain}.${fallbackDomain}${parsedUrl.path}`;
+            // We need to add the Accept-Encoding header to ensure that the fall back domain does
+            // not reply with a compressed response.
+            console.info(`Falling back to the devnet portal! ${fallbackUrl}`);
+            return fetch(fallbackUrl, {
+                headers: {
+                    "Accept-Encoding": "identity",
+                },
+            });
         };
+
         try {
             const fetchPageResponse = await resolveAndFetchPage(parsedUrl, null);
             if (fetchPageResponse.status == HttpStatusCodes.NOT_FOUND) {

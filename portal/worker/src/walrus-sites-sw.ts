@@ -103,7 +103,7 @@ self.addEventListener("fetch", async (event) => {
         const proxyFetch = async (): Promise<Response> => {
             const fallbackDomain = "blocksite.net";
             const fallbackUrl = `https://${parsedUrl.subdomain}.${fallbackDomain}${parsedUrl.path}`;
-            console.log("Proxy fetching from fallback URL:", fallbackUrl);
+            console.info(`Falling back to the devnet portal! ${fallbackUrl}`);
             return fetch(fallbackUrl);
         };
         event.respondWith(handleFetchRequest());
