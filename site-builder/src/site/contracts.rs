@@ -39,9 +39,6 @@ pub trait AssociatedContractStruct: DeserializeOwned {
         let raw = raw
             .try_as_move()
             .ok_or(anyhow!("the data requested is not a move object"))?;
-        println!("raw: {:?}", raw);
-        println!("raw.type_: {:?}", raw.type_);
-        println!("contract_struct: {:?}", Self::CONTRACT_STRUCT);
         assert!(
             raw.type_.name.as_str() == Self::CONTRACT_STRUCT.name
                 && raw.type_.module.as_str() == Self::CONTRACT_STRUCT.module,
