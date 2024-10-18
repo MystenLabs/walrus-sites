@@ -5,7 +5,7 @@ use std::{collections::BTreeMap, path::Path};
 
 use anyhow::{Context, Result};
 use move_core_types::u256::U256;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
 use super::Routes;
@@ -29,11 +29,8 @@ pub(crate) struct LocalResource {
     #[serde_as(as = "DisplayFromStr")]
     pub blob_id: BlobId,
     /// The hash of the blob contents. Serialze and deserialize as hex string.
-    #[serde(
-        serialize_with = "serialize_u256",
-        deserialize_with = "deserialize_u256"
-    )]
-    pub blob_hash: U256,
+    #[serde_as(as = "serde_with::hex::Hex")]
+    pub blob_hash: [u8; 32],
     /// Byte ranges for the resource.
     pub range: Option<Range>,
 }
@@ -44,7 +41,7 @@ impl From<LocalResource> for SuiResource {
             path: resource.path,
             headers: resource.headers,
             blob_id: resource.blob_id,
-            blob_hash: resource.blob_hash,
+            blob_hash: U256::from_le_bytes(&resource.blob_hash),
             range: resource.range,
         }
     }
@@ -56,25 +53,10 @@ impl From<SuiResource> for LocalResource {
             path: resource.path,
             headers: resource.headers,
             blob_id: resource.blob_id,
-            blob_hash: resource.blob_hash,
+            blob_hash: resource.blob_hash.to_le_bytes(),
             range: resource.range,
         }
     }
-}
-
-fn deserialize_u256<'de, D>(deserializer: D) -> Result<U256, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s = String::deserialize(deserializer)?;
-    U256::from_str_radix(&s, 16).map_err(serde::de::Error::custom)
-}
-
-fn serialize_u256<S>(value: &U256, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    serializer.serialize_str(&format!("{:x}", value))
 }
 
 /// Deserialized object of the file's `ws-resource.json` contents.
@@ -123,10 +105,6 @@ impl WSResources {
 #[cfg(test)]
 mod tests {
 
-    use std::str::FromStr;
-
-    use move_core_types::u256::U256;
-
     use super::*;
     use crate::walrus::types::BlobId;
 
@@ -156,7 +134,7 @@ mod tests {
                     "Content-Type": "application/json"
                 },
                 "blob_id": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE",
-                "blob_hash": "1869f",
+                "blob_hash": "1212121212121212121212121212121212121212121212121212121212121212",
                 "range": null
             }
         ]
@@ -166,7 +144,7 @@ mod tests {
     fn test_deserialize_resource() {
         let resource = LocalResource {
             path: "/index.html".to_owned(),
-            blob_hash: U256::from_str("99999").unwrap(),
+            blob_hash: [12u8; 32],
             blob_id: BlobId([1u8; 32]),
             range: None,
             headers: HttpHeaders(

@@ -20,7 +20,7 @@ move-core-types = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1
 notify = "6.1.1"
 serde = { version = "1.0.203", features = ["derive"] }
 serde_json = "1.0.117"
-serde_with = { version = "3.8.1", features = ["base64"] }
+serde_with = { version = "3.8.1", features = ["base64", "hex"] }
 serde_yaml = "0.9"
 shared-crypto = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.34.2" }
 sui-keys = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.34.2" }
