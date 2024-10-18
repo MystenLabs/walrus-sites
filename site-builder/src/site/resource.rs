@@ -402,7 +402,7 @@ impl ResourceManager {
     /// Recursively iterate a directory and load all [`Resources`][Resource] within.
     pub async fn read_dir(&mut self, root: &Path) -> Result<SiteData> {
         let resource_paths = Self::iter_dir(root, root)?;
-        let resources = ResourceSet::from_iter(
+        let mut resources = ResourceSet::from_iter(
             try_join_all(
                 resource_paths
                     .iter()
@@ -413,6 +413,22 @@ impl ResourceManager {
             .into_iter()
             .flatten(),
         );
+
+        // HACK(giac): add the local resources from the config.
+        if let Some(additional) = self
+            .ws_resources
+            .as_ref()
+            .and_then(|config| config.pre_built.as_ref())
+            .map(|pre_built| {
+                pre_built
+                    .clone()
+                    .into_iter()
+                    .map(Resource::from)
+                    .collect::<Vec<_>>()
+            })
+        {
+            resources.inner.extend(additional);
+        }
 
         Ok(SiteData::new(
             resources,

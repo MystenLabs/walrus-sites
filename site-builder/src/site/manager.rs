@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::BTreeSet, str::FromStr};
+use std::{collections::BTreeSet, path::PathBuf, str::FromStr};
 
 use anyhow::{anyhow, Result};
 use sui_keys::keystore::AccountKeystore;
@@ -109,6 +109,10 @@ impl SiteManager {
     async fn publish_to_walrus<'b>(&mut self, updates: &[&ResourceOp<'b>]) -> Result<()> {
         for update in updates.iter() {
             let resource = update.inner();
+            // HACK(giac): if the resource does not have a full path, skip it.
+            if resource.full_path == PathBuf::default() {
+                continue;
+            }
             tracing::debug!(
                 resource=?resource.full_path,
                 blob_id=%resource.info.blob_id,
