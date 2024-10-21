@@ -29,7 +29,7 @@ export function redirectToAggregatorUrlResponse(scope: URL, blobId: string): Res
 /**
  * Checks if the object has a redirect in its Display representation.
  */
-export async function checkRedirect(object: SuiObjectResponse): Promise<string | null> {
+export function checkRedirect(object: SuiObjectResponse): string | null {
     if (object.data && object.data.display) {
         let display = object.data.display;
         // Check if "walrus site address" is set in the display field.

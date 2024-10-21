@@ -66,19 +66,18 @@ export async function fetchResource(
     const rootPageData: SuiObjectResponse = pageData[0];
     const dynamicFieldData: SuiObjectResponse = pageData[1];
 
-    const redirectPromise = checkRedirect(rootPageData);
     seenResources.add(objectId);
+
+    const redirectId = checkRedirect(rootPageData);
+    if (redirectId) {
+        return fetchResource(client, redirectId, path, seenResources, depth + 1);
+    }
 
     // If no page data found.
     if (!dynamicFieldData.data) {
-        const redirectId = await redirectPromise;
-        if (redirectId) {
-            return fetchResource(client, redirectId, path, seenResources, depth + 1);
-        }
         console.log("No page data found");
         return HttpStatusCodes.NOT_FOUND;
     }
-
     const siteResource = getResourceFields(dynamicFieldData.data);
     if (!siteResource || !siteResource.blob_id) {
         return HttpStatusCodes.NOT_FOUND;
