@@ -212,8 +212,22 @@ async fn run() -> Result<()> {
 
     let args = Args::parse();
     let mut config: Config = std::fs::read_to_string(&args.config)
+        .or_else(|err| {
+            if err.kind() == std::io::ErrorKind::NotFound {
+                let config;
+                if let Some(home_dir) = home::home_dir() {
+                    config =
+                        std::fs::read_to_string(home_dir.join(".walrus").join("sites-config.yaml"));
+                    return config;
+                }
+                Err(err)
+            } else {
+                Err(err)
+            }
+        })
         .context(format!(
-            "unable to read config {:?}; consider using the --config flag to point to the config",
+            "unable to read config {:?}; consider using the --config flag to point to the config, \
+            or specify a ~/.config/walrus/sites-config.yaml",
             args.config
         ))
         .and_then(|s| {
