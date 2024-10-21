@@ -54,13 +54,15 @@ export async function fetchResource(
     console.log("Derived dynamic field objectID: ", dynamicFieldId);
 
     // Fetch page data.
-    const pageData = await client.getObject({
-        id: dynamicFieldId,
-        options: { showBcs: true },
-    });
+    const pageData = await client.multiGetObjects(
+        {
+            ids: [dynamicFieldId],
+            options: { showBcs: true }
+        },
+    );
 
     // If no page data found.
-    if (!pageData || !pageData.data) {
+    if (!pageData || !pageData[0].data) {
         const redirectId = await redirectPromise;
         if (redirectId) {
             return fetchResource(client, redirectId, path, seenResources, depth + 1);
@@ -69,14 +71,14 @@ export async function fetchResource(
         return HttpStatusCodes.NOT_FOUND;
     }
 
-    const siteResource = getResourceFields(pageData.data);
+    const siteResource = getResourceFields(pageData[0].data);
     if (!siteResource || !siteResource.blob_id) {
         return HttpStatusCodes.NOT_FOUND;
     }
 
     return {
         ...siteResource,
-        version: pageData.data?.version,
+        version: pageData[0].data?.version,
         objectId: dynamicFieldId,
     } as VersionedResource;
 }
