@@ -51,7 +51,7 @@ pub struct PublishOptions {
     #[clap(long)]
     ws_resources: Option<PathBuf>,
     /// The number of epochs for which to save the resources on Walrus.
-    #[clap(long, default_value_t = 1)]
+    #[clap(long)]
     pub epochs: u64,
     /// Preprocess the directory before publishing.
     /// See the `list-directory` command. Warning: Rewrites all `index.html` files.

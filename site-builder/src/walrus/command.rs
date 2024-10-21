@@ -46,8 +46,6 @@ pub enum Command {
     Store {
         /// The path to the file to be stored.
         file: PathBuf,
-        /// The number of epochs for which to store the file.
-        #[serde(default = "default::epochs")]
         epochs: u64,
         /// Do not check for the blob status before storing it.
         ///
@@ -111,10 +109,6 @@ impl RpcArg {
 mod default {
     pub(crate) fn gas_budget() -> u64 {
         500_000_000
-    }
-
-    pub(crate) fn epochs() -> u64 {
-        1
     }
 }
 
