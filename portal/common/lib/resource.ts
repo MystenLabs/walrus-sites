@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { HttpStatusCodes } from "./http/http_status_codes";
-import { SuiClient, SuiObjectData } from "@mysten/sui/client";
+import { SuiClient, SuiObjectData, SuiObjectResponse } from "@mysten/sui/client";
 import { Resource, VersionedResource } from "./types";
 import { MAX_REDIRECT_DEPTH, RESOURCE_PATH_MOVE_TYPE } from "./constants";
 import { checkRedirect } from "./redirects";
@@ -43,27 +43,34 @@ export async function fetchResource(
         return HttpStatusCodes.TOO_MANY_REDIRECTS;
     }
 
-    const object = await client.getObject({ id: objectId, options: { showDisplay: true } });
-    const redirectPromise = checkRedirect(object);
-    seenResources.add(objectId);
-
     const dynamicFieldId = deriveDynamicFieldID(
         objectId,
         RESOURCE_PATH_MOVE_TYPE,
         bcs.string().serialize(path).toBytes(),
     );
-    console.log("Derived dynamic field objectID: ", dynamicFieldId);
 
     // Fetch page data.
     const pageData = await client.multiGetObjects(
         {
-            ids: [dynamicFieldId],
-            options: { showBcs: true }
+            ids: [
+                objectId,
+                dynamicFieldId
+            ],
+            options: { showBcs: true, showDisplay: true }
         },
     );
+    if (!pageData) {
+        return HttpStatusCodes.NOT_FOUND;
+    }
+    // MultiGetObjects returns the objects *always* in the order they were requested.
+    const rootPageData: SuiObjectResponse = pageData[0];
+    const dynamicFieldData: SuiObjectResponse = pageData[1];
+
+    const redirectPromise = checkRedirect(rootPageData);
+    seenResources.add(objectId);
 
     // If no page data found.
-    if (!pageData || !pageData[0].data) {
+    if (!dynamicFieldData.data) {
         const redirectId = await redirectPromise;
         if (redirectId) {
             return fetchResource(client, redirectId, path, seenResources, depth + 1);
@@ -72,14 +79,14 @@ export async function fetchResource(
         return HttpStatusCodes.NOT_FOUND;
     }
 
-    const siteResource = getResourceFields(pageData[0].data);
+    const siteResource = getResourceFields(dynamicFieldData.data);
     if (!siteResource || !siteResource.blob_id) {
         return HttpStatusCodes.NOT_FOUND;
     }
 
     return {
         ...siteResource,
-        version: pageData[0].data?.version,
+        version: dynamicFieldData.data.version,
         objectId: dynamicFieldId,
     } as VersionedResource;
 }
