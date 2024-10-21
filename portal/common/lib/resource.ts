@@ -43,7 +43,8 @@ export async function fetchResource(
         return HttpStatusCodes.TOO_MANY_REDIRECTS;
     }
 
-    const redirectPromise = checkRedirect(client, objectId);
+    const object = await client.getObject({ id: objectId, options: { showDisplay: true } });
+    const redirectPromise = checkRedirect(object);
     seenResources.add(objectId);
 
     const dynamicFieldId = deriveDynamicFieldID(
