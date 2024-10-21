@@ -43,29 +43,18 @@ export async function fetchResource(
         return HttpStatusCodes.TOO_MANY_REDIRECTS;
     }
 
+    // The dynamic field object ID can be derived, without
+    // making a request to the network.
     const dynamicFieldId = deriveDynamicFieldID(
         objectId,
         RESOURCE_PATH_MOVE_TYPE,
         bcs.string().serialize(path).toBytes(),
     );
 
-    // Fetch page data.
-    const pageData = await client.multiGetObjects(
-        {
-            ids: [
-                objectId,
-                dynamicFieldId
-            ],
-            options: { showBcs: true, showDisplay: true }
-        },
-    );
-    if (!pageData) {
-        return HttpStatusCodes.NOT_FOUND;
-    }
-
-    // MultiGetObjects returns the objects *always* in the order they were requested.
-    const primaryObjectResponse: SuiObjectResponse = pageData[0];
-    const dynamicFieldResponse: SuiObjectResponse = pageData[1];
+    const [
+        primaryObjectResponse,
+        dynamicFieldResponse
+    ] = await fetchObjectPairData(client, objectId, dynamicFieldId);
 
     seenResources.add(objectId);
 
@@ -83,12 +72,40 @@ export async function fetchResource(
     if (!siteResource || !siteResource.blob_id) {
         return HttpStatusCodes.NOT_FOUND;
     }
-
     return {
         ...siteResource,
         version: dynamicFieldResponse.data.version,
         objectId: dynamicFieldId,
     } as VersionedResource;
+}
+
+/**
+* Fetches the data of a parentObject and its' dynamicFieldObject.
+* @param client: A SuiClient to interact with the Sui network.
+* @param objectId: The objectId of the parentObject (e.g. site::Site).
+* @param dynamicFieldId: The Id of the dynamicFieldObject (e.g. site::Resource).
+* @returns A tuple of SuiObjectResponse[] or an HttpStatusCode in case of an error.
+*/
+async function fetchObjectPairData(
+    client: SuiClient,
+    objectId: string,
+    dynamicFieldId: string
+): Promise<SuiObjectResponse[]> {
+    // MultiGetObjects returns the objects *always* in the order they were requested.
+    const pageData = await client.multiGetObjects(
+        {
+            ids: [
+                objectId,
+                dynamicFieldId
+            ],
+            options: { showBcs: true, showDisplay: true }
+        },
+    );
+    // MultiGetObjects returns the objects *always* in the order they were requested.
+    const primaryObjectResponse: SuiObjectResponse = pageData[0];
+    const dynamicFieldResponse: SuiObjectResponse = pageData[1];
+
+    return [primaryObjectResponse, dynamicFieldResponse]
 }
 
 /**
