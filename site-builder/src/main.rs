@@ -227,7 +227,7 @@ async fn run() -> Result<()> {
         })
         .context(format!(
             "unable to read config {:?}; consider using the --config flag to point to the config, \
-            or specify a ~/.config/walrus/sites-config.yaml",
+            or specify a ~/.walrus/sites-config.yaml",
             args.config
         ))
         .and_then(|s| {
