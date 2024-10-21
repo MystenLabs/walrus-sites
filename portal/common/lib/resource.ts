@@ -62,30 +62,31 @@ export async function fetchResource(
     if (!pageData) {
         return HttpStatusCodes.NOT_FOUND;
     }
+
     // MultiGetObjects returns the objects *always* in the order they were requested.
-    const rootPageData: SuiObjectResponse = pageData[0];
-    const dynamicFieldData: SuiObjectResponse = pageData[1];
+    const primaryObjectResponse: SuiObjectResponse = pageData[0];
+    const dynamicFieldResponse: SuiObjectResponse = pageData[1];
 
     seenResources.add(objectId);
 
-    const redirectId = checkRedirect(rootPageData);
+    const redirectId = checkRedirect(primaryObjectResponse);
     if (redirectId) {
         return fetchResource(client, redirectId, path, seenResources, depth + 1);
     }
 
     // If no page data found.
-    if (!dynamicFieldData.data) {
+    if (!dynamicFieldResponse.data) {
         console.log("No page data found");
         return HttpStatusCodes.NOT_FOUND;
     }
-    const siteResource = getResourceFields(dynamicFieldData.data);
+    const siteResource = getResourceFields(dynamicFieldResponse.data);
     if (!siteResource || !siteResource.blob_id) {
         return HttpStatusCodes.NOT_FOUND;
     }
 
     return {
         ...siteResource,
-        version: dynamicFieldData.data.version,
+        version: dynamicFieldResponse.data.version,
         objectId: dynamicFieldId,
     } as VersionedResource;
 }
