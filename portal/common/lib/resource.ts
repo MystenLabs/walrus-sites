@@ -36,12 +36,8 @@ export async function fetchResource(
     seenResources: Set<string>,
     depth: number = 0,
 ): Promise<VersionedResource | HttpStatusCodes> {
-    if (seenResources.has(objectId)) {
-        return HttpStatusCodes.LOOP_DETECTED;
-    }
-    if (depth >= MAX_REDIRECT_DEPTH) {
-        return HttpStatusCodes.TOO_MANY_REDIRECTS;
-    }
+    const error = checkForErrors(objectId, seenResources, depth);
+    if (error) return error;
 
     // The dynamic field object ID can be derived, without
     // making a request to the network.
@@ -63,20 +59,7 @@ export async function fetchResource(
         return fetchResource(client, redirectId, path, seenResources, depth + 1);
     }
 
-    // If no page data found.
-    if (!dynamicFieldResponse.data) {
-        console.log("No page data found");
-        return HttpStatusCodes.NOT_FOUND;
-    }
-    const siteResource = getResourceFields(dynamicFieldResponse.data);
-    if (!siteResource || !siteResource.blob_id) {
-        return HttpStatusCodes.NOT_FOUND;
-    }
-    return {
-        ...siteResource,
-        version: dynamicFieldResponse.data.version,
-        objectId: dynamicFieldId,
-    } as VersionedResource;
+    return extractResource(dynamicFieldResponse, dynamicFieldId);
 }
 
 /**
@@ -106,6 +89,49 @@ async function fetchObjectPairData(
     const dynamicFieldResponse: SuiObjectResponse = pageData[1];
 
     return [primaryObjectResponse, dynamicFieldResponse]
+}
+
+/**
+* Extracts the resource data from the dynamicFieldObject.
+* @param dynamicFieldResponse: contains the data of the dynamicFieldObject
+* @param dynamicFieldId: The Id of the dynamicFieldObject (e.g. site::Resource).
+* @returns A VersionedResource or an HttpStatusCode in case of an error.
+*/
+function extractResource(
+    dynamicFieldResponse: SuiObjectResponse,
+    dynamicFieldId: string): VersionedResource | HttpStatusCodes
+{
+    if (!dynamicFieldResponse.data) {
+        console.log("No page data found");
+        return HttpStatusCodes.NOT_FOUND;
+    }
+
+    const siteResource = getResourceFields(dynamicFieldResponse.data);
+    if (!siteResource || !siteResource.blob_id) {
+        return HttpStatusCodes.NOT_FOUND;
+    }
+
+    return {
+        ...siteResource,
+        version: dynamicFieldResponse.data.version,
+        objectId: dynamicFieldId,
+    } as VersionedResource;
+}
+
+/**
+* Checks for loop detection and too many redirects.
+* @param objectId
+* @param seenResources
+* @param depth
+* @returns
+*/
+function checkForErrors(
+    objectId: string,
+    seenResources: Set<string>, depth: number
+): HttpStatusCodes | null {
+    if (seenResources.has(objectId)) return HttpStatusCodes.LOOP_DETECTED;
+    if (depth >= MAX_REDIRECT_DEPTH) return HttpStatusCodes.TOO_MANY_REDIRECTS;
+    return null;
 }
 
 /**
