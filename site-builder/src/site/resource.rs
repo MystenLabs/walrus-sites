@@ -330,7 +330,16 @@ impl ResourceManager {
             .ws_resources
             .as_ref()
             .and_then(|config| config.headers.as_ref())
-            .and_then(|headers| headers.get(&resource_path))
+            .and_then(|headers| {
+                headers
+                    .iter()
+                    .filter(|(path, _)| {
+                        // TODO: replace with Regex
+                        *path == &resource_path
+                    })
+                    .map(|(_, header_map)| header_map)
+                    .next() // Why are we using next here? Reduce instead based on the length.
+            })
             .cloned()
             // Cast the keys to lowercase because http headers
             //  are case-insensitive: RFC7230 sec. 2.7.3
