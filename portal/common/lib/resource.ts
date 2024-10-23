@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { HttpStatusCodes } from "./http/http_status_codes";
-import { SuiClient, SuiObjectData } from "@mysten/sui/client";
+import { SuiClient, SuiObjectData, SuiObjectResponse } from "@mysten/sui/client";
 import { Resource, VersionedResource } from "./types";
 import { MAX_REDIRECT_DEPTH, RESOURCE_PATH_MOVE_TYPE } from "./constants";
 import { checkRedirect } from "./redirects";
@@ -36,49 +36,102 @@ export async function fetchResource(
     seenResources: Set<string>,
     depth: number = 0,
 ): Promise<VersionedResource | HttpStatusCodes> {
-    if (seenResources.has(objectId)) {
-        return HttpStatusCodes.LOOP_DETECTED;
-    }
-    if (depth >= MAX_REDIRECT_DEPTH) {
-        return HttpStatusCodes.TOO_MANY_REDIRECTS;
-    }
+    const error = checkForErrors(objectId, seenResources, depth);
+    if (error) return error;
 
-    const redirectPromise = checkRedirect(client, objectId);
-    seenResources.add(objectId);
-
+    // The dynamic field object ID can be derived, without
+    // making a request to the network.
     const dynamicFieldId = deriveDynamicFieldID(
         objectId,
         RESOURCE_PATH_MOVE_TYPE,
         bcs.string().serialize(path).toBytes(),
     );
-    console.log("Derived dynamic field objectID: ", dynamicFieldId);
 
-    // Fetch page data.
-    const pageData = await client.getObject({
-        id: dynamicFieldId,
-        options: { showBcs: true },
-    });
+    const [
+        primaryObjectResponse,
+        dynamicFieldResponse
+    ] = await fetchObjectPairData(client, objectId, dynamicFieldId);
 
-    // If no page data found.
-    if (!pageData || !pageData.data) {
-        const redirectId = await redirectPromise;
-        if (redirectId) {
-            return fetchResource(client, redirectId, path, seenResources, depth + 1);
-        }
+    seenResources.add(objectId);
+
+    const redirectId = checkRedirect(primaryObjectResponse);
+    if (redirectId) {
+        return fetchResource(client, redirectId, path, seenResources, depth + 1);
+    }
+
+    return extractResource(dynamicFieldResponse, dynamicFieldId);
+}
+
+/**
+* Fetches the data of a parentObject and its' dynamicFieldObject.
+* @param client: A SuiClient to interact with the Sui network.
+* @param objectId: The objectId of the parentObject (e.g. site::Site).
+* @param dynamicFieldId: The Id of the dynamicFieldObject (e.g. site::Resource).
+* @returns A tuple of SuiObjectResponse[] or an HttpStatusCode in case of an error.
+*/
+async function fetchObjectPairData(
+    client: SuiClient,
+    objectId: string,
+    dynamicFieldId: string
+): Promise<SuiObjectResponse[]> {
+    // MultiGetObjects returns the objects *always* in the order they were requested.
+    const pageData = await client.multiGetObjects(
+        {
+            ids: [
+                objectId,
+                dynamicFieldId
+            ],
+            options: { showBcs: true, showDisplay: true }
+        },
+    );
+    // MultiGetObjects returns the objects *always* in the order they were requested.
+    const primaryObjectResponse: SuiObjectResponse = pageData[0];
+    const dynamicFieldResponse: SuiObjectResponse = pageData[1];
+
+    return [primaryObjectResponse, dynamicFieldResponse]
+}
+
+/**
+* Extracts the resource data from the dynamicFieldObject.
+* @param dynamicFieldResponse: contains the data of the dynamicFieldObject
+* @param dynamicFieldId: The Id of the dynamicFieldObject (e.g. site::Resource).
+* @returns A VersionedResource or an HttpStatusCode in case of an error.
+*/
+function extractResource(
+    dynamicFieldResponse: SuiObjectResponse,
+    dynamicFieldId: string): VersionedResource | HttpStatusCodes
+{
+    if (!dynamicFieldResponse.data) {
         console.log("No page data found");
         return HttpStatusCodes.NOT_FOUND;
     }
 
-    const siteResource = getResourceFields(pageData.data);
+    const siteResource = getResourceFields(dynamicFieldResponse.data);
     if (!siteResource || !siteResource.blob_id) {
         return HttpStatusCodes.NOT_FOUND;
     }
 
     return {
         ...siteResource,
-        version: pageData.data?.version,
+        version: dynamicFieldResponse.data.version,
         objectId: dynamicFieldId,
     } as VersionedResource;
+}
+
+/**
+* Checks for loop detection and too many redirects.
+* @param objectId
+* @param seenResources
+* @param depth
+* @returns
+*/
+function checkForErrors(
+    objectId: string,
+    seenResources: Set<string>, depth: number
+): HttpStatusCodes | null {
+    if (seenResources.has(objectId)) return HttpStatusCodes.LOOP_DETECTED;
+    if (depth >= MAX_REDIRECT_DEPTH) return HttpStatusCodes.TOO_MANY_REDIRECTS;
+    return null;
 }
 
 /**

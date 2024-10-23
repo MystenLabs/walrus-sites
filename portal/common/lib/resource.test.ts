@@ -8,13 +8,16 @@ import { SuiClient } from "@mysten/sui/client";
 import { HttpStatusCodes } from "./http/http_status_codes";
 import { checkRedirect } from "./redirects";
 import { fromBase64 } from "@mysten/bcs";
-import { DynamicFieldStruct } from "./bcs_data_parsing";
 
 // Mock SuiClient methods
-const getObject = vi.fn();
+const multiGetObjects = vi.fn();
 const mockClient = {
-    getObject,
+    multiGetObjects,
 } as unknown as SuiClient;
+
+vi.mock("@mysten/sui/utils", () => ({
+    deriveDynamicFieldID: vi.fn(() => "0xdynamicFieldId"),
+}))
 
 // Mock checkRedirect
 vi.mock("./redirects", () => ({
@@ -61,99 +64,98 @@ describe("fetchResource", () => {
 
     test("should fetch resource without redirect", async () => {
         // Mock object response
-        getObject.mockResolvedValueOnce({
-            data: {
-                bcs: {
-                    dataType: "moveObject",
-                    bcsBytes: "mockBcsBytes",
+        multiGetObjects.mockResolvedValueOnce([
+            {
+                data: {
+                    bcs: {
+                        dataType: "moveObject",
+                        bcsBytes: "mockBcsBytes",
+                    },
                 },
             },
-        });
+            {
+                data: {
+                    bcs: {
+                        dataType: "moveObject",
+                        bcsBytes: "mockBcsBytes",
+                    },
+                },
+            },
+        ]);
         (fromBase64 as any).mockReturnValueOnce("decodedBcsBytes");
 
         const result = await fetchResource(mockClient, "0x1", "/path", new Set());
         expect(result).toEqual({
             blob_id: "0xresourceBlobId",
-            objectId: "0x3cf9bff169db6f780a0a3cae7b3b770097c26342ad0c08604bc80728cfa37bdc",
-            version: undefined,
-        });
-        expect(mockClient.getObject).toHaveBeenCalledWith({
-            id: "0x3cf9bff169db6f780a0a3cae7b3b770097c26342ad0c08604bc80728cfa37bdc",
-            options: { showBcs: true },
-        });
-    });
-
-    test("should follow redirect and recursively fetch resource", async () => {
-        // Mock the redirect check to return a redirect ID on the first call
-        (checkRedirect as any).mockResolvedValueOnce(
-            "0x51813e7d4040265af8bd6c757f52accbe11e6df5b9cf3d6696a96e3f54fad096",
-        );
-        (checkRedirect as any).mockResolvedValueOnce(undefined);
-
-        // Mock the first resource object response
-        getObject.mockResolvedValueOnce({
-            data: {
-                bcs: {
-                    dataType: "moveObject",
-                    bcsBytes: "mockBcsBytes",
-                },
-            },
-        });
-
-        // Mock the final resource object response
-        getObject.mockResolvedValueOnce({
-            data: {
-                bcs: {
-                    dataType: "moveObject",
-                    bcsBytes: "mockBcsBytes",
-                },
-            },
-        });
-
-        const result = await fetchResource(mockClient, "0x1", "/path", new Set());
-
-        // Verify the results
-        expect(result).toEqual({
-            blob_id: "0xresourceBlobId",
-            objectId: "0x3cf9bff169db6f780a0a3cae7b3b770097c26342ad0c08604bc80728cfa37bdc",
+            objectId: "0xdynamicFieldId",
             version: undefined,
         });
         expect(checkRedirect).toHaveBeenCalledTimes(1);
     });
 
+    test("should follow redirect and recursively fetch resource", async () => {
+        const mockObject = {
+            "objectId": "0x26dc2460093a9d6d31b58cb0ed1e72b19d140542a49be7472a6f25d542cb5cc3",
+            "version": "150835605",
+            "digest": "DDD7ZZvLkBQjq1kJpRsPDMpqhvYtGM878SdCTfF42ywE",
+            "display": {
+                "data": {
+                    "walrus site address": "0x2"
+                },
+                "error": null
+            },
+            "bcs": {
+                "dataType": "moveObject",
+                "type": "0x1::flatland::Flatlander",
+                "hasPublicTransfer": true,
+                "version": 150835605,
+            }
+        };
+
+        const mockResource = {
+            data: {
+                bcs: {
+                    dataType: "moveObject",
+                    bcsBytes: "mockBcsBytes",
+                },
+            },
+        };
+
+        (checkRedirect as any).mockResolvedValueOnce(undefined);
+
+        multiGetObjects
+            .mockResolvedValueOnce([mockObject, mockResource])
+            .mockResolvedValueOnce([mockObject, mockResource]);
+
+        const result = await fetchResource(
+            mockClient,
+            "0x26dc2460093a9d6d31b58cb0ed1e72b19d140542a49be7472a6f25d542cb5cc3",
+            "/path",
+            new Set());
+
+        // Verify the results
+        expect(result).toEqual({
+            blob_id: "0xresourceBlobId",
+            objectId: "0xdynamicFieldId",
+            version: undefined,
+        });
+        expect(checkRedirect).toHaveBeenCalledTimes(2);
+    });
+
     test("should return NOT_FOUND if the resource does not contain a blob_id", async () => {
         const seenResources = new Set<string>();
-        const mockResource = {}; // No blob_id
-
-        (checkRedirect as any).mockResolvedValueOnce(
-            "0x51813e7d4040265af8bd6c757f52accbe11e6df5b9cf3d6696a96e3f54fad096",
-        );
-
-        // Mock getObject to return a valid BCS object
-        getObject.mockResolvedValueOnce({
-            data: {
-                bcs: {
-                    dataType: "moveObject",
-                    bcsBytes: "mockBcsBytes",
+        (checkRedirect as any).mockResolvedValueOnce(undefined);
+        multiGetObjects.mockReturnValue([
+            {
+                data: {
+                    bcs: {
+                        dataType: "moveObject",
+                    },
                 },
             },
-        });
-        getObject.mockResolvedValueOnce({
-            data: {
-                bcs: {
-                    dataType: "moveObject",
-                    bcsBytes: "mockBcsBytes",
-                },
-            },
-        });
-
-        // Mock fromBase64 to simulate the decoding process
-        (fromBase64 as any).mockReturnValueOnce("decodedBcsBytes");
-
-        // Mock DynamicFieldStruct to return a resource without a blob_id
-        (DynamicFieldStruct as any).mockImplementation(() => ({
-            parse: () => ({ value: mockResource }),
-        }));
+            {},
+        ]);
+        (fromBase64 as any).mockReturnValueOnce(undefined);
 
         const result = await fetchResource(mockClient, "0x1", "/path", seenResources);
 
@@ -168,7 +170,10 @@ describe("fetchResource", () => {
         (checkRedirect as any).mockResolvedValueOnce(null);
 
         // Mock to simulate that dynamic fields are not found
-        getObject.mockResolvedValueOnce(undefined);
+        multiGetObjects.mockReturnValue([
+            {data: {bcs: {dataType: "moveObject"}}},
+            {},
+        ]);
 
         const result = await fetchResource(mockClient, "0x1", "/path", seenResources);
 

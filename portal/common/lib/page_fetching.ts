@@ -93,6 +93,7 @@ export async function resolveObjectId(
     if (!objectId) {
         // Check if there is a SuiNs name
         try {
+            // TODO: only check for SuiNs names if the subdomain is not a valid base36 string.
             objectId = await resolveSuiNsAddress(client, parsedUrl.subdomain);
             if (!objectId) {
                 return noObjectIdFound();
