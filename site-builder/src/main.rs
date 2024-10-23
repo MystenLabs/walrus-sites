@@ -214,11 +214,39 @@ async fn run() -> Result<()> {
     let mut config: Config = std::fs::read_to_string(&args.config)
         .or_else(|err| {
             if err.kind() == std::io::ErrorKind::NotFound {
-                let config;
+                if let Ok(xdg_config_home) = std::env::var("XDG_CONFIG_HOME") {
+                    return std::fs::read_to_string(
+                        PathBuf::from(xdg_config_home)
+                            .join("walrus")
+                            .join("sites-config.yaml"),
+                    );
+                }
+                Err(err)
+            } else {
+                Err(err)
+            }
+        })
+        .or_else(|err| {
+            if err.kind() == std::io::ErrorKind::NotFound {
                 if let Some(home_dir) = home::home_dir() {
-                    config =
-                        std::fs::read_to_string(home_dir.join(".walrus").join("sites-config.yaml"));
-                    return config;
+                    return std::fs::read_to_string(
+                        home_dir
+                            .join(".config")
+                            .join("walrus")
+                            .join("sites-config.yaml"),
+                    );
+                }
+                Err(err)
+            } else {
+                Err(err)
+            }
+        })
+        .or_else(|err| {
+            if err.kind() == std::io::ErrorKind::NotFound {
+                if let Some(home_dir) = home::home_dir() {
+                    return std::fs::read_to_string(
+                        home_dir.join(".walrus").join("sites-config.yaml"),
+                    );
                 }
                 Err(err)
             } else {
