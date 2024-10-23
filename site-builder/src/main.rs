@@ -206,56 +206,58 @@ mod default {
     }
 }
 
+/// Returns the path if it is `Some` or any of the default paths if they exist (attempt in order).
+pub fn path_or_defaults_if_exist() -> Option<PathBuf> {
+    // Construct the default paths. Warning! The order is important.
+    let sites_config_name = "sites-config.yaml";
+    let mut defaults: Vec<PathBuf> = vec![];
+    if let Ok(xdg_config_home) = std::env::var("XDG_CONFIG_HOME") {
+        defaults.push(
+            // $XDG_CONFIG_HOME/walrus/sites-config.yaml
+            PathBuf::from(xdg_config_home)
+                .join("walrus")
+                .join("sites-config.yaml"),
+        );
+    }
+    // Define the home directory. If it doesn't exist, use `/`.
+    let home_dir = match home::home_dir() {
+        Some(dir) => dir,
+        None => PathBuf::from("/"),
+    };
+    // ~/.config/walrus/sites-config.yaml
+    defaults.push(
+        home_dir
+            .join(".config")
+            .join("walrus")
+            .join(sites_config_name),
+    );
+    // ~/.walrus/sites-config.yaml
+    defaults.push(home_dir.join(".walrus").join(sites_config_name));
+
+    // Return the first default that exists.
+    for default in defaults {
+        tracing::debug!("checking default path: {:?}", default);
+        if default.exists() {
+            return Some(default);
+        }
+    }
+    None
+}
+
 async fn run() -> Result<()> {
     tracing_subscriber::fmt::init();
     tracing::info!("initializing site builder");
 
     let args = Args::parse();
     let mut config: Config = std::fs::read_to_string(&args.config)
-        .or_else(|err| {
-            if err.kind() == std::io::ErrorKind::NotFound {
-                if let Ok(xdg_config_home) = std::env::var("XDG_CONFIG_HOME") {
-                    return std::fs::read_to_string(
-                        PathBuf::from(xdg_config_home)
-                            .join("walrus")
-                            .join("sites-config.yaml"),
-                    );
-                }
-                Err(err)
-            } else {
-                Err(err)
+        .or_else(|e| {
+            if let Some(path) = path_or_defaults_if_exist() {
+                return std::fs::read_to_string(path);
             }
-        })
-        .or_else(|err| {
-            if err.kind() == std::io::ErrorKind::NotFound {
-                if let Some(home_dir) = home::home_dir() {
-                    return std::fs::read_to_string(
-                        home_dir
-                            .join(".config")
-                            .join("walrus")
-                            .join("sites-config.yaml"),
-                    );
-                }
-                Err(err)
-            } else {
-                Err(err)
-            }
-        })
-        .or_else(|err| {
-            if err.kind() == std::io::ErrorKind::NotFound {
-                if let Some(home_dir) = home::home_dir() {
-                    return std::fs::read_to_string(
-                        home_dir.join(".walrus").join("sites-config.yaml"),
-                    );
-                }
-                Err(err)
-            } else {
-                Err(err)
-            }
+            Err(e)
         })
         .context(format!(
-            "unable to read config {:?}; consider using the --config flag to point to the config, \
-            or specify a ~/.walrus/sites-config.yaml",
+            "unable to read config {:?}; consider using the --config flag to point to the config",
             args.config
         ))
         .and_then(|s| {
