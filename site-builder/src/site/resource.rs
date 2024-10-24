@@ -17,6 +17,7 @@ use fastcrypto::hash::{HashFunction, Sha256};
 use flate2::{write::GzEncoder, Compression};
 use futures::future::try_join_all;
 use move_core_types::u256::U256;
+use regex::Regex;
 
 use super::SiteData;
 use crate::{
@@ -334,11 +335,16 @@ impl ResourceManager {
                 headers
                     .iter()
                     .filter(|(path, _)| {
-                        // TODO: replace with Regex
-                        *path == &resource_path
+                        let path_regex = path.replace('*', ".*");
+                        match Regex::new(&path_regex) {
+                            Ok(re) => re.is_match(&resource_path),
+                            Err(_) => false,
+                        }
                     })
+                    .max_by_key(|(path, _)| path.len())
                     .map(|(_, header_map)| header_map)
-                    .next() // Why are we using next here? Reduce instead based on the length.
+                    .into_iter()
+                    .reduce(|_, header_map| header_map)
             })
             .cloned()
             // Cast the keys to lowercase because http headers
