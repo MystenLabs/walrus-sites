@@ -207,7 +207,7 @@ mod default {
 }
 
 /// Returns the path if it is `Some` or any of the default paths if they exist (attempt in order).
-pub fn path_or_defaults_if_exist() -> Option<PathBuf> {
+pub fn path_or_defaults_if_exist() -> Result<PathBuf, anyhow::Error> {
     // Construct the default paths. Warning! The order is important.
     let sites_config_name = "sites-config.yaml";
     let mut defaults: Vec<PathBuf> = vec![];
@@ -222,7 +222,11 @@ pub fn path_or_defaults_if_exist() -> Option<PathBuf> {
     // Define the home directory. If it doesn't exist, use `/`.
     let home_dir = match home::home_dir() {
         Some(dir) => dir,
-        None => PathBuf::from("/"),
+        None => {
+            return Err(anyhow::anyhow!(
+                "failed to get home directory. $HOME needs to be defined."
+            ));
+        }
     };
     // ~/.config/walrus/sites-config.yaml
     defaults.push(
@@ -235,13 +239,16 @@ pub fn path_or_defaults_if_exist() -> Option<PathBuf> {
     defaults.push(home_dir.join(".walrus").join(sites_config_name));
 
     // Return the first default that exists.
-    for default in defaults {
-        tracing::debug!("checking default path: {:?}", default);
+    for default in &defaults {
+        tracing::debug!("checking default path: {:?}", &default);
         if default.exists() {
-            return Some(default);
+            return Ok(default.clone());
         }
     }
-    None
+    Err(anyhow::anyhow!(
+        "Could not locate sites-config.yaml in any of the following paths: {:?}.",
+        defaults
+    ))
 }
 
 async fn run() -> Result<()> {
@@ -251,7 +258,7 @@ async fn run() -> Result<()> {
     let args = Args::parse();
     let mut config: Config = std::fs::read_to_string(&args.config)
         .or_else(|e| {
-            if let Some(path) = path_or_defaults_if_exist() {
+            if let Ok(path) = path_or_defaults_if_exist() {
                 return std::fs::read_to_string(path);
             }
             Err(e)
