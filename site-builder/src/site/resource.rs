@@ -327,37 +327,7 @@ impl ResourceManager {
         }
 
         let resource_path = full_path_to_resource_path(full_path, root)?;
-        let mut http_headers: BTreeMap<String, String> = self
-            .ws_resources
-            .as_ref()
-            .and_then(|config| config.headers.as_ref())
-            .and_then(|headers| {
-                headers
-                    .iter()
-                    .filter(|(path, _)| {
-                        let path_regex = path.replace('*', ".*");
-                        match Regex::new(&path_regex) {
-                            Ok(re) => re.is_match(&resource_path),
-                            Err(_) => false,
-                        }
-                    })
-                    .max_by_key(|(path, _)| path.len())
-                    .map(|(_, header_map)| header_map)
-                    .into_iter()
-                    .reduce(|_, header_map| header_map)
-            })
-            .cloned()
-            // Cast the keys to lowercase because http headers
-            //  are case-insensitive: RFC7230 sec. 2.7.3
-            .map(|headers| {
-                headers
-                    .0
-                    .into_iter()
-                    .map(|(k, v)| (k.to_lowercase(), v))
-                    .collect()
-            })
-            .unwrap_or_default();
-
+        let mut http_headers: BTreeMap<String, String> = self.derive_http_headers(&resource_path);
         let extension = full_path
             .extension()
             .unwrap_or(
@@ -412,6 +382,41 @@ impl ResourceManager {
             U256::from_le_bytes(&blob_hash),
             plain_content.len(),
         )))
+    }
+
+    /// Based on the ws-resources.yaml definition, this function derives the HTTP headers
+    /// based on wildcard matching, the headers that should be added to the HTTP response
+    /// of the resource defined by the resource_path.
+    fn derive_http_headers(&self, resource_path: &str) -> BTreeMap<String, String> {
+        self.ws_resources
+            .as_ref()
+            .and_then(|config| config.headers.as_ref())
+            .and_then(|headers| {
+                headers
+                    .iter()
+                    .filter(|(path, _)| {
+                        let path_regex = path.replace('*', ".*");
+                        match Regex::new(&path_regex) {
+                            Ok(re) => re.is_match(resource_path),
+                            Err(_) => false,
+                        }
+                    })
+                    .max_by_key(|(path, _)| path.len())
+                    .map(|(_, header_map)| header_map)
+                    .into_iter()
+                    .reduce(|_, header_map| header_map)
+            })
+            .cloned()
+            // Cast the keys to lowercase because http headers
+            //  are case-insensitive: RFC7230 sec. 2.7.3
+            .map(|headers| {
+                headers
+                    .0
+                    .into_iter()
+                    .map(|(k, v)| (k.to_lowercase(), v))
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     /// Recursively iterate a directory and load all [`Resources`][Resource] within.
