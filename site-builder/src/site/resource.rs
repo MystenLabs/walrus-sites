@@ -395,7 +395,9 @@ impl ResourceManager {
                 headers
                     .iter()
                     .filter(|(path, _)| {
+                        // Replace the wildcard with a regex wildcard.
                         let path_regex = path.replace('*', ".*");
+                        // Check if the resource_path matches the path_regex.
                         match Regex::new(&path_regex) {
                             Ok(re) => re.is_match(resource_path),
                             Err(_) => false,
