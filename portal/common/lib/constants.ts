@@ -14,3 +14,15 @@ export const SITE_NAMES: { [key: string]: string } = {
 export const FALLBACK_PORTAL = "blob.store";
 // The string representing the ResourcePath struct in the walrus_site package.
 export const RESOURCE_PATH_MOVE_TYPE = SITE_PACKAGE + "::site::ResourcePath";
+
+export const testnetRPCUrls = [
+    'https://fullnode.testnet.sui.io:443',
+    'https://sui-testnet.public.blastapi.io/',
+    'https://sui-testnet-endpoint.blockvision.org/',
+    'https://rpc.ankr.com/sui_testnet',
+];
+
+export const prodRPCUrls = [
+    'https://sui-mainnet-endpoint.blockvision.org/',
+    'https://sui-mainnet.public.blastapi.io/'
+];

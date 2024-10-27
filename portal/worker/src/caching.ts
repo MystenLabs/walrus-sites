@@ -5,6 +5,7 @@ import { resolveAndFetchPage } from "@lib/page_fetching";
 import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
 import { NETWORK } from "@lib/constants";
 import { DomainDetails } from "@lib/types";
+import rpcSelectorInstance from "@lib/node_selector";
 
 const CACHE_NAME = "walrus-sites-cache";
 const CACHE_EXPIRATION_TIME = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
@@ -35,7 +36,7 @@ export default async function resolveWithCache(
         }
     }
     console.log("Cache miss!", urlString);
-    const resolvedPage = await resolveAndFetchPage(parsedUrl, resolvedObjectId);
+    const resolvedPage = await resolveAndFetchPage(parsedUrl);
 
     await tryCachePut(cache, urlString, resolvedPage);
 
@@ -117,8 +118,7 @@ async function checkCachedVersionMatchesOnChain(
     if (!cachedResponse) {
         throw new Error("Cached response is null!");
     }
-    const rpcUrl = getFullnodeUrl(NETWORK);
-    const client = new SuiClient({ url: rpcUrl });
+    // const rpcUrl = getFullnodeUrl(NETWORK);
     const cachedVersion = cachedResponse.headers.get("x-resource-sui-object-version");
     const objectId = cachedResponse.headers.get("x-resource-sui-object-id");
     if (!cachedVersion || !objectId) {
@@ -130,7 +130,7 @@ async function checkCachedVersionMatchesOnChain(
         return false;
     }
 
-    const resourceObject = await client.getObject({ id: objectId });
+    const resourceObject = await rpcSelectorInstance.getObject({ id: objectId });
     if (!resourceObject.data) {
         throw new Error("Could not retrieve Resource object.");
     }

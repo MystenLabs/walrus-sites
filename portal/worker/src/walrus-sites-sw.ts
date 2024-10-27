@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { NETWORK } from "@lib/constants";
-import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
 import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
@@ -57,7 +56,7 @@ self.addEventListener("fetch", async (event) => {
             try {
                 return await fetchWithCacheSupport();
             } catch (error) {
-                return handleFetchError(error);
+                return;
             }
         };
 
@@ -73,23 +72,19 @@ self.addEventListener("fetch", async (event) => {
 
         // Attempt to fetch from cache
         const fetchFromCache = async (): Promise<Response> => {
-            const rpcUrl = getFullnodeUrl(NETWORK);
-            const client = new SuiClient({ url: rpcUrl });
             console.log("Pre-fetching the sui object ID");
-            const resolvedObjectId = await resolveObjectId(parsedUrl, client);
+            const resolvedObjectId = await resolveObjectId(parsedUrl);
             if (typeof resolvedObjectId !== "string") {
                 return resolvedObjectId;
             }
             const cachedResponse = await resolveWithCache(resolvedObjectId, parsedUrl, urlString);
-            return cachedResponse.status === HttpStatusCodes.NOT_FOUND
-                ? proxyFetch()
-                : cachedResponse;
+            return cachedResponse;
         };
 
         // Fetch directly and fallback if necessary
         const fetchDirectlyOrProxy = async (): Promise<Response> => {
-            const response = await resolveAndFetchPage(parsedUrl, null);
-            return response.status === HttpStatusCodes.NOT_FOUND ? proxyFetch() : response;
+            const response = await resolveAndFetchPage(parsedUrl);
+            return response;
         };
 
         // Handle error during fetching

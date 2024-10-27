@@ -22,7 +22,7 @@ describe('resolveSuiNsAddress', () => {
 
         for (const [input, expected] of cases) {
             (mockClient.call as Mock).mockResolvedValueOnce(expected);
-            const result = await resolveSuiNsAddress(mockClient, input);
+            const result = await resolveSuiNsAddress(input);
             expect(result).toBe(expected);
             expect(mockClient.call).toHaveBeenCalledWith("suix_resolveNameServiceAddress",
                 [`${input}.sui`]);
@@ -31,7 +31,7 @@ describe('resolveSuiNsAddress', () => {
 
     test('should return null for an unknown SuiNS address', async () => {
         (mockClient.call as Mock).mockResolvedValueOnce(null);
-        const result = await resolveSuiNsAddress(mockClient, "unknown");
+        const result = await resolveSuiNsAddress("unknown");
         expect(result).toBeNull();
         expect(mockClient.call).toHaveBeenCalledWith("suix_resolveNameServiceAddress",
             ["unknown.sui"]);

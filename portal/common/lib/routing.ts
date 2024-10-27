@@ -5,6 +5,7 @@ import { getFullnodeUrl, SuiClient, SuiObjectResponse } from "@mysten/sui/client
 import { Routes } from "./types";
 import { DynamicFieldStruct, RoutesStruct } from "./bcs_data_parsing";
 import { bcs, fromBase64 } from "@mysten/bcs";
+import rpcSelectorInstance from "./node_selector";
 
 /**
  * Gets the Routes dynamic field of the site object.
@@ -15,15 +16,14 @@ import { bcs, fromBase64 } from "@mysten/bcs";
  * @returns The routes list.
  */
 export async function getRoutes(
-    client: SuiClient,
     siteObjectId: string,
 ): Promise<Routes | undefined> {
-    const routesDF = await fetchRoutesDynamicField(client, siteObjectId);
+    const routesDF = await fetchRoutesDynamicField(siteObjectId);
     if (!routesDF.data) {
         console.warn("No routes dynamic field found for site object.");
         return;
     }
-    const routesObj = await fetchRoutesObject(client, routesDF.data.objectId);
+    const routesObj = await fetchRoutesObject(routesDF.data.objectId);
     const objectData = routesObj.data;
     if (objectData && objectData.bcs && objectData.bcs.dataType === "moveObject") {
         return parseRoutesData(objectData.bcs.bcsBytes);
@@ -39,10 +39,9 @@ export async function getRoutes(
  * @returns The dynamic field object for routes.
  */
 async function fetchRoutesDynamicField(
-    client: SuiClient,
     siteObjectId: string,
 ): Promise<SuiObjectResponse> {
-    return await client.getDynamicFieldObject({
+    return await rpcSelectorInstance.getDynamicFieldObject({
         parentId: siteObjectId,
         name: { type: "vector<u8>", value: "routes" },
     });
@@ -55,8 +54,8 @@ async function fetchRoutesDynamicField(
  * @param objectId - The ID of the dynamic field object.
  * @returns The routes object.
  */
-async function fetchRoutesObject(client: SuiClient, objectId: string): Promise<SuiObjectResponse> {
-    return await client.getObject({
+async function fetchRoutesObject(objectId: string): Promise<SuiObjectResponse> {
+    return await rpcSelectorInstance.getObject({
         id: objectId,
         options: { showBcs: true },
     });
