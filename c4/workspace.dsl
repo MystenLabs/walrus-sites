@@ -5,7 +5,14 @@ workspace "Walrus Sites" "The Walrus Sites architecture, as a C4 model." {
     model {
         u = person "User"
         ws = softwareSystem "Walrus Sites" {
-            smart_contract = container "Sui Smart Contract" "Move"
+            smart_contract = container "Sui Smart Contract" "Move" {
+                site_object = component "Site Object" {
+                    tags "move_object"
+                }
+                resource_object = component "Resource Object" {
+                    tags "move_object"
+                }
+            }
             walrus = container "Walrus"
             site_builder = container "site-builder"
             portals = container "Portals" {
@@ -23,6 +30,8 @@ workspace "Walrus Sites" "The Walrus Sites architecture, as a C4 model." {
 
         u -> ws.site_builder "Uploads (writes) sites to"
         ws.portals -> u "Serves (reads) site resources to"
+        ws.smart_contract -> ws.portals "Collects resource metadata from"
+        ws.walrus -> ws.portals "Sends blob(s) of resources to"
         ws.site_builder -> ws.smart_contract "Uploads the resource metadata to the blockchain"
         ws.site_builder -> ws.walrus "Adds blob(s) to"
 
@@ -35,6 +44,11 @@ workspace "Walrus Sites" "The Walrus Sites architecture, as a C4 model." {
         }
 
         container ws "WalrusSitesView" {
+            include *
+            autolayout lr
+        }
+
+        component ws.smart_contract "SmartContractView" {
             include *
             autolayout lr
         }
@@ -63,6 +77,10 @@ workspace "Walrus Sites" "The Walrus Sites architecture, as a C4 model." {
             element "server" {
                 background #f8289c
                 shape cylinder
+            }
+            element "move_object" {
+                background #f8289c
+                shape circle
             }
             element "Component" {
                 background #f8289c
