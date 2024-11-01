@@ -399,9 +399,10 @@ impl ResourceManager {
         )))
     }
 
-    /// Based on the ws-resources.yaml definition, this function derives the HTTP headers
-    /// based on wildcard matching, the headers that should be added to the HTTP response
-    /// of the resource defined by the resource_path.
+    ///  Derives the HTTP headers for a resource based on the ws-resources.yaml.
+    ///
+    ///  Matches the path of the resource to the wildcard paths in the configuration to
+    ///  determine the headers to be added to the HTTP response.
     fn derive_http_headers(&self, resource_path: &str) -> BTreeMap<String, String> {
         self.ws_resources
             .as_ref()
