@@ -37,8 +37,9 @@ class RPCSelector implements RPCSelectorInterface {
     }
     return RPCSelector.instance;
     }
+
     // General method to call clients and return the first successful response.
-    private async callClients<T>(methodName: string, args: any[]): Promise<T> {
+    private async invokeWithFailover<T>(methodName: string, args: any[]): Promise<T> {
         if (this.clients.length === 0) {
             throw new Error("No available clients to handle the request.");
         }
@@ -132,6 +133,7 @@ class RPCSelector implements RPCSelectorInterface {
 
     private validateSuiObjectResponse(response: SuiObjectResponse): boolean {
         if (response.error) {
+            if(response.error.code === "notExists")
             return false;
         }
         if (response.data) {
@@ -141,25 +143,25 @@ class RPCSelector implements RPCSelectorInterface {
     }
 
     public async getObject(input: GetObjectParams): Promise<SuiObjectResponse> {
-        return this.callClients<SuiObjectResponse>("getObject", [input]);
+        return this.invokeWithFailover<SuiObjectResponse>("getObject", [input]);
     }
 
     public async multiGetObjects(
         input: MultiGetObjectsParams,
     ): Promise<SuiObjectResponse[]> {
-        return this.callClients<SuiObjectResponse[]>("multiGetObjects", [input]);
+        return this.invokeWithFailover<SuiObjectResponse[]>("multiGetObjects", [input]);
     }
 
     public async getDynamicFieldObject(
         input: GetDynamicFieldObjectParams,
     ): Promise<SuiObjectResponse> {
-        return this.callClients<SuiObjectResponse>("getDynamicFieldObject", [
-        input,
+        return this.invokeWithFailover<SuiObjectResponse>("getDynamicFieldObject", [
+            input,
         ]);
     }
 
     public async call<T>(method: string, args: any[]): Promise<T> {
-        return this.callClients<T>(method, args);
+        return this.invokeWithFailover<T>(method, args);
     }
 }
 
