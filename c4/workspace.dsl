@@ -1,27 +1,27 @@
-workspace "Name" "Description" {
+workspace "Walrus Sites" "The Walrus Sites architecture, as a C4 model." {
 
     !identifiers hierarchical
 
     model {
         u = person "User"
-        ss = softwareSystem "Software System" {
-            wa = container "Web Application"
-            db = container "Database Schema" {
+        walrus_sites = softwareSystem "Walrus Sites" {
+            walrus = container "Walrus" {
                 tags "Database"
             }
+            sui = container "Sui Smart Contract"
         }
 
-        u -> ss.wa "Uses"
-        ss.wa -> ss.db "Reads from and writes to"
+        u -> walrus_sites.walrus "Uses"
+        walrus_sites.walrus -> walrus_sites.sui "Reads from and writes to"
     }
 
     views {
-        systemContext ss "Diagram1" {
+        systemContext walrus_sites "Diagram1" {
             include *
             autolayout lr
         }
 
-        container ss "Diagram2" {
+        container walrus_sites "Diagram2" {
             include *
             autolayout lr
         }

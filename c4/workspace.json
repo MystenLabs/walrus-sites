@@ -2,11 +2,11 @@
   "configuration" : {
     "scope" : "SoftwareSystem"
   },
-  "description" : "Description",
+  "description" : "The Walrus Sites architecture, as a C4 model.",
   "documentation" : { },
   "id" : 1,
   "lastModifiedAgent" : "structurizr-ui",
-  "lastModifiedDate" : "2024-11-01T14:02:03Z",
+  "lastModifiedDate" : "2024-11-01T15:34:10Z",
   "model" : {
     "people" : [ {
       "id" : "1",
@@ -20,7 +20,7 @@
         "destinationId" : "3",
         "id" : "5",
         "properties" : {
-          "structurizr.dsl.identifier" : "5464e019-8d75-4bc4-ae97-e9c7de058b61"
+          "structurizr.dsl.identifier" : "8086ac6d-21a7-434c-9852-9c5b0345e57b"
         },
         "sourceId" : "1",
         "tags" : "Relationship"
@@ -37,48 +37,48 @@
       "containers" : [ {
         "documentation" : { },
         "id" : "3",
-        "name" : "Web Application",
+        "name" : "Walrus",
         "properties" : {
-          "structurizr.dsl.identifier" : "ss.wa"
+          "structurizr.dsl.identifier" : "walrus_sites.walrus"
         },
         "relationships" : [ {
           "description" : "Reads from and writes to",
           "destinationId" : "4",
           "id" : "7",
           "properties" : {
-            "structurizr.dsl.identifier" : "6448efdf-3ac9-4cc4-a429-18d857758c3c"
+            "structurizr.dsl.identifier" : "6e728fd0-1461-4292-88c6-361783098dbe"
           },
           "sourceId" : "3",
           "tags" : "Relationship"
         } ],
-        "tags" : "Element,Container"
+        "tags" : "Element,Container,Database"
       }, {
         "documentation" : { },
         "id" : "4",
-        "name" : "Database Schema",
+        "name" : "Sui Smart Contract",
         "properties" : {
-          "structurizr.dsl.identifier" : "ss.db"
+          "structurizr.dsl.identifier" : "walrus_sites.sui"
         },
-        "tags" : "Element,Container,Database"
+        "tags" : "Element,Container"
       } ],
       "documentation" : { },
       "id" : "2",
       "location" : "Unspecified",
-      "name" : "Software System",
+      "name" : "Walrus Sites",
       "properties" : {
-        "structurizr.dsl.identifier" : "ss"
+        "structurizr.dsl.identifier" : "walrus_sites"
       },
       "tags" : "Element,Software System"
     } ]
   },
-  "name" : "Name",
+  "name" : "Walrus Sites",
   "properties" : {
-    "structurizr.dsl" : "d29ya3NwYWNlICJOYW1lIiAiRGVzY3JpcHRpb24iIHsKCiAgICAhaWRlbnRpZmllcnMgaGllcmFyY2hpY2FsCgogICAgbW9kZWwgewogICAgICAgIHUgPSBwZXJzb24gIlVzZXIiCiAgICAgICAgc3MgPSBzb2Z0d2FyZVN5c3RlbSAiU29mdHdhcmUgU3lzdGVtIiB7CiAgICAgICAgICAgIHdhID0gY29udGFpbmVyICJXZWIgQXBwbGljYXRpb24iCiAgICAgICAgICAgIGRiID0gY29udGFpbmVyICJEYXRhYmFzZSBTY2hlbWEiIHsKICAgICAgICAgICAgICAgIHRhZ3MgIkRhdGFiYXNlIgogICAgICAgICAgICB9CiAgICAgICAgfQoKICAgICAgICB1IC0+IHNzLndhICJVc2VzIgogICAgICAgIHNzLndhIC0+IHNzLmRiICJSZWFkcyBmcm9tIGFuZCB3cml0ZXMgdG8iCiAgICB9CgogICAgdmlld3MgewogICAgICAgIHN5c3RlbUNvbnRleHQgc3MgIkRpYWdyYW0xIiB7CiAgICAgICAgICAgIGluY2x1ZGUgKgogICAgICAgICAgICBhdXRvbGF5b3V0IGxyCiAgICAgICAgfQoKICAgICAgICBjb250YWluZXIgc3MgIkRpYWdyYW0yIiB7CiAgICAgICAgICAgIGluY2x1ZGUgKgogICAgICAgICAgICBhdXRvbGF5b3V0IGxyCiAgICAgICAgfQoKICAgICAgICBzdHlsZXMgewogICAgICAgICAgICBlbGVtZW50ICJFbGVtZW50IiB7CiAgICAgICAgICAgICAgICBjb2xvciAjZmZmZmZmCiAgICAgICAgICAgIH0KICAgICAgICAgICAgZWxlbWVudCAiUGVyc29uIiB7CiAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kICNiYTFlNzUKICAgICAgICAgICAgICAgIHNoYXBlIHBlcnNvbgogICAgICAgICAgICB9CiAgICAgICAgICAgIGVsZW1lbnQgIlNvZnR3YXJlIFN5c3RlbSIgewogICAgICAgICAgICAgICAgYmFja2dyb3VuZCAjZDkyMzg5CiAgICAgICAgICAgIH0KICAgICAgICAgICAgZWxlbWVudCAiQ29udGFpbmVyIiB7CiAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kICNmODI4OWMKICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgZWxlbWVudCAiRGF0YWJhc2UiIHsKICAgICAgICAgICAgICAgIHNoYXBlIGN5bGluZGVyCiAgICAgICAgICAgIH0KICAgICAgICB9CiAgICB9CgogICAgY29uZmlndXJhdGlvbiB7CiAgICAgICAgc2NvcGUgc29mdHdhcmVzeXN0ZW0KICAgIH0KCn0="
+    "structurizr.dsl" : "d29ya3NwYWNlICJXYWxydXMgU2l0ZXMiICJUaGUgV2FscnVzIFNpdGVzIGFyY2hpdGVjdHVyZSwgYXMgYSBDNCBtb2RlbC4iIHsKCiAgICAhaWRlbnRpZmllcnMgaGllcmFyY2hpY2FsCgogICAgbW9kZWwgewogICAgICAgIHUgPSBwZXJzb24gIlVzZXIiCiAgICAgICAgd2FscnVzX3NpdGVzID0gc29mdHdhcmVTeXN0ZW0gIldhbHJ1cyBTaXRlcyIgewogICAgICAgICAgICB3YWxydXMgPSBjb250YWluZXIgIldhbHJ1cyIgewogICAgICAgICAgICAgICAgdGFncyAiRGF0YWJhc2UiCiAgICAgICAgICAgIH0KICAgICAgICAgICAgc3VpID0gY29udGFpbmVyICJTdWkgU21hcnQgQ29udHJhY3QiCiAgICAgICAgfQoKICAgICAgICB1IC0+IHdhbHJ1c19zaXRlcy53YWxydXMgIlVzZXMiCiAgICAgICAgd2FscnVzX3NpdGVzLndhbHJ1cyAtPiB3YWxydXNfc2l0ZXMuc3VpICJSZWFkcyBmcm9tIGFuZCB3cml0ZXMgdG8iCiAgICB9CgogICAgdmlld3MgewogICAgICAgIHN5c3RlbUNvbnRleHQgd2FscnVzX3NpdGVzICJEaWFncmFtMSIgewogICAgICAgICAgICBpbmNsdWRlICoKICAgICAgICAgICAgYXV0b2xheW91dCBscgogICAgICAgIH0KCiAgICAgICAgY29udGFpbmVyIHdhbHJ1c19zaXRlcyAiRGlhZ3JhbTIiIHsKICAgICAgICAgICAgaW5jbHVkZSAqCiAgICAgICAgICAgIGF1dG9sYXlvdXQgbHIKICAgICAgICB9CgogICAgICAgIHN0eWxlcyB7CiAgICAgICAgICAgIGVsZW1lbnQgIkVsZW1lbnQiIHsKICAgICAgICAgICAgICAgIGNvbG9yICNmZmZmZmYKICAgICAgICAgICAgfQogICAgICAgICAgICBlbGVtZW50ICJQZXJzb24iIHsKICAgICAgICAgICAgICAgIGJhY2tncm91bmQgI2JhMWU3NQogICAgICAgICAgICAgICAgc2hhcGUgcGVyc29uCiAgICAgICAgICAgIH0KICAgICAgICAgICAgZWxlbWVudCAiU29mdHdhcmUgU3lzdGVtIiB7CiAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kICNkOTIzODkKICAgICAgICAgICAgfQogICAgICAgICAgICBlbGVtZW50ICJDb250YWluZXIiIHsKICAgICAgICAgICAgICAgIGJhY2tncm91bmQgI2Y4Mjg5YwogICAgICAgICAgICB9CiAgICAgICAgICAgICAgICBlbGVtZW50ICJEYXRhYmFzZSIgewogICAgICAgICAgICAgICAgc2hhcGUgY3lsaW5kZXIKICAgICAgICAgICAgfQogICAgICAgIH0KICAgIH0KCiAgICBjb25maWd1cmF0aW9uIHsKICAgICAgICBzY29wZSBzb2Z0d2FyZXN5c3RlbQogICAgfQoKfQ=="
   },
   "views" : {
     "configuration" : {
       "branding" : { },
-      "lastSavedView" : "Diagram2",
+      "lastSavedView" : "Diagram1",
       "metadataSymbols" : "SquareBrackets",
       "styles" : {
         "elements" : [ {
@@ -103,7 +103,7 @@
     },
     "containerViews" : [ {
       "automaticLayout" : {
-        "applied" : true,
+        "applied" : false,
         "edgeSeparation" : 0,
         "implementation" : "Graphviz",
         "nodeSeparation" : 300,
@@ -111,22 +111,18 @@
         "rankSeparation" : 300,
         "vertices" : false
       },
-      "dimensions" : {
-        "height" : 841,
-        "width" : 2320
-      },
       "elements" : [ {
         "id" : "1",
-        "x" : 200,
-        "y" : 200
+        "x" : 0,
+        "y" : 0
       }, {
         "id" : "3",
-        "x" : 900,
-        "y" : 250
+        "x" : 0,
+        "y" : 0
       }, {
         "id" : "4",
-        "x" : 1650,
-        "y" : 250
+        "x" : 0,
+        "y" : 0
       } ],
       "externalSoftwareSystemBoundariesVisible" : false,
       "key" : "Diagram2",
@@ -154,11 +150,11 @@
       },
       "elements" : [ {
         "id" : "1",
-        "x" : 200,
+        "x" : 199,
         "y" : 199
       }, {
         "id" : "2",
-        "x" : 900,
+        "x" : 899,
         "y" : 249
       } ],
       "enterpriseBoundaryVisible" : true,
