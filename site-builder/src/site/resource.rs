@@ -8,14 +8,14 @@ use std::{
     fmt::{self, Display},
     fs,
     io::Write,
-    num::NonZeroU16,
+    num::{NonZeroU16, NonZeroUsize},
     path::{Path, PathBuf},
 };
 
 use anyhow::{anyhow, Context, Result};
 use fastcrypto::hash::{HashFunction, Sha256};
 use flate2::{write::GzEncoder, Compression};
-use futures::future::try_join_all;
+use futures::stream::{self, StreamExt};
 use move_core_types::u256::U256;
 
 use super::SiteData;
@@ -297,6 +297,8 @@ pub(crate) struct ResourceManager {
     pub ws_resources_path: Option<PathBuf>,
     /// The number of shards of the Walrus system.
     pub n_shards: NonZeroU16,
+    /// The maximum number of concurrent calls to the walrus cli for computing the blob ID.
+    pub max_concurrent: Option<NonZeroUsize>,
 }
 
 impl ResourceManager {
@@ -304,6 +306,7 @@ impl ResourceManager {
         walrus: Walrus,
         ws_resources: Option<WSResources>,
         ws_resources_path: Option<PathBuf>,
+        max_concurrent: Option<NonZeroUsize>,
     ) -> Result<Self> {
         let n_shards = walrus.info(false).await?.n_shards;
         Ok(ResourceManager {
@@ -311,6 +314,7 @@ impl ResourceManager {
             ws_resources,
             ws_resources_path,
             n_shards,
+            max_concurrent,
         })
     }
 
@@ -402,17 +406,23 @@ impl ResourceManager {
     /// Recursively iterate a directory and load all [`Resources`][Resource] within.
     pub async fn read_dir(&mut self, root: &Path) -> Result<SiteData> {
         let resource_paths = Self::iter_dir(root, root)?;
-        let resources = ResourceSet::from_iter(
-            try_join_all(
-                resource_paths
-                    .iter()
-                    .map(|(full_path, root)| self.read_resource(full_path, root)),
-            )
-            .await
-            .context("error in loading one of the resources")?
-            .into_iter()
-            .flatten(),
-        );
+
+        let futures = resource_paths
+            .iter()
+            .map(|(full_path, _)| self.read_resource(full_path, root));
+
+        // Limit the amount of futures awaited concurrently.
+        let concurrency_limit = self
+            .max_concurrent
+            .map(NonZeroUsize::get)
+            .unwrap_or_else(|| resource_paths.len());
+
+        let mut stream = stream::iter(futures).buffer_unordered(concurrency_limit);
+
+        let mut resources = ResourceSet::empty();
+        while let Some(resource) = stream.next().await {
+            resources.inner.extend(resource?);
+        }
 
         Ok(SiteData::new(
             resources,

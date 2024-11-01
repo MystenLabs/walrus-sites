@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{
+    num::NonZeroUsize,
     path::{Path, PathBuf},
     sync::mpsc::channel,
 };
@@ -57,6 +58,9 @@ pub struct PublishOptions {
     /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
     #[clap(long, action)]
     pub list_directory: bool,
+    /// The maximum number of concurrent calls to the Walrus CLI for the computation of blob IDs.
+    #[clap(long)]
+    max_concurrent: Option<NonZeroUsize>,
 }
 
 /// The continuous editing options.
@@ -172,8 +176,13 @@ impl SiteEditor {
             );
         }
 
-        let mut resource_manager =
-            ResourceManager::new(walrus.clone(), ws_resources, ws_resources_path).await?;
+        let mut resource_manager = ResourceManager::new(
+            walrus.clone(),
+            ws_resources,
+            ws_resources_path,
+            self.publish_options.max_concurrent,
+        )
+        .await?;
         display::action(format!(
             "Parsing the directory {} and locally computing blob IDs",
             self.directory().to_string_lossy()
