@@ -397,11 +397,9 @@ impl ResourceManager {
                     .filter(|(path, _)| {
                         // Replace the wildcard with a regex wildcard.
                         let path_regex = path.replace('*', ".*");
-                        // Check if the resource_path matches the path_regex.
-                        match Regex::new(&path_regex) {
-                            Ok(re) => re.is_match(resource_path),
-                            Err(_) => false,
-                        }
+                        Regex::new(&path_regex)
+                            .map(|re| re.is_match(resource_path))
+                            .unwrap_or(false)
                     })
                     .max_by_key(|(path, _)| path.len())
                     .map(|(_, header_map)| header_map)
