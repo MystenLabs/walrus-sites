@@ -212,12 +212,14 @@ pub fn path_or_defaults_if_exist() -> Result<PathBuf, anyhow::Error> {
     let sites_config_name = "sites-config.yaml";
     let mut defaults: Vec<PathBuf> = vec![];
     if let Ok(xdg_config_home) = std::env::var("XDG_CONFIG_HOME") {
-        defaults.push(
-            // $XDG_CONFIG_HOME/walrus/sites-config.yaml
-            PathBuf::from(xdg_config_home)
-                .join("walrus")
-                .join("sites-config.yaml"),
-        );
+        // $XDG_CONFIG_HOME/walrus/sites-config.yaml
+        let xdg_config_home = PathBuf::from(xdg_config_home)
+            .join("walrus")
+            .join("sites-config.yaml");
+        if xdg_config_home.exists() {
+            return Ok(xdg_config_home);
+        }
+        defaults.push(xdg_config_home);
     }
     // Define the home directory. If it doesn't exist, use `/`.
     let home_dir = match home::home_dir() {
