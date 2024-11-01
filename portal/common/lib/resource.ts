@@ -10,7 +10,7 @@ import { fromBase64 } from "@mysten/bcs";
 import { ResourcePathStruct, DynamicFieldStruct, ResourceStruct } from "./bcs_data_parsing";
 import { deriveDynamicFieldID } from "@mysten/sui/utils";
 import { bcs } from "@mysten/bcs";
-import rpcSelectorInstance from "./node_selector";
+import rpcSelectorInstance from "./rpc_selector";
 
 /**
  * Fetches a resource of a site.

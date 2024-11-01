@@ -5,7 +5,7 @@ import { resolveAndFetchPage } from "@lib/page_fetching";
 import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
 import { NETWORK } from "@lib/constants";
 import { DomainDetails } from "@lib/types";
-import rpcSelectorInstance from "@lib/node_selector";
+import rpcSelectorInstance from "@lib/rpc_selector";
 
 const CACHE_NAME = "walrus-sites-cache";
 const CACHE_EXPIRATION_TIME = 24 * 60 * 60 * 1000; // 24 hours in milliseconds

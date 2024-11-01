@@ -5,7 +5,7 @@ import { getFullnodeUrl, SuiClient, SuiObjectResponse } from "@mysten/sui/client
 import { Routes } from "./types";
 import { DynamicFieldStruct, RoutesStruct } from "./bcs_data_parsing";
 import { bcs, fromBase64 } from "@mysten/bcs";
-import rpcSelectorInstance from "./node_selector";
+import rpcSelectorInstance from "./rpc_selector";
 
 /**
  * Gets the Routes dynamic field of the site object.

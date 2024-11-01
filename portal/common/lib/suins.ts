@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 import { SITE_NAMES } from "./constants";
-import rpcSelectorInstance from "./node_selector";
+import rpcSelectorInstance from "./rpc_selector";
 
 /**
  * Resolves the subdomain to an object ID using SuiNS.

@@ -12,7 +12,7 @@ import { testnetRPCUrls } from "./constants";
 
 interface RPCSelectorInterface {
     getObject(input: GetObjectParams): Promise<SuiObjectResponse>;
-    multiGetObjects(input: MultiGetObjectsParams): Promise<SuiObjectResponse>;
+    multiGetObjects(input: MultiGetObjectsParams): Promise<SuiObjectResponse[]>;
     getDynamicFieldObject(
         input: GetDynamicFieldObjectParams,
     ): Promise<SuiObjectResponse>;
@@ -32,41 +32,57 @@ class RPCSelector implements RPCSelectorInterface {
 
     // Get the singleton instance.
     public static getInstance(): RPCSelector {
-        if (!RPCSelector.instance) {
-            RPCSelector.instance = new RPCSelector(testnetRPCUrls);
-        }
-        return RPCSelector.instance;
+    if (!RPCSelector.instance) {
+        RPCSelector.instance = new RPCSelector(testnetRPCUrls);
     }
-
+    return RPCSelector.instance;
+    }
     // General method to call clients and return the first successful response.
     private async callClients<T>(methodName: string, args: any[]): Promise<T> {
         if (this.clients.length === 0) {
             throw new Error("No available clients to handle the request.");
         }
 
-        // Check if a selected client exists
-        if (this.selectedClient) {
-            try {
-                const method = (this.selectedClient as any)[methodName] as Function;
-                if (!method) {
-                    throw new Error(`Method ${methodName} not found on selected client`);
-                }
-                const result = await method.apply(this.selectedClient, args);
-                if (this.isValidResponse(result)) {
-                    return result;
-                } else {
-                    console.error("Invalid response from selected client");
-                    // Unset the selected client to trigger fallback
-                    this.selectedClient = undefined;
-                }
-            } catch (error) {
-                console.error(`Error with selected client: ${error}`);
-                // Unset the selected client to trigger fallback
-                this.selectedClient = undefined;
-            }
+        const isNoSelectedClient = !this.selectedClient;
+        if (isNoSelectedClient) {
+            return await this.callFallbackClients<T>(methodName, args);
         }
 
-        // Fallback to querying all clients using Promise.any
+        try {
+            return await this.callSelectedClient<T>(methodName, args);
+        } catch (error) {
+            console.error(`Selected client failed: ${error}`);
+            this.selectedClient = undefined;
+            return await this.callFallbackClients<T>(methodName, args);
+        }
+    }
+
+    // Attempt to call the method on the selected client with a timeout.
+    private async callSelectedClient<T>(methodName: string, args: any[]): Promise<T> {
+        const method = (this.selectedClient as any)[methodName] as Function;
+        if (!method) {
+            throw new Error(`Method ${methodName} not found on selected client`);
+        }
+        const timeoutDuration = 5000;
+        const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Request timed out")), timeoutDuration),
+        );
+
+        const result = await Promise.race([
+            method.apply(this.selectedClient, args),
+            timeoutPromise,
+        ]);
+
+        if (this.isValidResponse(result)) {
+            return result;
+        } else {
+            console.error("Invalid response from selected client");
+            throw new Error("Invalid response from selected client");
+        }
+    }
+
+    // Fallback to querying all clients using Promise.any.
+    private async callFallbackClients<T>(methodName: string, args: any[]): Promise<T> {
         const clientPromises = this.clients.map((client) =>
             new Promise<{ result: T; client: SuiClient }>(async (resolve, reject) => {
                 try {
@@ -89,39 +105,59 @@ class RPCSelector implements RPCSelectorInterface {
 
         try {
             const { result, client } = await Promise.any(clientPromises);
-            // Update the selected client
+            // Update the selected client for future calls.
             this.selectedClient = client;
             return result;
-        } catch (errors) {
+        } catch {
             throw new Error("All clients failed");
         }
     }
 
-    // Check if the response is valid. -- FIXME
-    private isValidResponse(result: any): boolean {
-        return result !== null && result !== undefined;
+    private isString(result: any): result is string {
+        return typeof result === 'string';
     }
 
-    // Implementing getObject method.
+    private isValidResponse(result: SuiObjectResponse | SuiObjectResponse[]): boolean {
+        if (!result) {
+            return false;
+        }
+        if (this.isString(result)) {
+            return result.trim().length > 0;
+        } else if (Array.isArray(result)) {
+            return result.some((item) => this.validateSuiObjectResponse(item));
+        } else {
+            return this.validateSuiObjectResponse(result);
+        }
+    }
+
+    private validateSuiObjectResponse(response: SuiObjectResponse): boolean {
+        if (response.error) {
+            return false;
+        }
+        if (response.data) {
+            return true;
+        }
+        return false;
+    }
+
     public async getObject(input: GetObjectParams): Promise<SuiObjectResponse> {
         return this.callClients<SuiObjectResponse>("getObject", [input]);
     }
 
-    // Implementing multiGetObjects method.
     public async multiGetObjects(
         input: MultiGetObjectsParams,
-    ): Promise<SuiObjectResponse> {
-        return this.callClients<SuiObjectResponse>("multiGetObjects", [input]);
+    ): Promise<SuiObjectResponse[]> {
+        return this.callClients<SuiObjectResponse[]>("multiGetObjects", [input]);
     }
 
-    // Implementing getDynamicFieldObject method.
     public async getDynamicFieldObject(
         input: GetDynamicFieldObjectParams,
     ): Promise<SuiObjectResponse> {
-        return this.callClients<SuiObjectResponse>("getDynamicFieldObject", [input]);
+        return this.callClients<SuiObjectResponse>("getDynamicFieldObject", [
+        input,
+        ]);
     }
 
-    // Implementing generic call method.
     public async call<T>(method: string, args: any[]): Promise<T> {
         return this.callClients<T>(method, args);
     }
