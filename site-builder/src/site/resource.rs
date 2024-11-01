@@ -402,16 +402,12 @@ impl ResourceManager {
                             .unwrap_or(false)
                     })
                     .max_by_key(|(path, _)| path.len())
-                    .map(|(_, header_map)| header_map)
-                    .into_iter()
-                    .reduce(|_, header_map| header_map)
+                    .map(|(_, header_map)| header_map.0.clone())
             })
-            .cloned()
             // Cast the keys to lowercase because http headers
             //  are case-insensitive: RFC7230 sec. 2.7.3
             .map(|headers| {
                 headers
-                    .0
                     .into_iter()
                     .map(|(k, v)| (k.to_lowercase(), v))
                     .collect()
