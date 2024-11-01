@@ -307,6 +307,21 @@ impl ResourceManager {
         ws_resources_path: Option<PathBuf>,
     ) -> Result<Self> {
         let n_shards = walrus.info(false).await?.n_shards;
+
+        // Cast the keys to lowercase because http headers
+        //  are case-insensitive: RFC7230 sec. 2.7.3
+        if let Some(resources) = ws_resources.as_ref() {
+            if let Some(ref headers) = resources.headers {
+                for (_, header_map) in headers.clone().iter_mut() {
+                    header_map.0 = header_map
+                        .0
+                        .iter()
+                        .map(|(k, v)| (k.to_lowercase(), v.clone()))
+                        .collect();
+                }
+            }
+        }
+
         Ok(ResourceManager {
             walrus,
             ws_resources,
@@ -403,14 +418,6 @@ impl ResourceManager {
                     })
                     .max_by_key(|(path, _)| path.len())
                     .map(|(_, header_map)| header_map.0.clone())
-            })
-            // Cast the keys to lowercase because http headers
-            //  are case-insensitive: RFC7230 sec. 2.7.3
-            .map(|headers| {
-                headers
-                    .into_iter()
-                    .map(|(k, v)| (k.to_lowercase(), v))
-                    .collect()
             })
             .unwrap_or_default()
     }
