@@ -549,7 +549,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_derive_http_headers() {
-        // Define the headers configuration for mocking the Walrus object.
+        // Define the headers configuration for mocking the resource manager.
         let mut headers: BTreeMap<String, HttpHeaders> = BTreeMap::new();
         headers.insert(
             "/*.svg".to_string(),
@@ -575,6 +575,9 @@ mod tests {
         assert_eq!(result.get("etag"), Some(&"\"abc123\"".to_string()));
     }
 
+    /// Sets up a mock resource manager with the given headers configuration and resource path.
+    ///
+    /// Helper function for testing the `derive_http_headers` method.
     async fn setup_resource_manager_mock(
         headers: BTreeMap<String, HttpHeaders>,
         ws_resources_path: &str,
