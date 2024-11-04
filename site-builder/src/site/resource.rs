@@ -410,17 +410,22 @@ impl ResourceManager {
             .and_then(|headers| {
                 headers
                     .iter()
-                    .filter(|(path, _)| {
-                        // Replace the wildcard with a regex wildcard.
-                        let path_regex = path.replace('*', ".*");
-                        Regex::new(&path_regex)
-                            .map(|re| re.is_match(resource_path))
-                            .unwrap_or(false)
-                    })
+                    .filter(|(path, _)| ResourceManager::is_pattern_match(path, resource_path))
                     .max_by_key(|(path, _)| path.len())
                     .map(|(_, header_map)| header_map.0.clone())
             })
             .unwrap_or_default()
+    }
+
+    /// Matches a pattern to a resource path.
+    ///
+    /// The pattern can contain a wildcard `*` which matches any sequence of characters.
+    /// e.g. `foo/*` will match `foo/bar` and `foo/bar/baz`.
+    fn is_pattern_match(pattern: &str, resource_path: &str) -> bool {
+        let path_regex = pattern.replace('*', ".*");
+        Regex::new(&path_regex)
+            .map(|re| re.is_match(resource_path))
+            .unwrap_or(false)
     }
 
     /// Recursively iterate a directory and load all [`Resources`][Resource] within.
@@ -481,4 +486,110 @@ pub(crate) fn full_path_to_resource_path(full_path: &Path, root: &Path) -> Resul
             .to_str()
             .ok_or(anyhow!("could not process the path string: {:?}", rel_path))?
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{collections::BTreeMap, path::PathBuf};
+
+    use super::{HttpHeaders, ResourceManager};
+    use crate::{site::config::WSResources, walrus::Walrus};
+    struct PatternMatchTestCase {
+        pattern: &'static str,
+        path: &'static str,
+        expected: bool,
+    }
+
+    #[test]
+    fn test_is_pattern_match() {
+        let tests = vec![
+            PatternMatchTestCase {
+                pattern: "*.txt",
+                path: "file.txt",
+                expected: true,
+            },
+            PatternMatchTestCase {
+                pattern: "*.txt",
+                path: "file.doc",
+                expected: false,
+            },
+            PatternMatchTestCase {
+                pattern: "test/*",
+                path: "test/file",
+                expected: true,
+            },
+            PatternMatchTestCase {
+                pattern: "test/*",
+                path: "test/file.extension",
+                expected: true,
+            },
+            PatternMatchTestCase {
+                pattern: "test/*",
+                path: "test/foo.bar.extension",
+                expected: true,
+            },
+            PatternMatchTestCase {
+                pattern: "test/*",
+                path: "test/foo-bar_baz.extension",
+                expected: true,
+            },
+            PatternMatchTestCase {
+                pattern: "[invalid",
+                path: "file",
+                expected: false,
+            },
+        ];
+        for t in tests {
+            assert_eq!(
+                ResourceManager::is_pattern_match(t.pattern, t.path),
+                t.expected
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_derive_http_headers() {
+        // Define the headers configuration for mocking the Walrus object.
+        let mut headers: BTreeMap<String, HttpHeaders> = BTreeMap::new();
+        headers.insert(
+            "/*.svg".to_string(),
+            HttpHeaders(BTreeMap::from([(
+                "cache-control".to_string(),
+                "public, max-age=86400".to_string(),
+            )])),
+        );
+        headers.insert(
+            "/foo/bar/baz/*.svg".to_string(),
+            HttpHeaders(BTreeMap::from([(
+                "etag".to_string(),
+                "\"abc123\"".to_string(),
+            )])),
+        );
+
+        let resource_manager = setup_resource_manager_mock(headers, "/foo/bar/baz/image.svg").await;
+
+        let result = resource_manager.derive_http_headers("/foo/bar/baz/image.svg");
+
+        println!("Result: {:?}", result.keys());
+        assert_eq!(result.len(), 1);
+        assert_eq!(result.get("etag"), Some(&"\"abc123\"".to_string()));
+    }
+
+    async fn setup_resource_manager_mock(
+        headers: BTreeMap<String, HttpHeaders>,
+        ws_resources_path: &str,
+    ) -> ResourceManager {
+        let walrus_mock = Walrus::new("walrus".to_string(), 1234, None, None, None);
+        let ws_resources = Some(WSResources {
+            headers: Some(headers),
+            routes: None,
+        });
+        ResourceManager::new(
+            walrus_mock.clone(),
+            ws_resources,
+            Some(PathBuf::from(ws_resources_path)),
+        )
+        .await
+        .unwrap()
+    }
 }
