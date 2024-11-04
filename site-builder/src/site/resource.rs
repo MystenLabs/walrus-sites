@@ -548,9 +548,24 @@ mod tests {
     }
 
     #[ignore = "The test depends on the file system containing a walrus binary.
-        Until we find a way to mock the walrus binary, this test will be ignored."]
+        // Until we find a way to mock the walrus binary, this test will be ignored."]
     #[tokio::test]
     async fn test_derive_http_headers() {
+        let resource_manager = setup_resource_manager_mock().await;
+
+        let resource_path = "/foo/bar/baz/image.svg";
+        let result = resource_manager.derive_http_headers(resource_path);
+
+        println!("Result: {:?}", result.keys());
+        assert_eq!(result.len(), 1);
+        assert_eq!(result.get("etag"), Some(&"\"abc123\"".to_string()));
+    }
+
+    /// Sets up a mock resource manager with the given headers configuration and resource path.
+    ///
+    /// Helper function for testing the `derive_http_headers` method.
+    async fn setup_resource_manager_mock() -> ResourceManager {
+        let walrus_mock = Walrus::new("walrus".to_string(), 1234, None, None, None);
         // Define the headers configuration for mocking the resource manager.
         let mut headers: BTreeMap<String, HttpHeaders> = BTreeMap::new();
         headers.insert(
@@ -567,23 +582,6 @@ mod tests {
                 "\"abc123\"".to_string(),
             )])),
         );
-        let resource_manager = setup_resource_manager_mock(headers).await;
-
-        let resource_path = "/foo/bar/baz/image.svg";
-        let result = resource_manager.derive_http_headers(resource_path);
-
-        println!("Result: {:?}", result.keys());
-        assert_eq!(result.len(), 1);
-        assert_eq!(result.get("etag"), Some(&"\"abc123\"".to_string()));
-    }
-
-    /// Sets up a mock resource manager with the given headers configuration and resource path.
-    ///
-    /// Helper function for testing the `derive_http_headers` method.
-    async fn setup_resource_manager_mock(
-        headers: BTreeMap<String, HttpHeaders>,
-    ) -> ResourceManager {
-        let walrus_mock = Walrus::new("walrus".to_string(), 1234, None, None, None);
         let ws_resources = Some(WSResources {
             headers: Some(headers),
             routes: None,
