@@ -547,6 +547,8 @@ mod tests {
         }
     }
 
+    #[ignore = "The test depends on the file system containing a walrus binary.
+        Until we find a way to mock the walrus binary, this test will be ignored."]
     #[tokio::test]
     async fn test_derive_http_headers() {
         // Define the headers configuration for mocking the resource manager.
@@ -566,9 +568,10 @@ mod tests {
             )])),
         );
 
-        let resource_manager = setup_resource_manager_mock(headers, "/foo/bar/baz/image.svg").await;
+        let resource_path = "/foo/bar/baz/image.svg";
+        let resource_manager = setup_resource_manager_mock(headers, resource_path).await;
 
-        let result = resource_manager.derive_http_headers("/foo/bar/baz/image.svg");
+        let result = resource_manager.derive_http_headers(resource_path);
 
         println!("Result: {:?}", result.keys());
         assert_eq!(result.len(), 1);
