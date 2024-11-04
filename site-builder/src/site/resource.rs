@@ -547,9 +547,9 @@ mod tests {
         }
     }
 
-    #[ignore = "The test depends on the file system containing a walrus binary.
-        // Until we find a way to mock the walrus binary, this test will be ignored."]
     #[tokio::test]
+    #[ignore = "The test depends on the file system containing a walrus binary.
+Until we find a way to mock the walrus binary, this test will be ignored."]
     async fn test_derive_http_headers() {
         let resource_manager = setup_resource_manager_mock().await;
 
