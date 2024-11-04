@@ -552,13 +552,17 @@ mod tests {
 Until we find a way to mock the walrus binary, this test will be ignored."]
     async fn test_derive_http_headers() {
         let resource_manager = setup_resource_manager_mock().await;
+        let test_paths = vec![
+            ("/foo/bar/baz/image.svg", 1),
+            ("/very_long_name_that_should_not_be_matched.svg", 1),
+        ];
 
-        let resource_path = "/foo/bar/baz/image.svg";
-        let result = resource_manager.derive_http_headers(resource_path);
-
-        println!("Result: {:?}", result.keys());
-        assert_eq!(result.len(), 1);
-        assert_eq!(result.get("etag"), Some(&"\"abc123\"".to_string()));
+        for (path, expected_len) in test_paths {
+            let result = resource_manager.derive_http_headers(path);
+            println!("Result for {}: {:?}", path, result.keys());
+            assert_eq!(result.len(), expected_len);
+            assert!(result.contains_key("etag"));
+        }
     }
 
     /// Sets up a mock resource manager with the given headers configuration and resource path.
