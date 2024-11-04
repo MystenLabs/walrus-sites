@@ -553,14 +553,14 @@ Until we find a way to mock the walrus binary, this test will be ignored."]
     async fn test_derive_http_headers() {
         let resource_manager = setup_resource_manager_mock().await;
         let test_paths = vec![
-            ("/foo/bar/baz/image.svg", 1),
-            ("/very_long_name_that_should_not_be_matched.svg", 1),
+            ("/foo/bar/baz/image.svg"), // Only this should be matched, as it is the longest path.
+            ("/very_long_name_that_should_not_be_matched.svg"),
         ];
 
-        for (path, expected_len) in test_paths {
+        for path in test_paths {
             let result = resource_manager.derive_http_headers(path);
             println!("Result for {}: {:?}", path, result.keys());
-            assert_eq!(result.len(), expected_len);
+            assert_eq!(result.len(), 1);
             assert!(result.contains_key("etag"));
         }
     }
