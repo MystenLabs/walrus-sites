@@ -11,13 +11,14 @@ mod util;
 mod walrus;
 use std::path::PathBuf;
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
 use futures::TryFutureExt;
 use publish::{ContinuousEditing, PublishOptions, SiteEditor, WhenWalrusUpload};
 use serde::Deserialize;
 use site::{manager::SiteIdentifier, RemoteSiteFactory};
 use sui_types::base_types::ObjectID;
+use util::path_or_defaults_if_exist;
 
 use crate::{
     preprocessor::Preprocessor,
@@ -27,12 +28,14 @@ use crate::{
 // Define the `GIT_REVISION` and `VERSION` consts.
 bin_version::bin_version!();
 
+const SITES_CONFIG_NAME: &str = "./sites-config.yaml";
+
 #[derive(Parser, Debug)]
 #[clap(rename_all = "kebab-case", version = VERSION, propagate_version = true)]
 struct Args {
     /// The path to the configuration file for the site builder.
-    #[clap(short, long, default_value = "sites-config.yaml")]
-    config: PathBuf,
+    #[clap(short, long)]
+    config: Option<PathBuf>,
     #[clap(flatten)]
     general: GeneralArgs,
     #[command(subcommand)]
@@ -206,20 +209,40 @@ mod default {
     }
 }
 
+/// Returns the default paths for the sites-config.yaml file.
+pub fn sites_config_default_paths() -> Vec<PathBuf> {
+    let mut default_paths = vec![SITES_CONFIG_NAME.into()];
+    if let Ok(home_dir) = std::env::var("XDG_CONFIG_HOME") {
+        default_paths.push(
+            PathBuf::from(home_dir)
+                .join("walrus")
+                .join(SITES_CONFIG_NAME),
+        );
+    };
+    if let Some(home_dir) = home::home_dir() {
+        default_paths.push(
+            home_dir
+                .join(".config")
+                .join("walrus")
+                .join(SITES_CONFIG_NAME),
+        );
+    }
+    default_paths
+}
+
 async fn run() -> Result<()> {
     tracing_subscriber::fmt::init();
     tracing::info!("initializing site builder");
 
     let args = Args::parse();
-    let mut config: Config = std::fs::read_to_string(&args.config)
-        .context(format!(
-            "unable to read config {:?}; consider using the --config flag to point to the config",
-            args.config
-        ))
-        .and_then(|s| {
-            serde_yaml::from_str(&s)
-                .context(format!("unable to parse yaml in file {:?}", args.config))
-        })?;
+    let config_path = path_or_defaults_if_exist(&args.config, &sites_config_default_paths())
+        .ok_or(anyhow!(
+            "could not find a valid sites configuration file; \
+            consider using  the --config flag to specify the config"
+        ))?;
+    tracing::info!(?config_path, "loading sites configuration");
+    let mut config = serde_yaml::from_str::<Config>(&std::fs::read_to_string(config_path)?)?;
+
     // Merge the configs and the CLI args. Serde default ensures that the `walrus_binary` and
     // `gas_budget` exist.
     config.merge(&args.general);
