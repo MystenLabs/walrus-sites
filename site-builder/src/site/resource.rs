@@ -411,7 +411,7 @@ impl ResourceManager {
                 headers
                     .iter()
                     .filter(|(path, _)| ResourceManager::is_pattern_match(path, resource_path))
-                    .max_by_key(|(path, _)| path.len())
+                    .max_by_key(|(path, _)| path.split('/').count()) // Longest path match
                     .map(|(_, header_map)| header_map.0.clone())
             })
             .unwrap_or_default()
@@ -547,21 +547,24 @@ mod tests {
         }
     }
 
-    #[tokio::test]
     #[ignore = "The test depends on the file system containing a walrus binary.
 Until we find a way to mock the walrus binary, this test will be ignored."]
+    #[tokio::test]
     async fn test_derive_http_headers() {
         let resource_manager = setup_resource_manager_mock().await;
         let test_paths = vec![
-            ("/foo/bar/baz/image.svg"), // Only this should be matched, as it is the longest path.
-            ("/very_long_name_that_should_not_be_matched.svg"),
+            // This is the longest path. So `/foo/bar/baz/*.svg` would persist over `*.svg`.
+            ("/foo/bar/baz/image.svg", "etag"),
+            // This will only match `*.svg`.
+            (
+                "/very_long_name_that_should_not_be_matched.svg",
+                "cache-control",
+            ),
         ];
-
-        for path in test_paths {
+        for (path, expected) in test_paths {
             let result = resource_manager.derive_http_headers(path);
-            println!("Result for {}: {:?}", path, result.keys());
             assert_eq!(result.len(), 1);
-            assert!(result.contains_key("etag"));
+            assert!(result.contains_key(expected));
         }
     }
 
