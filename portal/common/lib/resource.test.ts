@@ -10,9 +10,6 @@ import { fromBase64 } from "@mysten/bcs";
 
 // Mock SuiClient methods
 const multiGetObjects = vi.fn();
-// const mockClient = {
-//     multiGetObjects,
-// } as unknown as SuiClient;
 
 vi.mock("@mysten/sui/utils", () => ({
     deriveDynamicFieldID: vi.fn(() => "0xdynamicFieldId"),

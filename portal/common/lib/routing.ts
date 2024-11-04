@@ -5,7 +5,7 @@ import { getFullnodeUrl, SuiClient, SuiObjectResponse } from "@mysten/sui/client
 import { Routes } from "./types";
 import { DynamicFieldStruct, RoutesStruct } from "./bcs_data_parsing";
 import { bcs, fromBase64 } from "@mysten/bcs";
-import rpcSelectorInstance from "./rpc_selector";
+import rpcSelectorSingleton from "./rpc_selector";
 
 /**
  * Gets the Routes dynamic field of the site object.
@@ -41,7 +41,7 @@ export async function getRoutes(
 async function fetchRoutesDynamicField(
     siteObjectId: string,
 ): Promise<SuiObjectResponse> {
-    return await rpcSelectorInstance.getDynamicFieldObject({
+    return await rpcSelectorSingleton.getDynamicFieldObject({
         parentId: siteObjectId,
         name: { type: "vector<u8>", value: "routes" },
     });
@@ -55,7 +55,7 @@ async function fetchRoutesDynamicField(
  * @returns The routes object.
  */
 async function fetchRoutesObject(objectId: string): Promise<SuiObjectResponse> {
-    return await rpcSelectorInstance.getObject({
+    return await rpcSelectorSingleton.getObject({
         id: objectId,
         options: { showBcs: true },
     });

@@ -46,7 +46,7 @@ export async function GET(req: Request) {
         };
 
         try {
-            const fetchPageResponse = await resolveAndFetchPage(parsedUrl, null);
+            const fetchPageResponse = await resolveAndFetchPage(parsedUrl);
             if (fetchPageResponse.status == HttpStatusCodes.NOT_FOUND) {
                 return forwardToFallback();
             }
@@ -65,7 +65,6 @@ export async function GET(req: Request) {
                 subdomain: blobId,
                 path: parsedUrl?.path ?? "/index.html",
             },
-            null,
         );
         return response;
     }

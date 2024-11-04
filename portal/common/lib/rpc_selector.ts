@@ -8,7 +8,7 @@ import {
     SuiClient,
     SuiObjectResponse,
 } from "@mysten/sui/client";
-import { testnetRPCUrls } from "./constants";
+import { TESTNET_RPC_LIST } from "./constants";
 
 interface RPCSelectorInterface {
     getObject(input: GetObjectParams): Promise<SuiObjectResponse>;
@@ -33,7 +33,7 @@ class RPCSelector implements RPCSelectorInterface {
     // Get the singleton instance.
     public static getInstance(): RPCSelector {
     if (!RPCSelector.instance) {
-        RPCSelector.instance = new RPCSelector(testnetRPCUrls);
+        RPCSelector.instance = new RPCSelector(TESTNET_RPC_LIST);
     }
     return RPCSelector.instance;
     }
@@ -110,36 +110,23 @@ class RPCSelector implements RPCSelectorInterface {
             this.selectedClient = client;
             return result;
         } catch {
-            throw new Error("All clients failed");
+            return null;
         }
     }
 
-    private isString(result: any): result is string {
-        return typeof result === 'string';
-    }
-
-    private isValidResponse(result: SuiObjectResponse | SuiObjectResponse[]): boolean {
-        if (!result) {
+    private isValidResponse(result: SuiObjectResponse | SuiObjectResponse[] | string): boolean {
+        if (result == null) {
             return false;
         }
-        if (this.isString(result)) {
+
+        if (typeof result === 'string') {
             return result.trim().length > 0;
-        } else if (Array.isArray(result)) {
-            return result.some((item) => this.validateSuiObjectResponse(item));
-        } else {
-            return this.validateSuiObjectResponse(result);
         }
-    }
 
-    private validateSuiObjectResponse(response: SuiObjectResponse): boolean {
-        if (response.error) {
-            if(response.error.code === "notExists")
-            return false;
+        if (Array.isArray(result)) {
+            return result.some((item) => item != null);
         }
-        if (response.data) {
-            return true;
-        }
-        return false;
+        return true;
     }
 
     public async getObject(input: GetObjectParams): Promise<SuiObjectResponse> {
@@ -165,5 +152,5 @@ class RPCSelector implements RPCSelectorInterface {
     }
 }
 
-const rpcSelectorInstance = RPCSelector.getInstance();
-export default rpcSelectorInstance;
+const rpcSelectorSingleton = RPCSelector.getInstance();
+export default rpcSelectorSingleton;

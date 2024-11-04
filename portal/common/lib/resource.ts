@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { HttpStatusCodes } from "./http/http_status_codes";
-import { SuiClient, SuiObjectData, SuiObjectResponse } from "@mysten/sui/client";
+import { SuiObjectData, SuiObjectResponse } from "@mysten/sui/client";
 import { Resource, VersionedResource } from "./types";
 import { MAX_REDIRECT_DEPTH, RESOURCE_PATH_MOVE_TYPE } from "./constants";
 import { checkRedirect } from "./redirects";
@@ -10,7 +10,7 @@ import { fromBase64 } from "@mysten/bcs";
 import { ResourcePathStruct, DynamicFieldStruct, ResourceStruct } from "./bcs_data_parsing";
 import { deriveDynamicFieldID } from "@mysten/sui/utils";
 import { bcs } from "@mysten/bcs";
-import rpcSelectorInstance from "./rpc_selector";
+import rpcSelectorSingleton from "./rpc_selector";
 
 /**
  * Fetches a resource of a site.
@@ -74,7 +74,7 @@ async function fetchObjectPairData(
     dynamicFieldId: string
 ): Promise<SuiObjectResponse[]> {
     // MultiGetObjects returns the objects *always* in the order they were requested.
-    const pageData = await rpcSelectorInstance.multiGetObjects(
+    const pageData = await rpcSelectorSingleton.multiGetObjects(
         {
             ids: [
                 objectId,

@@ -78,13 +78,17 @@ self.addEventListener("fetch", async (event) => {
                 return resolvedObjectId;
             }
             const cachedResponse = await resolveWithCache(resolvedObjectId, parsedUrl, urlString);
-            return cachedResponse;
+            return cachedResponse.status === HttpStatusCodes.NOT_FOUND
+                ? proxyFetch()
+                : cachedResponse;
         };
 
         // Fetch directly and fallback if necessary
         const fetchDirectlyOrProxy = async (): Promise<Response> => {
             const response = await resolveAndFetchPage(parsedUrl);
-            return response;
+            return response.status === HttpStatusCodes.NOT_FOUND
+            ? proxyFetch()
+            : response;
         };
 
         // Handle error during fetching

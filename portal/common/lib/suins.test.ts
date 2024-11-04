@@ -1,15 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { beforeEach, describe, expect, Mock, test, vi } from 'vitest';
+// resolveSuiNsAddress.test.ts
+
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { resolveSuiNsAddress } from './suins';
-import { SuiClient } from "@mysten/sui/client";
+import rpcSelectorSingleton from './rpc_selector';
 
 describe('resolveSuiNsAddress', () => {
-    const mockClient = {
-        call: vi.fn()
-    } as unknown as SuiClient;
-
     beforeEach(() => {
         vi.clearAllMocks();
     });
@@ -21,19 +19,29 @@ describe('resolveSuiNsAddress', () => {
         ];
 
         for (const [input, expected] of cases) {
-            (mockClient.call as Mock).mockResolvedValueOnce(expected);
+            // Mock the rpcSelectorSingleton.call method
+            vi.spyOn(rpcSelectorSingleton, 'call').mockResolvedValueOnce(expected);
+
             const result = await resolveSuiNsAddress(input);
+
             expect(result).toBe(expected);
-            expect(mockClient.call).toHaveBeenCalledWith("suix_resolveNameServiceAddress",
-                [`${input}.sui`]);
+            expect(rpcSelectorSingleton.call).toHaveBeenCalledWith(
+                "suix_resolveNameServiceAddress",
+                [`${input}.sui`]
+            );
         }
     });
 
     test('should return null for an unknown SuiNS address', async () => {
-        (mockClient.call as Mock).mockResolvedValueOnce(null);
+        // Mock the rpcSelectorSingleton.call method to return null
+        vi.spyOn(rpcSelectorSingleton, 'call').mockResolvedValueOnce(null);
+
         const result = await resolveSuiNsAddress("unknown");
+
         expect(result).toBeNull();
-        expect(mockClient.call).toHaveBeenCalledWith("suix_resolveNameServiceAddress",
-            ["unknown.sui"]);
+        expect(rpcSelectorSingleton.call).toHaveBeenCalledWith(
+            "suix_resolveNameServiceAddress",
+            ["unknown.sui"]
+        );
     });
 });
