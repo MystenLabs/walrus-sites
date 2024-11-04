@@ -567,10 +567,9 @@ mod tests {
                 "\"abc123\"".to_string(),
             )])),
         );
+        let resource_manager = setup_resource_manager_mock(headers).await;
 
         let resource_path = "/foo/bar/baz/image.svg";
-        let resource_manager = setup_resource_manager_mock(headers, resource_path).await;
-
         let result = resource_manager.derive_http_headers(resource_path);
 
         println!("Result: {:?}", result.keys());
@@ -583,7 +582,6 @@ mod tests {
     /// Helper function for testing the `derive_http_headers` method.
     async fn setup_resource_manager_mock(
         headers: BTreeMap<String, HttpHeaders>,
-        ws_resources_path: &str,
     ) -> ResourceManager {
         let walrus_mock = Walrus::new("walrus".to_string(), 1234, None, None, None);
         let ws_resources = Some(WSResources {
@@ -593,7 +591,7 @@ mod tests {
         ResourceManager::new(
             walrus_mock.clone(),
             ws_resources,
-            Some(PathBuf::from(ws_resources_path)),
+            Some(PathBuf::from(&"mock/path/to/ws-resources")),
         )
         .await
         .unwrap()
