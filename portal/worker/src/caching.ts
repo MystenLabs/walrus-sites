@@ -118,7 +118,6 @@ async function checkCachedVersionMatchesOnChain(
     if (!cachedResponse) {
         throw new Error("Cached response is null!");
     }
-    // const rpcUrl = getFullnodeUrl(NETWORK);
     const cachedVersion = cachedResponse.headers.get("x-resource-sui-object-version");
     const objectId = cachedResponse.headers.get("x-resource-sui-object-id");
     if (!cachedVersion || !objectId) {
