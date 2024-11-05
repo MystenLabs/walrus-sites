@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { resolveAndFetchPage } from "@lib/page_fetching";
-import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
-import { NETWORK } from "@lib/constants";
 import { DomainDetails } from "@lib/types";
 import rpcSelectorSingleton from "@lib/rpc_selector";
 
