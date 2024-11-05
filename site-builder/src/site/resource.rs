@@ -504,38 +504,38 @@ mod tests {
     fn test_is_pattern_match() {
         let tests = vec![
             PatternMatchTestCase {
-                pattern: "*.txt",
-                path: "file.txt",
+                pattern: "/*.txt",
+                path: "/file.txt",
                 expected: true,
             },
             PatternMatchTestCase {
                 pattern: "*.txt",
-                path: "file.doc",
+                path: "/file.doc",
                 expected: false,
             },
             PatternMatchTestCase {
-                pattern: "test/*",
-                path: "test/file",
+                pattern: "/test/*",
+                path: "/test/file",
                 expected: true,
             },
             PatternMatchTestCase {
-                pattern: "test/*",
-                path: "test/file.extension",
+                pattern: "/test/*",
+                path: "/test/file.extension",
                 expected: true,
             },
             PatternMatchTestCase {
-                pattern: "test/*",
-                path: "test/foo.bar.extension",
+                pattern: "/test/*",
+                path: "/test/foo.bar.extension",
                 expected: true,
             },
             PatternMatchTestCase {
-                pattern: "test/*",
-                path: "test/foo-bar_baz.extension",
+                pattern: "/test/*",
+                path: "/test/foo-bar_baz.extension",
                 expected: true,
             },
             PatternMatchTestCase {
                 pattern: "[invalid",
-                path: "file",
+                path: "/file",
                 expected: false,
             },
         ];
