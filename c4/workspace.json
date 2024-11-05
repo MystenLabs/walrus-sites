@@ -6,7 +6,7 @@
   "documentation" : { },
   "id" : 1,
   "lastModifiedAgent" : "structurizr-ui",
-  "lastModifiedDate" : "2024-11-01T16:04:42Z",
+  "lastModifiedDate" : "2024-11-05T15:04:10Z",
   "model" : {
     "people" : [ {
       "id" : "1",
@@ -20,7 +20,7 @@
         "destinationId" : "7",
         "id" : "12",
         "properties" : {
-          "structurizr.dsl.identifier" : "8778e754-ef9c-4eed-9b56-4210022d4e9d"
+          "structurizr.dsl.identifier" : "ffaf69d5-5a3a-4bd4-b7c0-a22971f179b2"
         },
         "sourceId" : "1",
         "tags" : "Relationship"
@@ -52,7 +52,7 @@
           },
           "tags" : "Element,Component,move_object"
         } ],
-        "description" : "Move",
+        "description" : "Keeps track of each resource metadata.",
         "documentation" : { },
         "id" : "3",
         "name" : "Sui Smart Contract",
@@ -64,13 +64,15 @@
           "destinationId" : "8",
           "id" : "16",
           "properties" : {
-            "structurizr.dsl.identifier" : "890effbd-e059-4b42-a182-38b4fe6da1b7"
+            "structurizr.dsl.identifier" : "3052817c-eb6f-4c4c-ac6e-50b43ba9b4df"
           },
           "sourceId" : "3",
           "tags" : "Relationship"
         } ],
-        "tags" : "Element,Container"
+        "tags" : "Element,Container",
+        "technology" : "Move"
       }, {
+        "description" : "Decentralized storage network that stores and delivers raw data and media files. In this case, it stores the blobs of the site resources.",
         "documentation" : { },
         "id" : "6",
         "name" : "Walrus",
@@ -82,13 +84,14 @@
           "destinationId" : "8",
           "id" : "17",
           "properties" : {
-            "structurizr.dsl.identifier" : "5fcb4d6d-48ea-49c6-a62c-a872a602018e"
+            "structurizr.dsl.identifier" : "d9a05837-6efd-478c-9c1a-2770ad7fb55d"
           },
           "sourceId" : "6",
           "tags" : "Relationship"
         } ],
         "tags" : "Element,Container"
       }, {
+        "description" : "CLI tool that builds the site objects and uploads them to Sui and Walrus respectively.",
         "documentation" : { },
         "id" : "7",
         "name" : "site-builder",
@@ -100,7 +103,7 @@
           "destinationId" : "3",
           "id" : "18",
           "properties" : {
-            "structurizr.dsl.identifier" : "4e12616b-c05d-486b-a057-3eba10725cb2"
+            "structurizr.dsl.identifier" : "8ad421c4-a04f-446f-abd7-14f125d5c54e"
           },
           "sourceId" : "7",
           "tags" : "Relationship"
@@ -109,7 +112,7 @@
           "destinationId" : "6",
           "id" : "19",
           "properties" : {
-            "structurizr.dsl.identifier" : "ff5a82ed-507a-4229-a295-a7e296dce562"
+            "structurizr.dsl.identifier" : "968f2002-c51a-4928-bb58-8e613b9e0f68"
           },
           "sourceId" : "7",
           "tags" : "Relationship"
@@ -117,30 +120,73 @@
         "tags" : "Element,Container"
       }, {
         "components" : [ {
+          "description" : "Gets installed on the user's device. Intervene between fetch events, serving the site resources.",
           "documentation" : { },
           "id" : "9",
           "name" : "service-worker-portal",
           "properties" : {
             "structurizr.dsl.identifier" : "ws.portals.service_worker_portal"
           },
+          "relationships" : [ {
+            "description" : "Serves (reads) site resources to",
+            "destinationId" : "1",
+            "id" : "23",
+            "properties" : {
+              "structurizr.dsl.identifier" : "cf349280-be85-4436-b4c7-868302464a1f"
+            },
+            "sourceId" : "9",
+            "tags" : "Relationship"
+          } ],
           "tags" : "Element,Component,browser"
         }, {
+          "description" : "Loads first the site resources to the server and then provides them to the user.",
           "documentation" : { },
           "id" : "10",
           "name" : "server-side-portal",
           "properties" : {
             "structurizr.dsl.identifier" : "ws.portals.server_side_portal"
           },
+          "relationships" : [ {
+            "description" : "Serves (reads) site resources to",
+            "destinationId" : "1",
+            "id" : "22",
+            "properties" : {
+              "structurizr.dsl.identifier" : "2546942a-207d-4ec0-9086-ceaf94d08e5b"
+            },
+            "sourceId" : "10",
+            "tags" : "Relationship"
+          } ],
           "tags" : "Element,Component,server"
         }, {
+          "description" : "Includes functions that are common to both service-worker-portal and server-side-portal such as fetchings sui objects, contacting a walrus aggregator to fetch the files (blobs) etc.",
           "documentation" : { },
           "id" : "11",
           "name" : "common-lib",
           "properties" : {
             "structurizr.dsl.identifier" : "ws.portals.common_lib"
           },
+          "relationships" : [ {
+            "description" : "Provides interface for walrus & sui to",
+            "destinationId" : "10",
+            "id" : "20",
+            "properties" : {
+              "structurizr.dsl.identifier" : "6be740e3-0dc4-468b-a39a-6bc04a0a2e47"
+            },
+            "sourceId" : "11",
+            "tags" : "Relationship"
+          }, {
+            "description" : "Provides interface for walrus & sui to",
+            "destinationId" : "9",
+            "id" : "21",
+            "properties" : {
+              "structurizr.dsl.identifier" : "d247b740-8248-44fb-99eb-9f223c18935e"
+            },
+            "sourceId" : "11",
+            "tags" : "Relationship"
+          } ],
           "tags" : "Element,Component,library"
         } ],
+        "description" : "Enables users to access the site resources.",
         "documentation" : { },
         "id" : "8",
         "name" : "Portals",
@@ -152,7 +198,7 @@
           "destinationId" : "1",
           "id" : "14",
           "properties" : {
-            "structurizr.dsl.identifier" : "959291a9-f0fa-4291-b5eb-a4b0cd756d9e"
+            "structurizr.dsl.identifier" : "e736676e-072b-49f3-b41a-8e173dca53b5"
           },
           "sourceId" : "8",
           "tags" : "Relationship"
@@ -178,7 +224,7 @@
   },
   "name" : "Walrus Sites",
   "properties" : {
-    "structurizr.dsl" : "d29ya3NwYWNlICJXYWxydXMgU2l0ZXMiICJUaGUgV2FscnVzIFNpdGVzIGFyY2hpdGVjdHVyZSwgYXMgYSBDNCBtb2RlbC4iIHsKCiAgICAhaWRlbnRpZmllcnMgaGllcmFyY2hpY2FsCgogICAgbW9kZWwgewogICAgICAgIHUgPSBwZXJzb24gIlVzZXIiCiAgICAgICAgd3MgPSBzb2Z0d2FyZVN5c3RlbSAiV2FscnVzIFNpdGVzIiB7CiAgICAgICAgICAgIHNtYXJ0X2NvbnRyYWN0ID0gY29udGFpbmVyICJTdWkgU21hcnQgQ29udHJhY3QiICJNb3ZlIiB7CiAgICAgICAgICAgICAgICBzaXRlX29iamVjdCA9IGNvbXBvbmVudCAiU2l0ZSBPYmplY3QiIHsKICAgICAgICAgICAgICAgICAgICB0YWdzICJtb3ZlX29iamVjdCIKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgIHJlc291cmNlX29iamVjdCA9IGNvbXBvbmVudCAiUmVzb3VyY2UgT2JqZWN0IiB7CiAgICAgICAgICAgICAgICAgICAgdGFncyAibW92ZV9vYmplY3QiCiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgIH0KICAgICAgICAgICAgd2FscnVzID0gY29udGFpbmVyICJXYWxydXMiCiAgICAgICAgICAgIHNpdGVfYnVpbGRlciA9IGNvbnRhaW5lciAic2l0ZS1idWlsZGVyIgogICAgICAgICAgICBwb3J0YWxzID0gY29udGFpbmVyICJQb3J0YWxzIiB7CiAgICAgICAgICAgICAgICBzZXJ2aWNlX3dvcmtlcl9wb3J0YWwgPSBjb21wb25lbnQgInNlcnZpY2Utd29ya2VyLXBvcnRhbCIgewogICAgICAgICAgICAgICAgICAgIHRhZ3MgImJyb3dzZXIiCiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICBzZXJ2ZXJfc2lkZV9wb3J0YWwgPSBjb21wb25lbnQgInNlcnZlci1zaWRlLXBvcnRhbCIgewogICAgICAgICAgICAgICAgICAgIHRhZ3MgInNlcnZlciIKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgIGNvbW1vbl9saWIgPSBjb21wb25lbnQgImNvbW1vbi1saWIiIHsKICAgICAgICAgICAgICAgICAgICB0YWdzICJsaWJyYXJ5IgogICAgICAgICAgICAgICAgfQogICAgICAgICAgICB9CiAgICAgICAgfQoKICAgICAgICB1IC0+IHdzLnNpdGVfYnVpbGRlciAiVXBsb2FkcyAod3JpdGVzKSBzaXRlcyB0byIKICAgICAgICB3cy5wb3J0YWxzIC0+IHUgIlNlcnZlcyAocmVhZHMpIHNpdGUgcmVzb3VyY2VzIHRvIgogICAgICAgIHdzLnNtYXJ0X2NvbnRyYWN0IC0+IHdzLnBvcnRhbHMgIkNvbGxlY3RzIHJlc291cmNlIG1ldGFkYXRhIGZyb20iCiAgICAgICAgd3Mud2FscnVzIC0+IHdzLnBvcnRhbHMgIlNlbmRzIGJsb2Iocykgb2YgcmVzb3VyY2VzIHRvIgogICAgICAgIHdzLnNpdGVfYnVpbGRlciAtPiB3cy5zbWFydF9jb250cmFjdCAiVXBsb2FkcyB0aGUgcmVzb3VyY2UgbWV0YWRhdGEgdG8gdGhlIGJsb2NrY2hhaW4iCiAgICAgICAgd3Muc2l0ZV9idWlsZGVyIC0+IHdzLndhbHJ1cyAiQWRkcyBibG9iKHMpIHRvIgoKICAgIH0KCiAgICB2aWV3cyB7CiAgICAgICAgc3lzdGVtQ29udGV4dCB3cyAiU3lzdGVtVmlldyIgewogICAgICAgICAgICBpbmNsdWRlICoKICAgICAgICAgICAgYXV0b2xheW91dCBscgogICAgICAgIH0KCiAgICAgICAgY29udGFpbmVyIHdzICJXYWxydXNTaXRlc1ZpZXciIHsKICAgICAgICAgICAgaW5jbHVkZSAqCiAgICAgICAgICAgIGF1dG9sYXlvdXQgbHIKICAgICAgICB9CgogICAgICAgIGNvbXBvbmVudCB3cy5zbWFydF9jb250cmFjdCAiU21hcnRDb250cmFjdFZpZXciIHsKICAgICAgICAgICAgaW5jbHVkZSAqCiAgICAgICAgICAgIGF1dG9sYXlvdXQgbHIKICAgICAgICB9CgogICAgICAgIGNvbXBvbmVudCB3cy5wb3J0YWxzICJQb3J0YWxWaWV3IiB7CiAgICAgICAgICAgIGluY2x1ZGUgKgogICAgICAgICAgICBhdXRvbGF5b3V0IGxyCiAgICAgICAgfQoKICAgICAgICBzdHlsZXMgewogICAgICAgICAgICBlbGVtZW50ICJFbGVtZW50IiB7CiAgICAgICAgICAgICAgICBjb2xvciAjZmZmZmZmCiAgICAgICAgICAgIH0KICAgICAgICAgICAgZWxlbWVudCAiUGVyc29uIiB7CiAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kICNiYTFlNzUKICAgICAgICAgICAgICAgIHNoYXBlIHBlcnNvbgogICAgICAgICAgICB9CiAgICAgICAgICAgIGVsZW1lbnQgIlNvZnR3YXJlIFN5c3RlbSIgewogICAgICAgICAgICAgICAgYmFja2dyb3VuZCAjZDkyMzg5CiAgICAgICAgICAgICAgICBzaGFwZSBjb21wb25lbnQKICAgICAgICAgICAgfQogICAgICAgICAgICBlbGVtZW50ICJicm93c2VyIiB7CiAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kICNmODI4OWMKICAgICAgICAgICAgICAgIHNoYXBlIHdlYmJyb3dzZXIKICAgICAgICAgICAgfQogICAgICAgICAgICBlbGVtZW50ICJzZXJ2ZXIiIHsKICAgICAgICAgICAgICAgIGJhY2tncm91bmQgI2Y4Mjg5YwogICAgICAgICAgICAgICAgc2hhcGUgY3lsaW5kZXIKICAgICAgICAgICAgfQogICAgICAgICAgICBlbGVtZW50ICJtb3ZlX29iamVjdCIgewogICAgICAgICAgICAgICAgYmFja2dyb3VuZCAjZjgyODljCiAgICAgICAgICAgICAgICBzaGFwZSBjaXJjbGUKICAgICAgICAgICAgfQogICAgICAgICAgICBlbGVtZW50ICJDb21wb25lbnQiIHsKICAgICAgICAgICAgICAgIGJhY2tncm91bmQgI2Y4Mjg5YwogICAgICAgICAgICAgICAgc2hhcGUgY29tcG9uZW50CiAgICAgICAgICAgIH0KICAgICAgICAgICAgZWxlbWVudCAiQ29udGFpbmVyIiB7CiAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kICNmODI4OWMKICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgZWxlbWVudCAiRGF0YWJhc2UiIHsKICAgICAgICAgICAgICAgIHNoYXBlIGN5bGluZGVyCiAgICAgICAgICAgIH0KICAgICAgICAgICAgZWxlbWVudCAibGlicmFyeSIgewogICAgICAgICAgICAgICAgc2hhcGUgZm9sZGVyCiAgICAgICAgICAgIH0KICAgICAgICB9CiAgICB9CgogICAgY29uZmlndXJhdGlvbiB7CiAgICAgICAgc2NvcGUgc29mdHdhcmVzeXN0ZW0KICAgIH0KCn0="
+    "structurizr.dsl" : "d29ya3NwYWNlICJXYWxydXMgU2l0ZXMiICJUaGUgV2FscnVzIFNpdGVzIGFyY2hpdGVjdHVyZSwgYXMgYSBDNCBtb2RlbC4iIHsKCiAgICAhaWRlbnRpZmllcnMgaGllcmFyY2hpY2FsCgogICAgbW9kZWwgewogICAgICAgIHUgPSBwZXJzb24gIlVzZXIiCiAgICAgICAgd3MgPSBzb2Z0d2FyZVN5c3RlbSAiV2FscnVzIFNpdGVzIiB7CiAgICAgICAgICAgIHNtYXJ0X2NvbnRyYWN0ID0gY29udGFpbmVyICJTdWkgU21hcnQgQ29udHJhY3QiICJLZWVwcyB0cmFjayBvZiBlYWNoIHJlc291cmNlIG1ldGFkYXRhLiIgIk1vdmUiIHsKICAgICAgICAgICAgICAgIHNpdGVfb2JqZWN0ID0gY29tcG9uZW50ICJTaXRlIE9iamVjdCIgewogICAgICAgICAgICAgICAgICAgIHRhZ3MgIm1vdmVfb2JqZWN0IgogICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgcmVzb3VyY2Vfb2JqZWN0ID0gY29tcG9uZW50ICJSZXNvdXJjZSBPYmplY3QiIHsKICAgICAgICAgICAgICAgICAgICB0YWdzICJtb3ZlX29iamVjdCIKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgfQogICAgICAgICAgICB3YWxydXMgPSBjb250YWluZXIgIldhbHJ1cyIgIkRlY2VudHJhbGl6ZWQgc3RvcmFnZSBuZXR3b3JrIHRoYXQgc3RvcmVzIGFuZCBkZWxpdmVycyByYXcgZGF0YSBhbmQgbWVkaWEgZmlsZXMuIEluIHRoaXMgY2FzZSwgaXQgc3RvcmVzIHRoZSBibG9icyBvZiB0aGUgc2l0ZSByZXNvdXJjZXMuIgogICAgICAgICAgICBzaXRlX2J1aWxkZXIgPSBjb250YWluZXIgInNpdGUtYnVpbGRlciIgewogICAgICAgICAgICAgICAgZGVzY3JpcHRpb24gIkNMSSB0b29sIHRoYXQgYnVpbGRzIHRoZSBzaXRlIG9iamVjdHMgYW5kIHVwbG9hZHMgdGhlbSB0byBTdWkgYW5kIFdhbHJ1cyByZXNwZWN0aXZlbHkuIgogICAgICAgICAgICB9CgogICAgICAgICAgICBwb3J0YWxzID0gY29udGFpbmVyICJQb3J0YWxzIiAiRW5hYmxlcyB1c2VycyB0byBhY2Nlc3MgdGhlIHNpdGUgcmVzb3VyY2VzLiIgewogICAgICAgICAgICAgICAgc2VydmljZV93b3JrZXJfcG9ydGFsID0gY29tcG9uZW50ICJzZXJ2aWNlLXdvcmtlci1wb3J0YWwiICJzZXJ2aWNlLXdvcmtlciIgewogICAgICAgICAgICAgICAgICAgIHRhZ3MgImJyb3dzZXIiCiAgICAgICAgICAgICAgICAgICAgZGVzY3JpcHRpb24gIkdldHMgaW5zdGFsbGVkIG9uIHRoZSB1c2VyJ3MgZGV2aWNlLiBJbnRlcnZlbmUgYmV0d2VlbiBmZXRjaCBldmVudHMsIHNlcnZpbmcgdGhlIHNpdGUgcmVzb3VyY2VzLiIKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgIHNlcnZlcl9zaWRlX3BvcnRhbCA9IGNvbXBvbmVudCAic2VydmVyLXNpZGUtcG9ydGFsIiAibmV4dC5qcyJ7CiAgICAgICAgICAgICAgICAgICAgdGFncyAic2VydmVyIgogICAgICAgICAgICAgICAgICAgIGRlc2NyaXB0aW9uICJMb2FkcyBmaXJzdCB0aGUgc2l0ZSByZXNvdXJjZXMgdG8gdGhlIHNlcnZlciBhbmQgdGhlbiBwcm92aWRlcyB0aGVtIHRvIHRoZSB1c2VyLiIKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgIGNvbW1vbl9saWIgPSBjb21wb25lbnQgImNvbW1vbi1saWIiICJub2RlLmpzIiB7CiAgICAgICAgICAgICAgICAgICAgdGFncyAibGlicmFyeSIKICAgICAgICAgICAgICAgICAgICBkZXNjcmlwdGlvbiAiSW5jbHVkZXMgZnVuY3Rpb25zIHRoYXQgYXJlIGNvbW1vbiB0byBib3RoIHNlcnZpY2Utd29ya2VyLXBvcnRhbCBhbmQgc2VydmVyLXNpZGUtcG9ydGFsIHN1Y2ggYXMgZmV0Y2hpbmdzIHN1aSBvYmplY3RzLCBjb250YWN0aW5nIGEgd2FscnVzIGFnZ3JlZ2F0b3IgdG8gZmV0Y2ggdGhlIGZpbGVzIChibG9icykgZXRjLiIKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgfQogICAgICAgIH0KCiAgICAgICAgdSAtPiB3cy5zaXRlX2J1aWxkZXIgIlVwbG9hZHMgKHdyaXRlcykgc2l0ZXMgdG8iCiAgICAgICAgd3MucG9ydGFscyAtPiB1ICJTZXJ2ZXMgKHJlYWRzKSBzaXRlIHJlc291cmNlcyB0byIKICAgICAgICB3cy5zbWFydF9jb250cmFjdCAtPiB3cy5wb3J0YWxzICJDb2xsZWN0cyByZXNvdXJjZSBtZXRhZGF0YSBmcm9tIgogICAgICAgIHdzLndhbHJ1cyAtPiB3cy5wb3J0YWxzICJTZW5kcyBibG9iKHMpIG9mIHJlc291cmNlcyB0byIKICAgICAgICB3cy5zaXRlX2J1aWxkZXIgLT4gd3Muc21hcnRfY29udHJhY3QgIlVwbG9hZHMgdGhlIHJlc291cmNlIG1ldGFkYXRhIHRvIHRoZSBibG9ja2NoYWluIgogICAgICAgIHdzLnNpdGVfYnVpbGRlciAtPiB3cy53YWxydXMgIkFkZHMgYmxvYihzKSB0byIKCiAgICAgICAgd3MucG9ydGFscy5jb21tb25fbGliIC0+IHdzLnBvcnRhbHMuc2VydmVyX3NpZGVfcG9ydGFsICJQcm92aWRlcyBpbnRlcmZhY2UgZm9yIHdhbHJ1cyAmIHN1aSB0byIKICAgICAgICB3cy5wb3J0YWxzLmNvbW1vbl9saWIgLT4gd3MucG9ydGFscy5zZXJ2aWNlX3dvcmtlcl9wb3J0YWwgIlByb3ZpZGVzIGludGVyZmFjZSBmb3Igd2FscnVzICYgc3VpIHRvIgogICAgICAgIHdzLnBvcnRhbHMuc2VydmVyX3NpZGVfcG9ydGFsIC0+IHUgIlNlcnZlcyAocmVhZHMpIHNpdGUgcmVzb3VyY2VzIHRvIgogICAgICAgIHdzLnBvcnRhbHMuc2VydmljZV93b3JrZXJfcG9ydGFsIC0+IHUgIlNlcnZlcyAocmVhZHMpIHNpdGUgcmVzb3VyY2VzIHRvIgogICAgfQoKICAgIHZpZXdzIHsKICAgICAgICBzeXN0ZW1Db250ZXh0IHdzICJTeXN0ZW1WaWV3IiB7CiAgICAgICAgICAgIGluY2x1ZGUgKgogICAgICAgICAgICBhdXRvbGF5b3V0IGxyCiAgICAgICAgfQoKICAgICAgICBjb250YWluZXIgd3MgIldhbHJ1c1NpdGVzVmlldyIgewogICAgICAgICAgICBpbmNsdWRlICoKICAgICAgICAgICAgYXV0b2xheW91dCBscgogICAgICAgIH0KCiAgICAgICAgY29tcG9uZW50IHdzLnNtYXJ0X2NvbnRyYWN0ICJTbWFydENvbnRyYWN0VmlldyIgewogICAgICAgICAgICBpbmNsdWRlICoKICAgICAgICAgICAgYXV0b2xheW91dCBscgogICAgICAgIH0KCiAgICAgICAgY29tcG9uZW50IHdzLnBvcnRhbHMgIlBvcnRhbFZpZXciIHsKICAgICAgICAgICAgaW5jbHVkZSAqCiAgICAgICAgICAgIGF1dG9sYXlvdXQgbHIKICAgICAgICB9CgogICAgICAgIHN0eWxlcyB7CiAgICAgICAgICAgIGVsZW1lbnQgIkVsZW1lbnQiIHsKICAgICAgICAgICAgICAgIGNvbG9yICNmZmZmZmYKICAgICAgICAgICAgfQogICAgICAgICAgICBlbGVtZW50ICJQZXJzb24iIHsKICAgICAgICAgICAgICAgIGJhY2tncm91bmQgI2JhMWU3NQogICAgICAgICAgICAgICAgc2hhcGUgcGVyc29uCiAgICAgICAgICAgIH0KICAgICAgICAgICAgZWxlbWVudCAiU29mdHdhcmUgU3lzdGVtIiB7CiAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kICNkOTIzODkKICAgICAgICAgICAgICAgIHNoYXBlIGNvbXBvbmVudAogICAgICAgICAgICB9CiAgICAgICAgICAgIGVsZW1lbnQgImJyb3dzZXIiIHsKICAgICAgICAgICAgICAgIGJhY2tncm91bmQgI2Y4Mjg5YwogICAgICAgICAgICAgICAgc2hhcGUgd2ViYnJvd3NlcgogICAgICAgICAgICB9CiAgICAgICAgICAgIGVsZW1lbnQgInNlcnZlciIgewogICAgICAgICAgICAgICAgYmFja2dyb3VuZCAjZjgyODljCiAgICAgICAgICAgICAgICBzaGFwZSBjeWxpbmRlcgogICAgICAgICAgICB9CiAgICAgICAgICAgIGVsZW1lbnQgIm1vdmVfb2JqZWN0IiB7CiAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kICNmODI4OWMKICAgICAgICAgICAgICAgIHNoYXBlIGNpcmNsZQogICAgICAgICAgICB9CiAgICAgICAgICAgIGVsZW1lbnQgIkNvbXBvbmVudCIgewogICAgICAgICAgICAgICAgYmFja2dyb3VuZCAjZjgyODljCiAgICAgICAgICAgICAgICBzaGFwZSBjb21wb25lbnQKICAgICAgICAgICAgfQogICAgICAgICAgICBlbGVtZW50ICJDb250YWluZXIiIHsKICAgICAgICAgICAgICAgIGJhY2tncm91bmQgI2Y4Mjg5YwogICAgICAgICAgICB9CiAgICAgICAgICAgICAgICBlbGVtZW50ICJEYXRhYmFzZSIgewogICAgICAgICAgICAgICAgc2hhcGUgY3lsaW5kZXIKICAgICAgICAgICAgfQogICAgICAgICAgICBlbGVtZW50ICJsaWJyYXJ5IiB7CiAgICAgICAgICAgICAgICBzaGFwZSBmb2xkZXIKICAgICAgICAgICAgfQogICAgICAgIH0KICAgIH0KCiAgICBjb25maWd1cmF0aW9uIHsKICAgICAgICBzY29wZSBzb2Z0d2FyZXN5c3RlbQogICAgfQoKfQ=="
   },
   "views" : {
     "componentViews" : [ {
@@ -220,29 +266,42 @@
       },
       "containerId" : "8",
       "dimensions" : {
-        "height" : 2011,
-        "width" : 890
+        "height" : 1411,
+        "width" : 2320
       },
       "elements" : [ {
+        "id" : "1",
+        "x" : 1720,
+        "y" : 469
+      }, {
         "id" : "9",
-        "x" : 220,
-        "y" : 1420
+        "x" : 970,
+        "y" : 219
       }, {
         "id" : "10",
-        "x" : 220,
-        "y" : 220
+        "x" : 970,
+        "y" : 819
       }, {
         "id" : "11",
         "x" : 220,
-        "y" : 820
+        "y" : 519
       } ],
       "externalContainerBoundariesVisible" : false,
       "key" : "PortalView",
-      "order" : 4
+      "order" : 4,
+      "relationships" : [ {
+        "id" : "20"
+      }, {
+        "id" : "21"
+      }, {
+        "id" : "22"
+      }, {
+        "id" : "23"
+      } ]
     } ],
     "configuration" : {
       "branding" : { },
-      "lastSavedView" : "WalrusSitesView",
+      "lastSavedView" : "PortalView",
       "metadataSymbols" : "SquareBrackets",
       "styles" : {
         "elements" : [ {
@@ -302,23 +361,23 @@
       "elements" : [ {
         "id" : "1",
         "x" : 2469,
-        "y" : 1073
+        "y" : 1074
       }, {
         "id" : "3",
         "x" : 969,
-        "y" : 819
+        "y" : 820
       }, {
         "id" : "6",
         "x" : 969,
-        "y" : 219
+        "y" : 220
       }, {
         "id" : "7",
         "x" : 219,
-        "y" : 819
+        "y" : 820
       }, {
         "id" : "8",
         "x" : 1719,
-        "y" : 819
+        "y" : 820
       } ],
       "externalSoftwareSystemBoundariesVisible" : false,
       "key" : "WalrusSitesView",
@@ -327,7 +386,7 @@
         "id" : "12",
         "vertices" : [ {
           "x" : 969,
-          "y" : 1269
+          "y" : 1270
         } ]
       }, {
         "id" : "14"
@@ -358,11 +417,11 @@
       },
       "elements" : [ {
         "id" : "1",
-        "x" : 199,
+        "x" : 200,
         "y" : 200
       }, {
         "id" : "2",
-        "x" : 899,
+        "x" : 900,
         "y" : 250
       } ],
       "enterpriseBoundaryVisible" : true,
@@ -371,13 +430,13 @@
       "relationships" : [ {
         "id" : "13",
         "vertices" : [ {
-          "x" : 761,
+          "x" : 762,
           "y" : 550
         } ]
       }, {
         "id" : "15",
         "vertices" : [ {
-          "x" : 761,
+          "x" : 762,
           "y" : 250
         } ]
       } ],
