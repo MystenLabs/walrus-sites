@@ -122,7 +122,7 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' && 'true' || 'false' }}
       - name: Run tests
-        run: cargo test
+        run: cargo test -- --include-ignored
   check-all:
     name: Check if all code checks succeeded
     if: always()

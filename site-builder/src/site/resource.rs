@@ -342,7 +342,8 @@ impl ResourceManager {
         }
 
         let resource_path = full_path_to_resource_path(full_path, root)?;
-        let mut http_headers: BTreeMap<String, String> = self.derive_http_headers(&resource_path);
+        let mut http_headers: BTreeMap<String, String> =
+            ResourceManager::derive_http_headers(&self.ws_resources, &resource_path);
         let extension = full_path
             .extension()
             .unwrap_or(
@@ -403,15 +404,18 @@ impl ResourceManager {
     ///
     ///  Matches the path of the resource to the wildcard paths in the configuration to
     ///  determine the headers to be added to the HTTP response.
-    fn derive_http_headers(&self, resource_path: &str) -> BTreeMap<String, String> {
-        self.ws_resources
+    pub fn derive_http_headers(
+        ws_resources: &Option<WSResources>,
+        resource_path: &str,
+    ) -> BTreeMap<String, String> {
+        ws_resources
             .as_ref()
             .and_then(|config| config.headers.as_ref())
             .and_then(|headers| {
                 headers
                     .iter()
-                    .filter(|(path, _)| ResourceManager::is_pattern_match(path, resource_path))
-                    .max_by_key(|(path, _)| path.split('/').count()) // Longest path match
+                    .filter(|(path, _)| Self::is_pattern_match(path, resource_path))
+                    .max_by_key(|(path, _)| path.split('/').count())
                     .map(|(_, header_map)| header_map.0.clone())
             })
             .unwrap_or_default()
@@ -490,10 +494,11 @@ pub(crate) fn full_path_to_resource_path(full_path: &Path, root: &Path) -> Resul
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::BTreeMap, path::PathBuf};
+    use std::collections::BTreeMap;
 
     use super::{HttpHeaders, ResourceManager};
-    use crate::{site::config::WSResources, walrus::Walrus};
+    use crate::site::config::WSResources;
+
     struct PatternMatchTestCase {
         pattern: &'static str,
         path: &'static str,
@@ -547,11 +552,8 @@ mod tests {
         }
     }
 
-    #[ignore = "The test depends on the file system containing a walrus binary.
-Until we find a way to mock the walrus binary, this test will be ignored."]
-    #[tokio::test]
-    async fn test_derive_http_headers() {
-        let resource_manager = setup_resource_manager_mock().await;
+    #[test]
+    fn test_derive_http_headers() {
         let test_paths = vec![
             // This is the longest path. So `/foo/bar/baz/*.svg` would persist over `*.svg`.
             ("/foo/bar/baz/image.svg", "etag"),
@@ -561,18 +563,16 @@ Until we find a way to mock the walrus binary, this test will be ignored."]
                 "cache-control",
             ),
         ];
+        let ws_resources = mock_ws_resources();
         for (path, expected) in test_paths {
-            let result = resource_manager.derive_http_headers(path);
+            let result = ResourceManager::derive_http_headers(&ws_resources, path);
             assert_eq!(result.len(), 1);
             assert!(result.contains_key(expected));
         }
     }
 
-    /// Sets up a mock resource manager with the given headers configuration and resource path.
-    ///
     /// Helper function for testing the `derive_http_headers` method.
-    async fn setup_resource_manager_mock() -> ResourceManager {
-        let walrus_mock = Walrus::new("walrus".to_string(), 1234, None, None, None);
+    fn mock_ws_resources() -> Option<WSResources> {
         // Define the headers configuration for mocking the resource manager.
         let mut headers: BTreeMap<String, HttpHeaders> = BTreeMap::new();
         headers.insert(
@@ -589,16 +589,10 @@ Until we find a way to mock the walrus binary, this test will be ignored."]
                 "\"abc123\"".to_string(),
             )])),
         );
-        let ws_resources = Some(WSResources {
+
+        Some(WSResources {
             headers: Some(headers),
             routes: None,
-        });
-        ResourceManager::new(
-            walrus_mock.clone(),
-            ws_resources,
-            Some(PathBuf::from(&"mock/path/to/ws-resources")),
-        )
-        .await
-        .unwrap()
+        })
     }
 }
