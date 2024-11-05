@@ -25,7 +25,8 @@ max_line_length = 150
 indent_size = unset
 
 # Ignore paths
-[{.git/**/*,**/*.lock,**/Move.toml,LICENSE,**/*.html,**/*.css,**/*.json,portal/pnpm-lock.yaml}]
+[{.git/**/*,**/*.lock,**/Move.toml,LICENSE,**/*.html,**/*.css,**/*.json,portal/pnpm-lock.yaml,
+c4/**/*}]
 charset = unset
 end_of_line = unset
 indent_size = unset
