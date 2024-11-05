@@ -45,6 +45,7 @@ workspace "Walrus Sites" "The Walrus Sites architecture, as a C4 model." {
         ws.portals.common_lib -> ws.portals.service_worker_portal "Provides interface for walrus & sui to"
         ws.portals.server_side_portal -> u "Serves (reads) site resources to"
         ws.portals.service_worker_portal -> u "Serves (reads) site resources to"
+        ws.portals.service_worker_portal -> ws.portals.server_side_portal "Fallbacks to (when sw not supported)"
     }
 
     views {
@@ -55,7 +56,6 @@ workspace "Walrus Sites" "The Walrus Sites architecture, as a C4 model." {
 
         container ws "WalrusSitesView" {
             include *
-            autolayout lr
         }
 
         component ws.smart_contract "SmartContractView" {
@@ -65,7 +65,6 @@ workspace "Walrus Sites" "The Walrus Sites architecture, as a C4 model." {
 
         component ws.portals "PortalView" {
             include *
-            autolayout lr
         }
 
         styles {
