@@ -573,22 +573,15 @@ mod tests {
 
     /// Helper function for testing the `derive_http_headers` method.
     fn mock_ws_resources() -> Option<WSResources> {
-        // Define the headers configuration for mocking the resource manager.
-        let mut headers: BTreeMap<String, HttpHeaders> = BTreeMap::new();
-        headers.insert(
-            "/*.svg".to_string(),
-            HttpHeaders(BTreeMap::from([(
-                "cache-control".to_string(),
-                "public, max-age=86400".to_string(),
-            )])),
-        );
-        headers.insert(
-            "/foo/bar/baz/*.svg".to_string(),
-            HttpHeaders(BTreeMap::from([(
-                "etag".to_string(),
-                "\"abc123\"".to_string(),
-            )])),
-        );
+        let headers_json = r#"{
+                    "/*.svg": {
+                        "cache-control": "public, max-age=86400"
+                    },
+                    "/foo/bar/baz/*.svg": {
+                        "etag": "\"abc123\""
+                    }
+                }"#;
+        let headers: BTreeMap<String, HttpHeaders> = serde_json::from_str(headers_json).unwrap();
 
         Some(WSResources {
             headers: Some(headers),
