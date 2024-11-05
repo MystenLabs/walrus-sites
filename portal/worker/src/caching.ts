@@ -36,7 +36,7 @@ export default async function resolveWithCache(
         }
     }
     console.log("Cache miss!", urlString);
-    const resolvedPage = await resolveAndFetchPage(parsedUrl);
+    const resolvedPage = await resolveAndFetchPage(parsedUrl, resolvedObjectId);
 
     await tryCachePut(cache, urlString, resolvedPage);
 

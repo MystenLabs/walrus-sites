@@ -56,7 +56,7 @@ self.addEventListener("fetch", async (event) => {
             try {
                 return await fetchWithCacheSupport();
             } catch (error) {
-                return;
+                return handleFetchError(error);
             }
         };
 
@@ -85,7 +85,7 @@ self.addEventListener("fetch", async (event) => {
 
         // Fetch directly and fallback if necessary
         const fetchDirectlyOrProxy = async (): Promise<Response> => {
-            const response = await resolveAndFetchPage(parsedUrl);
+            const response = await resolveAndFetchPage(parsedUrl, null);
             return response.status === HttpStatusCodes.NOT_FOUND
             ? proxyFetch()
             : response;
