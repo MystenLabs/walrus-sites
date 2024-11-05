@@ -420,7 +420,7 @@ impl ResourceManager {
     /// Matches a pattern to a resource path.
     ///
     /// The pattern can contain a wildcard `*` which matches any sequence of characters.
-    /// e.g. `foo/*` will match `foo/bar` and `foo/bar/baz`.
+    /// e.g. `/foo/*` will match `/foo/bar` and `/foo/bar/baz`.
     fn is_pattern_match(pattern: &str, resource_path: &str) -> bool {
         let path_regex = pattern.replace('*', ".*");
         Regex::new(&path_regex)
