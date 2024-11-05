@@ -110,19 +110,22 @@ class RPCSelector implements RPCSelectorInterface {
             this.selectedClient = client;
             return result;
         } catch {
-            return null;
+            throw new Error(`Failed to contact fallback RPC clients.`);
         }
     }
 
     private isValidResponse(result: SuiObjectResponse | SuiObjectResponse[] | string): boolean {
+        // GetObject or getDynamicFieldObject
         if (result == null) {
             return false;
         }
 
+        // SuiNS
         if (typeof result === 'string') {
             return result.trim().length > 0;
         }
 
+        // MultiGetObject
         if (Array.isArray(result)) {
             return result.some((item) => item != null);
         }
