@@ -35,9 +35,8 @@ pub struct SiteDataDiff<'a> {
 
 impl SiteDataDiff<'_> {
     /// Returns `true` if there are updates to be made.
-    #[cfg(test)]
     pub fn has_updates(&self) -> bool {
-        !self.resource_ops.is_empty() || !self.route_ops.is_unchanged()
+        self.resource_ops.iter().any(|op| op.is_change()) || !self.route_ops.is_unchanged()
     }
 
     /// Returns the resources that need to be updated on Walrus.
