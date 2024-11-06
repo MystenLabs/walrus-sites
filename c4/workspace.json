@@ -1,0 +1,443 @@
+{
+  "configuration" : {
+    "scope" : "SoftwareSystem"
+  },
+  "description" : "The Walrus Sites architecture, as a C4 model.",
+  "documentation" : { },
+  "id" : 1,
+  "lastModifiedAgent" : "structurizr-ui",
+  "lastModifiedDate" : "2024-11-05T15:14:02Z",
+  "model" : {
+    "people" : [ {
+      "id" : "1",
+      "location" : "Unspecified",
+      "name" : "User",
+      "properties" : {
+        "structurizr.dsl.identifier" : "u"
+      },
+      "relationships" : [ {
+        "description" : "Uploads (writes) sites to",
+        "destinationId" : "7",
+        "id" : "12",
+        "properties" : {
+          "structurizr.dsl.identifier" : "e3bc58b3-0497-4c26-830a-22e5e15aba13"
+        },
+        "sourceId" : "1",
+        "tags" : "Relationship"
+      }, {
+        "description" : "Uploads (writes) sites to",
+        "destinationId" : "2",
+        "id" : "13",
+        "linkedRelationshipId" : "12",
+        "sourceId" : "1"
+      } ],
+      "tags" : "Element,Person"
+    } ],
+    "softwareSystems" : [ {
+      "containers" : [ {
+        "components" : [ {
+          "documentation" : { },
+          "id" : "4",
+          "name" : "Site Object",
+          "properties" : {
+            "structurizr.dsl.identifier" : "ws.smart_contract.site_object"
+          },
+          "tags" : "Element,Component,move_object"
+        }, {
+          "documentation" : { },
+          "id" : "5",
+          "name" : "Resource Object",
+          "properties" : {
+            "structurizr.dsl.identifier" : "ws.smart_contract.resource_object"
+          },
+          "tags" : "Element,Component,move_object"
+        } ],
+        "description" : "Keeps track of each resource metadata.",
+        "documentation" : { },
+        "id" : "3",
+        "name" : "Sui Smart Contract",
+        "properties" : {
+          "structurizr.dsl.identifier" : "ws.smart_contract"
+        },
+        "relationships" : [ {
+          "description" : "Collects resource metadata from",
+          "destinationId" : "8",
+          "id" : "16",
+          "properties" : {
+            "structurizr.dsl.identifier" : "86a8d86a-89a7-49f1-81aa-d70124a6291d"
+          },
+          "sourceId" : "3",
+          "tags" : "Relationship"
+        } ],
+        "tags" : "Element,Container",
+        "technology" : "Move"
+      }, {
+        "description" : "Decentralized storage network that stores and delivers raw data and media files. In this case, it stores the blobs of the site resources.",
+        "documentation" : { },
+        "id" : "6",
+        "name" : "Walrus",
+        "properties" : {
+          "structurizr.dsl.identifier" : "ws.walrus"
+        },
+        "relationships" : [ {
+          "description" : "Sends blob(s) of resources to",
+          "destinationId" : "8",
+          "id" : "17",
+          "properties" : {
+            "structurizr.dsl.identifier" : "e200ac7e-7fa5-4462-b85b-59c3b564d1ba"
+          },
+          "sourceId" : "6",
+          "tags" : "Relationship"
+        } ],
+        "tags" : "Element,Container"
+      }, {
+        "description" : "CLI tool that builds the site objects and uploads them to Sui and Walrus respectively.",
+        "documentation" : { },
+        "id" : "7",
+        "name" : "site-builder",
+        "properties" : {
+          "structurizr.dsl.identifier" : "ws.site_builder"
+        },
+        "relationships" : [ {
+          "description" : "Uploads the resource metadata to the blockchain",
+          "destinationId" : "3",
+          "id" : "18",
+          "properties" : {
+            "structurizr.dsl.identifier" : "a64f5465-ba15-4ef7-9bb2-fed959142d02"
+          },
+          "sourceId" : "7",
+          "tags" : "Relationship"
+        }, {
+          "description" : "Adds blob(s) to",
+          "destinationId" : "6",
+          "id" : "19",
+          "properties" : {
+            "structurizr.dsl.identifier" : "f9e4b253-0ceb-4558-8eea-558838a1122d"
+          },
+          "sourceId" : "7",
+          "tags" : "Relationship"
+        } ],
+        "tags" : "Element,Container"
+      }, {
+        "components" : [ {
+          "description" : "Gets installed on the user's device. Intervene between fetch events, serving the site resources.",
+          "documentation" : { },
+          "id" : "9",
+          "name" : "service-worker-portal",
+          "properties" : {
+            "structurizr.dsl.identifier" : "ws.portals.service_worker_portal"
+          },
+          "relationships" : [ {
+            "description" : "Serves (reads) site resources to",
+            "destinationId" : "1",
+            "id" : "23",
+            "properties" : {
+              "structurizr.dsl.identifier" : "9c0495b7-35b3-40c9-a980-3b2b57b6747f"
+            },
+            "sourceId" : "9",
+            "tags" : "Relationship"
+          }, {
+            "description" : "Fallbacks to (when sw not supported)",
+            "destinationId" : "10",
+            "id" : "24",
+            "properties" : {
+              "structurizr.dsl.identifier" : "fe31624e-50f3-48ef-bb5b-b00f7f7d1b65"
+            },
+            "sourceId" : "9",
+            "tags" : "Relationship"
+          } ],
+          "tags" : "Element,Component,browser"
+        }, {
+          "description" : "Loads first the site resources to the server and then provides them to the user.",
+          "documentation" : { },
+          "id" : "10",
+          "name" : "server-side-portal",
+          "properties" : {
+            "structurizr.dsl.identifier" : "ws.portals.server_side_portal"
+          },
+          "relationships" : [ {
+            "description" : "Serves (reads) site resources to",
+            "destinationId" : "1",
+            "id" : "22",
+            "properties" : {
+              "structurizr.dsl.identifier" : "86b9a349-1023-4f03-8acf-ede7cadebd79"
+            },
+            "sourceId" : "10",
+            "tags" : "Relationship"
+          } ],
+          "tags" : "Element,Component,server"
+        }, {
+          "description" : "Includes functions that are common to both service-worker-portal and server-side-portal such as fetchings sui objects, contacting a walrus aggregator to fetch the files (blobs) etc.",
+          "documentation" : { },
+          "id" : "11",
+          "name" : "common-lib",
+          "properties" : {
+            "structurizr.dsl.identifier" : "ws.portals.common_lib"
+          },
+          "relationships" : [ {
+            "description" : "Provides interface for walrus & sui to",
+            "destinationId" : "10",
+            "id" : "20",
+            "properties" : {
+              "structurizr.dsl.identifier" : "5e318644-5045-41ee-8ec4-795524d83a11"
+            },
+            "sourceId" : "11",
+            "tags" : "Relationship"
+          }, {
+            "description" : "Provides interface for walrus & sui to",
+            "destinationId" : "9",
+            "id" : "21",
+            "properties" : {
+              "structurizr.dsl.identifier" : "7f2df95d-c7e1-41ac-821d-3f36fb8ca80d"
+            },
+            "sourceId" : "11",
+            "tags" : "Relationship"
+          } ],
+          "tags" : "Element,Component,library"
+        } ],
+        "description" : "Enables users to access the site resources.",
+        "documentation" : { },
+        "id" : "8",
+        "name" : "Portals",
+        "properties" : {
+          "structurizr.dsl.identifier" : "ws.portals"
+        },
+        "relationships" : [ {
+          "description" : "Serves (reads) site resources to",
+          "destinationId" : "1",
+          "id" : "14",
+          "properties" : {
+            "structurizr.dsl.identifier" : "ee15e6cb-a82d-441b-8e3a-094b318b0671"
+          },
+          "sourceId" : "8",
+          "tags" : "Relationship"
+        } ],
+        "tags" : "Element,Container"
+      } ],
+      "documentation" : { },
+      "id" : "2",
+      "location" : "Unspecified",
+      "name" : "Walrus Sites",
+      "properties" : {
+        "structurizr.dsl.identifier" : "ws"
+      },
+      "relationships" : [ {
+        "description" : "Serves (reads) site resources to",
+        "destinationId" : "1",
+        "id" : "15",
+        "linkedRelationshipId" : "14",
+        "sourceId" : "2"
+      } ],
+      "tags" : "Element,Software System"
+    } ]
+  },
+  "name" : "Walrus Sites",
+  "properties" : {
+    "structurizr.dsl" : "d29ya3NwYWNlICJXYWxydXMgU2l0ZXMiICJUaGUgV2FscnVzIFNpdGVzIGFyY2hpdGVjdHVyZSwgYXMgYSBDNCBtb2RlbC4iIHsKCiAgICAhaWRlbnRpZmllcnMgaGllcmFyY2hpY2FsCgogICAgbW9kZWwgewogICAgICAgIHUgPSBwZXJzb24gIlVzZXIiCiAgICAgICAgd3MgPSBzb2Z0d2FyZVN5c3RlbSAiV2FscnVzIFNpdGVzIiB7CiAgICAgICAgICAgIHNtYXJ0X2NvbnRyYWN0ID0gY29udGFpbmVyICJTdWkgU21hcnQgQ29udHJhY3QiICJLZWVwcyB0cmFjayBvZiBlYWNoIHJlc291cmNlIG1ldGFkYXRhLiIgIk1vdmUiIHsKICAgICAgICAgICAgICAgIHNpdGVfb2JqZWN0ID0gY29tcG9uZW50ICJTaXRlIE9iamVjdCIgewogICAgICAgICAgICAgICAgICAgIHRhZ3MgIm1vdmVfb2JqZWN0IgogICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgcmVzb3VyY2Vfb2JqZWN0ID0gY29tcG9uZW50ICJSZXNvdXJjZSBPYmplY3QiIHsKICAgICAgICAgICAgICAgICAgICB0YWdzICJtb3ZlX29iamVjdCIKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgfQogICAgICAgICAgICB3YWxydXMgPSBjb250YWluZXIgIldhbHJ1cyIgIkRlY2VudHJhbGl6ZWQgc3RvcmFnZSBuZXR3b3JrIHRoYXQgc3RvcmVzIGFuZCBkZWxpdmVycyByYXcgZGF0YSBhbmQgbWVkaWEgZmlsZXMuIEluIHRoaXMgY2FzZSwgaXQgc3RvcmVzIHRoZSBibG9icyBvZiB0aGUgc2l0ZSByZXNvdXJjZXMuIgogICAgICAgICAgICBzaXRlX2J1aWxkZXIgPSBjb250YWluZXIgInNpdGUtYnVpbGRlciIgewogICAgICAgICAgICAgICAgZGVzY3JpcHRpb24gIkNMSSB0b29sIHRoYXQgYnVpbGRzIHRoZSBzaXRlIG9iamVjdHMgYW5kIHVwbG9hZHMgdGhlbSB0byBTdWkgYW5kIFdhbHJ1cyByZXNwZWN0aXZlbHkuIgogICAgICAgICAgICB9CgogICAgICAgICAgICBwb3J0YWxzID0gY29udGFpbmVyICJQb3J0YWxzIiAiRW5hYmxlcyB1c2VycyB0byBhY2Nlc3MgdGhlIHNpdGUgcmVzb3VyY2VzLiIgewogICAgICAgICAgICAgICAgc2VydmljZV93b3JrZXJfcG9ydGFsID0gY29tcG9uZW50ICJzZXJ2aWNlLXdvcmtlci1wb3J0YWwiICJzZXJ2aWNlLXdvcmtlciIgewogICAgICAgICAgICAgICAgICAgIHRhZ3MgImJyb3dzZXIiCiAgICAgICAgICAgICAgICAgICAgZGVzY3JpcHRpb24gIkdldHMgaW5zdGFsbGVkIG9uIHRoZSB1c2VyJ3MgZGV2aWNlLiBJbnRlcnZlbmUgYmV0d2VlbiBmZXRjaCBldmVudHMsIHNlcnZpbmcgdGhlIHNpdGUgcmVzb3VyY2VzLiIKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgIHNlcnZlcl9zaWRlX3BvcnRhbCA9IGNvbXBvbmVudCAic2VydmVyLXNpZGUtcG9ydGFsIiAibmV4dC5qcyJ7CiAgICAgICAgICAgICAgICAgICAgdGFncyAic2VydmVyIgogICAgICAgICAgICAgICAgICAgIGRlc2NyaXB0aW9uICJMb2FkcyBmaXJzdCB0aGUgc2l0ZSByZXNvdXJjZXMgdG8gdGhlIHNlcnZlciBhbmQgdGhlbiBwcm92aWRlcyB0aGVtIHRvIHRoZSB1c2VyLiIKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgIGNvbW1vbl9saWIgPSBjb21wb25lbnQgImNvbW1vbi1saWIiICJub2RlLmpzIiB7CiAgICAgICAgICAgICAgICAgICAgdGFncyAibGlicmFyeSIKICAgICAgICAgICAgICAgICAgICBkZXNjcmlwdGlvbiAiSW5jbHVkZXMgZnVuY3Rpb25zIHRoYXQgYXJlIGNvbW1vbiB0byBib3RoIHNlcnZpY2Utd29ya2VyLXBvcnRhbCBhbmQgc2VydmVyLXNpZGUtcG9ydGFsIHN1Y2ggYXMgZmV0Y2hpbmdzIHN1aSBvYmplY3RzLCBjb250YWN0aW5nIGEgd2FscnVzIGFnZ3JlZ2F0b3IgdG8gZmV0Y2ggdGhlIGZpbGVzIChibG9icykgZXRjLiIKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgfQogICAgICAgIH0KCiAgICAgICAgdSAtPiB3cy5zaXRlX2J1aWxkZXIgIlVwbG9hZHMgKHdyaXRlcykgc2l0ZXMgdG8iCiAgICAgICAgd3MucG9ydGFscyAtPiB1ICJTZXJ2ZXMgKHJlYWRzKSBzaXRlIHJlc291cmNlcyB0byIKICAgICAgICB3cy5zbWFydF9jb250cmFjdCAtPiB3cy5wb3J0YWxzICJDb2xsZWN0cyByZXNvdXJjZSBtZXRhZGF0YSBmcm9tIgogICAgICAgIHdzLndhbHJ1cyAtPiB3cy5wb3J0YWxzICJTZW5kcyBibG9iKHMpIG9mIHJlc291cmNlcyB0byIKICAgICAgICB3cy5zaXRlX2J1aWxkZXIgLT4gd3Muc21hcnRfY29udHJhY3QgIlVwbG9hZHMgdGhlIHJlc291cmNlIG1ldGFkYXRhIHRvIHRoZSBibG9ja2NoYWluIgogICAgICAgIHdzLnNpdGVfYnVpbGRlciAtPiB3cy53YWxydXMgIkFkZHMgYmxvYihzKSB0byIKCiAgICAgICAgd3MucG9ydGFscy5jb21tb25fbGliIC0+IHdzLnBvcnRhbHMuc2VydmVyX3NpZGVfcG9ydGFsICJQcm92aWRlcyBpbnRlcmZhY2UgZm9yIHdhbHJ1cyAmIHN1aSB0byIKICAgICAgICB3cy5wb3J0YWxzLmNvbW1vbl9saWIgLT4gd3MucG9ydGFscy5zZXJ2aWNlX3dvcmtlcl9wb3J0YWwgIlByb3ZpZGVzIGludGVyZmFjZSBmb3Igd2FscnVzICYgc3VpIHRvIgogICAgICAgIHdzLnBvcnRhbHMuc2VydmVyX3NpZGVfcG9ydGFsIC0+IHUgIlNlcnZlcyAocmVhZHMpIHNpdGUgcmVzb3VyY2VzIHRvIgogICAgICAgIHdzLnBvcnRhbHMuc2VydmljZV93b3JrZXJfcG9ydGFsIC0+IHUgIlNlcnZlcyAocmVhZHMpIHNpdGUgcmVzb3VyY2VzIHRvIgogICAgICAgIHdzLnBvcnRhbHMuc2VydmljZV93b3JrZXJfcG9ydGFsIC0+IHdzLnBvcnRhbHMuc2VydmVyX3NpZGVfcG9ydGFsICJGYWxsYmFja3MgdG8gKHdoZW4gc3cgbm90IHN1cHBvcnRlZCkiCiAgICB9CgogICAgdmlld3MgewogICAgICAgIHN5c3RlbUNvbnRleHQgd3MgIlN5c3RlbVZpZXciIHsKICAgICAgICAgICAgaW5jbHVkZSAqCiAgICAgICAgICAgIGF1dG9sYXlvdXQgbHIKICAgICAgICB9CgogICAgICAgIGNvbnRhaW5lciB3cyAiV2FscnVzU2l0ZXNWaWV3IiB7CiAgICAgICAgICAgIGluY2x1ZGUgKgogICAgICAgIH0KCiAgICAgICAgY29tcG9uZW50IHdzLnNtYXJ0X2NvbnRyYWN0ICJTbWFydENvbnRyYWN0VmlldyIgewogICAgICAgICAgICBpbmNsdWRlICoKICAgICAgICAgICAgYXV0b2xheW91dCBscgogICAgICAgIH0KCiAgICAgICAgY29tcG9uZW50IHdzLnBvcnRhbHMgIlBvcnRhbFZpZXciIHsKICAgICAgICAgICAgaW5jbHVkZSAqCiAgICAgICAgfQoKICAgICAgICBzdHlsZXMgewogICAgICAgICAgICBlbGVtZW50ICJFbGVtZW50IiB7CiAgICAgICAgICAgICAgICBjb2xvciAjZmZmZmZmCiAgICAgICAgICAgIH0KICAgICAgICAgICAgZWxlbWVudCAiUGVyc29uIiB7CiAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kICNiYTFlNzUKICAgICAgICAgICAgICAgIHNoYXBlIHBlcnNvbgogICAgICAgICAgICB9CiAgICAgICAgICAgIGVsZW1lbnQgIlNvZnR3YXJlIFN5c3RlbSIgewogICAgICAgICAgICAgICAgYmFja2dyb3VuZCAjZDkyMzg5CiAgICAgICAgICAgICAgICBzaGFwZSBjb21wb25lbnQKICAgICAgICAgICAgfQogICAgICAgICAgICBlbGVtZW50ICJicm93c2VyIiB7CiAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kICNmODI4OWMKICAgICAgICAgICAgICAgIHNoYXBlIHdlYmJyb3dzZXIKICAgICAgICAgICAgfQogICAgICAgICAgICBlbGVtZW50ICJzZXJ2ZXIiIHsKICAgICAgICAgICAgICAgIGJhY2tncm91bmQgI2Y4Mjg5YwogICAgICAgICAgICAgICAgc2hhcGUgY3lsaW5kZXIKICAgICAgICAgICAgfQogICAgICAgICAgICBlbGVtZW50ICJtb3ZlX29iamVjdCIgewogICAgICAgICAgICAgICAgYmFja2dyb3VuZCAjZjgyODljCiAgICAgICAgICAgICAgICBzaGFwZSBjaXJjbGUKICAgICAgICAgICAgfQogICAgICAgICAgICBlbGVtZW50ICJDb21wb25lbnQiIHsKICAgICAgICAgICAgICAgIGJhY2tncm91bmQgI2Y4Mjg5YwogICAgICAgICAgICAgICAgc2hhcGUgY29tcG9uZW50CiAgICAgICAgICAgIH0KICAgICAgICAgICAgZWxlbWVudCAiQ29udGFpbmVyIiB7CiAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kICNmODI4OWMKICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgZWxlbWVudCAiRGF0YWJhc2UiIHsKICAgICAgICAgICAgICAgIHNoYXBlIGN5bGluZGVyCiAgICAgICAgICAgIH0KICAgICAgICAgICAgZWxlbWVudCAibGlicmFyeSIgewogICAgICAgICAgICAgICAgc2hhcGUgZm9sZGVyCiAgICAgICAgICAgIH0KICAgICAgICB9CiAgICB9CgogICAgY29uZmlndXJhdGlvbiB7CiAgICAgICAgc2NvcGUgc29mdHdhcmVzeXN0ZW0KICAgIH0KCn0="
+  },
+  "views" : {
+    "componentViews" : [ {
+      "automaticLayout" : {
+        "applied" : false,
+        "edgeSeparation" : 0,
+        "implementation" : "Graphviz",
+        "nodeSeparation" : 300,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 300,
+        "vertices" : false
+      },
+      "containerId" : "3",
+      "elements" : [ {
+        "id" : "4",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "5",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "externalContainerBoundariesVisible" : false,
+      "key" : "SmartContractView",
+      "order" : 3
+    }, {
+      "containerId" : "8",
+      "dimensions" : {
+        "height" : 1119,
+        "width" : 3070
+      },
+      "elements" : [ {
+        "id" : "1",
+        "x" : 2200,
+        "y" : 345
+      }, {
+        "id" : "9",
+        "x" : 1405,
+        "y" : 120
+      }, {
+        "id" : "10",
+        "x" : 1415,
+        "y" : 605
+      }, {
+        "id" : "11",
+        "x" : 665,
+        "y" : 310
+      } ],
+      "externalContainerBoundariesVisible" : false,
+      "key" : "PortalView",
+      "order" : 4,
+      "relationships" : [ {
+        "id" : "20",
+        "vertices" : [ {
+          "x" : 1300,
+          "y" : 780
+        } ]
+      }, {
+        "id" : "21",
+        "vertices" : [ {
+          "x" : 1140,
+          "y" : 245
+        } ]
+      }, {
+        "id" : "22"
+      }, {
+        "id" : "23"
+      }, {
+        "id" : "24"
+      } ]
+    } ],
+    "configuration" : {
+      "branding" : { },
+      "lastSavedView" : "WalrusSitesView",
+      "metadataSymbols" : "SquareBrackets",
+      "styles" : {
+        "elements" : [ {
+          "color" : "#ffffff",
+          "tag" : "Element"
+        }, {
+          "background" : "#ba1e75",
+          "shape" : "Person",
+          "tag" : "Person"
+        }, {
+          "background" : "#d92389",
+          "shape" : "Component",
+          "tag" : "Software System"
+        }, {
+          "background" : "#f8289c",
+          "shape" : "WebBrowser",
+          "tag" : "browser"
+        }, {
+          "background" : "#f8289c",
+          "shape" : "Cylinder",
+          "tag" : "server"
+        }, {
+          "background" : "#f8289c",
+          "shape" : "Circle",
+          "tag" : "move_object"
+        }, {
+          "background" : "#f8289c",
+          "shape" : "Component",
+          "tag" : "Component"
+        }, {
+          "background" : "#f8289c",
+          "tag" : "Container"
+        }, {
+          "shape" : "Cylinder",
+          "tag" : "Database"
+        }, {
+          "shape" : "Folder",
+          "tag" : "library"
+        } ]
+      },
+      "terminology" : { }
+    },
+    "containerViews" : [ {
+      "dimensions" : {
+        "height" : 1674,
+        "width" : 3070
+      },
+      "elements" : [ {
+        "id" : "1",
+        "x" : 1390,
+        "y" : 1180
+      }, {
+        "id" : "3",
+        "x" : 1335,
+        "y" : 646
+      }, {
+        "id" : "6",
+        "x" : 1320,
+        "y" : 195
+      }, {
+        "id" : "7",
+        "x" : 585,
+        "y" : 646
+      }, {
+        "id" : "8",
+        "x" : 2085,
+        "y" : 646
+      } ],
+      "externalSoftwareSystemBoundariesVisible" : false,
+      "key" : "WalrusSitesView",
+      "order" : 2,
+      "relationships" : [ {
+        "id" : "12",
+        "vertices" : [ {
+          "x" : 1300,
+          "y" : 1140
+        } ]
+      }, {
+        "id" : "14"
+      }, {
+        "id" : "16"
+      }, {
+        "id" : "17"
+      }, {
+        "id" : "18"
+      }, {
+        "id" : "19"
+      } ],
+      "softwareSystemId" : "2"
+    } ],
+    "systemContextViews" : [ {
+      "automaticLayout" : {
+        "applied" : true,
+        "edgeSeparation" : 0,
+        "implementation" : "Graphviz",
+        "nodeSeparation" : 300,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 300,
+        "vertices" : false
+      },
+      "dimensions" : {
+        "height" : 800,
+        "width" : 1550
+      },
+      "elements" : [ {
+        "id" : "1",
+        "x" : 200,
+        "y" : 199
+      }, {
+        "id" : "2",
+        "x" : 900,
+        "y" : 249
+      } ],
+      "enterpriseBoundaryVisible" : true,
+      "key" : "SystemView",
+      "order" : 1,
+      "relationships" : [ {
+        "id" : "13",
+        "vertices" : [ {
+          "x" : 762,
+          "y" : 549
+        } ]
+      }, {
+        "id" : "15",
+        "vertices" : [ {
+          "x" : 762,
+          "y" : 249
+        } ]
+      } ],
+      "softwareSystemId" : "2"
+    } ]
+  }
+}
