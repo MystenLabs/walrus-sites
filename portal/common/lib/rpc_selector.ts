@@ -52,7 +52,6 @@ class RPCSelector implements RPCSelectorInterface {
         try {
             return await this.callSelectedClient<T>(methodName, args);
         } catch (error) {
-            console.error(`Selected client failed: ${error}`);
             this.selectedClient = undefined;
             return await this.callFallbackClients<T>(methodName, args);
         }

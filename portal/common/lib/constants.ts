@@ -16,9 +16,9 @@ export const FALLBACK_PORTAL = "blob.store";
 export const RESOURCE_PATH_MOVE_TYPE = SITE_PACKAGE + "::site::ResourcePath";
 
 export const TESTNET_RPC_LIST = [
-    'https://fullnode.testnet.sui.io:443',
-    'https://sui-testnet.public.blastapi.io/',
-    'https://sui-testnet-endpoint.blockvision.org/',
+    'https://fullnode.testnet.sui.io',
+    'https://sui-testnet.public.blastapi.io',
+    'https://sui-testnet-endpoint.blockvision.org',
     'https://rpc.ankr.com/sui_testnet',
     'https://sui.blockpi.network/v1/rpc/public'
 ];
