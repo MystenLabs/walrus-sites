@@ -159,6 +159,7 @@ impl SiteManager {
 
         // Publish the first MAX_RESOURCES_PER_PTB resources, or all resources if there are fewer
         // than that.
+        tracing::debug!("preparing and committing the first PTB");
         let mut end = MAX_RESOURCES_PER_PTB.min(updates.resource_ops.len());
 
         ptb.add_resource_operations(&updates.resource_ops[..end])?;
@@ -172,23 +173,28 @@ impl SiteManager {
             .sign_and_send_ptb(ptb.finish(), self.gas_coin_ref().await?)
             .await?;
 
+        let site_object_id = match &self.site_id {
+            SiteIdentifier::ExistingSite(site_id) => *site_id,
+            SiteIdentifier::NewSite(_) => {
+                let resp = result
+                    .effects
+                    .as_ref()
+                    .ok_or(anyhow!("the result did not have effects"))?;
+                get_site_id_from_response(self.active_address()?, resp)?
+            }
+        };
+
         // Keep iterating to load resources
         while end < updates.resource_ops.len() {
             let start = end;
             end = (end + MAX_RESOURCES_PER_PTB).min(updates.resource_ops.len());
-
-            // TODO(giac): improve error handling.
-            let resp = result
-                .effects
-                .as_ref()
-                .ok_or(anyhow!("the result did not have effects"))?;
-            let site_id = get_site_id_from_response(self.active_address()?, resp)?;
+            tracing::debug!(%start, %end, "preparing and committing the next PTB");
 
             let ptb = SitePtb::new(
                 self.config.package,
                 Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
             )?;
-            let call_arg: CallArg = self.wallet.get_object_ref(site_id).await?.into();
+            let call_arg: CallArg = self.wallet.get_object_ref(site_object_id).await?.into();
             let mut ptb = ptb.with_call_arg(&call_arg)?;
             ptb.add_resource_operations(&updates.resource_ops[start..end])?;
 

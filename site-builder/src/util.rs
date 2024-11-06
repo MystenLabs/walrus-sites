@@ -79,11 +79,15 @@ pub fn get_site_id_from_response(
     address: SuiAddress,
     effects: &SuiTransactionBlockEffects,
 ) -> Result<ObjectID> {
+    tracing::debug!(
+        ?effects,
+        "getting the object ID of the created Walrus site."
+    );
     Ok(effects
         .created()
         .iter()
         .find(|c| c.owner == address)
-        .expect("Could not find the object ID for the created Walrus site.")
+        .expect("could not find the object ID for the created Walrus site.")
         .reference
         .object_id)
 }
