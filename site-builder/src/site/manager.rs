@@ -8,7 +8,7 @@ use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{rpc_types::SuiTransactionBlockResponse, wallet_context::WalletContext, SuiClient};
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
-    transaction::{ProgrammableTransaction, TransactionData},
+    transaction::{CallArg, ProgrammableTransaction, TransactionData},
     Identifier,
 };
 
@@ -24,9 +24,12 @@ use crate::{
     display,
     publish::WhenWalrusUpload,
     summary::SiteDataDiffSummary,
+    util::get_site_id_from_response,
     walrus::Walrus,
     Config,
 };
+
+const MAX_RESOURCES_PER_PTB: usize = 200;
 
 /// The identifier for the new or existing site.
 ///
@@ -154,15 +157,47 @@ impl SiteManager {
             SiteIdentifier::NewSite(site_name) => ptb.with_create_site(site_name)?,
         };
 
-        ptb.add_resource_operations(&updates.resource_ops)?;
+        // Publish the first MAX_RESOURCES_PER_PTB resources, or all resources if there are fewer
+        // than that.
+        let mut end = MAX_RESOURCES_PER_PTB.min(updates.resource_ops.len());
+
+        ptb.add_resource_operations(&updates.resource_ops[..end])?;
         ptb.add_route_operations(&updates.route_ops)?;
 
         if self.needs_transfer() {
             ptb.transfer_site(self.active_address()?);
         }
 
-        self.sign_and_send_ptb(ptb.finish(), self.gas_coin_ref().await?)
-            .await
+        let result = self
+            .sign_and_send_ptb(ptb.finish(), self.gas_coin_ref().await?)
+            .await?;
+
+        // Keep iterating to load resources
+        while end < updates.resource_ops.len() {
+            let start = end;
+            end = (end + MAX_RESOURCES_PER_PTB).min(updates.resource_ops.len());
+
+            // TODO(giac): improve error handling.
+            let resp = result
+                .effects
+                .as_ref()
+                .ok_or(anyhow!("the result did not have effects"))?;
+            let site_id = get_site_id_from_response(self.active_address()?, resp)?;
+
+            let ptb = SitePtb::new(
+                self.config.package,
+                Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
+            )?;
+            let call_arg: CallArg = self.wallet.get_object_ref(site_id).await?.into();
+            let mut ptb = ptb.with_call_arg(&call_arg)?;
+            ptb.add_resource_operations(&updates.resource_ops[start..end])?;
+
+            let _result = self
+                .sign_and_send_ptb(ptb.finish(), self.gas_coin_ref().await?)
+                .await?;
+        }
+
+        Ok(result)
     }
 
     async fn sign_and_send_ptb(
