@@ -17,6 +17,7 @@ use fastcrypto::hash::{HashFunction, Sha256};
 use flate2::{write::GzEncoder, Compression};
 use futures::stream::{self, StreamExt};
 use move_core_types::u256::U256;
+use regex::Regex;
 
 use super::SiteData;
 use crate::{
@@ -309,6 +310,21 @@ impl ResourceManager {
         max_concurrent: Option<NonZeroUsize>,
     ) -> Result<Self> {
         let n_shards = walrus.info(false).await?.n_shards;
+
+        // Cast the keys to lowercase because http headers
+        //  are case-insensitive: RFC7230 sec. 2.7.3
+        if let Some(resources) = ws_resources.as_ref() {
+            if let Some(ref headers) = resources.headers {
+                for (_, header_map) in headers.clone().iter_mut() {
+                    header_map.0 = header_map
+                        .0
+                        .iter()
+                        .map(|(k, v)| (k.to_lowercase(), v.clone()))
+                        .collect();
+                }
+            }
+        }
+
         Ok(ResourceManager {
             walrus,
             ws_resources,
@@ -330,23 +346,8 @@ impl ResourceManager {
         }
 
         let resource_path = full_path_to_resource_path(full_path, root)?;
-        let mut http_headers: BTreeMap<String, String> = self
-            .ws_resources
-            .as_ref()
-            .and_then(|config| config.headers.as_ref())
-            .and_then(|headers| headers.get(&resource_path))
-            .cloned()
-            // Cast the keys to lowercase because http headers
-            //  are case-insensitive: RFC7230 sec. 2.7.3
-            .map(|headers| {
-                headers
-                    .0
-                    .into_iter()
-                    .map(|(k, v)| (k.to_lowercase(), v))
-                    .collect()
-            })
-            .unwrap_or_default();
-
+        let mut http_headers: BTreeMap<String, String> =
+            ResourceManager::derive_http_headers(&self.ws_resources, &resource_path);
         let extension = full_path
             .extension()
             .unwrap_or(
@@ -401,6 +402,38 @@ impl ResourceManager {
             U256::from_le_bytes(&blob_hash),
             plain_content.len(),
         )))
+    }
+
+    ///  Derives the HTTP headers for a resource based on the ws-resources.yaml.
+    ///
+    ///  Matches the path of the resource to the wildcard paths in the configuration to
+    ///  determine the headers to be added to the HTTP response.
+    pub fn derive_http_headers(
+        ws_resources: &Option<WSResources>,
+        resource_path: &str,
+    ) -> BTreeMap<String, String> {
+        ws_resources
+            .as_ref()
+            .and_then(|config| config.headers.as_ref())
+            .and_then(|headers| {
+                headers
+                    .iter()
+                    .filter(|(path, _)| Self::is_pattern_match(path, resource_path))
+                    .max_by_key(|(path, _)| path.split('/').count())
+                    .map(|(_, header_map)| header_map.0.clone())
+            })
+            .unwrap_or_default()
+    }
+
+    /// Matches a pattern to a resource path.
+    ///
+    /// The pattern can contain a wildcard `*` which matches any sequence of characters.
+    /// e.g. `/foo/*` will match `/foo/bar` and `/foo/bar/baz`.
+    fn is_pattern_match(pattern: &str, resource_path: &str) -> bool {
+        let path_regex = pattern.replace('*', ".*");
+        Regex::new(&path_regex)
+            .map(|re| re.is_match(resource_path))
+            .unwrap_or(false)
     }
 
     /// Recursively iterate a directory and load all [`Resources`][Resource] within.
@@ -467,4 +500,102 @@ pub(crate) fn full_path_to_resource_path(full_path: &Path, root: &Path) -> Resul
             .to_str()
             .ok_or(anyhow!("could not process the path string: {:?}", rel_path))?
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use super::{HttpHeaders, ResourceManager};
+    use crate::site::config::WSResources;
+
+    struct PatternMatchTestCase {
+        pattern: &'static str,
+        path: &'static str,
+        expected: bool,
+    }
+
+    #[test]
+    fn test_is_pattern_match() {
+        let tests = vec![
+            PatternMatchTestCase {
+                pattern: "/*.txt",
+                path: "/file.txt",
+                expected: true,
+            },
+            PatternMatchTestCase {
+                pattern: "*.txt",
+                path: "/file.doc",
+                expected: false,
+            },
+            PatternMatchTestCase {
+                pattern: "/test/*",
+                path: "/test/file",
+                expected: true,
+            },
+            PatternMatchTestCase {
+                pattern: "/test/*",
+                path: "/test/file.extension",
+                expected: true,
+            },
+            PatternMatchTestCase {
+                pattern: "/test/*",
+                path: "/test/foo.bar.extension",
+                expected: true,
+            },
+            PatternMatchTestCase {
+                pattern: "/test/*",
+                path: "/test/foo-bar_baz.extension",
+                expected: true,
+            },
+            PatternMatchTestCase {
+                pattern: "[invalid",
+                path: "/file",
+                expected: false,
+            },
+        ];
+        for t in tests {
+            assert_eq!(
+                ResourceManager::is_pattern_match(t.pattern, t.path),
+                t.expected
+            );
+        }
+    }
+
+    #[test]
+    fn test_derive_http_headers() {
+        let test_paths = vec![
+            // This is the longest path. So `/foo/bar/baz/*.svg` would persist over `*.svg`.
+            ("/foo/bar/baz/image.svg", "etag"),
+            // This will only match `*.svg`.
+            (
+                "/very_long_name_that_should_not_be_matched.svg",
+                "cache-control",
+            ),
+        ];
+        let ws_resources = mock_ws_resources();
+        for (path, expected) in test_paths {
+            let result = ResourceManager::derive_http_headers(&ws_resources, path);
+            assert_eq!(result.len(), 1);
+            assert!(result.contains_key(expected));
+        }
+    }
+
+    /// Helper function for testing the `derive_http_headers` method.
+    fn mock_ws_resources() -> Option<WSResources> {
+        let headers_json = r#"{
+                    "/*.svg": {
+                        "cache-control": "public, max-age=86400"
+                    },
+                    "/foo/bar/baz/*.svg": {
+                        "etag": "\"abc123\""
+                    }
+                }"#;
+        let headers: BTreeMap<String, HttpHeaders> = serde_json::from_str(headers_json).unwrap();
+
+        Some(WSResources {
+            headers: Some(headers),
+            routes: None,
+        })
+    }
 }

@@ -5619,6 +5619,7 @@ dependencies = [
  "home",
  "move-core-types",
  "notify",
+ "regex",
  "serde",
  "serde_json",
  "serde_with",
