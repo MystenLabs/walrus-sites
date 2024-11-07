@@ -11,6 +11,7 @@ module walrus_site::site {
     const EResourceDoesNotExist: u64 = 0;
     const ERangeStartGreaterThanRangeEnd: u64 = 1;
     const EStartAndEndRangeAreNone: u64 = 2;
+    const ESiteHasDynamicFields: u64 = 3;
 
     /// The site published on Sui.
     public struct Site has key, store {
@@ -201,5 +202,16 @@ module walrus_site::site {
     public fun remove_route(site: &mut Site, route: &String): (String, String) {
         let routes = df::borrow_mut(&mut site.id, ROUTES_FIELD);
         routes_remove(routes, route)
+    }
+
+    /// Deletes a site object.
+    /// Make sure to call this function only if there are no dynamic fields
+    /// attached to the sites object.
+    public fun burn(site: Site) {
+        let Site {
+            id,
+            name: _
+        } = site;
+        object::delete(id);
     }
 }
