@@ -205,13 +205,14 @@ module walrus_site::site {
     }
 
     /// Deletes a site object.
-    /// Make sure to call this function only if there are no dynamic fields
+    /// Make sure to call this function after deleting all the Resource dynamic fields
     /// attached to the sites object.
     public fun burn(site: Site) {
         let Site {
             id,
             name: _
         } = site;
+        df::remove_if_exists(&mut site.id, ROUTES_FIELD);
         object::delete(id);
     }
 }
