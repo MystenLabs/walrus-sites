@@ -107,10 +107,9 @@ impl SiteManager {
 
     /// Publishes the resources to Walrus using parallel uploads.
     async fn publish_to_walrus<'b>(&mut self, updates: &[&ResourceOp<'b>]) -> Result<()> {
-        // 创建信号量来控制并发数
+        // create semaphore to control concurrency
         let semaphore = Arc::new(Semaphore::new(self.config.workers));
 
-        // 使用 stream 来并行处理上传
         stream::iter(updates)
             .map(|update| {
                 let semaphore = semaphore.clone();
@@ -119,7 +118,6 @@ impl SiteManager {
                 let epochs = self.epochs;
 
                 async move {
-                    // 获取信号量许可
                     let _permit = semaphore.acquire().await?;
 
                     tracing::info!(
@@ -128,7 +126,6 @@ impl SiteManager {
                         resource.unencoded_size
                     );
 
-                    // 创建 walrus 命令
                     let cmd = WalrusJsonCmd {
                         config: None,
                         wallet: None,
@@ -140,7 +137,7 @@ impl SiteManager {
                         },
                     };
 
-                    // 打印实际的 walrus 命令
+                    // trace walrus command
                     let json_input = cmd.to_json()?;
                     tracing::info!("Executing walrus command: {}", json_input);
 
@@ -158,7 +155,7 @@ impl SiteManager {
                     output
                 }
             })
-            .buffer_unordered(10) // 最多10个并发任务
+            .buffer_unordered(self.config.workers)
             .try_collect::<Vec<_>>()
             .await?;
 
