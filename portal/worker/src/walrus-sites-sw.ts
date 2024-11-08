@@ -66,7 +66,7 @@ self.addEventListener("fetch", async (event) => {
                 return await fetchFromCache();
             } else {
                 console.warn("Cache API not available");
-                return await fetchDirectlyOrProxy();
+                return await fetchDirectly();
             }
         };
 
@@ -78,33 +78,21 @@ self.addEventListener("fetch", async (event) => {
                 return resolvedObjectId;
             }
             const cachedResponse = await resolveWithCache(resolvedObjectId, parsedUrl, urlString);
-            return cachedResponse.status === HttpStatusCodes.NOT_FOUND
-                ? proxyFetch()
-                : cachedResponse;
+            return cachedResponse;
         };
 
         // Fetch directly and fallback if necessary
-        const fetchDirectlyOrProxy = async (): Promise<Response> => {
+        const fetchDirectly = async (): Promise<Response> => {
             const response = await resolveAndFetchPage(parsedUrl, null);
-            return response.status === HttpStatusCodes.NOT_FOUND
-            ? proxyFetch()
-            : response;
+            return response;
         };
 
         // Handle error during fetching
-        const handleFetchError = (error: any): Promise<Response> => {
+        const handleFetchError = (error: any): Response => {
             console.error("Error resolving request:", error);
-            console.log("Retrying from the fallback portal.");
-            return proxyFetch();
+            return new Response("Error resolving request", { status: HttpStatusCodes.NOT_FOUND });
         };
 
-        // Fetch from the fallback URL
-        const proxyFetch = async (): Promise<Response> => {
-            const fallbackDomain = "blocksite.net";
-            const fallbackUrl = `https://${parsedUrl.subdomain}.${fallbackDomain}${parsedUrl.path}`;
-            console.info(`Falling back to the devnet portal! ${fallbackUrl}`);
-            return fetch(fallbackUrl);
-        };
         event.respondWith(handleFetchRequest());
         return;
     }
