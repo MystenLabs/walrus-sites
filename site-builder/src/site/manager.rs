@@ -1,9 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::BTreeSet, str::FromStr};
+use std::{collections::BTreeSet, str::FromStr, sync::Arc};
 
 use anyhow::{anyhow, Result};
+use futures::{
+    stream::{self, StreamExt},
+    TryStreamExt,
+};
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{rpc_types::SuiTransactionBlockResponse, wallet_context::WalletContext, SuiClient};
 use sui_types::{
@@ -11,20 +15,16 @@ use sui_types::{
     transaction::{ProgrammableTransaction, TransactionData},
     Identifier,
 };
+use tokio::sync::Semaphore;
 
 use super::{
-    builder::SitePtb,
-    resource::ResourceOp,
-    RemoteSiteFactory,
-    SiteData,
-    SiteDataDiff,
-    SITE_MODULE,
+    builder::SitePtb, resource::ResourceOp, RemoteSiteFactory, SiteData, SiteDataDiff, SITE_MODULE,
 };
 use crate::{
     display,
     publish::WhenWalrusUpload,
     summary::SiteDataDiffSummary,
-    walrus::Walrus,
+    walrus::{command::WalrusJsonCmd, Walrus},
     Config,
 };
 
@@ -93,12 +93,8 @@ impl SiteManager {
         tracing::debug!(operations=?site_updates, "list of operations computed");
 
         let walrus_updates = site_updates.get_walrus_updates(&self.when_upload);
-
-        if !walrus_updates.is_empty() {
+        let result = if !walrus_updates.is_empty() || !site_updates.route_ops.is_unchanged() {
             self.publish_to_walrus(&walrus_updates).await?;
-        }
-
-        let result = if site_updates.has_updates() {
             display::action("Updating the Walrus Site object on Sui");
             let result = self.execute_sui_updates(&site_updates).await?;
             display::done();
@@ -109,26 +105,63 @@ impl SiteManager {
         Ok((result, site_updates.summary(&self.when_upload)))
     }
 
-    /// Publishes the resources to Walrus.
+    /// Publishes the resources to Walrus using parallel uploads.
     async fn publish_to_walrus<'b>(&mut self, updates: &[&ResourceOp<'b>]) -> Result<()> {
-        for update in updates.iter() {
-            let resource = update.inner();
-            tracing::debug!(
-                resource=?resource.full_path,
-                blob_id=%resource.info.blob_id,
-                unencoded_size=%resource.unencoded_size,
-                "storing new blob on Walrus"
-            );
-            display::action(format!(
-                "Storing resource on Walrus: {}",
-                &resource.info.path
-            ));
-            let _output = self
-                .walrus
-                .store(resource.full_path.clone(), self.epochs, false)
-                .await?;
-            display::done();
-        }
+        // 创建信号量来控制并发数
+        let semaphore = Arc::new(Semaphore::new(self.config.workers));
+
+        // 使用 stream 来并行处理上传
+        stream::iter(updates)
+            .map(|update| {
+                let semaphore = semaphore.clone();
+                let resource = update.inner();
+                let mut walrus = self.walrus.clone();
+                let epochs = self.epochs;
+
+                async move {
+                    // 获取信号量许可
+                    let _permit = semaphore.acquire().await?;
+
+                    tracing::info!(
+                        "Uploading to Walrus: {} (size: {} bytes)",
+                        resource.full_path.display(),
+                        resource.unencoded_size
+                    );
+
+                    // 创建 walrus 命令
+                    let cmd = WalrusJsonCmd {
+                        config: None,
+                        wallet: None,
+                        gas_budget: 500_000_000,
+                        command: crate::walrus::command::Command::Store {
+                            file: resource.full_path.clone(),
+                            epochs,
+                            force: false,
+                        },
+                    };
+
+                    // 打印实际的 walrus 命令
+                    let json_input = cmd.to_json()?;
+                    tracing::info!("Executing walrus command: {}", json_input);
+
+                    display::action(format!(
+                        "Storing resource on Walrus: {}",
+                        &resource.info.path
+                    ));
+
+                    let output = walrus
+                        .store(resource.full_path.clone(), epochs, false)
+                        .await;
+
+                    display::done();
+
+                    output
+                }
+            })
+            .buffer_unordered(10) // 最多10个并发任务
+            .try_collect::<Vec<_>>()
+            .await?;
+
         Ok(())
     }
 

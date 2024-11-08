@@ -75,11 +75,15 @@ pub(crate) struct GeneralArgs {
     #[clap(short, long)]
     #[serde(default = "default::gas_budget")]
     gas_budget: Option<u64>,
+    /// The number of workers to use for parallel processing.
+    #[clap(long, default_value_t = 1)]
+    workers: usize,
 }
 
 impl Default for GeneralArgs {
     fn default() -> Self {
         Self {
+            workers: 1,
             rpc_url: None,
             wallet: None,
             walrus_binary: default::walrus_binary(),
@@ -171,6 +175,8 @@ pub(crate) struct Config {
     pub package: ObjectID,
     #[serde(default)]
     pub general: GeneralArgs,
+    #[serde(default)]
+    pub workers: usize,
 }
 
 impl Config {
@@ -179,6 +185,11 @@ impl Config {
     /// The values in `other_general` take precedence.
     pub fn merge(&mut self, other_general: &GeneralArgs) {
         self.general.merge(other_general);
+        if self.workers == 0 {
+            if other_general.workers > 0 {
+                self.workers = other_general.workers;
+            }
+        }
     }
 
     pub fn walrus_binary(&self) -> String {
