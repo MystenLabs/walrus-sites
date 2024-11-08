@@ -1,9 +1,11 @@
 #[test_only]
 module walrus_site::site_tests {
     use walrus_site::site::{
-        ERangeStartGreaterThanRangeEnd
+        ERangeStartGreaterThanRangeEnd,
+        EStartAndEndRangeAreNone
     };
     #[test]
+    #[expected_failure(abort_code = EStartAndEndRangeAreNone)]
     fun test_new_range_no_bounds_defined() {
         walrus_site::site::new_range(
             option::none(),
