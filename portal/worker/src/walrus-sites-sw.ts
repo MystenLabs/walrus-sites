@@ -34,7 +34,11 @@ self.addEventListener("fetch", async (event) => {
     // Check if the request is for a site.
     let portalDomainNameLengthString = process.env.PORTAL_DOMAIN_NAME_LENGTH;
     let portalDomainNameLength: number | undefined;
+<<<<<<< HEAD
     if (portalDomainNameLengthString) {
+=======
+    if (process.env.PORTAL_DOMAIN_NAME_LENGTH) {
+>>>>>>> f3ad50d (feat(portal): update portal domain name resolution using length (#293))
         portalDomainNameLength = Number(portalDomainNameLengthString);
     }
     const objectIdPath = getObjectIdLink(urlString);
