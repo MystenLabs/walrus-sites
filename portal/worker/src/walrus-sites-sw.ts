@@ -50,7 +50,7 @@ self.addEventListener("fetch", async (event) => {
 
     if (requestDomain === portalDomain && parsedUrl && parsedUrl.subdomain) {
 
-        // Handle caching and fetching based on cache availability
+        // Fetches the page resources and handles the cache if it exists
         const handleFetchRequest = async (): Promise<Response> => {
             if ("caches" in self) {
                 return await fetchFromCache();
