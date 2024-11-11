@@ -14,10 +14,17 @@ export async function GET(req: Request) {
     }
     const url = new URL(originalUrl);
 
+    // Check if the request is for a site.
+    let portalDomainNameLengthString = process.env.PORTAL_DOMAIN_NAME_LENGTH;
+    let portalDomainNameLength: number | undefined;
+    if (process.env.PORTAL_DOMAIN_NAME_LENGTH) {
+        portalDomainNameLength = Number(portalDomainNameLengthString);
+    }
+
     const objectIdPath = getObjectIdLink(url.toString());
     if (objectIdPath) {
         console.log(`Redirecting to portal url response: ${url.toString()} from ${objectIdPath}`);
-        return redirectToPortalURLResponse(url, objectIdPath);
+        return redirectToPortalURLResponse(url, objectIdPath, portalDomainNameLength);
     }
     const walrusPath: string | null = getBlobIdLink(url.toString());
     if (walrusPath) {
@@ -25,10 +32,9 @@ export async function GET(req: Request) {
         return redirectToAggregatorUrlResponse(url, walrusPath);
     }
 
-    // Check if the request is for a site.
-    const parsedUrl = getSubdomainAndPath(url);
-    const portalDomain = getDomain(url);
-    const requestDomain = getDomain(url);
+    const parsedUrl = getSubdomainAndPath(url, Number(portalDomainNameLength));
+    const portalDomain = getDomain(url, Number(portalDomainNameLength));
+    const requestDomain = getDomain(url, Number(portalDomainNameLength));
 
     if (requestDomain == portalDomain && parsedUrl && parsedUrl.subdomain) {
         const forwardToFallback = async () => {

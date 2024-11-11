@@ -5,6 +5,8 @@ import { describe, expect, test } from 'vitest'
 import { getDomain, getSubdomainAndPath } from './domain_parsing'
 import { DomainDetails } from './types'
 
+const PORTAL_DOMAIN_NAME_LENGTH = 21
+
 const getDomainTestCases: [string, string][] = [
     ['https://example.com', 'example.com'],
     ['https://suinsname.localhost:8080', 'localhost'],
@@ -23,6 +25,20 @@ describe('getDomain', () => {
     getDomainTestCases.forEach(([input, expected]) => {
         test(`${input} -> ${expected}`, () => {
             const domain = getDomain(new URL(input))
+                expect(domain).toEqual(expected)
+        })
+    })
+})
+
+const getDomainWithPortalNameLengthTestCases: [string, string][] = [
+    ['https://sw-tnet.blocksite.net', 'sw-tnet.blocksite.net'],
+    ['https://subname.sw-tnet.blocksite.net', 'sw-tnet.blocksite.net']
+]
+
+describe('getDomain with portal name length', () => {
+    getDomainWithPortalNameLengthTestCases.forEach(([input, expected]) => {
+        test(`${input} -> ${expected}`, () => {
+            const domain = getDomain(new URL(input), PORTAL_DOMAIN_NAME_LENGTH)
                 expect(domain).toEqual(expected)
         })
     })
@@ -50,6 +66,27 @@ describe('getSubdomainAndPath', () => {
                 path: ${path.path ?? "null"}`,
                 () => {
                     expect(getSubdomainAndPath(new URL(input))).toEqual(path);
+                });
+        });
+})
+
+
+const getSubdomainAndPathWithPortalLengthTestCases: [string, DomainDetails][] = [
+    ['https://subname.name.sw-tnet.blocksite.net/',
+        {subdomain: 'subname.name', path: '/index.html' }],
+    ['https://name.sw-tnet.blocksite.net/',
+        { subdomain: 'name', path: '/index.html' }],
+]
+describe('getSubdomainAndPath', () => {
+    getSubdomainAndPathWithPortalLengthTestCases.forEach(
+        ([input, path]) => {
+            test(`${input} ->
+                subdomain: ${path.subdomain ?? "null"},
+                path: ${path.path ?? "null"}`,
+                () => {
+                    expect(getSubdomainAndPath(
+                        new URL(input), PORTAL_DOMAIN_NAME_LENGTH
+                    )).toEqual(path);
                 });
         });
 })

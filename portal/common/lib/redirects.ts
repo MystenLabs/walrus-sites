@@ -9,9 +9,11 @@ import { SuiObjectResponse } from "@mysten/sui/client";
 /**
  * Redirects to the portal URL.
  */
-export function redirectToPortalURLResponse(scope: URL, path: DomainDetails): Response {
+export function redirectToPortalURLResponse(
+    scope: URL, path: DomainDetails, portalDomainNameLength?: number
+): Response {
     // Redirect to the walrus site for the specified domain and path
-    const redirectUrl = getPortalUrl(path, scope.href);
+    const redirectUrl = getPortalUrl(path, scope.href, portalDomainNameLength);
     console.log("Redirecting to the Walrus Site link: ", path, redirectUrl);
     return makeRedirectResponse(redirectUrl);
 }
@@ -52,9 +54,12 @@ function makeRedirectResponse(url: string): Response {
 /**
  * Returns the url for the Portal, given a subdomain and a path.
  */
-function getPortalUrl(path: DomainDetails, scope: string): string {
+function getPortalUrl(path: DomainDetails,
+    scope: string,
+    portalDomainNameLength?: number
+): string {
     const scopeUrl = new URL(scope);
-    const portalDomain = getDomain(scopeUrl);
+    const portalDomain = getDomain(scopeUrl, portalDomainNameLength);
     let portString = "";
     if (scopeUrl.port) {
         portString = ":" + scopeUrl.port;
