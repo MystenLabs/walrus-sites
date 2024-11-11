@@ -5,6 +5,8 @@ import { describe, expect, test } from 'vitest'
 import { getDomain, getSubdomainAndPath } from './domain_parsing'
 import { DomainDetails } from './types'
 
+const PORTAL_DOMAIN_NAME_LENGTH = 21
+
 const getDomainTestCases: [string, string][] = [
     ['https://example.com', 'example.com'],
     ['https://suinsname.localhost:8080', 'localhost'],
@@ -36,7 +38,7 @@ const getDomainWithPortalNameLengthTestCases: [string, string][] = [
 describe('getDomain with portal name length', () => {
     getDomainWithPortalNameLengthTestCases.forEach(([input, expected]) => {
         test(`${input} -> ${expected}`, () => {
-            const domain = getDomain(new URL(input), 21)
+            const domain = getDomain(new URL(input), PORTAL_DOMAIN_NAME_LENGTH)
                 expect(domain).toEqual(expected)
         })
     })
@@ -70,8 +72,10 @@ describe('getSubdomainAndPath', () => {
 
 
 const getSubdomainAndPathWithPortalLengthTestCases: [string, DomainDetails][] = [
-    ['https://subname.name.sw-tnet.blocksite.net/', {subdomain: 'subname.name', path: '/index.html' }],
-    ['https://name.sw-tnet.blocksite.net/', { subdomain: 'name', path: '/index.html' }],
+    ['https://subname.name.sw-tnet.blocksite.net/',
+        {subdomain: 'subname.name', path: '/index.html' }],
+    ['https://name.sw-tnet.blocksite.net/',
+        { subdomain: 'name', path: '/index.html' }],
 ]
 describe('getSubdomainAndPath', () => {
     getSubdomainAndPathWithPortalLengthTestCases.forEach(
@@ -80,7 +84,9 @@ describe('getSubdomainAndPath', () => {
                 subdomain: ${path.subdomain ?? "null"},
                 path: ${path.path ?? "null"}`,
                 () => {
-                    expect(getSubdomainAndPath(new URL(input), 21)).toEqual(path);
+                    expect(getSubdomainAndPath(
+                        new URL(input), PORTAL_DOMAIN_NAME_LENGTH
+                    )).toEqual(path);
                 });
         });
 })

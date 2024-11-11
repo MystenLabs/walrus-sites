@@ -44,9 +44,14 @@ self.addEventListener("fetch", async (event) => {
     }
 
     // Check if the request is for a site.
-    const parsedUrl = getSubdomainAndPath(url);
-    const portalDomain = getDomain(scope);
-    const requestDomain = getDomain(url);
+    let portalDomainNameLengthString = process.env.PORTAL_DOMAIN_NAME_LENGTH;
+    let portalDomainNameLength: Number | undefined;
+    if (process.env.PORTAL_DOMAIN_NAME_LENGTH) {
+        portalDomainNameLength = Number(portalDomainNameLengthString);
+    }
+    const parsedUrl = getSubdomainAndPath(url, Number(portalDomainNameLength));
+    const portalDomain = getDomain(url, Number(portalDomainNameLength));
+    const requestDomain = getDomain(url, Number(portalDomainNameLength));
 
     console.log("Portal domain and request domain: ", portalDomain, requestDomain);
     console.log("Parsed URL: ", parsedUrl);

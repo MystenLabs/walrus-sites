@@ -26,9 +26,14 @@ export async function GET(req: Request) {
     }
 
     // Check if the request is for a site.
-    const parsedUrl = getSubdomainAndPath(url);
-    const portalDomain = getDomain(url);
-    const requestDomain = getDomain(url);
+    let portalDomainNameLengthString = process.env.PORTAL_DOMAIN_NAME_LENGTH;
+    let portalDomainNameLength: Number | undefined;
+    if (process.env.PORTAL_DOMAIN_NAME_LENGTH) {
+        portalDomainNameLength = Number(portalDomainNameLengthString);
+    }
+    const parsedUrl = getSubdomainAndPath(url, Number(portalDomainNameLength));
+    const portalDomain = getDomain(url, Number(portalDomainNameLength));
+    const requestDomain = getDomain(url, Number(portalDomainNameLength));
 
     if (requestDomain == portalDomain && parsedUrl && parsedUrl.subdomain) {
         const forwardToFallback = async () => {
