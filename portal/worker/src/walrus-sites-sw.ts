@@ -1,13 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { NETWORK } from "@lib/constants";
 import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import resolveWithCache from "./caching";
 import { resolveAndFetchPage, resolveObjectId } from "@lib/page_fetching";
-import { HttpStatusCodes } from "@lib/http/http_status_codes";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
@@ -53,11 +51,7 @@ self.addEventListener("fetch", async (event) => {
     if (requestDomain === portalDomain && parsedUrl && parsedUrl.subdomain) {
         // Fetches the page resources.
         const handleFetchRequest = async (): Promise<Response> => {
-            try {
-                return await fetchWithCacheSupport();
-            } catch (error) {
-                return handleFetchError(error);
-            }
+            return await fetchWithCacheSupport();
         };
 
         // Handle caching and fetching based on cache availability
@@ -85,12 +79,6 @@ self.addEventListener("fetch", async (event) => {
         const fetchDirectly = async (): Promise<Response> => {
             const response = await resolveAndFetchPage(parsedUrl, null);
             return response;
-        };
-
-        // Handle error during fetching
-        const handleFetchError = (error: any): Response => {
-            console.error("Error resolving request:", error);
-            return new Response("Error resolving request", { status: HttpStatusCodes.NOT_FOUND });
         };
 
         event.respondWith(handleFetchRequest());

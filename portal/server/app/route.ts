@@ -5,7 +5,6 @@ import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import { resolveAndFetchPage } from "@lib/page_fetching";
-import { HttpStatusCodes } from "@lib/http/http_status_codes";
 
 export async function GET(req: Request) {
     const originalUrl = req.headers.get("x-original-url");
@@ -31,12 +30,8 @@ export async function GET(req: Request) {
     const requestDomain = getDomain(url);
 
     if (requestDomain == portalDomain && parsedUrl && parsedUrl.subdomain) {
-        try {
-            const fetchPageResponse = await resolveAndFetchPage(parsedUrl, null);
-            return fetchPageResponse;
-        } catch (error) {
-            return new Response("Error resolving request", { status: HttpStatusCodes.NOT_FOUND });
-        }
+        const fetchPageResponse = await resolveAndFetchPage(parsedUrl, null);
+        return fetchPageResponse;
     }
 
     const atBaseUrl = portalDomain == url.host.split(":")[0];
