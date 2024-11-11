@@ -31,9 +31,15 @@ self.addEventListener("fetch", async (event) => {
     const scopeString = self.registration.scope;
     const scope = new URL(scopeString);
 
+    // Check if the request is for a site.
+    let portalDomainNameLengthString = process.env.PORTAL_DOMAIN_NAME_LENGTH;
+    let portalDomainNameLength: number | undefined;
+    if (process.env.PORTAL_DOMAIN_NAME_LENGTH) {
+        portalDomainNameLength = Number(portalDomainNameLengthString);
+    }
     const objectIdPath = getObjectIdLink(urlString);
     if (objectIdPath) {
-        event.respondWith(redirectToPortalURLResponse(scope, objectIdPath));
+        event.respondWith(redirectToPortalURLResponse(scope, objectIdPath, portalDomainNameLength));
         return;
     }
 
@@ -43,12 +49,6 @@ self.addEventListener("fetch", async (event) => {
         return;
     }
 
-    // Check if the request is for a site.
-    let portalDomainNameLengthString = process.env.PORTAL_DOMAIN_NAME_LENGTH;
-    let portalDomainNameLength: Number | undefined;
-    if (process.env.PORTAL_DOMAIN_NAME_LENGTH) {
-        portalDomainNameLength = Number(portalDomainNameLengthString);
-    }
     const parsedUrl = getSubdomainAndPath(url, Number(portalDomainNameLength));
     const portalDomain = getDomain(url, Number(portalDomainNameLength));
     const requestDomain = getDomain(url, Number(portalDomainNameLength));
