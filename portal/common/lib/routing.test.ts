@@ -8,7 +8,6 @@ const snakeSiteObjectId = "0x7a95e4be3948415b852fb287d455166a276d7a52f1a567b4a26
 test.skip("getRoutes", async () => {
     // TODO: when you make sure get_routes fetches
     // the Routes dynamic field, mock the request.
-    // const rpcUrl = getFullnodeUrl(NETWORK);
     const routes = await getRoutes(snakeSiteObjectId);
     console.log(routes);
 });
