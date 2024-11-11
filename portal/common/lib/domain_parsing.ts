@@ -9,8 +9,8 @@ import { UrlExtract, DomainDetails } from "./types/index";
  * @param orig_url The URL to extract the domain from. e.g. "https://example.com"
  * @returns The domain of the URL. e.g. "example.com"
  */
-export function getDomain(url: URL): string | null {
-    return splitUrl(url).domain;
+export function getDomain(url: URL, portalNameLength?: Number): string | null {
+    return splitUrl(url, portalNameLength).domain;
 }
 
 /**
@@ -18,8 +18,8 @@ export function getDomain(url: URL): string | null {
 * @param url e.g. "https://subname.name.walrus.site/"
 * @returns domain details e.g. { subdomain: "subname", path: "/index.html"}
 */
-export function getSubdomainAndPath(url: URL): DomainDetails | null {
-    return splitUrl(url).details;
+export function getSubdomainAndPath(url: URL, portalNameLength?: Number): DomainDetails | null {
+    return splitUrl(url, portalNameLength).details;
 }
 
 /**
@@ -29,13 +29,18 @@ export function getSubdomainAndPath(url: URL): DomainDetails | null {
     {domain: name.walrus.site,
     { subdomain: "subname", path: "/index.html"}}
 */
-function splitUrl(url: URL): UrlExtract {
+function splitUrl(url: URL, portalNameLength?: Number): UrlExtract {
     const parsed = parseDomain(url.hostname);
     let domain: string | null = null;
     let subdomain: string | null = null;
     if (parsed.type === ParseResultType.Listed) {
-        domain = domain = parsed.domain + "." + parsed.topLevelDomains.join(".")
-        subdomain = parsed.subDomains.join(".")
+        if (portalNameLength) {
+            domain = parsed.hostname.slice(-portalNameLength)
+            subdomain = parsed.hostname.slice(0, -portalNameLength - 1)
+        } else {
+            domain = parsed.domain + "." + parsed.topLevelDomains.join(".")
+            subdomain = parsed.subDomains.join(".")
+        }
     } else if (parsed.type === ParseResultType.Reserved) {
         domain = parsed.labels[parsed.labels.length - 1];
         subdomain = parsed.labels.slice(0, parsed.labels.length - 1).join('.');

@@ -28,6 +28,20 @@ describe('getDomain', () => {
     })
 })
 
+const getDomainWithPortalNameLengthTestCases: [string, string][] = [
+    ['https://sw-tnet.blocksite.net', 'sw-tnet.blocksite.net'],
+    ['https://subname.sw-tnet.blocksite.net', 'sw-tnet.blocksite.net']
+]
+
+describe('getDomain with portal name length', () => {
+    getDomainWithPortalNameLengthTestCases.forEach(([input, expected]) => {
+        test(`${input} -> ${expected}`, () => {
+            const domain = getDomain(new URL(input), 21)
+                expect(domain).toEqual(expected)
+        })
+    })
+})
+
 const getSubdomainAndPathTestCases: [string, DomainDetails][] = [
     ['https://subname.name.walrus.site/', {subdomain: 'subname.name', path: '/index.html' }],
     ['https://name.walrus.site/', { subdomain: 'name', path: '/index.html' }],
@@ -50,6 +64,23 @@ describe('getSubdomainAndPath', () => {
                 path: ${path.path ?? "null"}`,
                 () => {
                     expect(getSubdomainAndPath(new URL(input))).toEqual(path);
+                });
+        });
+})
+
+
+const getSubdomainAndPathWithPortalLengthTestCases: [string, DomainDetails][] = [
+    ['https://subname.name.sw-tnet.blocksite.net/', {subdomain: 'subname.name', path: '/index.html' }],
+    ['https://name.sw-tnet.blocksite.net/', { subdomain: 'name', path: '/index.html' }],
+]
+describe('getSubdomainAndPath', () => {
+    getSubdomainAndPathWithPortalLengthTestCases.forEach(
+        ([input, path]) => {
+            test(`${input} ->
+                subdomain: ${path.subdomain ?? "null"},
+                path: ${path.path ?? "null"}`,
+                () => {
+                    expect(getSubdomainAndPath(new URL(input), 21)).toEqual(path);
                 });
         });
 })
