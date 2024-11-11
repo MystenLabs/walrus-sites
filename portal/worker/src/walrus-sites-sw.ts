@@ -49,18 +49,14 @@ self.addEventListener("fetch", async (event) => {
     console.log("Parsed URL: ", parsedUrl);
 
     if (requestDomain === portalDomain && parsedUrl && parsedUrl.subdomain) {
-        // Fetches the page resources.
-        const handleFetchRequest = async (): Promise<Response> => {
-            return await fetchWithCacheSupport();
-        };
 
         // Handle caching and fetching based on cache availability
-        const fetchWithCacheSupport = async (): Promise<Response> => {
+        const handleFetchRequest = async (): Promise<Response> => {
             if ("caches" in self) {
                 return await fetchFromCache();
             } else {
                 console.warn("Cache API not available");
-                return await fetchDirectly();
+                return await resolveAndFetchPage(parsedUrl, null);
             }
         };
 
@@ -71,14 +67,7 @@ self.addEventListener("fetch", async (event) => {
             if (typeof resolvedObjectId !== "string") {
                 return resolvedObjectId;
             }
-            const cachedResponse = await resolveWithCache(resolvedObjectId, parsedUrl, urlString);
-            return cachedResponse;
-        };
-
-        // Fetch directly and fallback if necessary
-        const fetchDirectly = async (): Promise<Response> => {
-            const response = await resolveAndFetchPage(parsedUrl, null);
-            return response;
+            return await resolveWithCache(resolvedObjectId, parsedUrl, urlString);
         };
 
         event.respondWith(handleFetchRequest());

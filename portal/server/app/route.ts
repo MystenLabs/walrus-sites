@@ -30,8 +30,7 @@ export async function GET(req: Request) {
     const requestDomain = getDomain(url);
 
     if (requestDomain == portalDomain && parsedUrl && parsedUrl.subdomain) {
-        const fetchPageResponse = await resolveAndFetchPage(parsedUrl, null);
-        return fetchPageResponse;
+        return await resolveAndFetchPage(parsedUrl, null);
     }
 
     const atBaseUrl = portalDomain == url.host.split(":")[0];
