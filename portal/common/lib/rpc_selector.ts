@@ -19,14 +19,27 @@ interface RPCSelectorInterface {
     call<T>(method: string, args: any[]): Promise<T>;
 }
 
+class WrappedSuiClient extends SuiClient {
+    private url: string;
+
+    constructor(url: string) {
+        super({ url });
+        this.url = url;
+    }
+
+    public getURL(): string {
+        return this.url;
+    }
+}
+
 class RPCSelector implements RPCSelectorInterface {
     private static instance: RPCSelector;
-    private clients: SuiClient[];
-    private selectedClient: SuiClient | undefined;
+    private clients: WrappedSuiClient[];
+    private selectedClient: WrappedSuiClient | undefined;
 
     private constructor(rpcURLs: string[]) {
         // Initialize clients.
-        this.clients = rpcURLs.map((rpcUrl) => new SuiClient({ url: rpcUrl }));
+        this.clients = rpcURLs.map((rpcUrl) => new WrappedSuiClient(rpcUrl));
         this.selectedClient = undefined;
     }
 
@@ -76,7 +89,6 @@ class RPCSelector implements RPCSelectorInterface {
         if (this.isValidResponse(result)) {
             return result;
         } else {
-            console.error("Invalid response from selected client");
             throw new Error("Invalid response from selected client");
         }
     }
@@ -84,7 +96,7 @@ class RPCSelector implements RPCSelectorInterface {
     // Fallback to querying all clients using Promise.any.
     private async callFallbackClients<T>(methodName: string, args: any[]): Promise<T> {
         const clientPromises = this.clients.map((client) =>
-            new Promise<{ result: T; client: SuiClient }>(async (resolve, reject) => {
+            new Promise<{ result: T; client: WrappedSuiClient }>(async (resolve, reject) => {
                 try {
                     const method = (client as any)[methodName] as Function;
                     if (!method) {
