@@ -1,8 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { getFullnodeUrl, SuiClient } from "@mysten/sui/client";
-import { NETWORK } from "./constants";
 import {
     DomainDetails,
     isResource,
@@ -33,11 +31,9 @@ export async function resolveAndFetchPage(
     parsedUrl: DomainDetails,
     resolvedObjectId: string | null,
 ): Promise<Response> {
-    const rpcUrl = getFullnodeUrl(NETWORK);
-    const client = new SuiClient({ url: rpcUrl });
 
     if (!resolvedObjectId) {
-        const resolveObjectResult = await resolveObjectId(parsedUrl, client);
+        const resolveObjectResult = await resolveObjectId(parsedUrl);
         const isObjectId = typeof resolveObjectResult == "string";
         if (!isObjectId) {
             return resolveObjectResult;
@@ -52,10 +48,10 @@ export async function resolveAndFetchPage(
 
     // Initiate a fetch request to get the Routes object in case the request
     // to the initial unfiltered path fails.
-    const routesPromise = getRoutes(client, resolvedObjectId);
+    const routesPromise = getRoutes(resolvedObjectId);
 
     // Fetch the page using the initial path.
-    const fetchPromise = await fetchPage(client, resolvedObjectId, parsedUrl.path);
+    const fetchPromise = await fetchPage(resolvedObjectId, parsedUrl.path);
 
     // If the fetch fails, check if the path can be matched using
     // the Routes DF and fetch the redirected path.
@@ -71,14 +67,13 @@ export async function resolveAndFetchPage(
             console.warn(`No matching route found for ${parsedUrl.path}`);
             return siteNotFound();
         }
-        return fetchPage(client, resolvedObjectId, matchingRoute);
+        return fetchPage(resolvedObjectId, matchingRoute);
     }
     return fetchPromise;
 }
 
 export async function resolveObjectId(
     parsedUrl: DomainDetails,
-    client: SuiClient,
 ): Promise<string | Response> {
     let objectId = hardcodedSubdmains(parsedUrl.subdomain);
     if (!objectId && !parsedUrl.subdomain.includes(".")) {
@@ -94,7 +89,7 @@ export async function resolveObjectId(
         // Check if there is a SuiNs name
         try {
             // TODO: only check for SuiNs names if the subdomain is not a valid base36 string.
-            objectId = await resolveSuiNsAddress(client, parsedUrl.subdomain);
+            objectId = await resolveSuiNsAddress(parsedUrl.subdomain);
             if (!objectId) {
                 return noObjectIdFound();
             }
@@ -110,14 +105,13 @@ export async function resolveObjectId(
  * Fetches a page.
  */
 export async function fetchPage(
-    client: SuiClient,
     objectId: string,
     path: string,
 ): Promise<Response> {
-    const result = await fetchResource(client, objectId, path, new Set<string>());
+    const result = await fetchResource(objectId, path, new Set<string>());
     if (!isResource(result) || !result.blob_id) {
         if (path !== "/404.html") {
-            return fetchPage(client, objectId, "/404.html");
+            return fetchPage(objectId, "/404.html");
         } else {
             return siteNotFound();
         }

@@ -14,3 +14,11 @@ export const SITE_NAMES: { [key: string]: string } = {
 export const FALLBACK_PORTAL = "blob.store";
 // The string representing the ResourcePath struct in the walrus_site package.
 export const RESOURCE_PATH_MOVE_TYPE = SITE_PACKAGE + "::site::ResourcePath";
+
+export const TESTNET_RPC_LIST = [
+    'https://fullnode.testnet.sui.io',
+    'https://sui-testnet.public.blastapi.io',
+    'https://sui-testnet-endpoint.blockvision.org'
+];
+
+export const RPC_REQUEST_TIMEOUT_MS = 7000;

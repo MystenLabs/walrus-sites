@@ -5,7 +5,6 @@ import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import { resolveAndFetchPage } from "@lib/page_fetching";
-import { HttpStatusCodes } from "@lib/http/http_status_codes";
 
 export async function GET(req: Request) {
     const originalUrl = req.headers.get("x-original-url");
@@ -37,29 +36,7 @@ export async function GET(req: Request) {
     const requestDomain = getDomain(url, Number(portalDomainNameLength));
 
     if (requestDomain == portalDomain && parsedUrl && parsedUrl.subdomain) {
-        const forwardToFallback = async () => {
-            const subdomain = parsedUrl.subdomain;
-            const fallbackDomain = process.env.FALLBACK_DEVNET_PORTAL;
-            const fallbackUrl = `https://${subdomain}.${fallbackDomain}${parsedUrl.path}`;
-            // We need to add the Accept-Encoding header to ensure that the fall back domain does
-            // not reply with a compressed response.
-            console.info(`Falling back to the devnet portal! ${fallbackUrl}`);
-            return fetch(fallbackUrl, {
-                headers: {
-                    "Accept-Encoding": "identity",
-                },
-            });
-        };
-
-        try {
-            const fetchPageResponse = await resolveAndFetchPage(parsedUrl, null);
-            if (fetchPageResponse.status == HttpStatusCodes.NOT_FOUND) {
-                return forwardToFallback();
-            }
-            return fetchPageResponse;
-        } catch (error) {
-            return forwardToFallback();
-        }
+        return await resolveAndFetchPage(parsedUrl, null);
     }
 
     const atBaseUrl = portalDomain == url.host.split(":")[0];

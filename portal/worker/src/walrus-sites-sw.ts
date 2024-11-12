@@ -1,14 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { NETWORK } from "@lib/constants";
-import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
 import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import resolveWithCache from "./caching";
 import { resolveAndFetchPage, resolveObjectId } from "@lib/page_fetching";
-import { HttpStatusCodes } from "@lib/http/http_status_codes";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
@@ -57,60 +54,27 @@ self.addEventListener("fetch", async (event) => {
     console.log("Parsed URL: ", parsedUrl);
 
     if (requestDomain === portalDomain && parsedUrl && parsedUrl.subdomain) {
-        // Fetches the page resources.
-        const handleFetchRequest = async (): Promise<Response> => {
-            try {
-                return await fetchWithCacheSupport();
-            } catch (error) {
-                return handleFetchError(error);
-            }
-        };
 
-        // Handle caching and fetching based on cache availability
-        const fetchWithCacheSupport = async (): Promise<Response> => {
+        // Fetches the page resources and handles the cache if it exists
+        const handleFetchRequest = async (): Promise<Response> => {
             if ("caches" in self) {
                 return await fetchFromCache();
             } else {
                 console.warn("Cache API not available");
-                return await fetchDirectlyOrProxy();
+                return await resolveAndFetchPage(parsedUrl, null);
             }
         };
 
         // Attempt to fetch from cache
         const fetchFromCache = async (): Promise<Response> => {
-            const rpcUrl = getFullnodeUrl(NETWORK);
-            const client = new SuiClient({ url: rpcUrl });
             console.log("Pre-fetching the sui object ID");
-            const resolvedObjectId = await resolveObjectId(parsedUrl, client);
+            const resolvedObjectId = await resolveObjectId(parsedUrl);
             if (typeof resolvedObjectId !== "string") {
                 return resolvedObjectId;
             }
-            const cachedResponse = await resolveWithCache(resolvedObjectId, parsedUrl, urlString);
-            return cachedResponse.status === HttpStatusCodes.NOT_FOUND
-                ? proxyFetch()
-                : cachedResponse;
+            return await resolveWithCache(resolvedObjectId, parsedUrl, urlString);
         };
 
-        // Fetch directly and fallback if necessary
-        const fetchDirectlyOrProxy = async (): Promise<Response> => {
-            const response = await resolveAndFetchPage(parsedUrl, null);
-            return response.status === HttpStatusCodes.NOT_FOUND ? proxyFetch() : response;
-        };
-
-        // Handle error during fetching
-        const handleFetchError = (error: any): Promise<Response> => {
-            console.error("Error resolving request:", error);
-            console.log("Retrying from the fallback portal.");
-            return proxyFetch();
-        };
-
-        // Fetch from the fallback URL
-        const proxyFetch = async (): Promise<Response> => {
-            const fallbackDomain = "blocksite.net";
-            const fallbackUrl = `https://${parsedUrl.subdomain}.${fallbackDomain}${parsedUrl.path}`;
-            console.info(`Falling back to the devnet portal! ${fallbackUrl}`);
-            return fetch(fallbackUrl);
-        };
         event.respondWith(handleFetchRequest());
         return;
     }

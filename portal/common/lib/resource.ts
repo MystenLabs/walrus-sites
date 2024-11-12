@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { HttpStatusCodes } from "./http/http_status_codes";
-import { SuiClient, SuiObjectData, SuiObjectResponse } from "@mysten/sui/client";
+import { SuiObjectData, SuiObjectResponse } from "@mysten/sui/client";
 import { Resource, VersionedResource } from "./types";
 import { MAX_REDIRECT_DEPTH, RESOURCE_PATH_MOVE_TYPE } from "./constants";
 import { checkRedirect } from "./redirects";
@@ -10,6 +10,7 @@ import { fromBase64 } from "@mysten/bcs";
 import { ResourcePathStruct, DynamicFieldStruct, ResourceStruct } from "./bcs_data_parsing";
 import { deriveDynamicFieldID } from "@mysten/sui/utils";
 import { bcs } from "@mysten/bcs";
+import rpcSelectorSingleton from "./rpc_selector";
 
 /**
  * Fetches a resource of a site.
@@ -30,7 +31,6 @@ import { bcs } from "@mysten/bcs";
  * This is done by using the `seenResources` set.
  */
 export async function fetchResource(
-    client: SuiClient,
     objectId: string,
     path: string,
     seenResources: Set<string>,
@@ -50,13 +50,13 @@ export async function fetchResource(
     const [
         primaryObjectResponse,
         dynamicFieldResponse
-    ] = await fetchObjectPairData(client, objectId, dynamicFieldId);
+    ] = await fetchObjectPairData(objectId, dynamicFieldId);
 
     seenResources.add(objectId);
 
     const redirectId = checkRedirect(primaryObjectResponse);
     if (redirectId) {
-        return fetchResource(client, redirectId, path, seenResources, depth + 1);
+        return fetchResource(redirectId, path, seenResources, depth + 1);
     }
 
     return extractResource(dynamicFieldResponse, dynamicFieldId);
@@ -70,12 +70,11 @@ export async function fetchResource(
 * @returns A tuple of SuiObjectResponse[] or an HttpStatusCode in case of an error.
 */
 async function fetchObjectPairData(
-    client: SuiClient,
     objectId: string,
     dynamicFieldId: string
 ): Promise<SuiObjectResponse[]> {
     // MultiGetObjects returns the objects *always* in the order they were requested.
-    const pageData = await client.multiGetObjects(
+    const pageData = await rpcSelectorSingleton.multiGetObjects(
         {
             ids: [
                 objectId,
