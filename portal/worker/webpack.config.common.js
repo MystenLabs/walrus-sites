@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 const path = require("path");
+const webpack = require("webpack");
 const CopyPlugin = require("copy-webpack-plugin");
 
 module.exports = {
@@ -36,6 +37,11 @@ module.exports = {
         extensions: [".ts", ".js", ".html"],
     },
     plugins: [
+        new webpack.DefinePlugin({
+            'process.env.PORTAL_DOMAIN_NAME_LENGTH': JSON.stringify(
+                process.env.PORTAL_DOMAIN_NAME_LENGTH || undefined
+            )
+        }),
         new CopyPlugin({
             patterns: [
                 {
