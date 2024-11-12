@@ -20,3 +20,5 @@ export const TESTNET_RPC_LIST = [
     'https://sui-testnet.public.blastapi.io',
     'https://sui-testnet-endpoint.blockvision.org'
 ];
+
+export const RPC_REQUEST_TIMEOUT_MS = 7000;

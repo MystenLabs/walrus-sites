@@ -8,7 +8,7 @@ import {
     SuiClient,
     SuiObjectResponse,
 } from "@mysten/sui/client";
-import { TESTNET_RPC_LIST } from "./constants";
+import { TESTNET_RPC_LIST, RPC_REQUEST_TIMEOUT_MS } from "./constants";
 
 interface RPCSelectorInterface {
     getObject(input: GetObjectParams): Promise<SuiObjectResponse>;
@@ -76,7 +76,7 @@ class RPCSelector implements RPCSelectorInterface {
         if (!method) {
             throw new Error(`Method ${methodName} not found on selected client`);
         }
-        const timeoutDuration = 5000;
+        const timeoutDuration = RPC_REQUEST_TIMEOUT_MS;
         const timeoutPromise = new Promise<never>((_, reject) =>
             setTimeout(() => reject(new Error("Request timed out")), timeoutDuration),
         );
