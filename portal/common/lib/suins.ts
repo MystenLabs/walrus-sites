@@ -10,9 +10,9 @@ import rpcSelectorSingleton from "./rpc_selector";
  */
 export async function resolveSuiNsAddress(subdomain: string
 ): Promise<string | null> {
-    const suiObjectId: string = await rpcSelectorSingleton.call("suix_resolveNameServiceAddress", [
+    const suiObjectId: string = await rpcSelectorSingleton.call<string>("call", ["suix_resolveNameServiceAddress", [
         subdomain + ".sui",
-    ]);
+    ]]);
     console.log("resolved suins name: ", subdomain, suiObjectId);
     return suiObjectId ? suiObjectId : null;
 }
