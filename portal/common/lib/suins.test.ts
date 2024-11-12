@@ -1,8 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-// resolveSuiNsAddress.test.ts
-
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { resolveSuiNsAddress } from './suins';
 import rpcSelectorSingleton from './rpc_selector';
@@ -26,8 +24,8 @@ describe('resolveSuiNsAddress', () => {
 
             expect(result).toBe(expected);
             expect(rpcSelectorSingleton.call).toHaveBeenCalledWith(
-                "suix_resolveNameServiceAddress",
-                [`${input}.sui`]
+                "call",
+                ["suix_resolveNameServiceAddress", [`${input}.sui`]]
             );
         }
     });
@@ -40,8 +38,8 @@ describe('resolveSuiNsAddress', () => {
 
         expect(result).toBeNull();
         expect(rpcSelectorSingleton.call).toHaveBeenCalledWith(
-            "suix_resolveNameServiceAddress",
-            ["unknown.sui"]
+            "call",
+            ["suix_resolveNameServiceAddress", ["unknown.sui"]]
         );
     });
 });

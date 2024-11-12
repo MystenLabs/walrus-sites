@@ -59,6 +59,7 @@ class RPCSelector implements RPCSelectorInterface {
 
         const isNoSelectedClient = !this.selectedClient;
         if (isNoSelectedClient) {
+            console.log("No selected RPC, looking for fallback...")
             return await this.callFallbackClients<T>(methodName, args);
         }
 
@@ -86,6 +87,10 @@ class RPCSelector implements RPCSelectorInterface {
             timeoutPromise,
         ]);
 
+        if (result == null) {
+            console.log("Result null from current client:", this.selectedClient.getURL())
+        }
+
         if (this.isValidResponse(result)) {
             return result;
         } else {
@@ -104,6 +109,9 @@ class RPCSelector implements RPCSelectorInterface {
                         return;
                     }
                     const result = await method.apply(client, args);
+                    if (result == null) {
+                        console.log("Result null from fallback client:", client.getURL())
+                    }
                     if (this.isValidResponse(result)) {
                         resolve({ result, client });
                     } else {
@@ -119,6 +127,8 @@ class RPCSelector implements RPCSelectorInterface {
             const { result, client } = await Promise.any(clientPromises);
             // Update the selected client for future calls.
             this.selectedClient = client;
+            console.log("RPC selected: ", this.selectedClient)
+
             return result;
         } catch {
             throw new Error(`Failed to contact fallback RPC clients.`);
