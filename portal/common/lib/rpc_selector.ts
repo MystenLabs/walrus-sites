@@ -87,7 +87,7 @@ class RPCSelector implements RPCSelectorInterface {
             timeoutPromise,
         ]);
 
-        if (result == null) {
+        if (result == null && this.selectedClient) {
             console.log("Result null from current client:", this.selectedClient.getURL())
         }
 
