@@ -76,9 +76,9 @@ class RPCSelector implements RPCSelectorInterface {
         if (!method) {
             throw new Error(`Method ${methodName} not found on selected client`);
         }
-        const timeoutDuration = RPC_REQUEST_TIMEOUT_MS;
+
         const timeoutPromise = new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("Request timed out")), timeoutDuration),
+            setTimeout(() => reject(new Error("Request timed out")), RPC_REQUEST_TIMEOUT_MS),
         );
 
         const result = await Promise.race([
