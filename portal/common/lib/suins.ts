@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { SITE_NAMES } from "./constants";
 import rpcSelectorSingleton from "./rpc_selector";
+import logger from "./logger";
 
 /**
  * Resolves the subdomain to an object ID using SuiNS.
@@ -13,7 +14,7 @@ export async function resolveSuiNsAddress(subdomain: string
     const suiObjectId: string = await rpcSelectorSingleton.call<string>("call", ["suix_resolveNameServiceAddress", [
         subdomain + ".sui",
     ]]);
-    console.log("resolved suins name: ", subdomain, suiObjectId);
+    logger.info("resolved suins name: ", subdomain, suiObjectId);
     return suiObjectId ? suiObjectId : null;
 }
 

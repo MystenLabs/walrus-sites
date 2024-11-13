@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { ungzip, inflate, inflateRaw } from 'pako';
+import logger from './logger';
 
 /**
 * Decompresses the contents of the buffer according to the content encoding.
@@ -37,7 +38,7 @@ export async function decompressData(
             return decompressed;
         }
     } catch (e) {
-        console.error("Pako decompression error", e);
+        logger.error("Pako decompression error", e);
     }
     return null;
 }

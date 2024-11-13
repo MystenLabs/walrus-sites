@@ -5,6 +5,7 @@ import { DomainDetails } from "./types/index";
 import { getDomain } from "./domain_parsing";
 import { aggregatorEndpoint } from "./aggregator";
 import { SuiObjectResponse } from "@mysten/sui/client";
+import logger from "./logger";
 
 /**
  * Redirects to the portal URL.
@@ -14,7 +15,7 @@ export function redirectToPortalURLResponse(
 ): Response {
     // Redirect to the walrus site for the specified domain and path
     const redirectUrl = getPortalUrl(path, scope.href, portalDomainNameLength);
-    console.log("Redirecting to the Walrus Site link: ", path, redirectUrl);
+    logger.info("Redirecting to the Walrus Site link: ", path, redirectUrl);
     return makeRedirectResponse(redirectUrl);
 }
 
@@ -24,7 +25,7 @@ export function redirectToPortalURLResponse(
 export function redirectToAggregatorUrlResponse(scope: URL, blobId: string): Response {
     // Redirect to the walrus site for the specified domain and path
     const redirectUrl = aggregatorEndpoint(blobId);
-    console.log("Redirecting to the Walrus Blob link: ", redirectUrl);
+    logger.info("Redirecting to the Walrus Blob link: ", redirectUrl);
     return makeRedirectResponse(redirectUrl.href);
 }
 

@@ -9,6 +9,7 @@ import {
     SuiObjectResponse,
 } from "@mysten/sui/client";
 import { TESTNET_RPC_LIST, RPC_REQUEST_TIMEOUT_MS } from "./constants";
+import logger from "./logger";
 
 interface RPCSelectorInterface {
     getObject(input: GetObjectParams): Promise<SuiObjectResponse>;
@@ -59,7 +60,7 @@ class RPCSelector implements RPCSelectorInterface {
 
         const isNoSelectedClient = !this.selectedClient;
         if (isNoSelectedClient) {
-            console.log("No selected RPC, looking for fallback...")
+            logger.info("No selected RPC, looking for fallback...")
             return await this.callFallbackClients<T>(methodName, args);
         }
 
@@ -88,7 +89,7 @@ class RPCSelector implements RPCSelectorInterface {
         ]);
 
         if (result == null && this.selectedClient) {
-            console.log("Result null from current client:", this.selectedClient.getURL())
+            logger.info("Result null from current client:", this.selectedClient.getURL())
         }
 
         if (this.isValidResponse(result)) {
@@ -110,7 +111,7 @@ class RPCSelector implements RPCSelectorInterface {
                     }
                     const result = await method.apply(client, args);
                     if (result == null) {
-                        console.log("Result null from fallback client:", client.getURL())
+                        logger.info("Result null from fallback client:", client.getURL())
                     }
                     if (this.isValidResponse(result)) {
                         resolve({ result, client });
@@ -127,7 +128,7 @@ class RPCSelector implements RPCSelectorInterface {
             const { result, client } = await Promise.any(clientPromises);
             // Update the selected client for future calls.
             this.selectedClient = client;
-            console.log("RPC selected: ", this.selectedClient)
+            logger.info("RPC selected: ", this.selectedClient)
 
             return result;
         } catch {

@@ -7,6 +7,8 @@ import {
     isValidSuiAddress,
     toHex
 } from "@mysten/sui/utils";
+import logger from "./logger";
+
 const baseX = require('base-x');
 
 const BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz";
@@ -22,7 +24,7 @@ const b36 = baseX(BASE36);
 export function subdomainToObjectId(subdomain: string): string | null {
     try{
         const objectId = Base36toHex(subdomain.toLowerCase());
-        console.log(
+        logger.info(
             "obtained object id: ",
             objectId,
             isValidSuiObjectId(objectId),
@@ -30,7 +32,7 @@ export function subdomainToObjectId(subdomain: string): string | null {
         );
         return isValidSuiObjectId(objectId) ? objectId : null;
     } catch (e) {
-        console.log("error converting subdomain to object id: ", e);
+        logger.info("error converting subdomain to object id: ", e);
         return null;
     }
 }

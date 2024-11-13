@@ -6,6 +6,7 @@ import { Routes } from "./types";
 import { DynamicFieldStruct, RoutesStruct } from "./bcs_data_parsing";
 import { bcs, fromBase64 } from "@mysten/bcs";
 import rpcSelectorSingleton from "./rpc_selector";
+import logger from "./logger";
 
 /**
  * Gets the Routes dynamic field of the site object.
@@ -20,7 +21,7 @@ export async function getRoutes(
 ): Promise<Routes | undefined> {
     const routesDF = await fetchRoutesDynamicField(siteObjectId);
     if (!routesDF.data) {
-        console.warn("No routes dynamic field found for site object.");
+        logger.warn("No routes dynamic field found for site object.");
         return;
     }
     const routesObj = await fetchRoutesObject(routesDF.data.objectId);

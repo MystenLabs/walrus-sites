@@ -20,6 +20,7 @@ import { toBase64 } from "@mysten/bcs";
 import { sha256 } from "./crypto";
 import { getRoutes, matchPathToRoute } from "./routing";
 import { HttpStatusCodes } from "./http/http_status_codes";
+import logger from "./logger";
 
 /**
  * Resolves the subdomain to an object ID, and gets the corresponding resources.
@@ -41,8 +42,8 @@ export async function resolveAndFetchPage(
         resolvedObjectId = resolveObjectResult;
     }
 
-    console.log("Object ID: ", resolvedObjectId);
-    console.log("Base36 version of the object ID: ", HEXtoBase36(resolvedObjectId));
+    logger.info("Object ID: ", resolvedObjectId);
+    logger.info("Base36 version of the object ID: ", HEXtoBase36(resolvedObjectId));
     // Rerouting based on the contents of the routes object,
     // constructed using the ws-resource.json.
 
@@ -58,13 +59,13 @@ export async function resolveAndFetchPage(
     if (fetchPromise.status == HttpStatusCodes.NOT_FOUND) {
         const routes = await routesPromise;
         if (!routes) {
-            console.warn("No routes found for the object ID");
+            logger.warn("No routes found for the object ID");
             return siteNotFound();
         }
         let matchingRoute: string | undefined;
         matchingRoute = matchPathToRoute(parsedUrl.path, routes);
         if (!matchingRoute) {
-            console.warn(`No matching route found for ${parsedUrl.path}`);
+            logger.warn(`No matching route found for ${parsedUrl.path}`);
             return siteNotFound();
         }
         return fetchPage(resolvedObjectId, matchingRoute);
@@ -117,7 +118,7 @@ export async function fetchPage(
         }
     }
 
-    console.log("Fetched Resource: ", result);
+    logger.info("Fetched Resource: ", result);
 
     // We have a resource, get the range header.
     let range_header = optionalRangeToRequestHeaders(result.range);
@@ -132,7 +133,7 @@ export async function fetchPage(
     // the response contents.
     const h10b = toBase64(await sha256(body));
     if (result.blob_hash != h10b) {
-        console.warn(
+        logger.warn(
             "[!] checksum mismatch [!] for:",
             result.path,
             ".",
