@@ -102,7 +102,7 @@ function extractResource(
     dynamicFieldId: string): VersionedResource | HttpStatusCodes
 {
     if (!dynamicFieldResponse.data) {
-        logger.error("No page data found for dynamic field id:", dynamicFieldId);
+        logger.warn("No page data found for dynamic field id:", dynamicFieldId);
         return HttpStatusCodes.NOT_FOUND;
     }
 

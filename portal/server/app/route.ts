@@ -5,6 +5,12 @@ import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import { resolveAndFetchPage } from "@lib/page_fetching";
+import logger from "@lib/logger";
+import * as Sentry from "@sentry/node";
+
+logger.setErrorPredicate((...args: any) => { Sentry.captureException(new Error(...args)) } );
+logger.setWarnPredicate((...args: any) => { Sentry.addBreadcrumb({ message: 'Warning', data: [...args] }) } );
+logger.setInfoPredicate((...args: any) => { Sentry.addBreadcrumb({ message: 'Info', data: [...args] }) } );
 
 export async function GET(req: Request) {
     const originalUrl = req.headers.get("x-original-url");
