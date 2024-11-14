@@ -6,36 +6,24 @@ import { DomainDetails } from "@lib/types";
 import rpcSelectorSingleton from "@lib/rpc_selector";
 
 const CACHE_NAME = "walrus-sites-cache";
-const CACHE_EXPIRATION_TIME = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+const CACHE_EXPIRATION_TIME = 60 * 60 * 1000; // 1 hour in milliseconds
 
 /**
  * Respond to the request using the cache API.
  */
 export default async function resolveWithCache(
-    resolvedObjectId: string,
     parsedUrl: DomainDetails,
     urlString: string,
 ): Promise<Response> {
     const cache = await caches.open(CACHE_NAME);
     const cachedResponse = await cache.match(urlString);
     const cacheWasFresh = !(await cleanExpiredCache(cachedResponse, urlString));
-
-    let isCacheSameAsNetwork: boolean;
     if (cachedResponse && cacheWasFresh) {
-        console.log("Cache hit!");
-        try {
-            isCacheSameAsNetwork = await checkCachedVersionMatchesOnChain(
-                resolvedObjectId,
-                cachedResponse,
-            );
-            if (isCacheSameAsNetwork) return cachedResponse;
-        } catch (e) {
-            console.error("Error checking cache version against chain:", e);
-        }
+        console.log("Cache hit and fresh!")
+        return cachedResponse;
     }
     console.log("Cache miss!", urlString);
-    const resolvedPage = await resolveAndFetchPage(parsedUrl, resolvedObjectId);
-
+    const resolvedPage = await resolveAndFetchPage(parsedUrl, null);
     await tryCachePut(cache, urlString, resolvedPage);
 
     return resolvedPage;
@@ -101,38 +89,4 @@ async function cleanExpiredCache(cachedResponse: Response, urlString: string): P
         console.log("Cache entry is still fresh:", urlString);
     }
     return false;
-}
-
-/**
- * Check if the cached version of the Resource object matches the current on-chain version.
- *
- * @param cachedResponse the response to check the version of
- * @returns true if the cached version matches the current version of the Resource object
- */
-async function checkCachedVersionMatchesOnChain(
-    resolvedObjectId: string,
-    cachedResponse: Response,
-): Promise<boolean> {
-    if (!cachedResponse) {
-        throw new Error("Cached response is null!");
-    }
-    const cachedVersion = cachedResponse.headers.get("x-resource-sui-object-version");
-    const objectId = cachedResponse.headers.get("x-resource-sui-object-id");
-    if (!cachedVersion || !objectId) {
-        throw new Error("Cached response does not have the required headers");
-    }
-
-    if (objectId !== resolvedObjectId) {
-        // The object ID has changed, so the cache is invalid.
-        return false;
-    }
-
-    const resourceObject = await rpcSelectorSingleton.getObject({ id: objectId });
-    if (!resourceObject.data) {
-        throw new Error("Could not retrieve Resource object.");
-    }
-    console.log("Cached version: ", cachedVersion);
-    console.log("Current version: ", resourceObject.data?.version);
-    const currentObjectVersion = resourceObject.data?.version;
-    return cachedVersion === currentObjectVersion;
 }
