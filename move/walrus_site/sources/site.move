@@ -211,6 +211,6 @@ module walrus_site::site {
             id,
             name: _
         } = site;
-        object::delete(id);
+        id.delete();
     }
 }
