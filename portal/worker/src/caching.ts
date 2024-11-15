@@ -6,7 +6,7 @@ import { DomainDetails } from "@lib/types";
 import rpcSelectorSingleton from "@lib/rpc_selector";
 
 const CACHE_NAME = "walrus-sites-cache";
-const CACHE_EXPIRATION_TIME = 60 * 60 * 1000; // 1 hour in milliseconds
+const CACHE_EXPIRATION_TIME = 60 * 1000; // 1 minute in milliseconds
 
 /**
  * Respond to the request using the cache API.
