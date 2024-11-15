@@ -5,7 +5,7 @@ import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import resolveWithCache from "./caching";
-import { resolveAndFetchPage, resolveObjectId } from "@lib/page_fetching";
+import { resolveAndFetchPage } from "@lib/page_fetching";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
@@ -68,11 +68,7 @@ self.addEventListener("fetch", async (event) => {
         // Attempt to fetch from cache
         const fetchFromCache = async (): Promise<Response> => {
             console.log("Pre-fetching the sui object ID");
-            const resolvedObjectId = await resolveObjectId(parsedUrl);
-            if (typeof resolvedObjectId !== "string") {
-                return resolvedObjectId;
-            }
-            return await resolveWithCache(resolvedObjectId, parsedUrl, urlString);
+            return await resolveWithCache(parsedUrl, urlString);
         };
 
         event.respondWith(handleFetchRequest());
