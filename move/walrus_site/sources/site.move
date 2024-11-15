@@ -209,7 +209,7 @@ module walrus_site::site {
     public fun burn(site: Site) {
         let Site {
             id,
-            name: _
+            ..
         } = site;
         id.delete();
     }
