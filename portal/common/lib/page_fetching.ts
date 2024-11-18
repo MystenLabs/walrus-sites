@@ -124,7 +124,7 @@ export async function fetchPage(
         }
     }
 
-    logger.info({ message: "Fetched Resource", fetchedResourceResult: result });
+    logger.info({ message: "Fetched Resource", fetchedResourceResult: JSON.stringify(result) });
 
     // We have a resource, get the range header.
     let range_header = optionalRangeToRequestHeaders(result.range);
