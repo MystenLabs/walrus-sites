@@ -19,10 +19,11 @@ import logger from "./logger";
 export async function getRoutes(
     siteObjectId: string,
 ): Promise<Routes | undefined> {
+    logger.info({ message: "Fetching routes dynamic field.", siteObjectId })
     const routesDF = await fetchRoutesDynamicField(siteObjectId);
     if (!routesDF.data) {
         logger.warn({
-            message: "No routes dynamic field found for site object.",
+            message: "No routes dynamic field found for site object. Exiting getRoutes.",
             siteObjectId
         });
         return;
@@ -31,6 +32,21 @@ export async function getRoutes(
     const objectData = routesObj.data;
     if (objectData && objectData.bcs && objectData.bcs.dataType === "moveObject") {
         return parseRoutesData(objectData.bcs.bcsBytes);
+    }
+    if (!objectData) {
+        logger.warn({
+            message: "Routes dynamic field does not contain a `data` field."
+        });
+    }
+    if (!objectData.bcs) {
+        logger.warn({
+            message: "Routes dynamic field does not contain a `bcs` field."
+        });
+    }
+    if (!objectData.bcs.dataType) {
+        logger.warn({
+            message: "Routes dynamic field does not contain a `dataType` field."
+        });
     }
     throw new Error("Routes object data could not be fetched.");
 }
