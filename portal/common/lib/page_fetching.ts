@@ -120,6 +120,7 @@ export async function fetchPage(
         if (path !== "/404.html") {
             return fetchPage(objectId, "/404.html");
         } else {
+            logger.error({ message: "Failed to fetch resource", path: path });
             return siteNotFound();
         }
     }
@@ -131,6 +132,7 @@ export async function fetchPage(
     const contents = await fetch(aggregatorEndpoint(result.blob_id), { headers: range_header });
 
     if (!contents.ok) {
+        logger.error({message: "Failed to fetch resource", path: result.path, status: contents.status});
         return siteNotFound();
     }
 
