@@ -98,10 +98,18 @@ export async function resolveObjectId(
             // TODO: only check for SuiNs names if the subdomain is not a valid base36 string.
             objectId = await resolveSuiNsAddress(parsedUrl.subdomain);
             if (!objectId) {
+                logger.warn({
+                    message: "Could not resolve SuiNs domain. Does the domain exist?",
+                    subdomain: parsedUrl.subdomain,
+                })
                 return noObjectIdFound();
             }
             return objectId;
         } catch {
+            logger.error({
+                message: "Failed to contact the full node while resolving suins domain",
+                subdomain: parsedUrl.subdomain
+            });
             return fullNodeFail();
         }
     }
