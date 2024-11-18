@@ -21,7 +21,10 @@ export async function getRoutes(
 ): Promise<Routes | undefined> {
     const routesDF = await fetchRoutesDynamicField(siteObjectId);
     if (!routesDF.data) {
-        logger.warn("No routes dynamic field found for site object.");
+        logger.warn({
+            message: "No routes dynamic field found for site object.",
+            siteObjectId
+        });
         return;
     }
     const routesObj = await fetchRoutesObject(routesDF.data.objectId);

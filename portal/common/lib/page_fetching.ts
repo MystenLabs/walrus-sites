@@ -32,7 +32,7 @@ export async function resolveAndFetchPage(
     parsedUrl: DomainDetails,
     resolvedObjectId: string | null,
 ): Promise<Response> {
-
+    logger.info({ message: "parsed-url", subdomain: parsedUrl.subdomain, path: parsedUrl.path });
     if (!resolvedObjectId) {
         const resolveObjectResult = await resolveObjectId(parsedUrl);
         const isObjectId = typeof resolveObjectResult == "string";
@@ -42,8 +42,8 @@ export async function resolveAndFetchPage(
         resolvedObjectId = resolveObjectResult;
     }
 
-    logger.info("Object ID: ", resolvedObjectId);
-    logger.info("Base36 version of the object ID: ", HEXtoBase36(resolvedObjectId));
+    logger.info({ message: "Resolved object id", resolvedObjectId: resolvedObjectId });
+    logger.info({ message: "Base36 version of the object id", base36OfObjectId: HEXtoBase36(resolvedObjectId) });
     // Rerouting based on the contents of the routes object,
     // constructed using the ws-resource.json.
 
@@ -59,13 +59,19 @@ export async function resolveAndFetchPage(
     if (fetchPromise.status == HttpStatusCodes.NOT_FOUND) {
         const routes = await routesPromise;
         if (!routes) {
-            logger.warn("No routes found for the object ID");
+            logger.warn({
+                message: "No routes found for the object ID",
+                resolvedObjectIdNoRoutes: resolvedObjectId
+            });
             return siteNotFound();
         }
         let matchingRoute: string | undefined;
         matchingRoute = matchPathToRoute(parsedUrl.path, routes);
         if (!matchingRoute) {
-            logger.warn(`No matching route found for ${parsedUrl.path}`);
+            logger.warn({
+                message: `No matching route found for ${parsedUrl.path}`,
+                resolvedObjectIdNoMatchingRoute: resolvedObjectId
+            });
             return siteNotFound();
         }
         return fetchPage(resolvedObjectId, matchingRoute);
@@ -118,7 +124,7 @@ export async function fetchPage(
         }
     }
 
-    logger.info("Fetched Resource: ", result);
+    logger.info({ message: "Fetched Resource", fetchedResourceResult: result });
 
     // We have a resource, get the range header.
     let range_header = optionalRangeToRequestHeaders(result.range);
@@ -133,12 +139,12 @@ export async function fetchPage(
     // the response contents.
     const h10b = toBase64(await sha256(body));
     if (result.blob_hash != h10b) {
-        logger.warn(
-            "[!] checksum mismatch [!] for:",
-            result.path,
-            ".",
-            `blob hash: ${result.blob_hash} | aggr. hash: ${h10b}`,
-        );
+        logger.error({
+            message: "Checksum mismatch",
+            path: result.path,
+            blobHash: result.blob_hash,
+            aggrHash: h10b
+        });
         return generateHashErrorResponse();
     }
 

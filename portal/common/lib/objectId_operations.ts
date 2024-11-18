@@ -24,15 +24,14 @@ const b36 = baseX(BASE36);
 export function subdomainToObjectId(subdomain: string): string | null {
     try{
         const objectId = Base36toHex(subdomain.toLowerCase());
-        logger.info(
-            "obtained object id: ",
-            objectId,
-            isValidSuiObjectId(objectId),
-            isValidSuiAddress(objectId)
-        );
+        logger.info( {message: "obtained object id",
+            objectId: objectId,
+            isValidSuiObjectId: isValidSuiObjectId(objectId),
+            isValidSuiAddress: isValidSuiAddress(objectId)
+        });
         return isValidSuiObjectId(objectId) ? objectId : null;
     } catch (e) {
-        logger.info("error converting subdomain to object id: ", e);
+        logger.error({ message: "Error converting subdomain to object id", error: e });
         return null;
     }
 }

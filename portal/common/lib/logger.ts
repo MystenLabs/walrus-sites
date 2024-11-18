@@ -3,7 +3,7 @@
 
 /// Provides a simple logger interface function for
 /// logging messages on different runtimes.
-type LoggingPredicate = (...args: any) => void;
+type LoggingPredicate = (args: any) => void;
 
 /**
  * Logger used as an abstraction for logging messages on different runtimes.
@@ -28,16 +28,16 @@ type LoggingPredicate = (...args: any) => void;
         this.errorPredicate = errorPredicate;
     }
 
-    info(...args: any): void {
-        this.infoPredicate(...args);
+    info(args: any): void {
+        this.infoPredicate(args);
     }
 
-    warn(...args: any): void {
-        this.warnPredicate(...args);
+    warn(args: any): void {
+        this.warnPredicate(args);
     }
 
-    error(...args: any): void {
-        this.errorPredicate(...args);
+    error(args: any): void {
+        this.errorPredicate(args);
     }
 
     setInfoPredicate(predicate: LoggingPredicate): void {

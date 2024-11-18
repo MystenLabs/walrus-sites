@@ -102,16 +102,19 @@ function extractResource(
     dynamicFieldId: string): VersionedResource | HttpStatusCodes
 {
     if (!dynamicFieldResponse.data) {
-        logger.warn("No page data found for dynamic field id:", dynamicFieldId);
+        logger.warn({
+            message: "No page data found for dynamic field id",
+            dynamicFieldId: dynamicFieldId
+        });
         return HttpStatusCodes.NOT_FOUND;
     }
 
     const siteResource = getResourceFields(dynamicFieldResponse.data);
     if (!siteResource || !siteResource.blob_id) {
-        logger.error(
-            "No site resource found inside the dynamicFieldResponse:",
-            dynamicFieldResponse
-        );
+        logger.error({
+            message: "No site resource found inside the dynamicFieldResponse:",
+            error: dynamicFieldResponse
+        });
         return HttpStatusCodes.NOT_FOUND;
     }
 
