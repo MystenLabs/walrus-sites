@@ -37,13 +37,11 @@ export async function getRoutes(
         logger.warn({
             message: "Routes dynamic field does not contain a `data` field."
         });
-    }
-    if (!objectData.bcs) {
+    } else if (!objectData.bcs) {
         logger.warn({
             message: "Routes dynamic field does not contain a `bcs` field."
         });
-    }
-    if (!objectData.bcs.dataType) {
+    } else if (!objectData.bcs.dataType) {
         logger.warn({
             message: "Routes dynamic field does not contain a `dataType` field."
         });
