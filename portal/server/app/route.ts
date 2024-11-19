@@ -22,7 +22,7 @@ logger.setErrorPredicate(args => {
 });
 logger.setWarnPredicate(args => {
     addLoggingArgsToSentry(args);
-    Sentry.addBreadcrumb({ message: args.message, data: args })
+    Sentry.addBreadcrumb({ message: args.message, data: args, level: 'warning' })
 } );
 logger.setInfoPredicate(args => {
     addLoggingArgsToSentry(args);
