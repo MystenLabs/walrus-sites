@@ -136,7 +136,7 @@ export async function fetchPage(
     }
 
     logger.info({ message: "Successfully fetched resource!", fetchedResourceResult: JSON.stringify(result) });
-
+    
     // We have a resource, get the range header.
     logger.info({ message: "Add the range headers of the resource", range: JSON.stringify(result.range)});
     let range_header = optionalRangeToRequestHeaders(result.range);
@@ -144,8 +144,8 @@ export async function fetchPage(
     if (!contents.ok) {
         logger.error(
             {
-                message: "Failed to fetch resource! Response from aggregator endpoint not ok.",
-                path: result.path,
+                message: "Failed to fetch resource! Response from aggregator endpoint not ok.", 
+                path: result.path, 
                 status: contents.status
             });
         return siteNotFound();
@@ -158,7 +158,7 @@ export async function fetchPage(
     if (result.blob_hash != h10b) {
         logger.error({
             message: "Checksum mismatch! The hash of the fetched resource does not " +
-                "match the hash of the aggregator response.",
+            "match the hash of the aggregator response.",
             path: result.path,
             blobHash: result.blob_hash,
             aggrHash: h10b
