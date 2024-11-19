@@ -130,7 +130,7 @@ export async function fetchPage(
             logger.warn({ message: "Resource not found. Fetching /404.html ...", path });
             return fetchPage(objectId, "/404.html");
         } else {
-            logger.error({ message: "Failed to fetch resource! Does this page exist?", path });
+            logger.warn({ message: "Failed to fetch resource! Does this page exist?", path });
             return siteNotFound();
         }
     }
