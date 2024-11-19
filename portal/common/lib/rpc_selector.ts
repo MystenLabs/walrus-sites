@@ -132,7 +132,7 @@ class RPCSelector implements RPCSelectorInterface {
             const { result, client } = await Promise.any(clientPromises);
             // Update the selected client for future calls.
             this.selectedClient = client;
-            logger.info({ message: "RPC selected", rpcClientSelected: this.selectedClient })
+            logger.info({ message: "RPC selected", rpcClientSelected: this.selectedClient.getURL() })
 
             return result;
         } catch {
