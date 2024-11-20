@@ -123,24 +123,31 @@ export async function fetchPage(
     objectId: string,
     path: string,
 ): Promise<Response> {
+    logger.info({message: 'Fetching page', objectId: objectId, path: path});
     const result = await fetchResource(objectId, path, new Set<string>());
     if (!isResource(result) || !result.blob_id) {
         if (path !== "/404.html") {
+            logger.warn({ message: "Resource not found. Fetching /404.html ...", path });
             return fetchPage(objectId, "/404.html");
         } else {
-            logger.error({ message: "Failed to fetch resource", path: path });
+            logger.warn({ message: "Page not found!", path });
             return siteNotFound();
         }
     }
 
-    logger.info({ message: "Fetched Resource", fetchedResourceResult: JSON.stringify(result) });
+    logger.info({ message: "Successfully fetched resource!", fetchedResourceResult: JSON.stringify(result) });
 
     // We have a resource, get the range header.
+    logger.info({ message: "Add the range headers of the resource", range: JSON.stringify(result.range)});
     let range_header = optionalRangeToRequestHeaders(result.range);
     const contents = await fetch(aggregatorEndpoint(result.blob_id), { headers: range_header });
-
     if (!contents.ok) {
-        logger.error({message: "Failed to fetch resource", path: result.path, status: contents.status});
+        logger.error(
+            {
+                message: "Failed to fetch resource! Response from aggregator endpoint not ok.",
+                path: result.path,
+                status: contents.status
+            });
         return siteNotFound();
     }
 
@@ -150,7 +157,8 @@ export async function fetchPage(
     const h10b = toBase64(await sha256(body));
     if (result.blob_hash != h10b) {
         logger.error({
-            message: "Checksum mismatch",
+            message: "Checksum mismatch! The hash of the fetched resource does not " +
+            "match the hash of the aggregator response.",
             path: result.path,
             blobHash: result.blob_hash,
             aggrHash: h10b
