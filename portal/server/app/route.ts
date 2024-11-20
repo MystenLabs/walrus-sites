@@ -26,8 +26,12 @@ logger.setWarnPredicate(args => {
 } );
 logger.setInfoPredicate(args => {
     addLoggingArgsToSentry(args);
-    Sentry.addBreadcrumb({ message: args.message, data: args })
+    Sentry.addBreadcrumb({ message: args.message, data: args, level: 'info'})
 } );
+logger.setDebugPredicate(args => {
+    addLoggingArgsToSentry(args);
+    Sentry.addBreadcrumb({ message: args.message, data: args, level: 'debug' })
+});
 
 export async function GET(req: Request) {
     const originalUrl = req.headers.get("x-original-url");
