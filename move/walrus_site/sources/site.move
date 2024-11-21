@@ -116,6 +116,10 @@ module walrus_site::site {
         resource.headers.insert(name, value);
     }
 
+    public fun remove_header(resource: &mut Resource, name: String) {
+        resource.headers.remove(&name);
+    }
+
     /// Creates a new resource path.
     fun new_path(path: String): ResourcePath {
         ResourcePath { path }
