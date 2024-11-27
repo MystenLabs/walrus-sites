@@ -20,6 +20,7 @@ import { toBase64 } from "@mysten/bcs";
 import { sha256 } from "./crypto";
 import { getRoutes, matchPathToRoute } from "./routing";
 import { HttpStatusCodes } from "./http/http_status_codes";
+import logger from "./logger";
 
 /**
  * Resolves the subdomain to an object ID, and gets the corresponding resources.
@@ -31,7 +32,7 @@ export async function resolveAndFetchPage(
     parsedUrl: DomainDetails,
     resolvedObjectId: string | null,
 ): Promise<Response> {
-
+    logger.debug({ message: "parsed-url", subdomain: parsedUrl.subdomain, path: parsedUrl.path });
     if (!resolvedObjectId) {
         const resolveObjectResult = await resolveObjectId(parsedUrl);
         const isObjectId = typeof resolveObjectResult == "string";
@@ -41,8 +42,8 @@ export async function resolveAndFetchPage(
         resolvedObjectId = resolveObjectResult;
     }
 
-    console.log("Object ID: ", resolvedObjectId);
-    console.log("Base36 version of the object ID: ", HEXtoBase36(resolvedObjectId));
+    logger.info({ message: "Resolved object id", resolvedObjectId: resolvedObjectId });
+    logger.info({ message: "Base36 version of the object id", base36OfObjectId: HEXtoBase36(resolvedObjectId) });
     // Rerouting based on the contents of the routes object,
     // constructed using the ws-resource.json.
 
@@ -58,13 +59,19 @@ export async function resolveAndFetchPage(
     if (fetchPromise.status == HttpStatusCodes.NOT_FOUND) {
         const routes = await routesPromise;
         if (!routes) {
-            console.warn("No routes found for the object ID");
+            logger.warn({
+                message: "No routes found for the object ID",
+                resolvedObjectIdNoRoutes: resolvedObjectId
+            });
             return siteNotFound();
         }
         let matchingRoute: string | undefined;
         matchingRoute = matchPathToRoute(parsedUrl.path, routes);
         if (!matchingRoute) {
-            console.warn(`No matching route found for ${parsedUrl.path}`);
+            logger.warn({
+                message: `No matching route found for ${parsedUrl.path}`,
+                resolvedObjectIdNoMatchingRoute: resolvedObjectId
+            });
             return siteNotFound();
         }
         return fetchPage(resolvedObjectId, matchingRoute);
@@ -91,10 +98,18 @@ export async function resolveObjectId(
             // TODO: only check for SuiNs names if the subdomain is not a valid base36 string.
             objectId = await resolveSuiNsAddress(parsedUrl.subdomain);
             if (!objectId) {
+                logger.warn({
+                    message: "Could not resolve SuiNs domain. Does the domain exist?",
+                    subdomain: parsedUrl.subdomain,
+                })
                 return noObjectIdFound();
             }
             return objectId;
         } catch {
+            logger.error({
+                message: "Failed to contact the full node while resolving suins domain",
+                subdomain: parsedUrl.subdomain
+            });
             return fullNodeFail();
         }
     }
@@ -108,22 +123,31 @@ export async function fetchPage(
     objectId: string,
     path: string,
 ): Promise<Response> {
+    logger.info({message: 'Fetching page', objectId: objectId, path: path});
     const result = await fetchResource(objectId, path, new Set<string>());
     if (!isResource(result) || !result.blob_id) {
         if (path !== "/404.html") {
+            logger.warn({ message: "Resource not found. Fetching /404.html ...", path });
             return fetchPage(objectId, "/404.html");
         } else {
+            logger.warn({ message: "Page not found!", path });
             return siteNotFound();
         }
     }
 
-    console.log("Fetched Resource: ", result);
+    logger.info({ message: "Successfully fetched resource!", fetchedResourceResult: JSON.stringify(result) });
 
     // We have a resource, get the range header.
+    logger.info({ message: "Add the range headers of the resource", range: JSON.stringify(result.range)});
     let range_header = optionalRangeToRequestHeaders(result.range);
     const contents = await fetch(aggregatorEndpoint(result.blob_id), { headers: range_header });
-
     if (!contents.ok) {
+        logger.error(
+            {
+                message: "Failed to fetch resource! Response from aggregator endpoint not ok.",
+                path: result.path,
+                status: contents.status
+            });
         return siteNotFound();
     }
 
@@ -132,12 +156,13 @@ export async function fetchPage(
     // the response contents.
     const h10b = toBase64(await sha256(body));
     if (result.blob_hash != h10b) {
-        console.warn(
-            "[!] checksum mismatch [!] for:",
-            result.path,
-            ".",
-            `blob hash: ${result.blob_hash} | aggr. hash: ${h10b}`,
-        );
+        logger.error({
+            message: "Checksum mismatch! The hash of the fetched resource does not " +
+            "match the hash of the aggregator response.",
+            path: result.path,
+            blobHash: result.blob_hash,
+            aggrHash: h10b
+        });
         return generateHashErrorResponse();
     }
 

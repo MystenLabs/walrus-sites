@@ -11,6 +11,7 @@ import { ResourcePathStruct, DynamicFieldStruct, ResourceStruct } from "./bcs_da
 import { deriveDynamicFieldID } from "@mysten/sui/utils";
 import { bcs } from "@mysten/bcs";
 import rpcSelectorSingleton from "./rpc_selector";
+import logger from "./logger";
 
 /**
  * Fetches a resource of a site.
@@ -101,12 +102,19 @@ function extractResource(
     dynamicFieldId: string): VersionedResource | HttpStatusCodes
 {
     if (!dynamicFieldResponse.data) {
-        console.log("No page data found");
+        logger.warn({
+            message: "No page data found for dynamic field id",
+            dynamicFieldId: dynamicFieldId
+        });
         return HttpStatusCodes.NOT_FOUND;
     }
 
     const siteResource = getResourceFields(dynamicFieldResponse.data);
     if (!siteResource || !siteResource.blob_id) {
+        logger.error({
+            message: "No site resource found inside the dynamicFieldResponse:",
+            error: dynamicFieldResponse
+        });
         return HttpStatusCodes.NOT_FOUND;
     }
 

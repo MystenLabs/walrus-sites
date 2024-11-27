@@ -5,6 +5,33 @@ import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import { resolveAndFetchPage } from "@lib/page_fetching";
+import logger from "@lib/logger";
+import * as Sentry from "@sentry/node";
+
+function addLoggingArgsToSentry(args: { [key: string]: any }) {
+    Object.entries(args).forEach(([key, value]) => {
+        if (key !== "message") { // Skipping the 'message' key
+            console.log(`${key}: ${value}`)
+            Sentry.setTag(key, value);
+        }
+    });
+}
+logger.setErrorPredicate(args => {
+    addLoggingArgsToSentry(args);
+    Sentry.captureException(new Error(args.message ))
+});
+logger.setWarnPredicate(args => {
+    addLoggingArgsToSentry(args);
+    Sentry.addBreadcrumb({ message: args.message, data: args, level: 'warning' })
+} );
+logger.setInfoPredicate(args => {
+    addLoggingArgsToSentry(args);
+    Sentry.addBreadcrumb({ message: args.message, data: args, level: 'info'})
+} );
+logger.setDebugPredicate(args => {
+    addLoggingArgsToSentry(args);
+    Sentry.addBreadcrumb({ message: args.message, data: args, level: 'debug' })
+});
 
 export async function GET(req: Request) {
     const originalUrl = req.headers.get("x-original-url");

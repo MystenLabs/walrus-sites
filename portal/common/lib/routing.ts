@@ -6,6 +6,7 @@ import { Routes } from "./types";
 import { DynamicFieldStruct, RoutesStruct } from "./bcs_data_parsing";
 import { bcs, fromBase64 } from "@mysten/bcs";
 import rpcSelectorSingleton from "./rpc_selector";
+import logger from "./logger";
 
 /**
  * Gets the Routes dynamic field of the site object.
@@ -18,15 +19,32 @@ import rpcSelectorSingleton from "./rpc_selector";
 export async function getRoutes(
     siteObjectId: string,
 ): Promise<Routes | undefined> {
+    logger.info({ message: "Fetching routes dynamic field.", siteObjectId })
     const routesDF = await fetchRoutesDynamicField(siteObjectId);
     if (!routesDF.data) {
-        console.warn("No routes dynamic field found for site object.");
+        logger.warn({
+            message: "No routes dynamic field found for site object. Exiting getRoutes.",
+            siteObjectId
+        });
         return;
     }
     const routesObj = await fetchRoutesObject(routesDF.data.objectId);
     const objectData = routesObj.data;
     if (objectData && objectData.bcs && objectData.bcs.dataType === "moveObject") {
         return parseRoutesData(objectData.bcs.bcsBytes);
+    }
+    if (!objectData) {
+        logger.warn({
+            message: "Routes dynamic field does not contain a `data` field."
+        });
+    } else if (!objectData.bcs) {
+        logger.warn({
+            message: "Routes dynamic field does not contain a `bcs` field."
+        });
+    } else if (!objectData.bcs.dataType) {
+        logger.warn({
+            message: "Routes dynamic field does not contain a `dataType` field."
+        });
     }
     throw new Error("Routes object data could not be fetched.");
 }
