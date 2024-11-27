@@ -32,7 +32,7 @@ export async function resolveAndFetchPage(
     parsedUrl: DomainDetails,
     resolvedObjectId: string | null,
 ): Promise<Response> {
-    logger.info({ message: "parsed-url", subdomain: parsedUrl.subdomain, path: parsedUrl.path });
+    logger.debug({ message: "parsed-url", subdomain: parsedUrl.subdomain, path: parsedUrl.path });
     if (!resolvedObjectId) {
         const resolveObjectResult = await resolveObjectId(parsedUrl);
         const isObjectId = typeof resolveObjectResult == "string";
