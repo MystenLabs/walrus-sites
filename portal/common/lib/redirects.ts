@@ -15,7 +15,7 @@ export function redirectToPortalURLResponse(
 ): Response {
     // Redirect to the walrus site for the specified domain and path
     const redirectUrl = getPortalUrl(path, scope.href, portalDomainNameLength);
-    logger.info("Redirecting to the Walrus Site link: ", path, redirectUrl);
+    logger.info({ message: "Redirecting to the Walrus Site link", path: path, redirectUrl: redirectUrl });
     return makeRedirectResponse(redirectUrl);
 }
 
@@ -25,7 +25,7 @@ export function redirectToPortalURLResponse(
 export function redirectToAggregatorUrlResponse(scope: URL, blobId: string): Response {
     // Redirect to the walrus site for the specified domain and path
     const redirectUrl = aggregatorEndpoint(blobId);
-    logger.info("Redirecting to the Walrus Blob link: ", redirectUrl);
+    logger.info({ message: "Redirecting to the Walrus Blob link", redirectUrl: redirectUrl });
     return makeRedirectResponse(redirectUrl.href);
 }
 

@@ -38,7 +38,7 @@ export async function decompressData(
             return decompressed;
         }
     } catch (e) {
-        logger.error("Pako decompression error", e);
+        logger.error({message: "Pako decompression error", error: e});
     }
     return null;
 }

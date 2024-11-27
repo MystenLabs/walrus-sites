@@ -14,7 +14,7 @@ export async function resolveSuiNsAddress(subdomain: string
     const suiObjectId: string = await rpcSelectorSingleton.call<string>("call", ["suix_resolveNameServiceAddress", [
         subdomain + ".sui",
     ]]);
-    logger.info("resolved suins name: ", subdomain, suiObjectId);
+    logger.info({ message: "resolved suins name", resolvedSuiNSName: subdomain, suiObjectId: suiObjectId });
     return suiObjectId ? suiObjectId : null;
 }
 
