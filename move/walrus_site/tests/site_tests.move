@@ -3,7 +3,7 @@ module walrus_site::site_tests {
     use walrus_site::site::{
         ERangeStartGreaterThanRangeEnd,
         EStartAndEndRangeAreNone,
-        Site, Range, Resource
+        Site, Range
     };
 
     #[test]
@@ -94,6 +94,9 @@ module walrus_site::site_tests {
                 b"styles.css".to_string(),
             );
             // Delete the resource.
+            walrus_site::site::remove_resource(
+                &mut site, b"styles.css".to_string()
+            );
             scenario.return_to_sender<Site>(site);
         };
 
