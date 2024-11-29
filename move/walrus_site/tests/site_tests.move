@@ -51,6 +51,8 @@ module walrus_site::site_tests {
         );
     }
 
+    /// This test runs a typical process
+    /// checking many of the contract's functions.
     #[test]
     fun test_site_creation_with_resources_and_routes() {
         use sui::test_scenario;
@@ -64,16 +66,26 @@ module walrus_site::site_tests {
             transfer::public_transfer(site, owner)
         };
 
-        // Add a resource to the site.
+        // Rename site and add a resource with headers to the site.
         scenario.next_tx(owner);
         {
             let mut site = scenario.take_from_sender<Site>();
-            let resource = walrus_site::site::new_resource(
+            // Update the site name.
+            walrus_site::site::update_name(&mut site, b"Fancy Example".to_string());
+            // Create a resource.
+            let mut resource = walrus_site::site::new_resource(
                b"index.html".to_string(),
                601749199,
                124794210,
                option::none<Range>()
             );
+            // Add a header to the resource.
+            walrus_site::site::add_header(
+                &mut resource,
+                b"Content-Type".to_string(),
+                b"text/html; charset=utf-8".to_string(),
+            );
+            // Add the resource to the site.
             walrus_site::site::add_resource(&mut site, resource);
             scenario.return_to_sender<Site>(site);
         };
