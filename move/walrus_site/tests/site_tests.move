@@ -140,7 +140,12 @@ module walrus_site::site_tests {
             scenario.return_to_sender<Site>(site);
         };
 
-        // TODO: Delete the resources, delete the route, and finally delete the site.
+        // Burn the site.
+        scenario.next_tx(owner);
+        {
+            let site = scenario.take_from_sender<Site>();
+            walrus_site::site::burn(site);
+        };
         scenario.end();
     }
 
