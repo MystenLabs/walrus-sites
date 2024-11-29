@@ -3,7 +3,7 @@ module walrus_site::site_tests {
     use walrus_site::site::{
         ERangeStartGreaterThanRangeEnd,
         EStartAndEndRangeAreNone,
-        Site, Range
+        Site, Range, Resource
     };
 
     #[test]
@@ -87,8 +87,19 @@ module walrus_site::site_tests {
             );
             // Add the resource to the site.
             walrus_site::site::add_resource(&mut site, resource);
+            // Move the resource to a different path.
+            walrus_site::site::move_resource(
+                &mut site,
+                b"index.html".to_string(),
+                b"styles.css".to_string(),
+            );
+            // Delete the resource.
             scenario.return_to_sender<Site>(site);
         };
+
+        // TODO: create a route, add it to the site.
+
+        // TODO: Delete the resources, delete the route, and finally delete the site.
 
         scenario.end();
     }
