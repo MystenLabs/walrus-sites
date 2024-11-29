@@ -2,8 +2,10 @@
 module walrus_site::site_tests {
     use walrus_site::site::{
         ERangeStartGreaterThanRangeEnd,
-        EStartAndEndRangeAreNone
+        EStartAndEndRangeAreNone,
+        Site, Range
     };
+
     #[test]
     #[expected_failure(abort_code = EStartAndEndRangeAreNone)]
     fun test_new_range_no_bounds_defined() {
@@ -48,4 +50,36 @@ module walrus_site::site_tests {
             option::some(1)
         );
     }
+
+    #[test]
+    fun test_site_creation_with_resources_and_routes() {
+        use sui::test_scenario;
+        let owner = @0xCAFE;
+        let mut scenario = test_scenario::begin(owner);
+        // Create a site.
+        {
+            let site = walrus_site::site::new_site(
+                b"Example".to_string(), scenario.ctx()
+            );
+            transfer::public_transfer(site, owner)
+        };
+
+        // Add a resource to the site.
+        scenario.next_tx(owner);
+        {
+            let mut site = scenario.take_from_sender<Site>();
+            let resource = walrus_site::site::new_resource(
+               b"index.html".to_string(),
+               601749199,
+               124794210,
+               option::none<Range>()
+            );
+            walrus_site::site::add_resource(&mut site, resource);
+            scenario.return_to_sender<Site>(site);
+        };
+
+        scenario.end();
+    }
+
+
 }
