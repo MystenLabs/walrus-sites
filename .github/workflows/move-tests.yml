@@ -1,0 +1,41 @@
+name: Run Move tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  run-tests:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: move/walrus_site
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Download Sui
+        run: |
+          VERSION=$(curl -s https://api.github.com/repos/MystenLabs/sui/releases/latest | jq -r '.tag_name')
+          curl -L "https://github.com/MystenLabs/sui/releases/download/$VERSION/sui-$VERSION-ubuntu-x86_64.tgz" -o sui.tgz
+          sudo tar -xvzf sui.tgz -C /usr/local/bin
+
+      # Run Tests with Coverage
+      - name: Run tests
+        run: sui-debug move test --coverage
+
+      - name: Check Move Coverage
+        run: |
+          COVERAGE_OUTPUT=$(sui-debug move coverage summary)
+          echo "$COVERAGE_OUTPUT"
+          COVERAGE_PERCENT=$(echo "$COVERAGE_OUTPUT" | grep "% Move Coverage:" | sed -E 's/.*: ([0-9]+(\.[0-9]+)?).*/\1/')
+          if (( $(echo "$COVERAGE_PERCENT < 80" | bc -l) )); then
+            echo "Coverage is below 80%. Build failed."
+            exit 1
+          fi
+          echo "Coverage is $COVERAGE_PERCENT%. Build passed."
