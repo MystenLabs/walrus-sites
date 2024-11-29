@@ -5,6 +5,7 @@ import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import { resolveAndFetchPage } from "@lib/page_fetching";
+import { has } from '@vercel/edge-config';
 import logger from "@lib/logger";
 import * as Sentry from "@sentry/node";
 
@@ -59,6 +60,17 @@ export async function GET(req: Request) {
     }
 
     const parsedUrl = getSubdomainAndPath(url, Number(portalDomainNameLength));
+    if (parsedUrl) {
+        const subdomainIsBlacklisted = await has(parsedUrl.subdomain)
+        if (subdomainIsBlacklisted) {
+            logger.info({
+                message: 'Attempt to access blacklisted subdomain',
+                blacklistedSubdomain: parsedUrl.subdomain
+            })
+            return new Response(`Subdomain ${parsedUrl.subdomain} is blacklisted.`, { status: 403 });
+        }
+    }
+
     const portalDomain = getDomain(url, Number(portalDomainNameLength));
     const requestDomain = getDomain(url, Number(portalDomainNameLength));
 
