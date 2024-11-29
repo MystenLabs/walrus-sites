@@ -54,7 +54,7 @@ module walrus_site::site_tests {
     /// This test runs a typical process
     /// checking many of the contract's functions.
     #[test]
-    fun test_site_creation_with_resources_and_routes() {
+    fun test_site_flow_with_resources_and_routes() {
         use sui::test_scenario;
         let owner = @0xCAFE;
         let mut scenario = test_scenario::begin(owner);
@@ -100,10 +100,47 @@ module walrus_site::site_tests {
             scenario.return_to_sender<Site>(site);
         };
 
-        // TODO: create a route, add it to the site.
+        // Create a route, add it to the site.
+        scenario.next_tx(owner);
+        {
+            let mut site = scenario.take_from_sender<Site>();
+            // Create the routes DF.
+            walrus_site::site::create_routes(&mut site);
+
+            // Create a resource and add it to the site.
+            // This is needed for the insert_route to work,
+            // since objects from previous transactions are lost.
+            let resource = walrus_site::site::new_resource(
+               b"index.html".to_string(),
+               601749199,
+               124794210,
+               option::none<Range>()
+            );
+            walrus_site::site::add_resource(&mut site, resource);
+
+            // Add some rerouting pairs.
+            walrus_site::site::insert_route(
+                &mut site,
+                b"/path1".to_string(),
+                b"index.html".to_string()
+            );
+            walrus_site::site::insert_route(
+                &mut site,
+                b"/path2".to_string(),
+                b"index.html".to_string()
+            );
+            // Delete the last route.
+            walrus_site::site::remove_route(
+                &mut site,
+                &b"/path2".to_string(),
+            );
+
+            // Remove all routes.
+            walrus_site::site::remove_all_routes_if_exist(&mut site);
+            scenario.return_to_sender<Site>(site);
+        };
 
         // TODO: Delete the resources, delete the route, and finally delete the site.
-
         scenario.end();
     }
 
