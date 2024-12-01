@@ -457,6 +457,22 @@ impl ResourceManager {
             resources.inner.extend(resource?);
         }
 
+        // HACK(giac): add the local resources from the config.
+        if let Some(additional) = self
+            .ws_resources
+            .as_ref()
+            .and_then(|config| config.pre_built.as_ref())
+            .map(|pre_built| {
+                pre_built
+                    .clone()
+                    .into_iter()
+                    .map(Resource::from)
+                    .collect::<Vec<_>>()
+            })
+        {
+            resources.inner.extend(additional);
+        }
+
         Ok(SiteData::new(
             resources,
             self.ws_resources
@@ -596,6 +612,7 @@ mod tests {
         Some(WSResources {
             headers: Some(headers),
             routes: None,
+            pre_built: None,
         })
     }
 }

@@ -66,8 +66,20 @@ where
     Ok(HttpHeaders(headers.into_iter().collect()))
 }
 
+/// Serialized the http headers as a vector of tuples, instead of a map.
+///
+/// This is required to serialize in a similar representation as the on-chain struct.
+#[allow(dead_code)]
+fn serialize_http_headers<S>(headers: &HttpHeaders, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let headers: Vec<_> = headers.0.iter().collect();
+    headers.serialize(serializer)
+}
+
 /// Serialize as string to make sure that the json output uses the base64 encoding.
-fn serialize_blob_id<S>(blob_id: &BlobId, serializer: S) -> Result<S::Ok, S::Error>
+pub fn serialize_blob_id<S>(blob_id: &BlobId, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {

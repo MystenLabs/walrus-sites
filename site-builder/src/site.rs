@@ -11,8 +11,10 @@ pub mod resource;
 use std::{collections::HashMap, str::FromStr};
 
 use anyhow::Result;
+use config::LocalResource;
 use contracts::get_sui_object;
 use resource::{ResourceOp, ResourceSet};
+use serde::{Deserialize, Serialize};
 use sui_sdk::SuiClient;
 use sui_types::{base_types::ObjectID, dynamic_field::DynamicFieldInfo, TypeTag};
 
@@ -108,7 +110,24 @@ impl SiteData {
             _ => RouteOps::Unchanged,
         }
     }
+
+    // HACK(giac): use this to get something quick that serializes to something to load to the
+    // pre_built field.
+    pub fn to_pre_built(&self) -> PreBuilt {
+        PreBuilt(
+            self.resources
+                .inner
+                .iter()
+                .cloned()
+                .map(|resource| LocalResource::from(resource.info))
+                .collect(),
+        )
+    }
 }
+
+// HACK(giac): temp, see above.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PreBuilt(pub Vec<LocalResource>);
 
 /// Fetches remote sites.
 pub struct RemoteSiteFactory<'a> {

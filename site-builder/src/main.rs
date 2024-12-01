@@ -156,11 +156,18 @@ enum Commands {
         object_id: ObjectID,
     },
     /// Show the pages composing the site at the given object ID.
-    Sitemap { object: ObjectID },
+    Sitemap {
+        object: ObjectID,
+    },
     /// Preprocess the directory, creating and linking index files.
     /// This command allows to publish directories as sites. Warning: Rewrites all `index.html`
     /// files.
-    ListDirectory { path: PathBuf },
+    ListDirectory {
+        path: PathBuf,
+    },
+    ListResources {
+        object: ObjectID,
+    },
 }
 
 /// The configuration for the site builder.
@@ -283,9 +290,10 @@ async fn run() -> Result<()> {
         // below will be monitored for changes.
         Commands::Sitemap { object } => {
             let wallet = load_wallet_context(&config.general.wallet)?;
-            let all_dynamic_fields = RemoteSiteFactory::new(&wallet.get_client().await?, object)
-                .get_existing_resources()
-                .await?;
+            let all_dynamic_fields =
+                RemoteSiteFactory::new(&wallet.get_client().await?, config.package)
+                    .get_existing_resources()
+                    .await?;
             println!("Pages in site at object id: {}", object);
             for (name, id) in all_dynamic_fields {
                 println!("  - {:<40} {:?}", name, id);
@@ -294,6 +302,17 @@ async fn run() -> Result<()> {
         Commands::Convert { object_id } => println!("{}", id_to_base36(&object_id)?),
         Commands::ListDirectory { path } => {
             Preprocessor::preprocess(path.as_path())?;
+        }
+        Commands::ListResources { object } => {
+            let wallet = load_wallet_context(&config.general.wallet)?;
+            let pre_built = RemoteSiteFactory::new(&wallet.get_client().await?, config.package)
+                .get_from_chain(object)
+                .await?
+                .to_pre_built();
+            println!(
+                "{{\"pre_built\": {}}}",
+                serde_json::to_string_pretty(&pre_built)?
+            );
         }
     };
 
