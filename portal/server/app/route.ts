@@ -67,14 +67,16 @@ export async function GET(req: Request) {
 
     const blocklistChecker = new BlocklistChecker(
         (id: string) => {
-            console.log('Checking if the site is blocked...')
+            console.log(`Checking ifthe "${id}" suins domain is in the blocklist...`);
             return has(id)
         }
     );
+
+    if (parsedUrl && await blocklistChecker.isBlocked(parsedUrl.subdomain)) {
+        return siteIsBlocked();
+    }
+
     if (requestDomain == portalDomain && parsedUrl && parsedUrl.subdomain) {
-        if (await blocklistChecker.isBlocked(parsedUrl.subdomain)) {
-            return siteIsBlocked();
-        }
         return await resolveAndFetchPage(parsedUrl, null, blocklistChecker);
     }
 
