@@ -283,9 +283,10 @@ async fn run() -> Result<()> {
         // below will be monitored for changes.
         Commands::Sitemap { object } => {
             let wallet = load_wallet_context(&config.general.wallet)?;
-            let all_dynamic_fields = RemoteSiteFactory::new(&wallet.get_client().await?, object)
-                .get_existing_resources()
-                .await?;
+            let all_dynamic_fields =
+                RemoteSiteFactory::new(&wallet.get_client().await?, config.package)
+                    .get_existing_resources(object)
+                    .await?;
             println!("Pages in site at object id: {}", object);
             for (name, id) in all_dynamic_fields {
                 println!("  - {:<40} {:?}", name, id);

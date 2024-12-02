@@ -166,8 +166,11 @@ impl RemoteSiteFactory<'_> {
     }
 
     /// Gets all the resources and their object ids from chain.
-    pub async fn get_existing_resources(&self) -> Result<HashMap<String, ObjectID>> {
-        let dynamic_fields = self.get_all_dynamic_fields(self.package_id).await?;
+    pub async fn get_existing_resources(
+        &self,
+        object_id: ObjectID,
+    ) -> Result<HashMap<String, ObjectID>> {
+        let dynamic_fields = self.get_all_dynamic_fields(object_id).await?;
         self.resources_from_dynamic_fields(&dynamic_fields)
     }
 
