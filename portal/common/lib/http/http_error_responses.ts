@@ -50,3 +50,11 @@ export function generateHashErrorResponse(): Response {
         }
     });
 }
+
+export function siteIsBlocked(): Response {
+    // TODO: Add a blocklist page similar to Response404.
+    return new Response(
+        "This site is blocked.",
+        { status: HttpStatusCodes.FORBIDDEN }
+    );
+}

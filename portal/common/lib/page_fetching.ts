@@ -14,6 +14,7 @@ import {
     noObjectIdFound,
     fullNodeFail,
     generateHashErrorResponse,
+    siteIsBlocked,
 } from "./http/http_error_responses";
 import { aggregatorEndpoint } from "./aggregator";
 import { toBase64 } from "@mysten/bcs";
@@ -21,6 +22,7 @@ import { sha256 } from "./crypto";
 import { getRoutes, matchPathToRoute } from "./routing";
 import { HttpStatusCodes } from "./http/http_status_codes";
 import logger from "./logger";
+import BlocklistChecker from "./blocklist_checker";
 
 /**
  * Resolves the subdomain to an object ID, and gets the corresponding resources.
@@ -31,6 +33,7 @@ import logger from "./logger";
 export async function resolveAndFetchPage(
     parsedUrl: DomainDetails,
     resolvedObjectId: string | null,
+    blocklistChecker?: BlocklistChecker
 ): Promise<Response> {
     logger.debug({ message: "parsed-url", subdomain: parsedUrl.subdomain, path: parsedUrl.path });
     if (!resolvedObjectId) {
@@ -42,8 +45,12 @@ export async function resolveAndFetchPage(
         resolvedObjectId = resolveObjectResult;
     }
 
-    logger.info({ message: "Resolved object id", resolvedObjectId: resolvedObjectId });
-    logger.info({ message: "Base36 version of the object id", base36OfObjectId: HEXtoBase36(resolvedObjectId) });
+    logger.debug({ message: "Resolved object id", resolvedObjectId: resolvedObjectId });
+    logger.debug({ message: "Base36 version of the object id", base36OfObjectId: HEXtoBase36(resolvedObjectId) });
+    if (blocklistChecker && await blocklistChecker.isBlocked(resolvedObjectId)) {
+        return siteIsBlocked();
+    }
+
     // Rerouting based on the contents of the routes object,
     // constructed using the ws-resource.json.
 

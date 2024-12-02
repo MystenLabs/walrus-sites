@@ -8,6 +8,7 @@ import { resolveAndFetchPage } from "@lib/page_fetching";
 import { has } from '@vercel/edge-config';
 import logger from "@lib/logger";
 import * as Sentry from "@sentry/node";
+import BlocklistChecker from "@lib/blocklist_checker";
 
 function addLoggingArgsToSentry(args: { [key: string]: any }) {
     Object.entries(args).forEach(([key, value]) => {
@@ -60,22 +61,17 @@ export async function GET(req: Request) {
     }
 
     const parsedUrl = getSubdomainAndPath(url, Number(portalDomainNameLength));
-    if (parsedUrl) {
-        const subdomainIsBlocklisted = await has(parsedUrl.subdomain)
-        if (subdomainIsBlocklisted) {
-            logger.info({
-                message: 'Attempt to access blocklisted subdomain',
-                blocklistedSubdomain: parsedUrl.subdomain
-            })
-            return new Response(`Subdomain ${parsedUrl.subdomain} is blocklisted.`, { status: 403 });
-        }
-    }
-
     const portalDomain = getDomain(url, Number(portalDomainNameLength));
     const requestDomain = getDomain(url, Number(portalDomainNameLength));
 
+    const blocklistChecker = new BlocklistChecker(
+        (id: string) => {
+            console.log('Checking if the site is blocked...')
+            return has(id)
+        }
+    );
     if (requestDomain == portalDomain && parsedUrl && parsedUrl.subdomain) {
-        return await resolveAndFetchPage(parsedUrl, null);
+        return await resolveAndFetchPage(parsedUrl, null, blocklistChecker);
     }
 
     const atBaseUrl = portalDomain == url.host.split(":")[0];
@@ -88,6 +84,7 @@ export async function GET(req: Request) {
                 path: parsedUrl?.path ?? "/index.html",
             },
             null,
+            blocklistChecker
         );
         return response;
     }
