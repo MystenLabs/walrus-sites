@@ -61,13 +61,13 @@ export async function GET(req: Request) {
 
     const parsedUrl = getSubdomainAndPath(url, Number(portalDomainNameLength));
     if (parsedUrl) {
-        const subdomainIsBlacklisted = await has(parsedUrl.subdomain)
-        if (subdomainIsBlacklisted) {
+        const subdomainIsBlocklisted = await has(parsedUrl.subdomain)
+        if (subdomainIsBlocklisted) {
             logger.info({
-                message: 'Attempt to access blacklisted subdomain',
-                blacklistedSubdomain: parsedUrl.subdomain
+                message: 'Attempt to access blocklisted subdomain',
+                blocklistedSubdomain: parsedUrl.subdomain
             })
-            return new Response(`Subdomain ${parsedUrl.subdomain} is blacklisted.`, { status: 403 });
+            return new Response(`Subdomain ${parsedUrl.subdomain} is blocklisted.`, { status: 403 });
         }
     }
 
