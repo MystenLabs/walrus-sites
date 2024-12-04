@@ -18,7 +18,7 @@ export const RESOURCE_PATH_MOVE_TYPE = SITE_PACKAGE + "::site::ResourcePath";
 export const TESTNET_RPC_LIST = [
     'https://fullnode.testnet.sui.io',
     'https://sui-testnet.public.blastapi.io',
-    'https://sui-testnet-endpoint.blockvision.org'
+    'https://testnet.suiet.app'
 ];
 
 export const RPC_REQUEST_TIMEOUT_MS = 7000;
