@@ -9,7 +9,7 @@ import { has } from '@vercel/edge-config';
 import logger from "@lib/logger";
 import * as Sentry from "@sentry/node";
 import BlocklistChecker from "@lib/blocklist_checker";
-import { siteIsBlocked } from "@lib/http/http_error_responses";
+import { siteNotFound } from "@lib/http/http_error_responses";
 
 function addLoggingArgsToSentry(args: { [key: string]: any }) {
     Object.entries(args).forEach(([key, value]) => {
@@ -73,7 +73,7 @@ export async function GET(req: Request) {
     );
 
     if (parsedUrl && await blocklistChecker.isBlocked(parsedUrl.subdomain)) {
-        return siteIsBlocked();
+        return siteNotFound();
     }
 
     if (requestDomain == portalDomain && parsedUrl && parsedUrl.subdomain) {

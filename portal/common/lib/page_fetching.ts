@@ -14,7 +14,6 @@ import {
     noObjectIdFound,
     fullNodeFail,
     generateHashErrorResponse,
-    siteIsBlocked,
 } from "./http/http_error_responses";
 import { aggregatorEndpoint } from "./aggregator";
 import { toBase64 } from "@mysten/bcs";
@@ -48,7 +47,7 @@ export async function resolveAndFetchPage(
     logger.debug({ message: "Resolved object id", resolvedObjectId: resolvedObjectId });
     logger.debug({ message: "Base36 version of the object id", base36OfObjectId: HEXtoBase36(resolvedObjectId) });
     if (blocklistChecker && await blocklistChecker.isBlocked(resolvedObjectId)) {
-        return siteIsBlocked();
+        return siteNotFound();
     }
 
     // Rerouting based on the contents of the routes object,
