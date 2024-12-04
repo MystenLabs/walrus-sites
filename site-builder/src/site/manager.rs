@@ -81,6 +81,7 @@ impl SiteManager {
         let existing_site = match &self.site_id {
             SiteIdentifier::ExistingSite(site_id) => {
                 RemoteSiteFactory::new(&self.sui_client().await?, self.config.package)
+                    .await?
                     .get_from_chain(*site_id)
                     .await?
             }

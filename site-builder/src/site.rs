@@ -8,10 +8,10 @@ pub mod contracts;
 pub mod manager;
 pub mod resource;
 
-use std::{collections::HashMap, str::FromStr};
+use std::collections::HashMap;
 
 use anyhow::Result;
-use contracts::get_sui_object;
+use contracts::{get_sui_object, TypeOriginMap};
 use resource::{ResourceOp, ResourceSet};
 use sui_sdk::SuiClient;
 use sui_types::{base_types::ObjectID, dynamic_field::DynamicFieldInfo, TypeTag};
@@ -20,7 +20,7 @@ use crate::{
     publish::WhenWalrusUpload,
     summary::SiteDataDiffSummary,
     types::{ResourceDynamicField, RouteOps, Routes, SuiDynamicField},
-    util::handle_pagination,
+    util::{handle_pagination, type_origin_map_for_package},
 };
 
 pub const SITE_MODULE: &str = "site";
@@ -113,27 +113,29 @@ impl SiteData {
 /// Fetches remote sites.
 pub struct RemoteSiteFactory<'a> {
     sui_client: &'a SuiClient,
-    package_id: ObjectID,
+    type_origin_map: TypeOriginMap,
 }
 
 impl RemoteSiteFactory<'_> {
     /// Creates a new remote site factory.
-    pub fn new(sui_client: &SuiClient, package_id: ObjectID) -> RemoteSiteFactory {
-        RemoteSiteFactory {
+    pub async fn new(sui_client: &SuiClient, package_id: ObjectID) -> Result<RemoteSiteFactory> {
+        let type_origin_map = type_origin_map_for_package(sui_client, package_id).await?;
+        Ok(RemoteSiteFactory {
             sui_client,
-            package_id,
-        }
+            type_origin_map,
+        })
     }
 
     /// Gets the remote site representation stored on chain
     pub async fn get_from_chain(&self, site_id: ObjectID) -> Result<SiteData> {
         let dynamic_fields = self.get_all_dynamic_fields(site_id).await?;
+        let resource_path_tag = self.resource_path_tag()?;
         let resources = ResourceSet::from_iter(
             futures::future::try_join_all(
                 dynamic_fields
                     .iter()
                     // Try to extract the resources.
-                    .filter(|field| field.name.type_ == self.resource_path_tag())
+                    .filter(|field| field.name.type_ == resource_path_tag)
                     .map(|field| {
                         get_sui_object::<ResourceDynamicField>(self.sui_client, field.object_id)
                     }),
@@ -190,7 +192,7 @@ impl RemoteSiteFactory<'_> {
         &self,
         dynamic_fields: &[DynamicFieldInfo],
     ) -> Result<HashMap<String, ObjectID>> {
-        let type_tag = self.resource_path_tag();
+        let type_tag = self.resource_path_tag()?;
         Ok(dynamic_fields
             .iter()
             .filter_map(|field| {
@@ -215,9 +217,10 @@ impl RemoteSiteFactory<'_> {
     }
 
     /// Gets the type tag for the ResourcePath move struct
-    fn resource_path_tag(&self) -> TypeTag {
-        TypeTag::from_str(&format!("{}::{SITE_MODULE}::ResourcePath", self.package_id))
-            .expect("this is a valid type tag construction")
+    fn resource_path_tag(&self) -> Result<TypeTag> {
+        contracts::site::ResourcePath
+            .to_move_struct_tag_with_type_map(&self.type_origin_map, &[])
+            .map(|tag| tag.into())
     }
 }
 

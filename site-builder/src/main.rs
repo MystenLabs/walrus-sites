@@ -285,6 +285,7 @@ async fn run() -> Result<()> {
             let wallet = load_wallet_context(&config.general.wallet)?;
             let all_dynamic_fields =
                 RemoteSiteFactory::new(&wallet.get_client().await?, config.package)
+                    .await?
                     .get_existing_resources(object)
                     .await?;
             println!("Pages in site at object id: {}", object);
