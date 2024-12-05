@@ -5,6 +5,7 @@
 //! and type names.
 
 use core::fmt;
+use std::collections::BTreeMap;
 
 use anyhow::{anyhow, Context, Result};
 use move_core_types::{identifier::Identifier, language_storage::StructTag as MoveStructTag};
@@ -76,6 +77,8 @@ impl<'a> FunctionTag<'a> {
     }
 }
 
+pub(crate) type TypeOriginMap = BTreeMap<(String, String), ObjectID>;
+
 /// Tag identifying contract structs based on their name and module.
 #[derive(Debug, PartialEq, Eq)]
 pub struct StructTag<'a> {
@@ -85,10 +88,11 @@ pub struct StructTag<'a> {
     pub module: &'a str,
 }
 
-#[allow(dead_code)]
 impl<'a> StructTag<'a> {
-    /// Returns a Move StructTag for the identified struct, within the published contract module.
-    pub fn to_move_struct_tag(
+    /// Returns a [MoveStructTag] for the identified struct with the given package ID.
+    ///
+    /// Use [`Self::to_move_struct_tag_with_type_map`] if the type origin map is available.
+    pub(crate) fn to_move_struct_tag_with_package(
         &self,
         package: ObjectID,
         type_params: &[TypeTag],
@@ -103,6 +107,19 @@ impl<'a> StructTag<'a> {
             })?,
             type_params: type_params.into(),
         })
+    }
+
+    /// Converts a [StructTag] to a [MoveStructTag] using the matching package ID from the given
+    /// type origin map.
+    pub(crate) fn to_move_struct_tag_with_type_map(
+        &self,
+        type_origin_map: &TypeOriginMap,
+        type_params: &[TypeTag],
+    ) -> Result<MoveStructTag> {
+        let package_id = type_origin_map
+            .get(&(self.module.to_string(), self.name.to_string()))
+            .ok_or(anyhow::anyhow!("type origin not found"))?;
+        self.to_move_struct_tag_with_package(*package_id, type_params)
     }
 }
 

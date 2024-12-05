@@ -3,13 +3,22 @@
 
 use std::{path::PathBuf, str};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use futures::Future;
 use sui_sdk::{
-    rpc_types::{Page, SuiTransactionBlockEffects, SuiTransactionBlockEffectsAPI},
+    rpc_types::{
+        Page,
+        SuiObjectDataOptions,
+        SuiRawData,
+        SuiTransactionBlockEffects,
+        SuiTransactionBlockEffectsAPI,
+    },
     wallet_context::WalletContext,
+    SuiClient,
 };
 use sui_types::base_types::{ObjectID, SuiAddress};
+
+use crate::site::contracts::TypeOriginMap;
 
 pub async fn handle_pagination<F, T, C, Fut>(
     closure: F,
@@ -102,6 +111,30 @@ pub fn path_or_defaults_if_exist(path: &Option<PathBuf>, defaults: &[PathBuf]) -
         path = default.exists().then_some(default.clone());
     }
     path
+}
+
+/// Gets the type origin map for a given package.
+pub(crate) async fn type_origin_map_for_package(
+    sui_client: &SuiClient,
+    package_id: ObjectID,
+) -> Result<TypeOriginMap> {
+    let Ok(Some(SuiRawData::Package(raw_package))) = sui_client
+        .read_api()
+        .get_object_with_options(
+            package_id,
+            SuiObjectDataOptions::default().with_type().with_bcs(),
+        )
+        .await?
+        .into_object()
+        .map(|object| object.bcs)
+    else {
+        bail!("no package foundwith ID {package_id}");
+    };
+    Ok(raw_package
+        .type_origin_table
+        .into_iter()
+        .map(|origin| ((origin.module_name, origin.datatype_name), origin.package))
+        .collect())
 }
 
 /// Loads the wallet context from the given path.
