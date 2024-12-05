@@ -72,12 +72,14 @@ export async function GET(req: Request) {
         }
     );
 
-    if (parsedUrl && await blocklistChecker.isBlocked(parsedUrl.subdomain)) {
-        return siteNotFound();
-    }
+    if (parsedUrl) {
+        if (await blocklistChecker.isBlocked(parsedUrl.subdomain)) {
+            return siteNotFound();
+        }
 
-    if (requestDomain == portalDomain && parsedUrl && parsedUrl.subdomain) {
-        return await resolveAndFetchPage(parsedUrl, null, blocklistChecker);
+        if (requestDomain == portalDomain && parsedUrl.subdomain) {
+            return await resolveAndFetchPage(parsedUrl, null, blocklistChecker);
+        }
     }
 
     const atBaseUrl = portalDomain == url.host.split(":")[0];
