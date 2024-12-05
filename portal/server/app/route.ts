@@ -5,8 +5,11 @@ import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import { resolveAndFetchPage } from "@lib/page_fetching";
+import { has } from '@vercel/edge-config';
 import logger from "@lib/logger";
 import * as Sentry from "@sentry/node";
+import BlocklistChecker from "@lib/blocklist_checker";
+import { siteNotFound } from "@lib/http/http_error_responses";
 
 function addLoggingArgsToSentry(args: { [key: string]: any }) {
     Object.entries(args).forEach(([key, value]) => {
@@ -62,8 +65,21 @@ export async function GET(req: Request) {
     const portalDomain = getDomain(url, Number(portalDomainNameLength));
     const requestDomain = getDomain(url, Number(portalDomainNameLength));
 
-    if (requestDomain == portalDomain && parsedUrl && parsedUrl.subdomain) {
-        return await resolveAndFetchPage(parsedUrl, null);
+    const blocklistChecker = new BlocklistChecker(
+        (id: string) => {
+            console.log(`Checking ifthe "${id}" suins domain is in the blocklist...`);
+            return has(id)
+        }
+    );
+
+    if (parsedUrl) {
+        if (await blocklistChecker.isBlocked(parsedUrl.subdomain)) {
+            return siteNotFound();
+        }
+
+        if (requestDomain == portalDomain && parsedUrl.subdomain) {
+            return await resolveAndFetchPage(parsedUrl, null, blocklistChecker);
+        }
     }
 
     const atBaseUrl = portalDomain == url.host.split(":")[0];
@@ -76,6 +92,7 @@ export async function GET(req: Request) {
                 path: parsedUrl?.path ?? "/index.html",
             },
             null,
+            blocklistChecker
         );
         return response;
     }
