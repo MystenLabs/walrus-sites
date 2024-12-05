@@ -309,7 +309,7 @@ impl ResourceManager {
         ws_resources_path: Option<PathBuf>,
         max_concurrent: Option<NonZeroUsize>,
     ) -> Result<Self> {
-        let n_shards = walrus.info(false).await?.n_shards;
+        let n_shards = walrus.n_shards().await?;
 
         // Cast the keys to lowercase because http headers
         //  are case-insensitive: RFC7230 sec. 2.7.3
