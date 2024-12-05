@@ -166,6 +166,17 @@ impl SitePtb<Argument> {
         Ok(())
     }
 
+    /// Removes all dynamic fields and then burns the site.
+    pub fn destroy<'a>(&mut self, resources: impl IntoIterator<Item = &'a Resource>) -> Result<()> {
+        self.remove_routes()?;
+        for resource in resources {
+            self.remove_resource_if_exists(resource)?;
+        }
+
+        self.burn();
+        Ok(())
+    }
+
     /// Adds the move calls to create a resource.
     ///
     /// Returns the [`Argument`] for the newly-created resource.
@@ -260,6 +271,15 @@ impl SitePtb<Argument> {
             name,
             value,
         )
+    }
+
+    /// Burns the site.
+    fn burn(&mut self) {
+        self.add_programmable_move_call(
+            contracts::site::burn.identifier(),
+            vec![],
+            vec![self.site_argument],
+        );
     }
 }
 

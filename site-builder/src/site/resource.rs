@@ -259,6 +259,15 @@ impl ResourceSet {
     }
 }
 
+impl<'a> IntoIterator for &'a ResourceSet {
+    type Item = &'a Resource;
+    type IntoIter = std::collections::btree_set::Iter<'a, Resource>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.inner.iter()
+    }
+}
+
 impl FromIterator<Resource> for ResourceSet {
     fn from_iter<I: IntoIterator<Item = Resource>>(source: I) -> Self {
         Self {

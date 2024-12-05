@@ -1,6 +1,5 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-
 use std::{path::PathBuf, str};
 
 use anyhow::{anyhow, bail, Result};
@@ -12,13 +11,36 @@ use sui_sdk::{
         SuiRawData,
         SuiTransactionBlockEffects,
         SuiTransactionBlockEffectsAPI,
+        SuiTransactionBlockResponse,
     },
     wallet_context::WalletContext,
     SuiClient,
 };
-use sui_types::base_types::{ObjectID, SuiAddress};
+use sui_types::{
+    base_types::{ObjectID, ObjectRef, SuiAddress},
+    transaction::{ProgrammableTransaction, TransactionData},
+};
 
 use crate::site::contracts::TypeOriginMap;
+
+pub async fn sign_and_send_ptb(
+    active_address: SuiAddress,
+    wallet: &WalletContext,
+    programmable_transaction: ProgrammableTransaction,
+    gas_coin: ObjectRef,
+    gas_budget: u64,
+) -> Result<SuiTransactionBlockResponse> {
+    let gas_price = wallet.get_reference_gas_price().await?;
+    let transaction = TransactionData::new_programmable(
+        active_address,
+        vec![gas_coin],
+        programmable_transaction,
+        gas_budget,
+        gas_price,
+    );
+    let transaction = wallet.sign_transaction(&transaction);
+    wallet.execute_transaction_may_fail(transaction).await
+}
 
 pub async fn handle_pagination<F, T, C, Fut>(
     closure: F,
