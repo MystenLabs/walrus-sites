@@ -2,4 +2,3 @@ packages:
     - 'common'
     - 'worker'
     - 'server'
-    - 'worker-nextjs'
