@@ -3,11 +3,14 @@
 	"dependencies": {
 		"@mysten/sui": "^1.12.0",
 		"common": "workspace:common",
+		"next": "^15.0.4",
+		"react": "^18.3.1",
 		"ts-loader": "^9.5.1",
 		"tsc": "^2.0.4",
 		"typescript": "^5.6.3"
 	},
 	"devDependencies": {
+		"@types/serviceworker": "^0.0.107",
 		"copy-webpack-plugin": "^12.0.2",
 		"css-minimizer-webpack-plugin": "^7.0.0",
 		"html-minimizer-webpack-plugin": "^5.0.0",
@@ -18,8 +21,8 @@
 		"webpack-merge": "^6.0.1"
 	},
 	"scripts": {
-		"serve": "webpack serve --config webpack.config.dev.js",
-		"serve:prod": "webpack serve --config webpack.config.prod.js",
+	    "serve": "next dev",
+		"serve:prod": "next prod",
 		"build": "pnpm build:prod",
 		"dev": "pnpm build:dev",
 		"build:dev": "webpack --config webpack.config.dev.js",

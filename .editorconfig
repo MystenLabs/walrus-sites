@@ -26,7 +26,7 @@ indent_size = unset
 
 # Ignore paths
 [{.git/**/*,**/*.lock,**/Move.toml,LICENSE,**/*.html,**/*.css,**/*.json,portal/pnpm-lock.yaml,
-c4/**/*}]
+c4/**/*, portal/worker*/**/*.js}]
 charset = unset
 end_of_line = unset
 indent_size = unset

@@ -8,7 +8,7 @@ const CopyPlugin = require("copy-webpack-plugin");
 module.exports = {
     watch: true,
     entry: {
-        "walrus-sites-sw": "./src/walrus-sites-sw.ts",
+        "sw": "./src/walrus-sites-sw.ts",
         "walrus-sites-portal-register-sw": "./src/walrus-sites-portal-register-sw.ts",
     },
     module: {
@@ -19,14 +19,19 @@ module.exports = {
             },
             {
                 test: /\.ts$/,
-                use: "ts-loader",
+                use: {
+                    loader: "ts-loader",
+                    options: {
+                        transpileOnly: true
+                    }
+                },
                 exclude: /node_modules/,
             },
         ],
     },
     output: {
         filename: "[name].js",
-        path: path.resolve(__dirname, "./dist/"),
+        path: path.resolve(__dirname, "./public/"),
         clean: true,
     },
     resolve: {

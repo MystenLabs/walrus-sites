@@ -1,34 +1,55 @@
 {
   "compilerOptions": {
-    "target": "esnext",
+    "target": "ESNext",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": false,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "incremental": true,
+    "esModuleInterop": true,
     "module": "esnext",
     "moduleResolution": "node",
-    "lib": [
-      "esnext",
-      "webworker",
-      "dom"
-    ],
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "composite": true,
     "baseUrl": "./",
-      "paths": {
-        "@static/*": ["../common/static/*"],
-        "@lib/*": ["../common/lib/*"]
-    }
+    "paths": {
+      "@static/*": [
+        "../common/static/*"
+      ],
+      "@lib/*": [
+        "../common/lib/*"
+      ]
+    },
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ]
   },
   "baseUrl": "./",
   "rootDir": "src",
   "outDir": "dist",
   "skipLibCheck": true,
   "include": [
+    "../common/**/*",
     "src/**/*",
-    "../common/**/*"
+    ".next/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",
-    "dist",
+    "dist"
   ],
   "references": [
-      {
-          "path": "../common/tsconfig.json"
-      }
+    {
+      "path": "../common/tsconfig.json"
+    }
   ]
 }
