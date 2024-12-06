@@ -3,10 +3,10 @@
 import { getSubdomainAndPath } from "@lib/domain_parsing";
 import { FALLBACK_PORTAL } from "@lib/constants";
 
-function main() {
+export function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
         navigator.serviceWorker
-            .register("/walrus-sites-sw.js")
+            .register("/sw.js")
             .then((reg) => {
                 console.log("SW registered");
                 if (reg.installing) {
@@ -70,5 +70,3 @@ function displayErrorMessage(messageNode: any) {
     let messageDiv = document.getElementById("loading-message");
     messageDiv.replaceChildren(messageNode);
 }
-
-main();

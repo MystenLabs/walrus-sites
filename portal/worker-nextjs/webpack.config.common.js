@@ -8,7 +8,7 @@ const CopyPlugin = require("copy-webpack-plugin");
 module.exports = {
     watch: true,
     entry: {
-        "sw": "./src/sw.ts",
+        "sw": "./src/walrus-sites-sw.ts",
         "walrus-sites-portal-register-sw": "./src/walrus-sites-portal-register-sw.ts",
     },
     module: {
