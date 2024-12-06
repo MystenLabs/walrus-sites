@@ -73,8 +73,8 @@ impl Walrus {
     /// Issues a `store` JSON command to the Walrus CLI, returning the parsed output.
     // NOTE: takes a mutable reference to ensure that only one store command is executed at every
     // time. The issue is that the inner wallet may lock coins if called in parallel.
-    pub async fn store(&mut self, file: PathBuf, epochs: u64, force: bool) -> Result<StoreOutput> {
-        create_command!(self, store, file, epochs, force)
+    pub async fn store(&mut self, file: PathBuf, epochs: u64, force: bool, deletable: bool) -> Result<StoreOutput> {
+        create_command!(self, store, file, epochs, force, deletable)
     }
 
     /// Issues a `read` JSON command to the Walrus CLI, returning the parsed output.
