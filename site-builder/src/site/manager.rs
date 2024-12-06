@@ -129,7 +129,7 @@ impl SiteManager {
             ));
             let _output = self
                 .walrus
-                .store(resource.full_path.clone(), self.epochs, false)
+                .store(resource.full_path.clone(), self.epochs, false, true)
                 .await?;
             display::done();
         }
