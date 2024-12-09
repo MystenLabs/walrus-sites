@@ -148,6 +148,11 @@ enum Commands {
         #[clap(long, action)]
         force: bool,
     },
+    /// Delete a site.
+    // Delete {
+    //     /// The object ID of the site to delete
+    //     object_id: ObjectID,
+    // },
     /// Convert an object ID in hex format to the equivalent Base36 format.
     ///
     /// This command may be useful to browse a site, given it object ID.
@@ -279,6 +284,9 @@ async fn run() -> Result<()> {
             .run()
             .await?
         }
+        // Commands::Delete { object_id } => {
+        //     object_id
+        // }
         // Add a path to be watched. All files and directories at that path and
         // below will be monitored for changes.
         Commands::Sitemap { object } => {
