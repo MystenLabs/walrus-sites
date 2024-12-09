@@ -62,9 +62,9 @@ pub struct PublishOptions {
     #[clap(long)]
     max_concurrent: Option<NonZeroUsize>,
 
-    /// By default sites are deletable with site-builder delete command. By passing --permanεent, the site is deleted after `epochs` expiration.
+    /// By default sites are deletable with site-builder delete command. By passing --permanent, the site is deleted only after `epochs` expiration.
     #[clap(long)]
-    permanent: bool,
+    permanent: Option<bool>,
 }
 
 /// The continuous editing options.
@@ -195,6 +195,8 @@ impl SiteEditor {
         display::done();
         tracing::debug!(?local_site_data, "resources loaded from directory");
 
+        let permanent = self.publish_options.permanent.unwrap_or(false);
+
         let mut site_manager = SiteManager::new(
             self.config.clone(),
             walrus,
@@ -202,7 +204,7 @@ impl SiteEditor {
             self.site_id.clone(),
             self.publish_options.epochs,
             self.when_upload.clone(),
-            self.publish_options.permanent,
+            permanent,
         )
         .await?;
         let (response, summary) = site_manager.update_site(&local_site_data).await?;
