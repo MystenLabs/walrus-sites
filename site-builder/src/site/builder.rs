@@ -7,8 +7,7 @@ use sui_types::{
     base_types::{ObjectID, SuiAddress},
     programmable_transaction_builder::ProgrammableTransactionBuilder,
     transaction::{Argument, CallArg, ProgrammableTransaction},
-    Identifier,
-    TypeTag,
+    Identifier, TypeTag,
 };
 
 use super::{
