@@ -47,6 +47,7 @@ pub struct SiteManager {
     pub site_id: SiteIdentifier,
     pub epochs: u64,
     pub when_upload: WhenWalrusUpload,
+    pub permanent: bool,
 }
 
 impl SiteManager {
@@ -58,6 +59,7 @@ impl SiteManager {
         site_id: SiteIdentifier,
         epochs: u64,
         when_upload: WhenWalrusUpload,
+        permanent: bool,
     ) -> Result<Self> {
         Ok(SiteManager {
             walrus,
@@ -66,6 +68,7 @@ impl SiteManager {
             site_id,
             epochs,
             when_upload,
+            permanent,
         })
     }
 
@@ -115,6 +118,9 @@ impl SiteManager {
 
     /// Publishes the resources to Walrus.
     async fn publish_to_walrus<'b>(&mut self, updates: &[&ResourceOp<'b>]) -> Result<()> {
+        
+        let deletable = !self.permanent;   
+
         for update in updates.iter() {
             let resource = update.inner();
             tracing::debug!(
@@ -129,7 +135,7 @@ impl SiteManager {
             ));
             let _output = self
                 .walrus
-                .store(resource.full_path.clone(), self.epochs, false, true)
+                .store(resource.full_path.clone(), self.epochs, false, deletable)
                 .await?;
             display::done();
         }

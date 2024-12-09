@@ -61,6 +61,10 @@ pub struct PublishOptions {
     /// The maximum number of concurrent calls to the Walrus CLI for the computation of blob IDs.
     #[clap(long)]
     max_concurrent: Option<NonZeroUsize>,
+
+    /// By default sites are deletable with site-builder delete command. By passing --permanεent, the site is deleted after `epochs` expiration.
+    #[clap(long)]
+    permanent: bool,
 }
 
 /// The continuous editing options.
@@ -198,6 +202,7 @@ impl SiteEditor {
             self.site_id.clone(),
             self.publish_options.epochs,
             self.when_upload.clone(),
+            self.publish_options.permanent,
         )
         .await?;
         let (response, summary) = site_manager.update_site(&local_site_data).await?;
