@@ -13,11 +13,20 @@ use sui_types::{
 };
 
 use super::{
-    builder::SitePtb, resource::ResourceOp, RemoteSiteFactory, SiteData, SiteDataDiff, SITE_MODULE,
+    builder::SitePtb,
+    resource::ResourceOp,
+    RemoteSiteFactory,
+    SiteData,
+    SiteDataDiff,
+    SITE_MODULE,
 };
 use crate::{
-    display, publish::WhenWalrusUpload, summary::SiteDataDiffSummary,
-    util::get_site_id_from_response, walrus::Walrus, Config,
+    display,
+    publish::WhenWalrusUpload,
+    summary::SiteDataDiffSummary,
+    util::get_site_id_from_response,
+    walrus::Walrus,
+    Config,
 };
 
 const MAX_RESOURCES_PER_PTB: usize = 200;

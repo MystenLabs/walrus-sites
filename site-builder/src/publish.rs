@@ -11,7 +11,9 @@ use anyhow::{anyhow, Result};
 use clap::Parser;
 use notify::{RecursiveMode, Watcher};
 use sui_sdk::rpc_types::{
-    SuiExecutionStatus, SuiTransactionBlockEffects, SuiTransactionBlockResponse,
+    SuiExecutionStatus,
+    SuiTransactionBlockEffects,
+    SuiTransactionBlockResponse,
 };
 use sui_types::base_types::SuiAddress;
 
@@ -25,7 +27,10 @@ use crate::{
     },
     summary::{SiteDataDiffSummary, Summarizable},
     util::{
-        get_site_id_from_response, id_to_base36, load_wallet_context, path_or_defaults_if_exist,
+        get_site_id_from_response,
+        id_to_base36,
+        load_wallet_context,
+        path_or_defaults_if_exist,
     },
     walrus::Walrus,
     Config,
