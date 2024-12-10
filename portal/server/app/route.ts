@@ -5,36 +5,14 @@ import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import { resolveAndFetchPage } from "@lib/page_fetching";
-import { has } from '@vercel/edge-config';
-import logger from "@lib/logger";
-import * as Sentry from "@sentry/node";
-import BlocklistChecker from "@lib/blocklist_checker";
 import { siteNotFound } from "@lib/http/http_error_responses";
+import integrateLoggerWithSentry from "sentry_logger";
+import blocklistChecker from "custom_blocklist_checker";
 
-function addLoggingArgsToSentry(args: { [key: string]: any }) {
-    Object.entries(args).forEach(([key, value]) => {
-        if (key !== "message") { // Skipping the 'message' key
-            console.log(`${key}: ${value}`)
-            Sentry.setTag(key, value);
-        }
-    });
+if (process.env.ENABLE_SENTRY === "true") {
+    // Only integrate Sentry on production.
+    integrateLoggerWithSentry();
 }
-logger.setErrorPredicate(args => {
-    addLoggingArgsToSentry(args);
-    Sentry.captureException(new Error(args.message ))
-});
-logger.setWarnPredicate(args => {
-    addLoggingArgsToSentry(args);
-    Sentry.addBreadcrumb({ message: args.message, data: args, level: 'warning' })
-} );
-logger.setInfoPredicate(args => {
-    addLoggingArgsToSentry(args);
-    Sentry.addBreadcrumb({ message: args.message, data: args, level: 'info'})
-} );
-logger.setDebugPredicate(args => {
-    addLoggingArgsToSentry(args);
-    Sentry.addBreadcrumb({ message: args.message, data: args, level: 'debug' })
-});
 
 export async function GET(req: Request) {
     const originalUrl = req.headers.get("x-original-url");
@@ -65,15 +43,8 @@ export async function GET(req: Request) {
     const portalDomain = getDomain(url, Number(portalDomainNameLength));
     const requestDomain = getDomain(url, Number(portalDomainNameLength));
 
-    const blocklistChecker = new BlocklistChecker(
-        (id: string) => {
-            console.log(`Checking ifthe "${id}" suins domain is in the blocklist...`);
-            return has(id)
-        }
-    );
-
     if (parsedUrl) {
-        if (await blocklistChecker.isBlocked(parsedUrl.subdomain)) {
+        if (blocklistChecker && await blocklistChecker.isBlocked(parsedUrl.subdomain)) {
             return siteNotFound();
         }
 

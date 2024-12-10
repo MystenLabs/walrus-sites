@@ -1,9 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-
 import {withSentryConfig} from '@sentry/nextjs';
-// Copyright (c) Mysten Labs, Inc.
-// SPDX-License-Identifier: Apache-2.0
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
