@@ -6,35 +6,14 @@ import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@l
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import { resolveAndFetchPage } from "@lib/page_fetching";
 import { has } from '@vercel/edge-config';
-import logger from "@lib/logger";
-import * as Sentry from "@sentry/node";
 import BlocklistChecker from "@lib/blocklist_checker";
 import { siteNotFound } from "@lib/http/http_error_responses";
+import integrateLoggerWithSentry from "sentry_logger";
 
-function addLoggingArgsToSentry(args: { [key: string]: any }) {
-    Object.entries(args).forEach(([key, value]) => {
-        if (key !== "message") { // Skipping the 'message' key
-            console.log(`${key}: ${value}`)
-            Sentry.setTag(key, value);
-        }
-    });
+// Only integrate Sentry on production.
+if (process.env.NODE_ENV === "production") {
+    integrateLoggerWithSentry();
 }
-logger.setErrorPredicate(args => {
-    addLoggingArgsToSentry(args);
-    Sentry.captureException(new Error(args.message ))
-});
-logger.setWarnPredicate(args => {
-    addLoggingArgsToSentry(args);
-    Sentry.addBreadcrumb({ message: args.message, data: args, level: 'warning' })
-} );
-logger.setInfoPredicate(args => {
-    addLoggingArgsToSentry(args);
-    Sentry.addBreadcrumb({ message: args.message, data: args, level: 'info'})
-} );
-logger.setDebugPredicate(args => {
-    addLoggingArgsToSentry(args);
-    Sentry.addBreadcrumb({ message: args.message, data: args, level: 'debug' })
-});
 
 export async function GET(req: Request) {
     const originalUrl = req.headers.get("x-original-url");
