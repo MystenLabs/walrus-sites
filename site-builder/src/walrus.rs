@@ -80,6 +80,7 @@ impl Walrus {
         force: bool,
         deletable: bool,
     ) -> Result<StoreOutput> {
+        tracing::info!(?deletable, "Deletable store variables");
         create_command!(self, store, file, epochs, force, deletable)
     }
 

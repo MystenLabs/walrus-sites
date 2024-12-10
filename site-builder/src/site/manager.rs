@@ -120,6 +120,8 @@ impl SiteManager {
     async fn publish_to_walrus<'b>(&mut self, updates: &[&ResourceOp<'b>]) -> Result<()> {
         let deletable = !self.permanent;
 
+        tracing::info!(?deletable, ?self.permanent, "Deletable and permanent variables");
+
         for update in updates.iter() {
             let resource = update.inner();
             tracing::debug!(
