@@ -5,13 +5,12 @@ import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import { resolveAndFetchPage } from "@lib/page_fetching";
-import { has } from '@vercel/edge-config';
-import BlocklistChecker from "@lib/blocklist_checker";
 import { siteNotFound } from "@lib/http/http_error_responses";
 import integrateLoggerWithSentry from "sentry_logger";
+import blocklistChecker from "custom_blocklist_checker";
 
-// Only integrate Sentry on production.
 if (process.env.NODE_ENV === "production") {
+    // Only integrate Sentry on production.
     integrateLoggerWithSentry();
 }
 
@@ -44,15 +43,8 @@ export async function GET(req: Request) {
     const portalDomain = getDomain(url, Number(portalDomainNameLength));
     const requestDomain = getDomain(url, Number(portalDomainNameLength));
 
-    const blocklistChecker = new BlocklistChecker(
-        (id: string) => {
-            console.log(`Checking ifthe "${id}" suins domain is in the blocklist...`);
-            return has(id)
-        }
-    );
-
     if (parsedUrl) {
-        if (await blocklistChecker.isBlocked(parsedUrl.subdomain)) {
+        if (blocklistChecker && await blocklistChecker.isBlocked(parsedUrl.subdomain)) {
             return siteNotFound();
         }
 
