@@ -22,7 +22,7 @@ function create_blocklist_checker(): BlocklistChecker {
 }
 
 let blocklistChecker: BlocklistChecker | undefined;
-if (process.env.NODE_ENV === "production") {
+if (process.env.ENABLE_BLOCKLIST === "true") {
     blocklistChecker = create_blocklist_checker();
 }
 export default blocklistChecker;

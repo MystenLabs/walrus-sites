@@ -9,7 +9,7 @@ import { siteNotFound } from "@lib/http/http_error_responses";
 import integrateLoggerWithSentry from "sentry_logger";
 import blocklistChecker from "custom_blocklist_checker";
 
-if (process.env.NODE_ENV === "production") {
+if (process.env.ENABLE_SENTRY === "true") {
     // Only integrate Sentry on production.
     integrateLoggerWithSentry();
 }
