@@ -110,7 +110,7 @@ pub enum ResourceOp<'a> {
     Unchanged(&'a Resource),
 }
 
-impl<'a> fmt::Debug for ResourceOp<'a> {
+impl fmt::Debug for ResourceOp<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (op, path) = match self {
             ResourceOp::Deleted(resource) => ("delete", &resource.info.path),

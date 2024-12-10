@@ -1,6 +1,6 @@
 repos:
 - repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v4.6.0
+  rev: v5.0.0
   hooks:
   - id: check-merge-conflict
   - id: check-yaml
@@ -10,7 +10,7 @@ repos:
   - id: mixed-line-ending
   - id: trailing-whitespace
 - repo: https://github.com/editorconfig-checker/editorconfig-checker.python
-  rev: "2.7.3"
+  rev: "3.0.3"
   hooks:
   - id: editorconfig-checker
     alias: ec
@@ -21,16 +21,16 @@ repos:
       args: []
       pass_filenames: false
 - repo: https://github.com/crate-ci/typos
-  rev: v1.22.7
+  rev: typos-dict-v0.11.37
   hooks:
   - id: typos
     pass_filenames: false
 - repo: https://github.com/EmbarkStudios/cargo-deny
-  rev: 0.14.24
+  rev: 0.16.3
   hooks:
   - id: cargo-deny
 - repo: https://github.com/DevinR528/cargo-sort
-  rev: v1.0.9
+  rev: v1.1.0
   hooks:
   - id: cargo-sort
     args: ["--workspace"]
