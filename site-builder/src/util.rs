@@ -95,7 +95,12 @@ pub fn get_site_id_from_response(
     Ok(effects
         .created()
         .iter()
-        .find(|c| c.owner == address)
+        .find(|c| {
+            c.owner
+                .get_owner_address()
+                .map(|owner_address| owner_address == address)
+                .unwrap_or(false)
+        })
         .expect("could not find the object ID for the created Walrus site.")
         .reference
         .object_id)

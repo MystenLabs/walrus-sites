@@ -51,6 +51,7 @@ pub trait AssociatedContractStruct: DeserializeOwned {
 
 /// Tag identifying contract functions based on their name and module.
 #[derive(Debug)]
+#[allow(unused)]
 pub struct FunctionTag<'a> {
     /// Move function name.
     pub name: &'a str,
@@ -62,7 +63,7 @@ pub struct FunctionTag<'a> {
     pub n_object_outputs: u16,
 }
 
-impl<'a> FunctionTag<'a> {
+impl FunctionTag<'_> {
     /// Return a new [FunctionTag] with the provided type parameters.
     #[allow(dead_code)]
     pub fn with_type_params(&self, type_params: &[TypeTag]) -> Self {
@@ -88,7 +89,7 @@ pub struct StructTag<'a> {
     pub module: &'a str,
 }
 
-impl<'a> StructTag<'a> {
+impl StructTag<'_> {
     /// Returns a [MoveStructTag] for the identified struct with the given package ID.
     ///
     /// Use [`Self::to_move_struct_tag_with_type_map`] if the type origin map is available.
@@ -132,7 +133,7 @@ impl<'a> From<&'a MoveStructTag> for StructTag<'a> {
     }
 }
 
-impl<'a> fmt::Display for StructTag<'a> {
+impl fmt::Display for StructTag<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}::{}", self.module, self.name)
     }
