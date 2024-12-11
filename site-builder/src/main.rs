@@ -166,6 +166,12 @@ enum Commands {
     /// This command allows to publish directories as sites. Warning: Rewrites all `index.html`
     /// files.
     ListDirectory { path: PathBuf },
+    /// Completely destroys the site at the given object id.
+    ///
+    /// Removes all resources and routes, and destroys the site, returning the Sui storage rebate to
+    /// the owner. Warning: this action is irreversible! Re-publishing the site will generate a
+    /// different Site object ID.
+    Destroy { object: ObjectID },
 }
 
 /// The configuration for the site builder.
@@ -258,15 +264,15 @@ async fn run() -> Result<()> {
             publish_options,
             site_name,
         } => {
-            SiteEditor::new(
-                publish_options,
-                SiteIdentifier::NewSite(site_name),
-                config,
-                ContinuousEditing::Once,
-                WhenWalrusUpload::Modified,
-            )
-            .run()
-            .await?
+            SiteEditor::new(config)
+                .with_edit_options(
+                    publish_options,
+                    SiteIdentifier::NewSite(site_name),
+                    ContinuousEditing::Once,
+                    WhenWalrusUpload::Modified,
+                )
+                .run()
+                .await?
         }
         Commands::Update {
             publish_options,
@@ -274,15 +280,15 @@ async fn run() -> Result<()> {
             watch,
             force,
         } => {
-            SiteEditor::new(
-                publish_options,
-                SiteIdentifier::ExistingSite(object_id),
-                config,
-                ContinuousEditing::from_watch_flag(watch),
-                WhenWalrusUpload::from_force_flag(force),
-            )
-            .run()
-            .await?
+            SiteEditor::new(config)
+                .with_edit_options(
+                    publish_options,
+                    SiteIdentifier::ExistingSite(object_id),
+                    ContinuousEditing::from_watch_flag(watch),
+                    WhenWalrusUpload::from_force_flag(force),
+                )
+                .run()
+                .await?
         }
         // Commands::Delete { object_id } => {
         //     object_id
@@ -304,6 +310,10 @@ async fn run() -> Result<()> {
         Commands::Convert { object_id } => println!("{}", id_to_base36(&object_id)?),
         Commands::ListDirectory { path } => {
             Preprocessor::preprocess(path.as_path())?;
+        }
+        Commands::Destroy { object } => {
+            let site_editor = SiteEditor::new(config);
+            site_editor.destroy(object).await?;
         }
     };
 

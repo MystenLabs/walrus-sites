@@ -8,7 +8,7 @@ use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{rpc_types::SuiTransactionBlockResponse, wallet_context::WalletContext, SuiClient};
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
-    transaction::{CallArg, ProgrammableTransaction, TransactionData},
+    transaction::{CallArg, ProgrammableTransaction},
     Identifier,
 };
 
@@ -24,7 +24,7 @@ use crate::{
     display,
     publish::WhenWalrusUpload,
     summary::SiteDataDiffSummary,
-    util::get_site_id_from_response,
+    util::{get_site_id_from_response, sign_and_send_ptb},
     walrus::Walrus,
     Config,
 };
@@ -217,16 +217,14 @@ impl SiteManager {
         programmable_transaction: ProgrammableTransaction,
         gas_coin: ObjectRef,
     ) -> Result<SuiTransactionBlockResponse> {
-        let gas_price = self.wallet.get_reference_gas_price().await?;
-        let transaction = TransactionData::new_programmable(
+        sign_and_send_ptb(
             self.active_address()?,
-            vec![gas_coin],
+            &self.wallet,
             programmable_transaction,
+            gas_coin,
             self.config.gas_budget(),
-            gas_price,
-        );
-        let transaction = self.wallet.sign_transaction(&transaction);
-        self.wallet.execute_transaction_may_fail(transaction).await
+        )
+        .await
     }
 
     async fn sui_client(&self) -> Result<SuiClient> {

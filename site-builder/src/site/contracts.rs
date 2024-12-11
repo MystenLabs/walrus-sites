@@ -202,6 +202,7 @@ pub mod site {
     use super::*;
 
     contract_ident!(fn site::new_site, 1);
+    contract_ident!(fn site::burn);
     // Resource functions
     contract_ident!(struct site::Resource);
     contract_ident!(struct site::ResourcePath);
@@ -215,7 +216,6 @@ pub mod site {
     contract_ident!(fn site::insert_route);
     contract_ident!(fn site::remove_all_routes_if_exist, 1);
     // Range functions
-    //contract_ident!(struct site::Range);
     contract_ident!(fn site::new_range_option, 1);
 }
 
