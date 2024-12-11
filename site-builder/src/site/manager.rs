@@ -141,6 +141,15 @@ impl SiteManager {
         Ok(())
     }
 
+    /// Publishes the resources to Walrus.
+    async fn delete_from_walrus<'b>(&mut self, blob_id: String) -> Result<()> {
+        tracing::debug!(blob_id, "deleting blob from Walrus");
+        display::action(format!("deleting blob from Walrus", blob_id));
+        let _output = self.walrus.delete(blob_id).await?;
+        display::done();
+        Ok(())
+    }
+
     /// Executes the updates on Sui.
     async fn execute_sui_updates<'b>(
         &self,

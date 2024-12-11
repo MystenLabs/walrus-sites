@@ -159,8 +159,31 @@ impl SiteEditor {
         }
     }
 
-    pub async fn destroy(&self, site_id: ObjectID) -> Result<()> {
+    pub async fn destroy(&self, site_id: ObjectID, config: &Config) -> Result<()> {
         let mut wallet = load_wallet_context(&self.config.general.wallet)?;
+
+        let all_dynamic_fields =
+            RemoteSiteFactory::new(&wallet.get_client().await?, config.package)
+                .await?
+                .get_existing_resources(site_id)
+                .await?;
+
+        let mut site_manager = SiteManager::new(
+            self.config.clone(),
+            walrus,
+            wallet,
+            self.edit_options.site_id.clone(),
+            self.edit_options.publish_options.epochs,
+            self.edit_options.when_upload.clone(),
+            self.edit_options.publish_options.permanent.unwrap_or(false),
+        )
+        .await?;
+        let (response, summary) = site_manager.update_site(&local_site_data).await?;
+        for (name, id) in all_dynamic_fields {
+            println!("Deleting dynamic field - {:<40} {:?}", name, id);
+            let (response, summary) = site_manager.delete_from_walrus(&site_manager, id).await?;
+        }
+
         let ptb = SitePtb::new(self.config.package, Identifier::new(SITE_MODULE)?)?;
         let mut ptb = ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
         let site = RemoteSiteFactory::new(&wallet.get_client().await?, self.config.package)

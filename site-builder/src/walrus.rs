@@ -127,4 +127,9 @@ impl Walrus {
             rpc_url: self.rpc_url.clone(),
         }
     }
+
+    pub async fn delete(&mut self, blob_id: String) -> Result<StoreOutput> {
+        tracing::info!(?blob_id, "Deleting Blob");
+        create_command!(self, delete, blob_id)
+    }
 }

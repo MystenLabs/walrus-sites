@@ -148,13 +148,14 @@ enum Commands {
         #[clap(long, action)]
         force: bool,
     },
-    /// Delete a site.
-    // Delete {
-    //     /// The object ID of the site to delete
-    //     object_id: ObjectID,
-    // },
+
+    /// Delete a blob from Walrus.
+    Delete {
+        /// The blob ID of the blob to delete
+        blob_id: String,
+    },
+
     /// Convert an object ID in hex format to the equivalent Base36 format.
-    ///
     /// This command may be useful to browse a site, given it object ID.
     Convert {
         /// The object id (in hex format) to convert
@@ -290,9 +291,6 @@ async fn run() -> Result<()> {
                 .run()
                 .await?
         }
-        // Commands::Delete { object_id } => {
-        //     object_id
-        // }
         // Add a path to be watched. All files and directories at that path and
         // below will be monitored for changes.
         Commands::Sitemap { object } => {
@@ -313,7 +311,7 @@ async fn run() -> Result<()> {
         }
         Commands::Destroy { object } => {
             let site_editor = SiteEditor::new(config);
-            site_editor.destroy(object).await?;
+            site_editor.destroy(object, &config).await?;
         }
     };
 

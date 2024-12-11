@@ -172,6 +172,12 @@ impl WalrusCmdBuilder {
         self.with_command(command)
     }
 
+    /// Adds a [`Command::Delete`] command to the builder.
+    pub fn delete(self, blob_id: String) -> WalrusCmdBuilder<Command> {
+        let command = Command::Delete { blob_id };
+        self.with_command(command)
+    }
+
     /// Adds a [`Command::Read`] command to the builder.
     #[allow(dead_code)]
     pub fn read(
