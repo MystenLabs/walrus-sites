@@ -8,7 +8,6 @@ import {
     SuiClient,
     SuiObjectResponse,
 } from "@mysten/sui/client";
-import { TESTNET_RPC_LIST, RPC_REQUEST_TIMEOUT_MS } from "./constants";
 import logger from "./logger";
 
 interface RPCSelectorInterface {
@@ -44,12 +43,25 @@ class RPCSelector implements RPCSelectorInterface {
         this.selectedClient = undefined;
     }
 
+    /**
+     * Get the list of RPC URLs from the environment variable.
+     */
+    private static parseRPCList(): string[] {
+        const rpcList = process.env.RPC_URL_LIST;
+        if (!rpcList) {
+            throw new Error("No RPC list found in environment variables");
+        }
+        return rpcList.split(",");
+    }
+
     // Get the singleton instance.
     public static getInstance(): RPCSelector {
-    if (!RPCSelector.instance) {
-        RPCSelector.instance = new RPCSelector(TESTNET_RPC_LIST);
-    }
-    return RPCSelector.instance;
+        if (!RPCSelector.instance) {
+            RPCSelector.instance = new RPCSelector(
+                RPCSelector.parseRPCList()
+            );
+        }
+        return RPCSelector.instance;
     }
 
     // General method to call clients and return the first successful response.
@@ -80,7 +92,10 @@ class RPCSelector implements RPCSelectorInterface {
         }
 
         const timeoutPromise = new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("Request timed out")), RPC_REQUEST_TIMEOUT_MS),
+            setTimeout(() => reject(
+                new Error("Request timed out")),
+                Number(process.env.RPC_REQUEST_TIMEOUT_MS) ?? 7000
+            ),
         );
 
         const result = await Promise.race([
