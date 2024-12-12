@@ -161,11 +161,11 @@ impl SiteEditor {
         }
     }
 
-    pub async fn destroy(&self, site_id: ObjectID, config: &Config) -> Result<()> {
+    pub async fn destroy(&self, site_id: ObjectID) -> Result<()> {
         let wallet2 = load_wallet_context(&self.config.general.wallet)?;
 
         let all_dynamic_fields =
-            RemoteSiteFactory::new(&wallet2.get_client().await?, config.package)
+            RemoteSiteFactory::new(&wallet2.get_client().await?, self.config.package)
                 .await?
                 .get_existing_resources(site_id)
                 .await?;

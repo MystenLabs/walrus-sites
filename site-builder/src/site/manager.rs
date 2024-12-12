@@ -155,7 +155,7 @@ impl SiteManager {
             ));
             let _output = self
                 .walrus
-                .delete(name.clone())
+                .delete(blob_id.to_string())
                 .await?;
             display::done();
         }

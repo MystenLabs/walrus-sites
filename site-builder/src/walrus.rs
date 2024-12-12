@@ -80,13 +80,10 @@ impl Walrus {
         force: bool,
         deletable: bool,
     ) -> Result<StoreOutput> {
-        tracing::info!(?deletable, "Deletable store variables");
         create_command!(self, store, file, epochs, force, deletable)
     }
 
-    /// Issues a `store` JSON command to the Walrus CLI, returning the parsed output.
-    // NOTE: takes a mutable reference to ensure that only one store command is executed at every
-    // time. The issue is that the inner wallet may lock coins if called in parallel.
+    /// Issues a `delete` JSON command to the Walrus CLI, returning the parsed output.
     pub async fn delete(
         &mut self,
         blob_id: String,

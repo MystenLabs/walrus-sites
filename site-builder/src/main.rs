@@ -303,8 +303,8 @@ async fn run() -> Result<()> {
             Preprocessor::preprocess(path.as_path())?;
         }
         Commands::Destroy { object } => {
-            let site_editor = SiteEditor::new(config.clone());
-            site_editor.destroy(object, &config).await?;
+            let site_editor = SiteEditor::new(config);
+            site_editor.destroy(object).await?;
         }
     };
 
