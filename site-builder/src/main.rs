@@ -148,13 +148,6 @@ enum Commands {
         #[clap(long, action)]
         force: bool,
     },
-
-    /// Delete a blob from Walrus.
-    Delete {
-        /// The blob ID of the blob to delete
-        blob_id: String,
-    },
-
     /// Convert an object ID in hex format to the equivalent Base36 format.
     /// This command may be useful to browse a site, given it object ID.
     Convert {
@@ -310,7 +303,7 @@ async fn run() -> Result<()> {
             Preprocessor::preprocess(path.as_path())?;
         }
         Commands::Destroy { object } => {
-            let site_editor = SiteEditor::new(config);
+            let site_editor = SiteEditor::new(config.clone());
             site_editor.destroy(object, &config).await?;
         }
     };

@@ -84,6 +84,18 @@ impl Walrus {
         create_command!(self, store, file, epochs, force, deletable)
     }
 
+    /// Issues a `store` JSON command to the Walrus CLI, returning the parsed output.
+    // NOTE: takes a mutable reference to ensure that only one store command is executed at every
+    // time. The issue is that the inner wallet may lock coins if called in parallel.
+    pub async fn delete(
+        &mut self,
+        blob_id: String,
+    ) -> Result<StoreOutput> {
+        tracing::info!(?blob_id, "Deleting blob");
+        create_command!(self, delete, blob_id)
+    }
+
+
     /// Issues a `read` JSON command to the Walrus CLI, returning the parsed output.
     #[allow(dead_code)]
     pub async fn read(&self, blob_id: BlobId, out: Option<PathBuf>) -> Result<ReadOutput> {
@@ -126,10 +138,5 @@ impl Walrus {
         RpcArg {
             rpc_url: self.rpc_url.clone(),
         }
-    }
-
-    pub async fn delete(&mut self, blob_id: String) -> Result<StoreOutput> {
-        tracing::info!(?blob_id, "Deleting Blob");
-        create_command!(self, delete, blob_id)
     }
 }
