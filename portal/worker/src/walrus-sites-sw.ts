@@ -5,12 +5,14 @@ import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import resolveWithCache from "./caching";
-import { resolveAndFetchPage } from "@lib/page_fetching";
+import { PageFetcher } from "@lib/page_fetching";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
 declare var self: ServiceWorkerGlobalScope;
 declare var clients: Clients;
+
+export const pageFetcher = new PageFetcher();
 
 self.addEventListener("install", (_event) => {
     self.skipWaiting();
@@ -61,7 +63,7 @@ self.addEventListener("fetch", async (event) => {
                 return await fetchFromCache();
             } else {
                 console.warn("Cache API not available");
-                return await resolveAndFetchPage(parsedUrl, null);
+                return await pageFetcher.resolveAndFetchPage(parsedUrl, null);
             }
         };
 
