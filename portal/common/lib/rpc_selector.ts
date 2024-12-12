@@ -8,7 +8,7 @@ import {
     SuiClient,
     SuiObjectResponse,
 } from "@mysten/sui/client";
-import { TESTNET_RPC_LIST, RPC_REQUEST_TIMEOUT_MS } from "./constants";
+import { RPC_REQUEST_TIMEOUT_MS } from "./constants";
 import logger from "./logger";
 
 interface RPCSelectorInterface {
@@ -38,18 +38,10 @@ class RPCSelector implements RPCSelectorInterface {
     private clients: WrappedSuiClient[];
     private selectedClient: WrappedSuiClient | undefined;
 
-    private constructor(rpcURLs: string[]) {
+    constructor(rpcURLs: string[]) {
         // Initialize clients.
         this.clients = rpcURLs.map((rpcUrl) => new WrappedSuiClient(rpcUrl));
         this.selectedClient = undefined;
-    }
-
-    // Get the singleton instance.
-    public static getInstance(): RPCSelector {
-    if (!RPCSelector.instance) {
-        RPCSelector.instance = new RPCSelector(TESTNET_RPC_LIST);
-    }
-    return RPCSelector.instance;
     }
 
     // General method to call clients and return the first successful response.
@@ -181,5 +173,8 @@ class RPCSelector implements RPCSelectorInterface {
     }
 }
 
-const rpcSelectorSingleton = RPCSelector.getInstance();
+if (!process.env.TESTNET_RPC_LIST) {
+    throw new Error("Missing TESTNET_RPC_LIST environment variable");
+}
+const rpcSelectorSingleton = new RPCSelector(process.env.TESTNET_RPC_LIST.split(','));
 export default rpcSelectorSingleton;
