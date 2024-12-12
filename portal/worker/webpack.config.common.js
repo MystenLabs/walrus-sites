@@ -40,6 +40,9 @@ module.exports = {
         new webpack.DefinePlugin({
             'process.env.PORTAL_DOMAIN_NAME_LENGTH': JSON.stringify(
                 process.env.PORTAL_DOMAIN_NAME_LENGTH || undefined
+            ),
+            'process.env.RPC_URL_LIST': JSON.stringify(
+                process.env.RPC_URL_LIST || undefined
             )
         }),
         new CopyPlugin({

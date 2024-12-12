@@ -204,11 +204,11 @@ module walrus_site::site {
     }
 
     /// Deletes a site object.
-    /// WARNING: This function does **NOT** delete the dynamic fields!
-    /// Make sure to call this function after deleting manually
-    /// all the dynamic fields attached to the sites object.
-    /// If you don't delete the dynamic fields, they will become
-    /// unaccessible and you will not be able to delete them in the future.
+    ///
+    /// NB: This function does **NOT** delete the dynamic fields! Make sure to call this function
+    /// after deleting manually all the dynamic fields attached to the sites object. If you don't
+    /// delete the dynamic fields, they will become unaccessible and you will not be able to delete
+    /// them in the future.
     public fun burn(site: Site) {
         let Site {
             id,
