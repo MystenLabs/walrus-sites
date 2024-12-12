@@ -4,7 +4,7 @@ This repo contains the various components of a working [Walrus
 Site](https://docs.walrus.site/walrus-sites/intro.html). The resources of a Walrus Site are stored
 on Walrus, and the metadata and ownership of the site is managed through Sui.
 
-Documentation of Walrus and Walrus Sites is available at [docs.walrus.site](https://docs.walrus.site).
+Documentation of Walrus and Walrus Sites is available at [docs.walrus.site](https://docs.walrus.site/walrus-sites/intro.html).
 
 ## Repo structure
 
@@ -14,6 +14,7 @@ Documentation of Walrus and Walrus Sites is available at [docs.walrus.site](http
   output of a standard website building tool (i.e., a directory containing html/css/js).
 - In [`examples`](./examples/) there is a handy collection of websites to test the functions of the Walrus
   Sites.
+- In [`c4`](./c4/) there is the C4 model depicting the architecture of the project.
 
 ## Star History
 
