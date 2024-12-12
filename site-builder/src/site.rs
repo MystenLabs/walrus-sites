@@ -108,6 +108,10 @@ impl SiteData {
             _ => RouteOps::Unchanged,
         }
     }
+
+    pub fn resources(&self) -> &ResourceSet {
+        &self.resources
+    }
 }
 
 /// Fetches remote sites.
