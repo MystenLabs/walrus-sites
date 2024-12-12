@@ -9,10 +9,16 @@ use std::{
 
 use anyhow::{anyhow, Result};
 use sui_keys::keystore::AccountKeystore;
-use sui_sdk::{rpc_types::SuiTransactionBlockResponse, wallet_context::WalletContext};
+use sui_sdk::{
+    rpc_types::{
+        SuiTransactionBlockEffectsAPI,
+        SuiTransactionBlockResponse,
+    },
+    wallet_context::WalletContext,
+};
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
-    transaction::{CallArg, ProgrammableTransaction},
+    transaction::{CallArg, ProgrammableTransaction, TransactionData},
     Identifier,
 };
 
@@ -109,19 +115,55 @@ impl SiteManager {
         tracing::debug!(operations=?site_updates, "list of operations computed");
 
         let walrus_updates = site_updates.get_walrus_updates(&self.when_upload);
+        let mut total_storage_cost = 0;
 
         if !walrus_updates.is_empty() {
-            self.publish_to_walrus(&walrus_updates).await?;
+            tracing::info!("Dry-running Walrus store operations");
+            for update in &walrus_updates {
+                let resource = update.inner();
+
+                let dry_run_output = self
+                    .walrus
+                    .dry_run_store(resource.full_path.clone(), self.epochs.clone(), !self.permanent, false)
+                    .await?;
+
+                let storage_cost = dry_run_output.storage_cost;
+                total_storage_cost += storage_cost;
+            }
         }
 
+        // Check if there are any updates to the site on-chain.
         let result = if site_updates.has_updates() {
-            display::action("Updating the Walrus Site object on Sui");
+            // Before doing the actual execution, perform a dry run
+            display::action(&format!(
+                "Estimated Storage Cost for this publish/update (Gas Cost Excluded): {} FROST",
+                total_storage_cost
+            ));
+
+            // Add user confirmation prompt.
+            display::action("Waiting for user confirmation...");
+            if !dialoguer::Confirm::new()
+                .with_prompt("Do you want to proceed with these updates?")
+                .default(true)
+                .interact()?
+            {
+                display::error("Update cancelled by user");
+                return Err(anyhow!("Update cancelled by user"));
+            }
+            display::action("Applying the Walrus Site object updates on Sui");
             let result = self.execute_sui_updates(&site_updates).await?;
             display::done();
             result
         } else {
+            // No updates necessary
             SuiTransactionBlockResponse::default()
         };
+
+        // After applying on-chain updates, publish to Walrus if needed.
+        if !walrus_updates.is_empty() {
+            self.publish_to_walrus(&walrus_updates).await?;
+        }
+
         Ok((result, site_updates.summary(&self.when_upload)))
     }
 
