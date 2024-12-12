@@ -3,7 +3,7 @@
 
 // Import necessary functions and types
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { fetchResource } from "./resource";
+import { ResourceFetcher } from "./resource";
 import { HttpStatusCodes } from "./http/http_status_codes";
 import { checkRedirect } from "./redirects";
 import { fromBase64 } from "@mysten/bcs";
@@ -42,6 +42,7 @@ vi.mock("./bcs_data_parsing", async (importOriginal) => {
 });
 
 describe("fetchResource", () => {
+    const resourceFetcher = new ResourceFetcher();
     beforeEach(() => {
         vi.clearAllMocks();
     });
@@ -49,14 +50,14 @@ describe("fetchResource", () => {
     test("should return LOOP_DETECTED if objectId is already in seenResources", async () => {
         const seenResources = new Set<string>(["0xParentId"]);
 
-        const result = await fetchResource("0xParentId", "/path", seenResources);
+        const result = await resourceFetcher.fetchResource("0xParentId", "/path", seenResources);
         expect(result).toBe(HttpStatusCodes.LOOP_DETECTED);
     });
 
     test("TOO_MANY_REDIRECTS if recursion depth exceeds MAX_REDIRECT_DEPTH", async () => {
         const seenResources = new Set<string>();
         // Assuming MAX_REDIRECT_DEPTH is 3
-        const result = await fetchResource("0xParentId", "/path", seenResources, 4);
+        const result = await resourceFetcher.fetchResource("0xParentId", "/path", seenResources, 4);
         expect(result).toBe(HttpStatusCodes.TOO_MANY_REDIRECTS);
     });
 
@@ -95,7 +96,7 @@ describe("fetchResource", () => {
         ]);
         (fromBase64 as any).mockReturnValueOnce("decodedBcsBytes");
 
-        const result = await fetchResource("0x1", "/path", new Set());
+        const result = await resourceFetcher.fetchResource("0x1", "/path", new Set());
         expect(result).toEqual({
             blob_id: "0xresourceBlobId",
             objectId: "0xdynamicFieldId",
@@ -154,7 +155,7 @@ describe("fetchResource", () => {
             .mockResolvedValueOnce([mockObject, mockResource])
             .mockResolvedValueOnce([mockObject, mockResource]);
 
-        const result = await fetchResource(
+        const result = await resourceFetcher.fetchResource(
             "0x26dc2460093a9d6d31b58cb0ed1e72b19d140542a49be7472a6f25d542cb5cc3",
             "/path",
             new Set());
@@ -190,7 +191,7 @@ describe("fetchResource", () => {
         ]);
         (fromBase64 as any).mockReturnValueOnce(undefined);
 
-        const result = await fetchResource("0x1", "/path", seenResources);
+        const result = await resourceFetcher.fetchResource("0x1", "/path", seenResources);
 
         // Since the resource does not have a blob_id, the function should return NOT_FOUND
         expect(result).toBe(HttpStatusCodes.NOT_FOUND);
@@ -221,7 +222,7 @@ describe("fetchResource", () => {
             {}
         ]);
 
-        const result = await fetchResource("0x1", "/path", seenResources);
+        const result = await resourceFetcher.fetchResource("0x1", "/path", seenResources);
 
         // Check that the function returns NOT_FOUND
         expect(result).toBe(HttpStatusCodes.NOT_FOUND);

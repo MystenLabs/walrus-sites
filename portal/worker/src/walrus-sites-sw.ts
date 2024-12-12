@@ -6,13 +6,14 @@ import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@l
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import resolveWithCache from "./caching";
 import { PageFetcher } from "@lib/page_fetching";
+import { ResourceFetcher } from "@lib/resource";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
 declare var self: ServiceWorkerGlobalScope;
 declare var clients: Clients;
 
-export const pageFetcher = new PageFetcher();
+export const pageFetcher = new PageFetcher(new ResourceFetcher());
 
 self.addEventListener("install", (_event) => {
     self.skipWaiting();

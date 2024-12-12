@@ -8,7 +8,7 @@ import {
 } from "./types/index";
 import { subdomainToObjectId, HEXtoBase36 } from "./objectId_operations";
 import { resolveSuiNsAddress, hardcodedSubdmains } from "./suins";
-import { fetchResource } from "./resource";
+import { ResourceFetcher } from "./resource";
 import {
     siteNotFound,
     noObjectIdFound,
@@ -27,6 +27,8 @@ import BlocklistChecker from "./blocklist_checker";
 * Includes all the logic for fetching a walrus site.
 */
 export class PageFetcher {
+    constructor(private resourceFetcher: ResourceFetcher){}
+
     /**
      * Resolves the subdomain to an object ID, and gets the corresponding resources.
      *
@@ -133,7 +135,7 @@ export class PageFetcher {
         path: string,
     ): Promise<Response> {
         logger.info({message: 'Fetching page', objectId: objectId, path: path});
-        const result = await fetchResource(objectId, path, new Set<string>());
+        const result = await this.resourceFetcher.fetchResource(objectId, path, new Set<string>());
         if (!isResource(result) || !result.blob_id) {
             if (path !== "/404.html") {
                 logger.warn({ message: "Resource not found. Fetching /404.html ...", path });

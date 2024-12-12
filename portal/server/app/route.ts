@@ -5,6 +5,7 @@ import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import { PageFetcher } from "@lib/page_fetching";
+import { ResourceFetcher } from "@lib/resource";
 import { siteNotFound } from "@lib/http/http_error_responses";
 import integrateLoggerWithSentry from "sentry_logger";
 import blocklistChecker from "custom_blocklist_checker";
@@ -14,7 +15,9 @@ if (process.env.ENABLE_SENTRY === "true") {
     integrateLoggerWithSentry();
 }
 
-const pageFetcher = new PageFetcher();
+const pageFetcher = new PageFetcher(
+    new ResourceFetcher()
+);
 
 export async function GET(req: Request) {
     const originalUrl = req.headers.get("x-original-url");
