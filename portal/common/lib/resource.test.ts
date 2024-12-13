@@ -4,6 +4,7 @@
 // Import necessary functions and types
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { ResourceFetcher } from "./resource";
+import { RPCSelector } from "./rpc_selector";
 import { HttpStatusCodes } from "./http/http_status_codes";
 import { checkRedirect } from "./redirects";
 import { fromBase64 } from "@mysten/bcs";
@@ -42,7 +43,9 @@ vi.mock("./bcs_data_parsing", async (importOriginal) => {
 });
 
 describe("fetchResource", () => {
-    const resourceFetcher = new ResourceFetcher();
+    const resourceFetcher = new ResourceFetcher(
+        new RPCSelector(process.env.RPC_URL_LIST!.split(','))
+    );
     beforeEach(() => {
         vi.clearAllMocks();
     });

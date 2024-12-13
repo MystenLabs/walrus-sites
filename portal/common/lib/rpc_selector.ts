@@ -33,7 +33,7 @@ class WrappedSuiClient extends SuiClient {
     }
 }
 
-class RPCSelector implements RPCSelectorInterface {
+export class RPCSelector implements RPCSelectorInterface {
     private static instance: RPCSelector;
     private clients: WrappedSuiClient[];
     private selectedClient: WrappedSuiClient | undefined;

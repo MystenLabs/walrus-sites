@@ -6,6 +6,7 @@ import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@l
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import { PageFetcher } from "@lib/page_fetching";
 import { ResourceFetcher } from "@lib/resource";
+import { RPCSelector } from "@lib/rpc_selector";
 import { siteNotFound } from "@lib/http/http_error_responses";
 import integrateLoggerWithSentry from "sentry_logger";
 import blocklistChecker from "custom_blocklist_checker";
@@ -16,7 +17,9 @@ if (process.env.ENABLE_SENTRY === "true") {
 }
 
 const pageFetcher = new PageFetcher(
-    new ResourceFetcher()
+    new ResourceFetcher(
+        new RPCSelector(process.env.RPC_URL_LIST!.split(','))
+    )
 );
 
 export async function GET(req: Request) {
