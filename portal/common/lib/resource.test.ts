@@ -11,8 +11,6 @@ import { fromBase64 } from "@mysten/bcs";
 import rpcSelector from "./rpc_selector";
 import { SuiObjectResponse } from "@mysten/sui/client";
 
-// Mock SuiClient methods
-const multiGetObjects = vi.spyOn(rpcSelector, 'multiGetObjects');
 
 vi.mock("@mysten/sui/utils", () => ({
     deriveDynamicFieldID: vi.fn(() => "0xdynamicFieldId"),
@@ -43,9 +41,14 @@ vi.mock("./bcs_data_parsing", async (importOriginal) => {
 });
 
 describe("fetchResource", () => {
-    const resourceFetcher = new ResourceFetcher(
-        new RPCSelector(process.env.RPC_URL_LIST!.split(','))
-    );
+    console.log("RPC URLS:", process.env.RPC_URL_LIST!.split(','));
+    const rpcSelector = new RPCSelector(
+        process.env.RPC_URL_LIST!.split(',')
+    )
+    const resourceFetcher = new ResourceFetcher(rpcSelector);
+    // Mock SuiClient methods
+    const multiGetObjects = vi.spyOn(rpcSelector, 'multiGetObjects');
+
     beforeEach(() => {
         vi.clearAllMocks();
     });
