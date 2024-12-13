@@ -17,7 +17,7 @@ export type Configuration = {
     edgeConfig?: string;
     enableBlocklist: Boolean;
     landingPageOidB36: string;
-    portalDomainNameLength: number;
+    portalDomainNameLength?: number;
     premiumRpcUrlList?: string[];
     rpcUrlList: string[];
     enableSentry: Boolean;
@@ -53,11 +53,11 @@ class ConfigurationLoader {
 
     private loadEnableBlocklist(): Boolean {
         if (!process.env.ENABLE_BLOCKLIST) {
-            throw new Error('Missing ENABLE_BLOCKLIST environment variable')
+            throw new Error('Missing ENABLE_BLOCKLIST environment variable.')
         }
         const enable = process.env.ENABLE_BLOCKLIST.toLowerCase()
         if (!isStringBoolean(enable)) {
-            throw new Error('ENABLE_BLOCKLIST must be "true" or "false"')
+            throw new Error('ENABLE_BLOCKLIST must be "true" or "false".')
         }
         return toBoolean(enable)
     }
@@ -65,23 +65,20 @@ class ConfigurationLoader {
     private loadLandingPageOidB36(): string {
         const pageOidB36 = process.env.LANDING_PAGE_OID_B36
         if (!pageOidB36) {
-            throw new Error('Missing LANDING_PAGE_OID_B36 environment variable')
+            throw new Error('Missing LANDING_PAGE_OID_B36 environment variable.')
         }
         const base36Pattern = /^[0-9a-z]+$/i
         if (!base36Pattern.test(pageOidB36)) {
-            throw new Error('LANDING_PAGE_OID_B36 must be a valid base36 string')
+            throw new Error('LANDING_PAGE_OID_B36 must be a valid base36 string.')
         }
         return pageOidB36
     }
 
     private loadPortalDomainNameLength(): number {
         const portalDomainNameLength = process.env.PORTAL_DOMAIN_NAME_LENGTH
-        if (!portalDomainNameLength) {
-            throw new Error('Missing PORTAL_DOMAIN_NAME_LENGTH environment variable')
-        }
-        const length = Number(portalDomainNameLength)
-        if (isNaN(length) || length <= 0) {
-            throw new Error('PORTAL_DOMAIN_NAME_LENGTH must be a number')
+
+        if (portalDomainNameLength && isNaN(portalDomainNameLength.length) || length <= 0) {
+            throw new Error('PORTAL_DOMAIN_NAME_LENGTH must be positive number.')
         }
         return length
     }
@@ -101,7 +98,7 @@ class ConfigurationLoader {
     private loadRpcUrlList(): string[] {
         const rpcUrlListString = process.env.RPC_URL_LIST
         if (!rpcUrlListString) {
-            throw new Error('Missing RPC_URL_LIST environment variable')
+            throw new Error('Missing RPC_URL_LIST environment variable.')
         }
         const rpcUrlList = rpcUrlListString.trim().split(',')
         if (rpcUrlList.length <= 0) {
@@ -112,11 +109,11 @@ class ConfigurationLoader {
 
     private loadEnableSentry(): Boolean {
         if (!process.env.ENABLE_SENTRY) {
-            throw new Error('Missing ENABLE_SENTRY environment variable')
+            throw new Error('Missing ENABLE_SENTRY environment variable.')
         }
         const enable = process.env.ENABLE_SENTRY.toLowerCase()
         if (!isStringBoolean(enable)) {
-            throw new Error('ENABLE_SENTRY must be "true" or "false"')
+            throw new Error('ENABLE_SENTRY must be "true" or "false".')
         }
         return toBoolean(enable)
     }
@@ -125,7 +122,7 @@ class ConfigurationLoader {
         if (this.loadEnableSentry()) {
             const authToken = process.env.SENTRY_AUTH_TOKEN
             if (!authToken) {
-                throw new Error('Missing SENTRY_AUTH_TOKEN environment variable')
+                throw new Error('Missing SENTRY_AUTH_TOKEN environment variable.')
             }
             return authToken
         }
@@ -135,7 +132,7 @@ class ConfigurationLoader {
         if (this.loadEnableSentry()) {
             const dsn = process.env.SENTRY_DSN
             if (!dsn) {
-                throw new Error('Missing SENTRY_DSN environment variable')
+                throw new Error('Missing SENTRY_DSN environment variable.')
             }
             return dsn
         }
