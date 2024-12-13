@@ -176,5 +176,5 @@ class RPCSelector implements RPCSelectorInterface {
 if (!process.env.RPC_URL_LIST) {
     throw new Error("Missing TESTNET_RPC_LIST environment variable");
 }
-const rpcSelectorSingleton = new RPCSelector(process.env.RPC_URL_LIST.split(','));
-export default rpcSelectorSingleton;
+const rpcSelector = new RPCSelector(process.env.RPC_URL_LIST.split(','));
+export default rpcSelector;

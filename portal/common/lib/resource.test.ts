@@ -7,11 +7,11 @@ import { ResourceFetcher } from "./resource";
 import { HttpStatusCodes } from "./http/http_status_codes";
 import { checkRedirect } from "./redirects";
 import { fromBase64 } from "@mysten/bcs";
-import rpcSelectorSingleton from "./rpc_selector";
+import rpcSelector from "./rpc_selector";
 import { SuiObjectResponse } from "@mysten/sui/client";
 
 // Mock SuiClient methods
-const multiGetObjects = vi.spyOn(rpcSelectorSingleton, 'multiGetObjects');
+const multiGetObjects = vi.spyOn(rpcSelector, 'multiGetObjects');
 
 vi.mock("@mysten/sui/utils", () => ({
     deriveDynamicFieldID: vi.fn(() => "0xdynamicFieldId"),

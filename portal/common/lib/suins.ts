@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 import { SITE_NAMES } from "./constants";
-import rpcSelectorSingleton from "./rpc_selector";
+import rpcSelector from "./rpc_selector";
 import logger from "./logger";
 
 /**
@@ -11,7 +11,7 @@ import logger from "./logger";
  */
 export async function resolveSuiNsAddress(subdomain: string
 ): Promise<string | null> {
-    const suiObjectId: string = await rpcSelectorSingleton.call<string>("call", ["suix_resolveNameServiceAddress", [
+    const suiObjectId: string = await rpcSelector.call<string>("call", ["suix_resolveNameServiceAddress", [
         subdomain + ".sui",
     ]]);
     logger.info({ message: "resolved suins name", resolvedSuiNSName: subdomain, suiObjectId: suiObjectId });

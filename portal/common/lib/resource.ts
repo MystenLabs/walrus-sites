@@ -10,7 +10,7 @@ import { fromBase64 } from "@mysten/bcs";
 import { ResourcePathStruct, DynamicFieldStruct, ResourceStruct } from "./bcs_data_parsing";
 import { deriveDynamicFieldID } from "@mysten/sui/utils";
 import { bcs } from "@mysten/bcs";
-import rpcSelectorSingleton from "./rpc_selector";
+import rpcSelector from "./rpc_selector";
 import logger from "./logger";
 
 export class ResourceFetcher {
@@ -76,7 +76,7 @@ export class ResourceFetcher {
         dynamicFieldId: string
     ): Promise<SuiObjectResponse[]> {
         // MultiGetObjects returns the objects *always* in the order they were requested.
-        const pageData = await rpcSelectorSingleton.multiGetObjects(
+        const pageData = await rpcSelector.multiGetObjects(
             {
                 ids: [
                     objectId,

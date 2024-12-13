@@ -3,7 +3,7 @@
 
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { resolveSuiNsAddress } from './suins';
-import rpcSelectorSingleton from './rpc_selector';
+import rpcSelector from './rpc_selector';
 
 describe('resolveSuiNsAddress', () => {
     beforeEach(() => {
@@ -18,12 +18,12 @@ describe('resolveSuiNsAddress', () => {
 
         for (const [input, expected] of cases) {
             // Mock the rpcSelectorSingleton.call method
-            vi.spyOn(rpcSelectorSingleton, 'call').mockResolvedValueOnce(expected);
+            vi.spyOn(rpcSelector, 'call').mockResolvedValueOnce(expected);
 
             const result = await resolveSuiNsAddress(input);
 
             expect(result).toBe(expected);
-            expect(rpcSelectorSingleton.call).toHaveBeenCalledWith(
+            expect(rpcSelector.call).toHaveBeenCalledWith(
                 "call",
                 ["suix_resolveNameServiceAddress", [`${input}.sui`]]
             );
@@ -32,12 +32,12 @@ describe('resolveSuiNsAddress', () => {
 
     test('should return null for an unknown SuiNS address', async () => {
         // Mock the rpcSelectorSingleton.call method to return null
-        vi.spyOn(rpcSelectorSingleton, 'call').mockResolvedValueOnce(null);
+        vi.spyOn(rpcSelector, 'call').mockResolvedValueOnce(null);
 
         const result = await resolveSuiNsAddress("unknown");
 
         expect(result).toBeNull();
-        expect(rpcSelectorSingleton.call).toHaveBeenCalledWith(
+        expect(rpcSelector.call).toHaveBeenCalledWith(
             "call",
             ["suix_resolveNameServiceAddress", ["unknown.sui"]]
         );
