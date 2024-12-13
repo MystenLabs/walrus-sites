@@ -7,7 +7,7 @@ import {
     optionalRangeToHeaders as optionalRangeToRequestHeaders,
 } from "./types/index";
 import { subdomainToObjectId, HEXtoBase36 } from "./objectId_operations";
-import { resolveSuiNsAddress, hardcodedSubdmains } from "./suins";
+import { SuiNSResolver } from "./suins";
 import { ResourceFetcher } from "./resource";
 import {
     siteNotFound,
@@ -27,7 +27,10 @@ import BlocklistChecker from "./blocklist_checker";
 * Includes all the logic for fetching a walrus site.
 */
 export class PageFetcher {
-    constructor(private resourceFetcher: ResourceFetcher){}
+    constructor(
+        private resourceFetcher: ResourceFetcher,
+        private suinsResolver: SuiNSResolver
+    ){}
 
     /**
      * Resolves the subdomain to an object ID, and gets the corresponding resources.
@@ -94,7 +97,7 @@ export class PageFetcher {
     async resolveObjectId(
         parsedUrl: DomainDetails,
     ): Promise<string | Response> {
-        let objectId = hardcodedSubdmains(parsedUrl.subdomain);
+        let objectId = this.suinsResolver.hardcodedSubdmains(parsedUrl.subdomain);
         if (!objectId && !parsedUrl.subdomain.includes(".")) {
             // Try to convert the subdomain to an object ID NOTE: This effectively _disables_ any SuiNs
             // name that is the base36 encoding of an object ID (i.e., a 32-byte string). This is
@@ -107,7 +110,7 @@ export class PageFetcher {
         if (!objectId) {
             // Check if there is a SuiNs name
             try {
-                objectId = await resolveSuiNsAddress(parsedUrl.subdomain);
+                objectId = await this.suinsResolver.resolveSuiNsAddress(parsedUrl.subdomain);
                 if (!objectId) {
                     logger.warn({
                         message: "Could not resolve SuiNs domain. Does the domain exist?",

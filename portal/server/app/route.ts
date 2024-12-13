@@ -11,16 +11,21 @@ import { RPCSelector } from "@lib/rpc_selector";
 import { siteNotFound } from "@lib/http/http_error_responses";
 import integrateLoggerWithSentry from "sentry_logger";
 import blocklistChecker from "custom_blocklist_checker";
+import { SuiNSResolver } from "@lib/suins";
 
 if (process.env.ENABLE_SENTRY === "true") {
     // Only integrate Sentry on production.
     integrateLoggerWithSentry();
 }
 
+const rpcUrlList = process.env.RPC_URL_LIST;
+if (!rpcUrlList) {
+    throw new Error("Missing RPC_URL_LIST environment variable");
+}
+const rpcSelector = new RPCSelector(rpcUrlList.split(','));
 const pageFetcher = new PageFetcher(
-    new ResourceFetcher(
-        new RPCSelector(process.env.RPC_URL_LIST!.split(','))
-    )
+    new ResourceFetcher(rpcSelector),
+    new SuiNSResolver(rpcSelector)
 );
 
 export async function GET(req: Request) {

@@ -2,10 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { resolveSuiNsAddress } from './suins';
-import rpcSelector from './rpc_selector';
+import { SuiNSResolver } from './suins';
+import { RPCSelector } from './rpc_selector';
 
 describe('resolveSuiNsAddress', () => {
+    const rpcSelector = new RPCSelector(process.env.RPC_URL_LIST!.split(','))
+    const suiNSResolver = new SuiNSResolver(
+        rpcSelector
+    );
+
     beforeEach(() => {
         vi.clearAllMocks();
     });
@@ -20,7 +25,7 @@ describe('resolveSuiNsAddress', () => {
             // Mock the rpcSelectorSingleton.call method
             vi.spyOn(rpcSelector, 'call').mockResolvedValueOnce(expected);
 
-            const result = await resolveSuiNsAddress(input);
+            const result = await suiNSResolver.resolveSuiNsAddress(input);
 
             expect(result).toBe(expected);
             expect(rpcSelector.call).toHaveBeenCalledWith(
@@ -34,7 +39,7 @@ describe('resolveSuiNsAddress', () => {
         // Mock the rpcSelectorSingleton.call method to return null
         vi.spyOn(rpcSelector, 'call').mockResolvedValueOnce(null);
 
-        const result = await resolveSuiNsAddress("unknown");
+        const result = await suiNSResolver.resolveSuiNsAddress("unknown");
 
         expect(result).toBeNull();
         expect(rpcSelector.call).toHaveBeenCalledWith(

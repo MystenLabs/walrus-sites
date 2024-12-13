@@ -8,7 +8,6 @@ import { RPCSelector } from "./rpc_selector";
 import { HttpStatusCodes } from "./http/http_status_codes";
 import { checkRedirect } from "./redirects";
 import { fromBase64 } from "@mysten/bcs";
-import rpcSelector from "./rpc_selector";
 import { SuiObjectResponse } from "@mysten/sui/client";
 
 
