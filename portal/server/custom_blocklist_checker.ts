@@ -3,6 +3,7 @@
 
 import { has } from '@vercel/edge-config';
 import BlocklistChecker from "@lib/blocklist_checker";
+import { config } from 'configuration-loader';
 
 /**
 * Defines a blocklistChecker that is integrated with Vercel's Edge Config.
@@ -22,7 +23,7 @@ function create_blocklist_checker(): BlocklistChecker {
 }
 
 let blocklistChecker: BlocklistChecker | undefined;
-if (process.env.ENABLE_BLOCKLIST === "true") {
+if (config.enableBlocklist) {
     blocklistChecker = create_blocklist_checker();
 }
 export default blocklistChecker;
