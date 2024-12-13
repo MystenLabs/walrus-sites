@@ -162,10 +162,12 @@ impl SiteEditor {
     }
 
     pub async fn destroy(&self, site_id: ObjectID) -> Result<()> {
-        let wallet2 = load_wallet_context(&self.config.general.wallet)?;
+
+        // Delete blobs on Walrus
+        let wallet_walrus = load_wallet_context(&self.config.general.wallet)?;
 
         let all_dynamic_fields =
-            RemoteSiteFactory::new(&wallet2.get_client().await?, self.config.package)
+            RemoteSiteFactory::new(&wallet_walrus.get_client().await?, self.config.package)
                 .await?
                 .get_existing_resources(site_id)
                 .await?;
@@ -180,26 +182,36 @@ impl SiteEditor {
         let mut site_manager = SiteManager::new(
             self.config.clone(),
             walrus,
-            wallet2,
+            wallet_walrus,
             ExistingSite(site_id),
             0,
             Modified,
             false,
         ).await?;
-        site_manager.delete_from_walrus(all_dynamic_fields).await?;
 
-        let mut wallet = load_wallet_context(&self.config.general.wallet)?;
+        tracing::info!(
+               "Retrieved blobs and deleting them: {:?}", &all_dynamic_fields,
+        );
+
+        let result = site_manager.delete_from_walrus(all_dynamic_fields).await?;
+
+        tracing::info!(
+               "Result from deletion: {:?}", &result,
+        );
+
+        // Delete objects on SUI blockchain
+        let mut wallet_sui = load_wallet_context(&self.config.general.wallet)?;
 
         let ptb = SitePtb::new(self.config.package, Identifier::new(SITE_MODULE)?)?;
-        let mut ptb = ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
-        let site = RemoteSiteFactory::new(&wallet.get_client().await?, self.config.package)
+        let mut ptb = ptb.with_call_arg(&wallet_sui.get_object_ref(site_id).await?.into())?;
+        let site = RemoteSiteFactory::new(&wallet_sui.get_client().await?, self.config.package)
             .await?
             .get_from_chain(site_id)
             .await?;
 
         ptb.destroy(site.resources())?;
-        let active_address = wallet.active_address()?;
-        let gas_coin = wallet
+        let active_address = wallet_sui.active_address()?;
+        let gas_coin = wallet_sui
             .gas_for_owner_budget(active_address, self.config.gas_budget(), BTreeSet::new())
             .await?
             .1
@@ -207,7 +219,7 @@ impl SiteEditor {
 
         sign_and_send_ptb(
             active_address,
-            &wallet,
+            &wallet_sui,
             ptb.finish(),
             gas_coin,
             self.config.gas_budget(),

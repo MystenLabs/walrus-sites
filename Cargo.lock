@@ -5978,6 +5978,8 @@ dependencies = [
  "home",
  "move-core-types",
  "notify",
+ "num-bigint 0.4.6",
+ "num-traits",
  "regex",
  "serde",
  "serde_json",

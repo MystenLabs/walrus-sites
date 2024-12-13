@@ -73,7 +73,6 @@ pub enum Command {
     /// Deletes a blob from Walrus.
     Delete {
         /// The blob ID of the blob to be deleted.
-        #[serde_as(as = "DisplayFromStr")]
         blob_id: String,
     },
     BlobId {

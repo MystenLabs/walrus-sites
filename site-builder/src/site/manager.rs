@@ -145,6 +145,7 @@ impl SiteManager {
     pub async fn delete_from_walrus<'b>(&mut self, blobs: HashMap<String, ObjectID>) -> Result<()> {
 
         for (name, blob_id) in blobs.iter() {
+
             tracing::debug!(
                 name,
                 "deleting blob from Walrus"
