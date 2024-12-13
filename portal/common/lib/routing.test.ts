@@ -1,14 +1,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { getRoutes, matchPathToRoute } from "./routing";
+import { WalrusSitesRouter } from "./routing";
 import { test, expect } from "vitest";
+import { RPCSelector } from "./rpc_selector";
 
 const snakeSiteObjectId = "0x7a95e4be3948415b852fb287d455166a276d7a52f1a567b4a26b6b5e9c753158";
+const wsRouter = new WalrusSitesRouter(
+    new RPCSelector(process.env.RPC_URL_LIST!.split(",")),
+);
+
 test.skip("getRoutes", async () => {
     // TODO: when you make sure get_routes fetches
     // the Routes dynamic field, mock the request.
-    const routes = await getRoutes(snakeSiteObjectId);
+    const routes = await wsRouter.getRoutes(snakeSiteObjectId);
     console.log(routes);
 });
 
@@ -32,7 +37,7 @@ const testCases = [
 
 testCases.forEach(([requestPath, expected]) => {
     test(`matchPathToRoute: "${requestPath}" -> "${expected}"`, () => {
-        const match = matchPathToRoute(requestPath, routesExample);
+        const match = wsRouter.matchPathToRoute(requestPath, routesExample);
         expect(match).toEqual(expected);
     });
 });
@@ -42,7 +47,7 @@ const emptyRoutes = { routes_list: new Map<string, string>() };
 
 testCases.forEach(([requestPath, _]) => {
     test(`matchPathToRoute: empty routes for "${requestPath}"`, () => {
-        const match = matchPathToRoute(requestPath, emptyRoutes);
+        const match = wsRouter.matchPathToRoute(requestPath, emptyRoutes);
         expect(match).toEqual(undefined);
     });
 });

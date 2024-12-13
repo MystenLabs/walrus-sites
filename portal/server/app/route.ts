@@ -12,6 +12,7 @@ import { siteNotFound } from "@lib/http/http_error_responses";
 import integrateLoggerWithSentry from "sentry_logger";
 import blocklistChecker from "custom_blocklist_checker";
 import { SuiNSResolver } from "@lib/suins";
+import { WalrusSitesRouter } from "@lib/routing";
 
 if (process.env.ENABLE_SENTRY === "true") {
     // Only integrate Sentry on production.
@@ -25,7 +26,8 @@ if (!rpcUrlList) {
 const rpcSelector = new RPCSelector(rpcUrlList.split(','));
 const pageFetcher = new PageFetcher(
     new ResourceFetcher(rpcSelector),
-    new SuiNSResolver(rpcSelector)
+    new SuiNSResolver(rpcSelector),
+    new WalrusSitesRouter(rpcSelector)
 );
 
 export async function GET(req: Request) {

@@ -18,7 +18,7 @@ import {
 import { aggregatorEndpoint } from "./aggregator";
 import { toBase64 } from "@mysten/bcs";
 import { sha256 } from "./crypto";
-import { getRoutes, matchPathToRoute } from "./routing";
+import { WalrusSitesRouter } from "./routing";
 import { HttpStatusCodes } from "./http/http_status_codes";
 import logger from "./logger";
 import BlocklistChecker from "./blocklist_checker";
@@ -29,7 +29,8 @@ import BlocklistChecker from "./blocklist_checker";
 export class PageFetcher {
     constructor(
         private resourceFetcher: ResourceFetcher,
-        private suinsResolver: SuiNSResolver
+        private suinsResolver: SuiNSResolver,
+        private wsRouter: WalrusSitesRouter
     ){}
 
     /**
@@ -64,7 +65,7 @@ export class PageFetcher {
 
         // Initiate a fetch request to get the Routes object in case the request
         // to the initial unfiltered path fails.
-        const routesPromise = getRoutes(resolvedObjectId);
+        const routesPromise = this.wsRouter.getRoutes(resolvedObjectId);
 
         // Fetch the page using the initial path.
         const fetchPromise = await this.fetchPage(resolvedObjectId, parsedUrl.path);
@@ -81,7 +82,7 @@ export class PageFetcher {
                 return siteNotFound();
             }
             let matchingRoute: string | undefined;
-            matchingRoute = matchPathToRoute(parsedUrl.path, routes);
+            matchingRoute = this.wsRouter.matchPathToRoute(parsedUrl.path, routes);
             if (!matchingRoute) {
                 logger.warn({
                     message: `No matching route found for ${parsedUrl.path}`,

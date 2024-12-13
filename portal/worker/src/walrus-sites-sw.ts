@@ -9,6 +9,7 @@ import { PageFetcher } from "@lib/page_fetching";
 import { ResourceFetcher } from "@lib/resource";
 import { RPCSelector } from "@lib/rpc_selector";
 import { SuiNSResolver } from "@lib/suins";
+import { WalrusSitesRouter } from "@lib/routing";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
@@ -22,7 +23,8 @@ if (!rpcUrlList) {
 const rpcSelector = new RPCSelector(rpcUrlList.split(','));
 export const pageFetcher = new PageFetcher(
     new ResourceFetcher(rpcSelector),
-    new SuiNSResolver(rpcSelector)
+    new SuiNSResolver(rpcSelector),
+    new WalrusSitesRouter(rpcSelector)
 );
 
 self.addEventListener("install", (_event) => {
