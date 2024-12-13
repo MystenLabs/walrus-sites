@@ -174,9 +174,3 @@ export class RPCSelector implements RPCSelectorInterface {
         return this.invokeWithFailover<T>(method, args);
     }
 }
-
-if (!process.env.RPC_URL_LIST) {
-    throw new Error("Missing RPC_URL_LIST environment variable");
-}
-const rpcSelector = new RPCSelector(process.env.RPC_URL_LIST.split(','));
-export default rpcSelector;
