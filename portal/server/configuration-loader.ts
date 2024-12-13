@@ -74,13 +74,15 @@ class ConfigurationLoader {
         return pageOidB36
     }
 
-    private loadPortalDomainNameLength(): number {
+    private loadPortalDomainNameLength(): number | undefined {
         const portalDomainNameLength = process.env.PORTAL_DOMAIN_NAME_LENGTH
-
-        if (portalDomainNameLength && isNaN(portalDomainNameLength.length) || length <= 0) {
+        if (!portalDomainNameLength) {
+            return undefined
+        }
+        if (portalDomainNameLength && Number(portalDomainNameLength) <= 0) {
             throw new Error('PORTAL_DOMAIN_NAME_LENGTH must be positive number.')
         }
-        return length
+        return Number(portalDomainNameLength)
     }
 
     private loadPremiumRpcUrlList(): string[] | undefined {
