@@ -18,7 +18,7 @@ export type Configuration = {
     enableBlocklist: Boolean;
     landingPageOidB36: string;
     portalDomainNameLength?: number;
-    premiumRpcUrlList?: string[];
+    premiumRpcUrlList: string[];
     rpcUrlList: string[];
     enableSentry: Boolean;
     sentryAuthToken?: string;
@@ -85,10 +85,10 @@ class ConfigurationLoader {
         return Number(portalDomainNameLength)
     }
 
-    private loadPremiumRpcUrlList(): string[] | undefined {
+    private loadPremiumRpcUrlList(): string[] {
         const premiumRpcUrlListString = process.env.PREMIUM_RPC_URL_LIST
         if (!premiumRpcUrlListString) {
-            return undefined
+           throw new Error('Missing PREMIUM_RPC_URL_LIST environment variable.')
         }
         const premiumRpcUrlList = premiumRpcUrlListString.split(',')
         if (premiumRpcUrlList.length <= 0) {
