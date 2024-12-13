@@ -17,6 +17,7 @@ pub type EpochCount = u32;
 
 /// Either an event ID or an object ID.
 #[derive(Debug, Clone, Deserialize)]
+#[allow(unused)]
 pub enum EventOrObjectId {
     /// The variant representing an event ID.
     Event(EventID),
@@ -26,6 +27,7 @@ pub enum EventOrObjectId {
 
 /// The operation performed on blob and storage resources to register a blob.
 #[derive(Debug, Clone, Deserialize)]
+#[allow(unused)]
 pub enum RegisterBlobOp {
     /// The storage and blob resources are purchased from scratch.
     RegisterFromScratch {
@@ -42,6 +44,7 @@ pub enum RegisterBlobOp {
 #[serde_as]
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[allow(unused)]
 pub enum BlobStoreResult {
     /// The blob already exists within Walrus, was certified, and is stored for at least the
     /// intended duration.
@@ -141,6 +144,7 @@ pub struct Blob {
 
 /// The output of the `store` command.
 #[derive(Debug, Clone, Deserialize)]
+#[allow(unused)]
 pub struct StoreOutput(pub BlobStoreResult);
 
 /// The output of the `read` command.

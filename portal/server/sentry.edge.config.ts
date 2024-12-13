@@ -8,7 +8,7 @@
 
 import * as Sentry from "@sentry/nextjs";
 
-if (process.env.NODE_ENV === "production") {
+if (process.env.ENABLE_SENTRY === "yes") {
     Sentry.init({
         dsn: process.env.SENTRY_DSN,
 

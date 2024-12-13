@@ -8,7 +8,6 @@ import {
     SuiClient,
     SuiObjectResponse,
 } from "@mysten/sui/client";
-import { RPC_REQUEST_TIMEOUT_MS } from "./constants";
 import logger from "./logger";
 
 interface RPCSelectorInterface {
@@ -72,7 +71,10 @@ export class RPCSelector implements RPCSelectorInterface {
         }
 
         const timeoutPromise = new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("Request timed out")), RPC_REQUEST_TIMEOUT_MS),
+            setTimeout(() => reject(
+                new Error("Request timed out")),
+                Number(process.env.RPC_REQUEST_TIMEOUT_MS) ?? 7000
+            ),
         );
 
         const result = await Promise.race([
@@ -174,7 +176,7 @@ export class RPCSelector implements RPCSelectorInterface {
 }
 
 if (!process.env.RPC_URL_LIST) {
-    throw new Error("Missing TESTNET_RPC_LIST environment variable");
+    throw new Error("Missing RPC_URL_LIST environment variable");
 }
 const rpcSelector = new RPCSelector(process.env.RPC_URL_LIST.split(','));
 export default rpcSelector;

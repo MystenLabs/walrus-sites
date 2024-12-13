@@ -14,6 +14,8 @@ ignore = [
     "RUSTSEC-2024-0336",
     # proc-macro-error is not maintained, but is a dependency in many of our packages.
     "RUSTSEC-2024-0370",
+    # `derivative` is unmaintained.
+    "RUSTSEC-2024-0388",
 ]
 
 # This section is considered when running `cargo deny check licenses`
@@ -34,9 +36,8 @@ allow = [
     "LicenseRef-ring",
     "MIT",
     "MPL-2.0",
-    "Unicode-DFS-2016",
     "Unlicense",
-    # "Unicode-3.0",
+    "Unicode-3.0",
 ]
 # The confidence threshold for detecting a license from license text.
 # The higher the value, the more closely the license text must be to the
@@ -47,9 +48,7 @@ confidence-threshold = 0.8
 [[licenses.clarify]]
 name = "ring"
 expression = "LicenseRef-ring"
-license-files = [
-    { path = "LICENSE", hash = 0xbd0eed23 },
-]
+license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
 
 [licenses.private]
 # If true, ignores workspace crates that aren't published, or are only
@@ -70,6 +69,7 @@ skip-tree = [
     # Mysten's libraries pull in several conflicting repo versions.
     { name = "fastcrypto", depth = 4 },
     { name = "sui-rest-api", depth = 6},
+    { name = "sui-sdk", depth = 6},
     # several crates depend on an older version of windows-sys
     { name = "windows-sys", depth = 3, version = "0.48" },
 ]
@@ -88,6 +88,8 @@ allow-git = [
     "https://github.com/wlmyng/jsonrpsee",
     "https://github.com/zhiburt/tabled",
     "https://github.com/bmwill/openapiv3",
+    "https://github.com/bmwill/axum-server",
+    "https://github.com/wlmyng/jsonrpsee",
 ]
 
 [sources.allow-org]

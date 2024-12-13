@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{
+    collections::BTreeSet,
     num::NonZeroUsize,
     path::{Path, PathBuf},
     sync::mpsc::channel,
@@ -15,15 +16,21 @@ use sui_sdk::rpc_types::{
     SuiTransactionBlockEffects,
     SuiTransactionBlockResponse,
 };
-use sui_types::base_types::SuiAddress;
+use sui_types::{
+    base_types::{ObjectID, SuiAddress},
+    Identifier,
+};
 
 use crate::{
     display,
     preprocessor::Preprocessor,
     site::{
+        builder::SitePtb,
         config::WSResources,
         manager::{SiteIdentifier, SiteManager},
         resource::ResourceManager,
+        RemoteSiteFactory,
+        SITE_MODULE,
     },
     summary::{SiteDataDiffSummary, Summarizable},
     util::{
@@ -31,6 +38,7 @@ use crate::{
         id_to_base36,
         load_wallet_context,
         path_or_defaults_if_exist,
+        sign_and_send_ptb,
     },
     walrus::Walrus,
     Config,
@@ -109,39 +117,83 @@ impl WhenWalrusUpload {
     }
 }
 
-pub(crate) struct SiteEditor {
-    publish_options: PublishOptions,
-    site_id: SiteIdentifier,
+pub(crate) struct EditOptions {
+    pub publish_options: PublishOptions,
+    pub site_id: SiteIdentifier,
+    pub continuous_editing: ContinuousEditing,
+    pub when_upload: WhenWalrusUpload,
+}
+
+pub(crate) struct SiteEditor<E = ()> {
     config: Config,
-    continuous_editing: ContinuousEditing,
-    when_upload: WhenWalrusUpload,
+    edit_options: E,
 }
 
 impl SiteEditor {
-    pub fn new(
-        publish_options: PublishOptions,
-        site_id: SiteIdentifier,
-        config: Config,
-        continuous_editing: ContinuousEditing,
-        when_upload: WhenWalrusUpload,
-    ) -> Self {
+    pub fn new(config: Config) -> Self {
         SiteEditor {
-            publish_options,
-            site_id,
             config,
-            continuous_editing,
-            when_upload,
+            edit_options: (),
         }
     }
 
+    pub fn with_edit_options(
+        self,
+        publish_options: PublishOptions,
+        site_id: SiteIdentifier,
+        continuous_editing: ContinuousEditing,
+        when_upload: WhenWalrusUpload,
+    ) -> SiteEditor<EditOptions> {
+        SiteEditor {
+            config: self.config,
+            edit_options: EditOptions {
+                publish_options,
+                site_id,
+                continuous_editing,
+                when_upload,
+            },
+        }
+    }
+
+    pub async fn destroy(&self, site_id: ObjectID) -> Result<()> {
+        let mut wallet = load_wallet_context(&self.config.general.wallet)?;
+        let ptb = SitePtb::new(self.config.package, Identifier::new(SITE_MODULE)?)?;
+        let mut ptb = ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
+        let site = RemoteSiteFactory::new(&wallet.get_client().await?, self.config.package)
+            .await?
+            .get_from_chain(site_id)
+            .await?;
+
+        ptb.destroy(site.resources())?;
+        let active_address = wallet.active_address()?;
+        let gas_coin = wallet
+            .gas_for_owner_budget(active_address, self.config.gas_budget(), BTreeSet::new())
+            .await?
+            .1
+            .object_ref();
+
+        sign_and_send_ptb(
+            active_address,
+            &wallet,
+            ptb.finish(),
+            gas_coin,
+            self.config.gas_budget(),
+        )
+        .await?;
+
+        Ok(())
+    }
+}
+
+impl SiteEditor<EditOptions> {
     /// The directory containing the site sources.
     pub fn directory(&self) -> &Path {
-        &self.publish_options.directory
+        &self.edit_options.publish_options.directory
     }
 
     /// Run the editing operations requested.
     pub async fn run(&self) -> Result<()> {
-        match self.continuous_editing {
+        match self.edit_options.continuous_editing {
             ContinuousEditing::Once => self.run_single_and_print_summary().await?,
             ContinuousEditing::Watch => self.run_continuous().await?,
         }
@@ -151,7 +203,7 @@ impl SiteEditor {
     async fn run_single_edit(
         &self,
     ) -> Result<(SuiAddress, SuiTransactionBlockResponse, SiteDataDiffSummary)> {
-        if self.publish_options.list_directory {
+        if self.edit_options.publish_options.list_directory {
             display::action(format!("Preprocessing: {}", self.directory().display()));
             Preprocessor::preprocess(self.directory())?;
             display::done();
@@ -167,8 +219,10 @@ impl SiteEditor {
             self.config.general.wallet.clone(),
         );
 
-        let (ws_resources, ws_resources_path) =
-            load_ws_resources(&self.publish_options.ws_resources, self.directory())?;
+        let (ws_resources, ws_resources_path) = load_ws_resources(
+            &self.edit_options.publish_options.ws_resources,
+            self.directory(),
+        )?;
         if let Some(path) = ws_resources_path.as_ref() {
             println!(
                 "Using the Walrus sites resources file: {}",
@@ -180,7 +234,7 @@ impl SiteEditor {
             walrus.clone(),
             ws_resources,
             ws_resources_path,
-            self.publish_options.max_concurrent,
+            self.edit_options.publish_options.max_concurrent,
         )
         .await?;
         display::action(format!(
@@ -195,9 +249,9 @@ impl SiteEditor {
             self.config.clone(),
             walrus,
             wallet,
-            self.site_id.clone(),
-            self.publish_options.epochs,
-            self.when_upload.clone(),
+            self.edit_options.site_id.clone(),
+            self.edit_options.publish_options.epochs,
+            self.edit_options.when_upload.clone(),
         )
         .await?;
         let (response, summary) = site_manager.update_site(&local_site_data).await?;
@@ -209,7 +263,7 @@ impl SiteEditor {
         print_summary(
             &self.config,
             &active_address,
-            &self.site_id,
+            &self.edit_options.site_id,
             &response,
             &summary,
         )?;

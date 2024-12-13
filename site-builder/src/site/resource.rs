@@ -110,7 +110,7 @@ pub enum ResourceOp<'a> {
     Unchanged(&'a Resource),
 }
 
-impl<'a> fmt::Debug for ResourceOp<'a> {
+impl fmt::Debug for ResourceOp<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (op, path) = match self {
             ResourceOp::Deleted(resource) => ("delete", &resource.info.path),
@@ -256,6 +256,15 @@ impl ResourceSet {
         let create_operations = other.create_all();
         delete_operations.extend(create_operations);
         delete_operations
+    }
+}
+
+impl<'a> IntoIterator for &'a ResourceSet {
+    type Item = &'a Resource;
+    type IntoIter = std::collections::btree_set::Iter<'a, Resource>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.inner.iter()
     }
 }
 
