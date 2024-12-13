@@ -72,8 +72,8 @@ pub enum Command {
     },
     /// Deletes a blob from Walrus.
     Delete {
-        /// The blob ID of the blob to be deleted.
-        blob_id: String,
+        /// The objectID of the blob to be deleted.
+        object_id: String,
     },
     BlobId {
         file: PathBuf,
@@ -178,8 +178,8 @@ impl WalrusCmdBuilder {
     }
 
     /// Adds a [`Command::Delete`] command to the builder.
-    pub fn delete(self, blob_id: String) -> WalrusCmdBuilder<Command> {
-        let command = Command::Delete { blob_id };
+    pub fn delete(self, object_id: String) -> WalrusCmdBuilder<Command> {
+        let command = Command::Delete { object_id };
         self.with_command(command)
     }
 
