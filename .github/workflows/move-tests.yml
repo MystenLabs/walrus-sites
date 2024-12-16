@@ -11,6 +11,18 @@ on:
       - move/**
 
 jobs:
+  prettier_move:
+    name: Check and fix formatting for Move files
+    runs-on: ubuntu-latest
+    defaults:
+        run:
+            working-directory: ./packages
+    steps:
+        - uses: actions/checkout@v4
+        - uses: actions/setup-node@v4
+        - run: npm i @mysten/prettier-plugin-move
+        - run: npx prettier-move -c **/*.move --write
+
   run-tests:
     name: Run Tests
     runs-on: ubuntu-latest
