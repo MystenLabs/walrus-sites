@@ -13,7 +13,7 @@ import integrateLoggerWithSentry from "sentry_logger";
 import blocklistChecker from "custom_blocklist_checker";
 import { SuiNSResolver } from "@lib/suins";
 import { WalrusSitesRouter } from "@lib/routing";
-import { config } from "configuration-loader";
+import { config } from "configuration_loader";
 
 if (config.enableSentry) {
     // Only integrate Sentry on production.

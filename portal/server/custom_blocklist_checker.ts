@@ -3,7 +3,7 @@
 
 import { has } from '@vercel/edge-config';
 import BlocklistChecker from "@lib/blocklist_checker";
-import { config } from 'configuration-loader';
+import { config } from 'configuration_loader';
 
 /**
 * Defines a blocklistChecker that is integrated with Vercel's Edge Config.

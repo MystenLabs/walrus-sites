@@ -6,7 +6,7 @@
 // https://docs.sentry.io/platforms/javascript/guides/nextjs/
 
 import * as Sentry from "@sentry/nextjs";
-import { config } from "configuration-loader";
+import { config } from "configuration_loader";
 
 if (config.enableSentry) {
     Sentry.init({
