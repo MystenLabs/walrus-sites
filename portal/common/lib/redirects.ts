@@ -48,6 +48,8 @@ function makeRedirectResponse(url: string): Response {
         status: 302,
         headers: {
             Location: url,
+            "Content-Type": "image/apng, image/avif/, image/jpeg, " +
+                "image/png, image/gif, image/webp, image/svg+xml",
         },
     });
 }
