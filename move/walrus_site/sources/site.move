@@ -1,8 +1,7 @@
 /// The module exposes the functionality to create and update Walrus sites.
 module walrus_site::site {
-    use sui::dynamic_field as df;
     use std::string::String;
-    use sui::vec_map;
+    use sui::{dynamic_field as df, vec_map};
 
     /// The name of the dynamic field containing the routes.
     const ROUTES_FIELD: vector<u8> = b"routes";
@@ -19,7 +18,7 @@ module walrus_site::site {
     }
 
     /// A resource in a site.
-    public struct Resource has store, drop {
+    public struct Resource has drop, store {
         path: String,
         // Response, Representation and Payload headers
         // regarding the contents of the resource.
@@ -36,20 +35,20 @@ module walrus_site::site {
         range: Option<Range>,
     }
 
-    public struct Range has store, drop {
+    public struct Range has drop, store {
         start: Option<u64>, // inclusive lower bound
-        end: Option<u64> // exclusive upper bound
+        end: Option<u64>, // exclusive upper bound
     }
 
     /// Representation of the resource path.
     ///
     /// Ensures there are no namespace collisions in the dynamic fields.
-    public struct ResourcePath has copy, store, drop {
+    public struct ResourcePath has copy, drop, store {
         path: String,
     }
 
     /// The routes for a site.
-    public struct Routes has store, drop {
+    public struct Routes has drop, store {
         route_list: vec_map::VecMap<String, String>,
     }
 
@@ -72,10 +71,7 @@ module walrus_site::site {
     /// Creates a new Range object.
     ///
     /// aborts if both range_start and range_end are none.
-    public fun new_range(
-        range_start: Option<u64>,
-        range_end: Option<u64>
-    ): Range {
+    public fun new_range(range_start: Option<u64>, range_end: Option<u64>): Range {
         let start_is_defined = range_start.is_some();
         let end_is_defined = range_end.is_some();
 
@@ -91,7 +87,7 @@ module walrus_site::site {
 
         Range {
             start: range_start,
-            end: range_end
+            end: range_end,
         }
     }
 
@@ -100,14 +96,14 @@ module walrus_site::site {
         path: String,
         blob_id: u256,
         blob_hash: u256,
-        range: Option<Range>
+        range: Option<Range>,
     ): Resource {
         Resource {
             path,
             headers: vec_map::empty(),
             blob_id,
             blob_hash,
-            range
+            range,
         }
     }
 
@@ -135,13 +131,13 @@ module walrus_site::site {
     /// Removes a resource from a site.
     ///
     /// Aborts if the resource does not exist.
-    public fun remove_resource(site: &mut Site, path: String): Resource{
+    public fun remove_resource(site: &mut Site, path: String): Resource {
         let path_obj = new_path(path);
         df::remove(&mut site.id, path_obj)
     }
 
     /// Removes a resource from a site if it exists.
-    public fun remove_resource_if_exists(site: &mut Site, path: String): Option<Resource>{
+    public fun remove_resource_if_exists(site: &mut Site, path: String): Option<Resource> {
         let path_obj = new_path(path);
         df::remove_if_exists(&mut site.id, path_obj)
     }
@@ -212,7 +208,7 @@ module walrus_site::site {
     public fun burn(site: Site) {
         let Site {
             id,
-            ..
+            ..,
         } = site;
         id.delete();
     }
