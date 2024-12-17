@@ -40,7 +40,7 @@ export class ResourceFetcher {
         seenResources: Set<string>,
         depth: number = 0,
     ): Promise<VersionedResource | HttpStatusCodes> {
-        const error = this.checkForErrors(objectId, seenResources, depth);
+        const error = this.checkRedirectLimits(objectId, seenResources, depth);
         if (error) return error;
 
         // The dynamic field object ID can be derived, without
@@ -135,7 +135,7 @@ export class ResourceFetcher {
     * @param depth
     * @returns
     */
-    private checkForErrors(
+    private checkRedirectLimits(
         objectId: string,
         seenResources: Set<string>, depth: number
     ): HttpStatusCodes | null {
