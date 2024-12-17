@@ -13,17 +13,14 @@ import integrateLoggerWithSentry from "sentry_logger";
 import blocklistChecker from "custom_blocklist_checker";
 import { SuiNSResolver } from "@lib/suins";
 import { WalrusSitesRouter } from "@lib/routing";
+import { config } from "configuration_loader";
 
-if (process.env.ENABLE_SENTRY === "true") {
+if (config.enableSentry) {
     // Only integrate Sentry on production.
     integrateLoggerWithSentry();
 }
 
-const rpcUrlList = process.env.RPC_URL_LIST;
-if (!rpcUrlList) {
-    throw new Error("Missing RPC_URL_LIST environment variable");
-}
-const rpcSelector = new RPCSelector(rpcUrlList.split(','));
+const rpcSelector = new RPCSelector(config.rpcUrlList);
 const pageFetcher = new PageFetcher(
     new ResourceFetcher(rpcSelector),
     new SuiNSResolver(rpcSelector),
@@ -37,14 +34,8 @@ export async function GET(req: Request) {
     }
     const url = new URL(originalUrl);
 
-    // Check if the request is for a site.
-    let portalDomainNameLengthString = process.env.PORTAL_DOMAIN_NAME_LENGTH;
-    let portalDomainNameLength: number | undefined;
-    if (process.env.PORTAL_DOMAIN_NAME_LENGTH) {
-        portalDomainNameLength = Number(portalDomainNameLengthString);
-    }
-
     const objectIdPath = getObjectIdLink(url.toString());
+    const portalDomainNameLength = config.portalDomainNameLength;
     if (objectIdPath) {
         console.log(`Redirecting to portal url response: ${url.toString()} from ${objectIdPath}`);
         return redirectToPortalURLResponse(url, objectIdPath, portalDomainNameLength);
@@ -72,10 +63,9 @@ export async function GET(req: Request) {
     const atBaseUrl = portalDomain == url.host.split(":")[0];
     if (atBaseUrl) {
         console.log("Serving the landing page from walrus...");
-        const blobId = process.env.LANDING_PAGE_OID_B36!;
         const response = await pageFetcher.resolveAndFetchPage(
             {
-                subdomain: blobId,
+                subdomain: config.landingPageOidB36,
                 path: parsedUrl?.path ?? "/index.html",
             },
             null,
