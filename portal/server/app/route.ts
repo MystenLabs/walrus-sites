@@ -8,7 +8,7 @@ import { siteNotFound } from "@lib/http/http_error_responses";
 import integrateLoggerWithSentry from "sentry_logger";
 import blocklistChecker from "custom_blocklist_checker";
 import { config } from "configuration_loader";
-import {standardPageFetcher, premiumPageFetcher} from "page_fetcher_factory";
+import { standardUrlFetcher, premiumUrlFetcher } from "url_fetcher_factory";
 import { isAllowed } from "allowlist_checker";
 
 if (config.enableSentry) {
@@ -44,7 +44,7 @@ export async function GET(req: Request) {
             return siteNotFound();
         }
 
-        const urlFetcher = await isAllowed(parsedUrl.subdomain ?? '') ? premiumPageFetcher : standardPageFetcher;
+        const urlFetcher = await isAllowed(parsedUrl.subdomain ?? '') ? premiumUrlFetcher : standardUrlFetcher;
         if (requestDomain == portalDomain && parsedUrl.subdomain) {
             return await urlFetcher.resolveDomainAndFetchUrl(parsedUrl, null, blocklistChecker);
         }
@@ -54,7 +54,7 @@ export async function GET(req: Request) {
     if (atBaseUrl) {
         console.log("Serving the landing page from walrus...");
         // Always use the premium page fetcher for the landing page (when available).
-        const urlFetcher = config.enableAllowlist ? premiumPageFetcher : standardPageFetcher;
+        const urlFetcher = config.enableAllowlist ? premiumUrlFetcher : standardUrlFetcher;
         const response = await urlFetcher.resolveDomainAndFetchUrl(
             {
                 subdomain: config.landingPageOidB36,
