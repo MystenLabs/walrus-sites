@@ -14,6 +14,7 @@ import blocklistChecker from "custom_blocklist_checker";
 import { SuiNSResolver } from "@lib/suins";
 import { WalrusSitesRouter } from "@lib/routing";
 import { config } from "configuration_loader";
+import { inject_unregister_service_worker_script } from "inject_unregister_sw_script";
 
 if (config.enableSentry) {
     // Only integrate Sentry on production.
@@ -43,7 +44,8 @@ export async function GET(req: Request) {
     const walrusPath: string | null = getBlobIdLink(url.toString());
     if (walrusPath) {
         console.log(`Redirecting to aggregator url response: ${req.url} from ${objectIdPath}`);
-        return redirectToAggregatorUrlResponse(url, walrusPath);
+        const response = redirectToAggregatorUrlResponse(url, walrusPath);
+        return inject_unregister_service_worker_script(response);
     }
 
     const parsedUrl = getSubdomainAndPath(url, Number(portalDomainNameLength));
@@ -52,11 +54,12 @@ export async function GET(req: Request) {
 
     if (parsedUrl) {
         if (blocklistChecker && await blocklistChecker.isBlocked(parsedUrl.subdomain)) {
-            return siteNotFound();
+            return inject_unregister_service_worker_script(siteNotFound());
         }
 
         if (requestDomain == portalDomain && parsedUrl.subdomain) {
-            return await urlFetcher.resolveDomainAndFetchUrl(parsedUrl, null, blocklistChecker);
+            const response = await urlFetcher.resolveDomainAndFetchUrl(parsedUrl, null, blocklistChecker);
+            return inject_unregister_service_worker_script(response);
         }
     }
 
@@ -71,8 +74,9 @@ export async function GET(req: Request) {
             null,
             blocklistChecker
         );
-        return response;
+        return inject_unregister_service_worker_script(response);
     }
 
-    return new Response(`Resource at ${originalUrl} not found!`, { status: 404 });
+    const response404 = new Response(`Resource at ${originalUrl} not found!`, { status: 404 });
+    return inject_unregister_service_worker_script(response404);
 }
