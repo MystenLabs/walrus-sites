@@ -15,7 +15,9 @@ function toBoolean(value: string): Boolean {
 */
 export type Configuration = {
     edgeConfig?: string;
+    edgeConfigAllowlist?: string;
     enableBlocklist: Boolean;
+    enableAllowlist: Boolean;
     landingPageOidB36: string;
     portalDomainNameLength?: number;
     premiumRpcUrlList: string[];
@@ -26,7 +28,7 @@ export type Configuration = {
 }
 
 /**
-* A utility class that makes it safe to load the environment
+* A utility class that makes safer to load the environment
 * variables of the project.
 * By using this class, we can ensure that the environment
 * variables are loaded correctly and their data types are
@@ -36,7 +38,9 @@ class ConfigurationLoader {
     get config(): Configuration {
         return {
             enableBlocklist: this.loadEnableBlocklist(),
+            enableAllowlist: this.loadEnableAllowlist(),
             edgeConfig: this.loadEdgeConfig(),
+            edgeConfigAllowlist: this.loadEdgeConfigAllowlist(),
             landingPageOidB36: this.loadLandingPageOidB36(),
             portalDomainNameLength: this.loadPortalDomainNameLength(),
             premiumRpcUrlList: this.loadPremiumRpcUrlList(),
@@ -51,6 +55,10 @@ class ConfigurationLoader {
         return this.loadEnableBlocklist() ? process.env.EDGE_CONFIG : undefined
     }
 
+    private loadEdgeConfigAllowlist(): string | undefined {
+        return this.loadEnableAllowlist() ? process.env.EDGE_CONFIG_ALLOWLIST : undefined
+    }
+
     private loadEnableBlocklist(): Boolean {
         if (!process.env.ENABLE_BLOCKLIST) {
             throw new Error('Missing ENABLE_BLOCKLIST environment variable.')
@@ -58,6 +66,17 @@ class ConfigurationLoader {
         const enable = process.env.ENABLE_BLOCKLIST.toLowerCase()
         if (!isStringBoolean(enable)) {
             throw new Error('ENABLE_BLOCKLIST must be "true" or "false".')
+        }
+        return toBoolean(enable)
+    }
+
+    private loadEnableAllowlist(): Boolean {
+        if (!process.env.ENABLE_ALLOWLIST) {
+            throw new Error('Missing ENABLE_ALLOWLIST environment variable.')
+        }
+        const enable = process.env.ENABLE_ALLOWLIST.toLowerCase()
+        if (!isStringBoolean(enable)) {
+            throw new Error('ENABLE_ALLOWLIST must be "true" or "false".')
         }
         return toBoolean(enable)
     }
