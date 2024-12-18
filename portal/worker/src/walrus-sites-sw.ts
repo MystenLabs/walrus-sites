@@ -5,7 +5,7 @@ import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import resolveWithCache from "./caching";
-import { PageFetcher } from "@lib/page_fetching";
+import { UrlFetcher } from "@lib/url_fetcher";
 import { ResourceFetcher } from "@lib/resource";
 import { RPCSelector } from "@lib/rpc_selector";
 import { SuiNSResolver } from "@lib/suins";
@@ -21,7 +21,7 @@ if (!rpcUrlList) {
     throw new Error("Missing RPC_URL_LIST environment variable");
 }
 const rpcSelector = new RPCSelector(rpcUrlList.split(','));
-export const pageFetcher = new PageFetcher(
+export const urlFetcher = new UrlFetcher(
     new ResourceFetcher(rpcSelector),
     new SuiNSResolver(rpcSelector),
     new WalrusSitesRouter(rpcSelector)
@@ -76,7 +76,7 @@ self.addEventListener("fetch", async (event) => {
                 return await fetchFromCache();
             } else {
                 console.warn("Cache API not available");
-                return await pageFetcher.resolveAndFetchPage(parsedUrl, null);
+                return await urlFetcher.resolveDomainAndFetchUrl(parsedUrl, null);
             }
         };
 

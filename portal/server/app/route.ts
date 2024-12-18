@@ -4,7 +4,7 @@
 import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
-import { PageFetcher } from "@lib/page_fetching";
+import { UrlFetcher } from "@lib/url_fetcher";
 import { ResourceFetcher } from "@lib/resource";
 import { RPCSelector } from "@lib/rpc_selector";
 
@@ -21,7 +21,7 @@ if (config.enableSentry) {
 }
 
 const rpcSelector = new RPCSelector(config.rpcUrlList);
-const pageFetcher = new PageFetcher(
+const urlFetcher = new UrlFetcher(
     new ResourceFetcher(rpcSelector),
     new SuiNSResolver(rpcSelector),
     new WalrusSitesRouter(rpcSelector)
@@ -56,14 +56,14 @@ export async function GET(req: Request) {
         }
 
         if (requestDomain == portalDomain && parsedUrl.subdomain) {
-            return await pageFetcher.resolveAndFetchPage(parsedUrl, null, blocklistChecker);
+            return await urlFetcher.resolveDomainAndFetchUrl(parsedUrl, null, blocklistChecker);
         }
     }
 
     const atBaseUrl = portalDomain == url.host.split(":")[0];
     if (atBaseUrl) {
         console.log("Serving the landing page from walrus...");
-        const response = await pageFetcher.resolveAndFetchPage(
+        const response = await urlFetcher.resolveDomainAndFetchUrl(
             {
                 subdomain: config.landingPageOidB36,
                 path: parsedUrl?.path ?? "/index.html",

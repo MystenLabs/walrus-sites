@@ -24,9 +24,9 @@ import logger from "./logger";
 import BlocklistChecker from "./blocklist_checker";
 
 /**
-* Includes all the logic for fetching a walrus site.
+* Includes all the logic for fetching the URL contents of a walrus site.
 */
-export class PageFetcher {
+export class UrlFetcher {
     constructor(
         private resourceFetcher: ResourceFetcher,
         private suinsResolver: SuiNSResolver,
@@ -39,7 +39,7 @@ export class PageFetcher {
      * The `resolvedObjectId` variable is the object ID of the site that was previously resolved. If
      * `null`, the object ID is resolved again.
      */
-    public async resolveAndFetchPage(
+    public async resolveDomainAndFetchUrl(
         parsedUrl: DomainDetails,
         resolvedObjectId: string | null,
         blocklistChecker?: BlocklistChecker
@@ -67,8 +67,8 @@ export class PageFetcher {
         // to the initial unfiltered path fails.
         const routesPromise = this.wsRouter.getRoutes(resolvedObjectId);
 
-        // Fetch the page using the initial path.
-        const fetchPromise = await this.fetchPage(resolvedObjectId, parsedUrl.path);
+        // Fetch the URL using the initial path.
+        const fetchPromise = await this.fetchUrl(resolvedObjectId, parsedUrl.path);
 
         // If the fetch fails, check if the path can be matched using
         // the Routes DF and fetch the redirected path.
@@ -90,7 +90,7 @@ export class PageFetcher {
                 });
                 return siteNotFound();
             }
-            return this.fetchPage(resolvedObjectId, matchingRoute);
+            return this.fetchUrl(resolvedObjectId, matchingRoute);
         }
         return fetchPromise;
     }
@@ -132,20 +132,22 @@ export class PageFetcher {
     }
 
     /**
-     * Fetches a page.
+     * Fetches the URL of a walrus site.
+     * @param objectId - The object ID of the site object.
+     * @param path - The path of the site resource to fetch. e.g. /index.html
      */
-    private async fetchPage(
+    private async fetchUrl(
         objectId: string,
         path: string,
     ): Promise<Response> {
-        logger.info({message: 'Fetching page', objectId: objectId, path: path});
+        logger.info({message: 'Fetching URL', objectId: objectId, path: path});
         const result = await this.resourceFetcher.fetchResource(objectId, path, new Set<string>());
         if (!isResource(result) || !result.blob_id) {
             if (path !== "/404.html") {
                 logger.warn({ message: "Resource not found. Fetching /404.html ...", path });
-                return this.fetchPage(objectId, "/404.html");
+                return this.fetchUrl(objectId, "/404.html");
             } else {
-                logger.warn({ message: "Page not found!", path });
+                logger.warn({ message: "Walrus Site not found!", objectId, path });
                 return siteNotFound();
             }
         }
