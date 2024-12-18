@@ -375,6 +375,13 @@ impl ResourceManager {
                 "identity".to_string(),
             );
 
+        // Is Cache-Control specified? Else, add default to headers.
+        http_headers
+            .entry("Cache-Control".to_string())
+            .or_insert(
+                "public, max-age=3600".to_string(),
+            );
+
         // Read the content type.
         let content_type =
             ContentType::try_from_extension(extension.ok_or_else(|| {
@@ -402,6 +409,8 @@ impl ResourceManager {
         let mut hash_function = Sha256::default();
         hash_function.update(&plain_content);
         let blob_hash: [u8; 32] = hash_function.finalize().digest;
+
+        tracing::info!(http_headers);
 
         Ok(Some(Resource::new(
             resource_path,
