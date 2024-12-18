@@ -3,10 +3,10 @@
 import { getSubdomainAndPath } from "@lib/domain_parsing";
 import { FALLBACK_PORTAL } from "@lib/constants";
 
-function main() {
+export function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
         navigator.serviceWorker
-            .register("/walrus-sites-sw.js")
+            .register("/sw.js")
             .then((reg) => {
                 console.log("SW registered");
                 if (reg.installing) {
@@ -15,7 +15,7 @@ function main() {
                         if (sw.state === "installed") {
                             console.log("SW installed");
                             // SW installed. Refresh page so SW can respond with SW-enabled page.
-                            window.location.reload();
+                            location.reload();
                         }
                     };
                 } else if (reg.active) {
@@ -26,12 +26,12 @@ function main() {
             })
             .catch(handleError);
     } else {
-        const currentUrl = new URL(window.location.href);
+        const currentUrl = new URL(location.href);
         console.warn(
             "This browser does not yet support Walrus Sites 💔, redirecting to blob.store",
         );
         const domainDetails = getSubdomainAndPath(currentUrl);
-        window.location.href = new URL(
+        location.href = new URL(
             `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`,
             `https://${
                 domainDetails.subdomain ? domainDetails.subdomain + "." : ""
@@ -70,5 +70,3 @@ function displayErrorMessage(messageNode: any) {
     let messageDiv = document.getElementById("loading-message");
     messageDiv.replaceChildren(messageNode);
 }
-
-main();
