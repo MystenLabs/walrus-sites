@@ -4,9 +4,11 @@
 import { SuiObjectResponse } from "@mysten/sui/client";
 import { Routes } from "./types";
 import { DynamicFieldStruct, RoutesStruct } from "./bcs_data_parsing";
-import { bcs, fromBase64 } from "@mysten/bcs";
+import { bcs, BcsType, fromB64, fromBase64 } from "@mysten/bcs";
 import logger from "./logger";
 import { RPCSelector } from "./rpc_selector";
+import { deriveDynamicFieldID } from "@mysten/sui/utils";
+import { ROUTES_MOVE_TYPE } from "./constants";
 
 /**
 * The WalrusSiteRouter class is responsible for handling the routing logic for published
@@ -26,16 +28,15 @@ export class WalrusSitesRouter {
     public async getRoutes(
         siteObjectId: string,
     ): Promise<Routes | undefined> {
-        logger.info({ message: "Fetching routes dynamic field.", siteObjectId })
-        const routesDF = await this.fetchRoutesDynamicField(siteObjectId);
-        if (!routesDF.data) {
+        const routesDfID = this.deriveRoutesDynamicFieldID(siteObjectId);
+        const routesObj = await this.fetchRoutesObject(routesDfID);
+        if (!routesObj.data) {
             logger.warn({
                 message: "No routes dynamic field found for site object. Exiting getRoutes.",
                 siteObjectId
             });
             return;
         }
-        const routesObj = await this.fetchRoutesObject(routesDF.data.objectId);
         const objectData = routesObj.data;
         if (objectData && objectData.bcs && objectData.bcs.dataType === "moveObject") {
             return this.parseRoutesData(objectData.bcs.bcsBytes);
@@ -57,19 +58,25 @@ export class WalrusSitesRouter {
     }
 
     /**
-     * Fetches the dynamic field object for routes.
+     * Derives the dynamic field object ID for the routes.
      *
      * @param client - The SuiClient instance.
      * @param siteObjectId - The ID of the site object.
-     * @returns The dynamic field object for routes.
+     * @returns The dynamic field object ID for routes.
      */
-    private async fetchRoutesDynamicField(
+    private deriveRoutesDynamicFieldID(
         siteObjectId: string,
-    ): Promise<SuiObjectResponse> {
-        return await this.rpcSelector.getDynamicFieldObject({
-            parentId: siteObjectId,
-            name: { type: "vector<u8>", value: "routes" },
-        });
+    ): string {
+        const routesStringBCS = bcs.string().serialize('routes').toBytes();
+        const routesU8VecSerialized = bcs.vector(bcs.u8()).serialize(routesStringBCS);
+        const routesId = deriveDynamicFieldID(
+            siteObjectId,
+            ROUTES_MOVE_TYPE,
+            routesU8VecSerialized.toBytes(),
+        );
+
+        console.log({ message: "Derived routes dynamic field ID.", routesId });
+        return routesId;
     }
 
     /**
