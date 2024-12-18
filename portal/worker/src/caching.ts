@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { resolveAndFetchPage } from "@lib/page_fetching";
+import { urlFetcher } from "./walrus-sites-sw";
 import { DomainDetails } from "@lib/types";
 
 const CACHE_NAME = "walrus-sites-cache";
@@ -22,7 +22,7 @@ export default async function resolveWithCache(
         return cachedResponse;
     }
     console.log("Cache miss!", urlString);
-    const resolvedPage = await resolveAndFetchPage(parsedUrl, null);
+    const resolvedPage = await urlFetcher.resolveDomainAndFetchUrl(parsedUrl, null);
     await tryCachePut(cache, urlString, resolvedPage);
 
     return resolvedPage;

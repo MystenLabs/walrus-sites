@@ -5,12 +5,27 @@ import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import resolveWithCache from "./caching";
-import { resolveAndFetchPage } from "@lib/page_fetching";
+import { UrlFetcher } from "@lib/url_fetcher";
+import { ResourceFetcher } from "@lib/resource";
+import { RPCSelector } from "@lib/rpc_selector";
+import { SuiNSResolver } from "@lib/suins";
+import { WalrusSitesRouter } from "@lib/routing";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
 declare var self: ServiceWorkerGlobalScope;
 declare var clients: Clients;
+
+const rpcUrlList = process.env.RPC_URL_LIST;
+if (!rpcUrlList) {
+    throw new Error("Missing RPC_URL_LIST environment variable");
+}
+const rpcSelector = new RPCSelector(rpcUrlList.split(','));
+export const urlFetcher = new UrlFetcher(
+    new ResourceFetcher(rpcSelector),
+    new SuiNSResolver(rpcSelector),
+    new WalrusSitesRouter(rpcSelector)
+);
 
 self.addEventListener("install", (_event) => {
     self.skipWaiting();
@@ -61,7 +76,7 @@ self.addEventListener("fetch", async (event) => {
                 return await fetchFromCache();
             } else {
                 console.warn("Cache API not available");
-                return await resolveAndFetchPage(parsedUrl, null);
+                return await urlFetcher.resolveDomainAndFetchUrl(parsedUrl, null);
             }
         };
 

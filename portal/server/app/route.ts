@@ -4,15 +4,28 @@
 import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
-import { resolveAndFetchPage } from "@lib/page_fetching";
+import { UrlFetcher } from "@lib/url_fetcher";
+import { ResourceFetcher } from "@lib/resource";
+import { RPCSelector } from "@lib/rpc_selector";
+
 import { siteNotFound } from "@lib/http/http_error_responses";
 import integrateLoggerWithSentry from "sentry_logger";
 import blocklistChecker from "custom_blocklist_checker";
+import { SuiNSResolver } from "@lib/suins";
+import { WalrusSitesRouter } from "@lib/routing";
+import { config } from "configuration_loader";
 
-if (process.env.ENABLE_SENTRY === "true") {
+if (config.enableSentry) {
     // Only integrate Sentry on production.
     integrateLoggerWithSentry();
 }
+
+const rpcSelector = new RPCSelector(config.rpcUrlList);
+const urlFetcher = new UrlFetcher(
+    new ResourceFetcher(rpcSelector),
+    new SuiNSResolver(rpcSelector),
+    new WalrusSitesRouter(rpcSelector)
+);
 
 export async function GET(req: Request) {
     const originalUrl = req.headers.get("x-original-url");
@@ -21,14 +34,8 @@ export async function GET(req: Request) {
     }
     const url = new URL(originalUrl);
 
-    // Check if the request is for a site.
-    let portalDomainNameLengthString = process.env.PORTAL_DOMAIN_NAME_LENGTH;
-    let portalDomainNameLength: number | undefined;
-    if (process.env.PORTAL_DOMAIN_NAME_LENGTH) {
-        portalDomainNameLength = Number(portalDomainNameLengthString);
-    }
-
     const objectIdPath = getObjectIdLink(url.toString());
+    const portalDomainNameLength = config.portalDomainNameLength;
     if (objectIdPath) {
         console.log(`Redirecting to portal url response: ${url.toString()} from ${objectIdPath}`);
         return redirectToPortalURLResponse(url, objectIdPath, portalDomainNameLength);
@@ -49,17 +56,16 @@ export async function GET(req: Request) {
         }
 
         if (requestDomain == portalDomain && parsedUrl.subdomain) {
-            return await resolveAndFetchPage(parsedUrl, null, blocklistChecker);
+            return await urlFetcher.resolveDomainAndFetchUrl(parsedUrl, null, blocklistChecker);
         }
     }
 
     const atBaseUrl = portalDomain == url.host.split(":")[0];
     if (atBaseUrl) {
         console.log("Serving the landing page from walrus...");
-        const blobId = process.env.LANDING_PAGE_OID_B36!;
-        const response = await resolveAndFetchPage(
+        const response = await urlFetcher.resolveDomainAndFetchUrl(
             {
-                subdomain: blobId,
+                subdomain: config.landingPageOidB36,
                 path: parsedUrl?.path ?? "/index.html",
             },
             null,
