@@ -68,7 +68,6 @@ skip = [
 skip-tree = [
     # Mysten's libraries pull in several conflicting repo versions.
     { name = "fastcrypto", depth = 4 },
-    { name = "sui-rest-api", depth = 6},
     { name = "sui-sdk", depth = 6},
     # several crates depend on an older version of windows-sys
     { name = "windows-sys", depth = 3, version = "0.48" },
@@ -89,7 +88,6 @@ allow-git = [
     "https://github.com/zhiburt/tabled",
     "https://github.com/bmwill/openapiv3",
     "https://github.com/bmwill/axum-server",
-    "https://github.com/wlmyng/jsonrpsee",
 ]
 
 [sources.allow-org]

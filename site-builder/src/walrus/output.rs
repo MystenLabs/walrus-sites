@@ -147,6 +147,14 @@ pub struct Blob {
 #[allow(unused)]
 pub struct StoreOutput(pub BlobStoreResult);
 
+// Result when attempting to store a blob.
+#[serde_as]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DryRunOutput {
+    pub storage_cost: u64,
+}
+
 /// The output of the `read` command.
 #[serde_as]
 #[derive(Debug, Clone, Deserialize, Eq, PartialEq)]
