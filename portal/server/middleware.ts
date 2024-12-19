@@ -7,6 +7,10 @@ import type { NextRequest } from 'next/server'
 export function middleware(request: NextRequest) {
     const urlOriginal = extractUrlFrom(request)
     const alreadyAtRoot = request.nextUrl.pathname === '/'
+    // Bypass middleware for walrus-sites-sw.js
+    if (request.nextUrl.pathname.endsWith('walrus-sites-sw.js')) {
+        return NextResponse.next()
+    }
     if (alreadyAtRoot) {
         const response = NextResponse.next()
         response.headers.set('x-original-url', urlOriginal)

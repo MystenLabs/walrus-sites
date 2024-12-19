@@ -28,7 +28,7 @@ export type Configuration = {
 }
 
 /**
-* A utility class that makes safer to load the environment
+* A utility class that makes it safe to load the environment
 * variables of the project.
 * By using this class, we can ensure that the environment
 * variables are loaded correctly and their data types are
