@@ -23,13 +23,11 @@ export async function inject_unregister_service_worker_script(response: Response
     const script = `
         <script>
             if ('serviceWorker' in navigator) {
-                console.log('Unregistering the walrus sites service-worker!');
                 navigator.serviceWorker.getRegistrations().then(registrations => {
                     registrations.forEach(registration => {
-                        if (registration.scope.includes('walrus-sites-sw')) {
-                            registration.unregister();
-                            console.log('Service worker successfully unregistered.');
-                        }
+                        console.log('Unregistering the walrus sites service-worker!');
+                        registration.unregister();
+                        location.reload();
                     });
                 });
             }
