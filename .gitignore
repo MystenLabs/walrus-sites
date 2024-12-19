@@ -9,6 +9,7 @@ inlined.html
 target/
 config.toml
 .vscode/
+.idea/
 rustfmt.toml
 env/
 .next/

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{collections::BTreeSet, str::FromStr};
-
+use std::collections::HashMap;
 use anyhow::{anyhow, Result};
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{rpc_types::SuiTransactionBlockResponse, wallet_context::WalletContext, SuiClient};
@@ -47,6 +47,7 @@ pub struct SiteManager {
     pub site_id: SiteIdentifier,
     pub epochs: u64,
     pub when_upload: WhenWalrusUpload,
+    pub permanent: bool,
 }
 
 impl SiteManager {
@@ -58,6 +59,7 @@ impl SiteManager {
         site_id: SiteIdentifier,
         epochs: u64,
         when_upload: WhenWalrusUpload,
+        permanent: bool,
     ) -> Result<Self> {
         Ok(SiteManager {
             walrus,
@@ -66,6 +68,7 @@ impl SiteManager {
             site_id,
             epochs,
             when_upload,
+            permanent,
         })
     }
 
@@ -115,6 +118,8 @@ impl SiteManager {
 
     /// Publishes the resources to Walrus.
     async fn publish_to_walrus<'b>(&mut self, updates: &[&ResourceOp<'b>]) -> Result<()> {
+        let deletable = !self.permanent;
+
         for update in updates.iter() {
             let resource = update.inner();
             tracing::debug!(
@@ -129,7 +134,29 @@ impl SiteManager {
             ));
             let _output = self
                 .walrus
-                .store(resource.full_path.clone(), self.epochs, false)
+                .store(resource.full_path.clone(), self.epochs, false, deletable)
+                .await?;
+            display::done();
+        }
+        Ok(())
+    }
+
+    /// Deletes the resources from Walrus.
+    pub async fn delete_from_walrus<'b>(&mut self, blobs: HashMap<String, ObjectID>) -> Result<()> {
+
+        for (name, blob_id) in blobs.iter() {
+
+            tracing::debug!(
+                name,
+                "deleting blob from Walrus"
+            );
+            display::action(format!(
+                "Deleting resource from Walrus: {}",
+                blob_id,
+            ));
+            let _output = self
+                .walrus
+                .delete(blob_id.to_string())
                 .await?;
             display::done();
         }

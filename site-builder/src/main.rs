@@ -149,7 +149,6 @@ enum Commands {
         force: bool,
     },
     /// Convert an object ID in hex format to the equivalent Base36 format.
-    ///
     /// This command may be useful to browse a site, given it object ID.
     Convert {
         /// The object id (in hex format) to convert

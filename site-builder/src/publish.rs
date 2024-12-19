@@ -43,6 +43,8 @@ use crate::{
     walrus::Walrus,
     Config,
 };
+use crate::publish::WhenWalrusUpload::Modified;
+use crate::site::manager::SiteIdentifier::ExistingSite;
 
 const DEFAULT_WS_RESOURCES_FILE: &str = "ws-resources.json";
 
@@ -69,6 +71,10 @@ pub struct PublishOptions {
     /// The maximum number of concurrent calls to the Walrus CLI for the computation of blob IDs.
     #[clap(long)]
     max_concurrent: Option<NonZeroUsize>,
+
+    /// By default, sites are deletable with site-builder delete command. By passing --permanent, the site is deleted only after `epochs` expiration.
+    #[clap(long)]
+    permanent: Option<bool>,
 }
 
 /// The continuous editing options.
@@ -156,17 +162,56 @@ impl SiteEditor {
     }
 
     pub async fn destroy(&self, site_id: ObjectID) -> Result<()> {
-        let mut wallet = load_wallet_context(&self.config.general.wallet)?;
+
+        // Delete blobs on Walrus
+        let wallet_walrus = load_wallet_context(&self.config.general.wallet)?;
+
+        let all_dynamic_fields =
+            RemoteSiteFactory::new(&wallet_walrus.get_client().await?, self.config.package)
+                .await?
+                .get_existing_resources(site_id)
+                .await?;
+
+        let walrus = Walrus::new(
+            self.config.walrus_binary(),
+            self.config.gas_budget(),
+            self.config.general.rpc_url.clone(),
+            self.config.general.walrus_config.clone(),
+            self.config.general.wallet.clone(),
+        );
+        let mut site_manager = SiteManager::new(
+            self.config.clone(),
+            walrus,
+            wallet_walrus,
+            ExistingSite(site_id),
+            0,
+            Modified,
+            false,
+        ).await?;
+
+        tracing::info!(
+               "Retrieved blobs and deleting them: {:?}", &all_dynamic_fields,
+        );
+
+        let result = site_manager.delete_from_walrus(all_dynamic_fields).await?;
+
+        tracing::info!(
+               "Result from deletion: {:?}", &result,
+        );
+
+        // Delete objects on SUI blockchain
+        let mut wallet_sui = load_wallet_context(&self.config.general.wallet)?;
+
         let ptb = SitePtb::new(self.config.package, Identifier::new(SITE_MODULE)?)?;
-        let mut ptb = ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
-        let site = RemoteSiteFactory::new(&wallet.get_client().await?, self.config.package)
+        let mut ptb = ptb.with_call_arg(&wallet_sui.get_object_ref(site_id).await?.into())?;
+        let site = RemoteSiteFactory::new(&wallet_sui.get_client().await?, self.config.package)
             .await?
             .get_from_chain(site_id)
             .await?;
 
         ptb.destroy(site.resources())?;
-        let active_address = wallet.active_address()?;
-        let gas_coin = wallet
+        let active_address = wallet_sui.active_address()?;
+        let gas_coin = wallet_sui
             .gas_for_owner_budget(active_address, self.config.gas_budget(), BTreeSet::new())
             .await?
             .1
@@ -174,7 +219,7 @@ impl SiteEditor {
 
         sign_and_send_ptb(
             active_address,
-            &wallet,
+            &wallet_sui,
             ptb.finish(),
             gas_coin,
             self.config.gas_budget(),
@@ -252,6 +297,7 @@ impl SiteEditor<EditOptions> {
             self.edit_options.site_id.clone(),
             self.edit_options.publish_options.epochs,
             self.edit_options.when_upload.clone(),
+            self.edit_options.publish_options.permanent.unwrap_or(false),
         )
         .await?;
         let (response, summary) = site_manager.update_site(&local_site_data).await?;

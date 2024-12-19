@@ -12,6 +12,9 @@ use tokio::process::Command as CliCommand;
 
 use self::types::BlobId;
 use crate::walrus::command::WalrusCmdBuilder;
+// use num_bigint::BigUint;
+// use num_traits::{ToPrimitive, Zero};
+// use num_traits::Num;
 
 pub mod command;
 pub mod output;
@@ -35,6 +38,9 @@ pub struct Walrus {
 macro_rules! create_command {
     ($self:ident, $name:ident, $($arg:expr),*) => {{
         let json_input = $self.builder().$name($($arg),*).build().to_json()?;
+
+       tracing::info!(json_input, "Creating command");
+
         let output = $self
             .base_command()
             .arg(&json_input)
@@ -73,9 +79,58 @@ impl Walrus {
     /// Issues a `store` JSON command to the Walrus CLI, returning the parsed output.
     // NOTE: takes a mutable reference to ensure that only one store command is executed at every
     // time. The issue is that the inner wallet may lock coins if called in parallel.
-    pub async fn store(&mut self, file: PathBuf, epochs: u64, force: bool) -> Result<StoreOutput> {
-        create_command!(self, store, file, epochs, force)
+    pub async fn store(
+        &mut self,
+        file: PathBuf,
+        epochs: u64,
+        force: bool,
+        deletable: bool,
+    ) -> Result<StoreOutput> {
+        create_command!(self, store, file, epochs, force, deletable)
     }
+
+    /// Issues a `delete` JSON command to the Walrus CLI, returning the parsed output.
+    pub async fn delete(
+        &mut self,
+        object_id: String,
+    ) -> Result<StoreOutput> {
+
+        // if let Some(blob_id) = self.hex_to_base36(object_id.as_str()) {
+        tracing::info!(?object_id, "Deleting blob");
+        create_command!(self, delete, object_id)
+        // } else {
+        //     panic!("Failed to convert hex to Base36");
+        // }
+    }
+
+    // fn base36_encode(mut value: BigUint) -> String {
+    //     const BASE36: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyz";
+    //     let mut result = Vec::new();
+    //
+    //     let base = BigUint::from(36u8);
+    //
+    //     // Extract digits of value in Base36
+    //     while value > BigUint::zero() {
+    //         let digit = (&value % &base).to_usize().unwrap(); // Get the remainder as usize
+    //         result.push(BASE36[digit]);
+    //         value /= &base; // Perform integer division
+    //     }
+    //
+    //     // Reverse to display result in correct order
+    //     result.reverse();
+    //     String::from_utf8(result).unwrap()
+    // }
+    // fn hex_to_base36(&self, hex: &str) -> Option<String> {
+    //
+    //     let clean_hex = if hex.starts_with("0x") { &hex[2..] } else { hex };
+    //
+    //     tracing::info!(?clean_hex);
+    //
+    //     let decimal_value = BigUint::from_str_radix(clean_hex, 16).ok()?;
+    //     tracing::info!(?decimal_value);
+    //     Some(Walrus::base36_encode(decimal_value))
+    // }
+
 
     /// Issues a `read` JSON command to the Walrus CLI, returning the parsed output.
     #[allow(dead_code)]
