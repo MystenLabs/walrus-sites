@@ -4,6 +4,8 @@
 import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
+
+import { isAllowed } from "allowlist_checker";
 import { UrlFetcher } from "@lib/url_fetcher";
 import { ResourceFetcher } from "@lib/resource";
 import { RPCSelector } from "@lib/rpc_selector";
@@ -55,6 +57,7 @@ export async function GET(req: Request) {
             return siteNotFound();
         }
 
+        const urlFetcher = await isAllowed(parsedUrl.subdomain ?? '') ? premiumUrlFetcher : standardUrlFetcher;
         if (requestDomain == portalDomain && parsedUrl.subdomain) {
             return await urlFetcher.resolveDomainAndFetchUrl(parsedUrl, null, blocklistChecker);
         }
@@ -63,6 +66,8 @@ export async function GET(req: Request) {
     const atBaseUrl = portalDomain == url.host.split(":")[0];
     if (atBaseUrl) {
         console.log("Serving the landing page from walrus...");
+        // Always use the premium page fetcher for the landing page (when available).
+        const urlFetcher = config.enableAllowlist ? premiumUrlFetcher : standardUrlFetcher;
         const response = await urlFetcher.resolveDomainAndFetchUrl(
             {
                 subdomain: config.landingPageOidB36,
