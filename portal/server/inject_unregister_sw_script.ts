@@ -13,6 +13,12 @@
 * @returns a new response with the script injected.
 */
 export async function inject_unregister_service_worker_script(response: Response): Promise<Response> {
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('text/html')) {
+        console.log('Skipping service worker unregistration script injection because the content type is not HTML.');
+        return response;
+    }
+
     let responseBody = await response.text();
     const script = `
         <script>

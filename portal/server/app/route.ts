@@ -45,7 +45,7 @@ export async function GET(req: Request) {
     if (walrusPath) {
         console.log(`Redirecting to aggregator url response: ${req.url} from ${objectIdPath}`);
         const response = redirectToAggregatorUrlResponse(url, walrusPath);
-        return inject_unregister_service_worker_script(response);
+        return await inject_unregister_service_worker_script(response);
     }
 
     const parsedUrl = getSubdomainAndPath(url, Number(portalDomainNameLength));
@@ -54,12 +54,12 @@ export async function GET(req: Request) {
 
     if (parsedUrl) {
         if (blocklistChecker && await blocklistChecker.isBlocked(parsedUrl.subdomain)) {
-            return inject_unregister_service_worker_script(siteNotFound());
+            return await inject_unregister_service_worker_script(siteNotFound());
         }
 
         if (requestDomain == portalDomain && parsedUrl.subdomain) {
             const response = await urlFetcher.resolveDomainAndFetchUrl(parsedUrl, null, blocklistChecker);
-            return inject_unregister_service_worker_script(response);
+            return await inject_unregister_service_worker_script(response);
         }
     }
 
@@ -74,9 +74,9 @@ export async function GET(req: Request) {
             null,
             blocklistChecker
         );
-        return inject_unregister_service_worker_script(response);
+        return await inject_unregister_service_worker_script(response);
     }
 
     const response404 = new Response(`Resource at ${originalUrl} not found!`, { status: 404 });
-    return inject_unregister_service_worker_script(response404);
+    return await inject_unregister_service_worker_script(response404);
 }
