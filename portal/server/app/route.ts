@@ -6,28 +6,16 @@ import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@l
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 
 import { isAllowed } from "allowlist_checker";
-import { UrlFetcher } from "@lib/url_fetcher";
-import { ResourceFetcher } from "@lib/resource";
-import { RPCSelector } from "@lib/rpc_selector";
-
 import { siteNotFound } from "@lib/http/http_error_responses";
 import integrateLoggerWithSentry from "sentry_logger";
 import blocklistChecker from "custom_blocklist_checker";
-import { SuiNSResolver } from "@lib/suins";
-import { WalrusSitesRouter } from "@lib/routing";
 import { config } from "configuration_loader";
+import { standardUrlFetcher, premiumUrlFetcher } from "url_fetcher_factory";
 
 if (config.enableSentry) {
     // Only integrate Sentry on production.
     integrateLoggerWithSentry();
 }
-
-const rpcSelector = new RPCSelector(config.rpcUrlList);
-const urlFetcher = new UrlFetcher(
-    new ResourceFetcher(rpcSelector),
-    new SuiNSResolver(rpcSelector),
-    new WalrusSitesRouter(rpcSelector)
-);
 
 export async function GET(req: Request) {
     const originalUrl = req.headers.get("x-original-url");
