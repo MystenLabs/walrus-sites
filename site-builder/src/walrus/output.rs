@@ -17,6 +17,7 @@ pub type EpochCount = u32;
 
 /// Either an event ID or an object ID.
 #[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[allow(unused)]
 pub enum EventOrObjectId {
     /// The variant representing an event ID.
@@ -27,6 +28,7 @@ pub enum EventOrObjectId {
 
 /// The operation performed on blob and storage resources to register a blob.
 #[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", rename_all_fields = "camelCase")]
 #[allow(unused)]
 pub enum RegisterBlobOp {
     /// The storage and blob resources are purchased from scratch.
@@ -53,6 +55,7 @@ pub enum BlobStoreResult {
         #[serde_as(as = "DisplayFromStr")]
         blob_id: BlobId,
         /// The event where the blob was certified.
+        #[serde(flatten)]
         event_or_object: EventOrObjectId,
         /// The epoch until which the blob is stored (exclusive).
         end_epoch: Epoch,
