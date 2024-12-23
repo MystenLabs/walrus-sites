@@ -5,7 +5,15 @@ use std::{collections::BTreeSet, str::FromStr};
 
 use anyhow::{anyhow, Result};
 use sui_keys::keystore::AccountKeystore;
-use sui_sdk::{rpc_types::SuiTransactionBlockResponse, wallet_context::WalletContext, SuiClient};
+use sui_sdk::{
+    rpc_types::{
+        DryRunTransactionBlockResponse,
+        SuiTransactionBlockEffectsAPI,
+        SuiTransactionBlockResponse,
+    },
+    wallet_context::WalletContext,
+    SuiClient,
+};
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
     transaction::{CallArg, ProgrammableTransaction},
@@ -97,19 +105,57 @@ impl SiteManager {
         tracing::debug!(operations=?site_updates, "list of operations computed");
 
         let walrus_updates = site_updates.get_walrus_updates(&self.when_upload);
+        let mut total_storage_cost = 0;
 
         if !walrus_updates.is_empty() {
-            self.publish_to_walrus(&walrus_updates).await?;
+            tracing::info!("Dry-running Walrus store operations");
+            for update in &walrus_updates {
+                let resource = update.inner();
+
+                let dry_run_output = self
+                    .walrus
+                    .dry_run_store(resource.full_path.clone(), self.epochs, false)
+                    .await?;
+
+                let storage_cost = dry_run_output.storage_cost;
+                total_storage_cost += storage_cost;
+            }
         }
 
+        // Check if there are any updates to the site on-chain.
         let result = if site_updates.has_updates() {
-            display::action("Updating the Walrus Site object on Sui");
+            // Before doing the actual execution, perform a dry run
+            let gas_summary = self.dry_run_sui_updates(&site_updates).await?;
+            tracing::info!(
+                "Estimated costs for this publish/update: Sui Gas Cost {} MIST, Storage Cost: {} FROST",
+                gas_summary,
+                total_storage_cost
+            );
+
+            // Add user confirmation prompt.
+            display::action("Waiting for user confirmation...");
+            if !dialoguer::Confirm::new()
+                .with_prompt("Do you want to proceed with these updates?")
+                .default(true)
+                .interact()?
+            {
+                display::error("Update cancelled by user");
+                return Err(anyhow!("Update cancelled by user"));
+            }
+            display::action("Applying the Walrus Site object updates on Sui");
             let result = self.execute_sui_updates(&site_updates).await?;
             display::done();
             result
         } else {
+            // No updates necessary
             SuiTransactionBlockResponse::default()
         };
+
+        // After applying on-chain updates, publish to Walrus if needed.
+        if !walrus_updates.is_empty() {
+            self.publish_to_walrus(&walrus_updates).await?;
+        }
+
         Ok((result, site_updates.summary(&self.when_upload)))
     }
 
@@ -220,6 +266,105 @@ impl SiteManager {
             self.config.gas_budget(),
         )
         .await
+    }
+
+    /// Dry runs the updates on Sui without committing them.
+    /// Returns the `DryRunTransactionBlockResponse` so that you can inspect.
+    /// the effects, costs, and outcome of the transaction sequence.
+    async fn dry_run_sui_updates<'b>(&self, updates: &SiteDataDiff<'b>) -> Result<u64> {
+        tracing::debug!(
+            address = ?self.active_address()?,
+            "starting to dry-run update site resources on chain",
+        );
+
+        let ptb = SitePtb::new(
+            self.config.package,
+            Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
+        )?;
+
+        // Add the call arg if we are updating a site, or add the command to create a new site.
+        let mut ptb = match &self.site_id {
+            SiteIdentifier::ExistingSite(site_id) => {
+                ptb.with_call_arg(&self.wallet.get_object_ref(*site_id).await?.into())?
+            }
+            SiteIdentifier::NewSite(site_name) => ptb.with_create_site(site_name)?,
+        };
+
+        // Add as many resources as fit into the first PTB.
+        tracing::debug!("preparing and committing the first PTB");
+        let mut end = MAX_RESOURCES_PER_PTB.min(updates.resource_ops.len());
+
+        ptb.add_resource_operations(&updates.resource_ops[..end])?;
+        ptb.add_route_operations(&updates.route_ops)?;
+
+        if self.needs_transfer() {
+            ptb.transfer_site(self.active_address()?);
+        }
+
+        let first_ptb = ptb.finish();
+        let gas_coin = self.gas_coin_ref().await?;
+        let dry_run_response = self.dry_run_ptb(first_ptb, gas_coin).await?;
+        let site_object_id = match &self.site_id {
+            SiteIdentifier::ExistingSite(site_id) => *site_id,
+            SiteIdentifier::NewSite(_) => {
+                get_site_id_from_response(self.active_address()?, &dry_run_response.effects)?
+            }
+        };
+        // Track total storage costs.
+        let mut total_storage_cost = dry_run_response.effects.gas_cost_summary().storage_cost;
+        total_storage_cost += dry_run_response.effects.gas_cost_summary().computation_cost;
+
+        // Continue processing additional resource operations in batches, if any.
+        while end < updates.resource_ops.len() {
+            let start = end;
+            end = (end + MAX_RESOURCES_PER_PTB).min(updates.resource_ops.len());
+            tracing::debug!(%start, %end, "preparing and committing the next PTB");
+
+            let ptb = SitePtb::new(
+                self.config.package,
+                Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
+            )?;
+            let call_arg: CallArg = self.wallet.get_object_ref(site_object_id).await?.into();
+            let mut ptb = ptb.with_call_arg(&call_arg)?;
+            ptb.add_resource_operations(&updates.resource_ops[start..end])?;
+
+            // Dry run the next batch and add its storage cost to total.
+            let next_response = self
+                .dry_run_ptb(ptb.finish(), self.gas_coin_ref().await?)
+                .await?;
+            total_storage_cost += next_response.effects.gas_cost_summary().storage_cost;
+            total_storage_cost += next_response.effects.gas_cost_summary().computation_cost;
+        }
+
+        tracing::debug!("Total storage cost: {}", total_storage_cost);
+
+        Ok(total_storage_cost)
+    }
+
+    async fn dry_run_ptb(
+        &self,
+        programmable_transaction: ProgrammableTransaction,
+        gas_coin: ObjectRef,
+    ) -> Result<DryRunTransactionBlockResponse> {
+        let gas_price = self.wallet.get_reference_gas_price().await?;
+        let transaction = TransactionData::new_programmable(
+            self.active_address()?,
+            vec![gas_coin],
+            programmable_transaction,
+            self.config.gas_budget(),
+            gas_price,
+        );
+        // Await the future to get the SuiClient.
+        let client = self.wallet.get_client().await?;
+
+        // Now you can call read_api() on the actual client.
+        let response = client
+            .read_api()
+            .dry_run_transaction_block(transaction)
+            .await?;
+
+        // Return the response wrapped in Ok.
+        Ok(response)
     }
 
     async fn sui_client(&self) -> Result<SuiClient> {
