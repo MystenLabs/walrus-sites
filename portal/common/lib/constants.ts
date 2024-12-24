@@ -14,4 +14,3 @@ export const SITE_NAMES: { [key: string]: string } = {
 export const FALLBACK_PORTAL = "blob.store";
 // The string representing the ResourcePath struct in the walrus_site package.
 export const RESOURCE_PATH_MOVE_TYPE = SITE_PACKAGE + "::site::ResourcePath";
-export const ROUTES_MOVE_TYPE = SITE_PACKAGE + "::site::Routes";
