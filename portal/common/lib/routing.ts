@@ -50,14 +50,13 @@ export class WalrusSitesRouter {
     /**
      * Derives and fetches the Routes dynamic field object.
      *
-     * @param client - The SuiClient instance.
-     * @param objectId - The site object ID.
+     * @param siteObjectId - The site object ID.
      * @returns The routes object.
      */
-    private async fetchRoutesDynamicFieldObject(objectId: string): Promise<SuiObjectResponse> {
+    private async fetchRoutesDynamicFieldObject(siteObjectId: string): Promise<SuiObjectResponse> {
         const routesMoveType = "vector<u8>";
         const dynamicFieldId = deriveDynamicFieldID(
-            objectId,
+            siteObjectId,
             routesMoveType,
             bcs.vector(bcs.u8()).serialize(Buffer.from("routes")).toBytes(),
         );
