@@ -4,12 +4,15 @@
 import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
-import { resolveAndFetchPage } from "@lib/page_fetching";
+
+import { isAllowed } from "allowlist_checker";
 import { siteNotFound } from "@lib/http/http_error_responses";
 import integrateLoggerWithSentry from "sentry_logger";
 import blocklistChecker from "custom_blocklist_checker";
+import { config } from "configuration_loader";
+import { standardUrlFetcher, premiumUrlFetcher } from "url_fetcher_factory";
 
-if (process.env.ENABLE_SENTRY === "true") {
+if (config.enableSentry) {
     // Only integrate Sentry on production.
     integrateLoggerWithSentry();
 }
@@ -21,14 +24,8 @@ export async function GET(req: Request) {
     }
     const url = new URL(originalUrl);
 
-    // Check if the request is for a site.
-    let portalDomainNameLengthString = process.env.PORTAL_DOMAIN_NAME_LENGTH;
-    let portalDomainNameLength: number | undefined;
-    if (process.env.PORTAL_DOMAIN_NAME_LENGTH) {
-        portalDomainNameLength = Number(portalDomainNameLengthString);
-    }
-
     const objectIdPath = getObjectIdLink(url.toString());
+    const portalDomainNameLength = config.portalDomainNameLength;
     if (objectIdPath) {
         console.log(`Redirecting to portal url response: ${url.toString()} from ${objectIdPath}`);
         return redirectToPortalURLResponse(url, objectIdPath, portalDomainNameLength);
@@ -48,18 +45,20 @@ export async function GET(req: Request) {
             return siteNotFound();
         }
 
+        const urlFetcher = await isAllowed(parsedUrl.subdomain ?? '') ? premiumUrlFetcher : standardUrlFetcher;
         if (requestDomain == portalDomain && parsedUrl.subdomain) {
-            return await resolveAndFetchPage(parsedUrl, null, blocklistChecker);
+            return await urlFetcher.resolveDomainAndFetchUrl(parsedUrl, null, blocklistChecker);
         }
     }
 
     const atBaseUrl = portalDomain == url.host.split(":")[0];
     if (atBaseUrl) {
         console.log("Serving the landing page from walrus...");
-        const blobId = process.env.LANDING_PAGE_OID_B36!;
-        const response = await resolveAndFetchPage(
+        // Always use the premium page fetcher for the landing page (when available).
+        const urlFetcher = config.enableAllowlist ? premiumUrlFetcher : standardUrlFetcher;
+        const response = await urlFetcher.resolveDomainAndFetchUrl(
             {
-                subdomain: blobId,
+                subdomain: config.landingPageOidB36,
                 path: parsedUrl?.path ?? "/index.html",
             },
             null,

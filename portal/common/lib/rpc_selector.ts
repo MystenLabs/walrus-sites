@@ -32,36 +32,15 @@ class WrappedSuiClient extends SuiClient {
     }
 }
 
-class RPCSelector implements RPCSelectorInterface {
+export class RPCSelector implements RPCSelectorInterface {
     private static instance: RPCSelector;
     private clients: WrappedSuiClient[];
     private selectedClient: WrappedSuiClient | undefined;
 
-    private constructor(rpcURLs: string[]) {
+    constructor(rpcURLs: string[]) {
         // Initialize clients.
         this.clients = rpcURLs.map((rpcUrl) => new WrappedSuiClient(rpcUrl));
         this.selectedClient = undefined;
-    }
-
-    /**
-     * Get the list of RPC URLs from the environment variable.
-     */
-    private static parseRPCList(): string[] {
-        const rpcList = process.env.RPC_URL_LIST;
-        if (!rpcList) {
-            throw new Error("No RPC list found in environment variables");
-        }
-        return rpcList.split(",");
-    }
-
-    // Get the singleton instance.
-    public static getInstance(): RPCSelector {
-        if (!RPCSelector.instance) {
-            RPCSelector.instance = new RPCSelector(
-                RPCSelector.parseRPCList()
-            );
-        }
-        return RPCSelector.instance;
     }
 
     // General method to call clients and return the first successful response.
@@ -195,6 +174,3 @@ class RPCSelector implements RPCSelectorInterface {
         return this.invokeWithFailover<T>(method, args);
     }
 }
-
-const rpcSelectorSingleton = RPCSelector.getInstance();
-export default rpcSelectorSingleton;

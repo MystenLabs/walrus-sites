@@ -4,6 +4,7 @@
 const path = require("path");
 const webpack = require("webpack");
 const CopyPlugin = require("copy-webpack-plugin");
+require('dotenv').config({ path: '.env.local' });
 
 module.exports = {
     watch: true,
