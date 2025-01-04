@@ -37,7 +37,7 @@ export type Range = {
  * Checks if the range is well formed.
  */
 function isRangeValid(range: Range): boolean {
-    if (!range.start !== null && !range.end !== null) {
+    if (range.start == null && range.end == null) {
         return false;
     }
     if (range.start !== null && range.start < 0) {
