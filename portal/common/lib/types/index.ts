@@ -105,7 +105,7 @@ export function isVersionedResource(resource: any): resource is VersionedResourc
 }
 
 /**
- * Routes is an opitonal dynamic field object belonging to each site.
+ * Routes is an optional dynamic field object belonging to each site.
  */
 export type Routes = {
     routes_list: Map<string, string>;
