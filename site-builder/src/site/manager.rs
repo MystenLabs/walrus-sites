@@ -1,8 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::BTreeSet, str::FromStr};
-use std::collections::HashMap;
+use std::{
+    collections::{BTreeSet, HashMap},
+    str::FromStr,
+};
+
 use anyhow::{anyhow, Result};
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{rpc_types::SuiTransactionBlockResponse, wallet_context::WalletContext, SuiClient};
@@ -143,21 +146,10 @@ impl SiteManager {
 
     /// Deletes the resources from Walrus.
     pub async fn delete_from_walrus<'b>(&mut self, blobs: HashMap<String, ObjectID>) -> Result<()> {
-
         for (name, blob_id) in blobs.iter() {
-
-            tracing::debug!(
-                name,
-                "deleting blob from Walrus"
-            );
-            display::action(format!(
-                "Deleting resource from Walrus: {}",
-                blob_id,
-            ));
-            let _output = self
-                .walrus
-                .delete(blob_id.to_string())
-                .await?;
+            tracing::debug!(name, "deleting blob from Walrus");
+            display::action(format!("Deleting resource from Walrus: {}", blob_id,));
+            let _output = self.walrus.delete(blob_id.to_string()).await?;
             display::done();
         }
         Ok(())

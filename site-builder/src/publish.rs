@@ -24,10 +24,11 @@ use sui_types::{
 use crate::{
     display,
     preprocessor::Preprocessor,
+    publish::WhenWalrusUpload::Modified,
     site::{
         builder::SitePtb,
         config::WSResources,
-        manager::{SiteIdentifier, SiteManager},
+        manager::{SiteIdentifier, SiteIdentifier::ExistingSite, SiteManager},
         resource::ResourceManager,
         RemoteSiteFactory,
         SITE_MODULE,
@@ -43,8 +44,6 @@ use crate::{
     walrus::Walrus,
     Config,
 };
-use crate::publish::WhenWalrusUpload::Modified;
-use crate::site::manager::SiteIdentifier::ExistingSite;
 
 const DEFAULT_WS_RESOURCES_FILE: &str = "ws-resources.json";
 
@@ -162,7 +161,6 @@ impl SiteEditor {
     }
 
     pub async fn destroy(&self, site_id: ObjectID) -> Result<()> {
-
         // Delete blobs on Walrus
         let wallet_walrus = load_wallet_context(&self.config.general.wallet)?;
 
@@ -187,17 +185,15 @@ impl SiteEditor {
             0,
             Modified,
             false,
-        ).await?;
+        )
+        .await?;
 
-        tracing::info!(
-               "Retrieved blobs and deleting them: {:?}", &all_dynamic_fields,
+        tracing::debug!(
+            "Retrieved blobs and deleting them: {:?}",
+            &all_dynamic_fields,
         );
 
-        let result = site_manager.delete_from_walrus(all_dynamic_fields).await?;
-
-        tracing::info!(
-               "Result from deletion: {:?}", &result,
-        );
+        site_manager.delete_from_walrus(all_dynamic_fields).await?;
 
         // Delete objects on SUI blockchain
         let mut wallet_sui = load_wallet_context(&self.config.general.wallet)?;
