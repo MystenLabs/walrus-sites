@@ -35,6 +35,7 @@ export class WalrusSitesRouter {
             logger.warn({
                 message: "Routes dynamic field does not contain a `data` field.",
             });
+            return
         } else if (!objectData.bcs) {
             logger.warn({
                 message: "Routes dynamic field does not contain a `bcs` field.",
