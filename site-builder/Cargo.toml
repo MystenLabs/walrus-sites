@@ -32,5 +32,3 @@ tokio = { version = "1.38.1", features = ["rt", "rt-multi-thread", "macros", "pr
 toml = "0.8.14"
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
-num-bigint = "0.4.6"
-num-traits = "0.2.19"
