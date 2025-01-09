@@ -72,7 +72,7 @@ export class RPCSelector implements RPCSelectorInterface {
 
         const timeoutPromise = new Promise<never>((_, reject) =>
             setTimeout(() => reject(
-                    new Error("Request timed out")),
+                new Error("Request timed out")),
                 Number(process.env.RPC_REQUEST_TIMEOUT_MS) ?? 7000
             ),
         );
