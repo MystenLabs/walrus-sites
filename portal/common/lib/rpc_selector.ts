@@ -12,13 +12,10 @@ import logger from "./logger";
 
 interface RPCSelectorInterface {
     getObject(input: GetObjectParams): Promise<SuiObjectResponse>;
-
     multiGetObjects(input: MultiGetObjectsParams): Promise<SuiObjectResponse[]>;
-
     getDynamicFieldObject(
         input: GetDynamicFieldObjectParams,
     ): Promise<SuiObjectResponse>;
-
     call<T>(method: string, args: any[]): Promise<T>;
 }
 
@@ -26,7 +23,7 @@ class WrappedSuiClient extends SuiClient {
     private url: string;
 
     constructor(url: string) {
-        super({url});
+        super({ url });
         this.url = url;
     }
 
@@ -44,28 +41,6 @@ export class RPCSelector implements RPCSelectorInterface {
         // Initialize clients.
         this.clients = rpcURLs.map((rpcUrl) => new WrappedSuiClient(rpcUrl));
         this.selectedClient = undefined;
-    }
-
-    public async getObject(input: GetObjectParams): Promise<SuiObjectResponse> {
-        return this.invokeWithFailover<SuiObjectResponse>("getObject", [input]);
-    }
-
-    public async multiGetObjects(
-        input: MultiGetObjectsParams,
-    ): Promise<SuiObjectResponse[]> {
-        return this.invokeWithFailover<SuiObjectResponse[]>("multiGetObjects", [input]);
-    }
-
-    public async getDynamicFieldObject(
-        input: GetDynamicFieldObjectParams,
-    ): Promise<SuiObjectResponse> {
-        return this.invokeWithFailover<SuiObjectResponse>("getDynamicFieldObject", [
-            input,
-        ]);
-    }
-
-    public async call<T>(method: string, args: any[]): Promise<T> {
-        return this.invokeWithFailover<T>(method, args);
     }
 
     // General method to call clients and return the first successful response.
@@ -110,8 +85,7 @@ export class RPCSelector implements RPCSelectorInterface {
         if (result == null && this.selectedClient) {
             logger.info({
                 message: "Result null from current client",
-                nullCurrentRPCClientUrl: this.selectedClient.getURL().toString()
-            })
+                nullCurrentRPCClientUrl: this.selectedClient.getURL().toString()})
         }
 
         if (this.isValidResponse(result)) {
@@ -135,11 +109,10 @@ export class RPCSelector implements RPCSelectorInterface {
                     if (result == null) {
                         logger.info({
                             message: "Result null from fallback client:",
-                            nullFallbackRPCClientUrl: client.getURL().toString()
-                        })
+                            nullFallbackRPCClientUrl: client.getURL().toString()})
                     }
                     if (this.isValidResponse(result)) {
-                        resolve({result, client});
+                        resolve({ result, client });
                     } else {
                         reject(new Error("Invalid response"));
                     }
@@ -150,10 +123,10 @@ export class RPCSelector implements RPCSelectorInterface {
         );
 
         try {
-            const {result, client} = await Promise.any(clientPromises);
+            const { result, client } = await Promise.any(clientPromises);
             // Update the selected client for future calls.
             this.selectedClient = client;
-            logger.info({message: "RPC selected", rpcClientSelected: this.selectedClient.getURL()})
+            logger.info({ message: "RPC selected", rpcClientSelected: this.selectedClient.getURL() })
 
             return result;
         } catch {
@@ -177,5 +150,27 @@ export class RPCSelector implements RPCSelectorInterface {
             return result.some((item) => item != null);
         }
         return true;
+    }
+
+    public async getObject(input: GetObjectParams): Promise<SuiObjectResponse> {
+        return this.invokeWithFailover<SuiObjectResponse>("getObject", [input]);
+    }
+
+    public async multiGetObjects(
+        input: MultiGetObjectsParams,
+    ): Promise<SuiObjectResponse[]> {
+        return this.invokeWithFailover<SuiObjectResponse[]>("multiGetObjects", [input]);
+    }
+
+    public async getDynamicFieldObject(
+        input: GetDynamicFieldObjectParams,
+    ): Promise<SuiObjectResponse> {
+        return this.invokeWithFailover<SuiObjectResponse>("getDynamicFieldObject", [
+            input,
+        ]);
+    }
+
+    public async call<T>(method: string, args: any[]): Promise<T> {
+        return this.invokeWithFailover<T>(method, args);
     }
 }
