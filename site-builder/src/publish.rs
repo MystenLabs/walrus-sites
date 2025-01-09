@@ -22,8 +22,10 @@ use sui_types::{
 };
 
 use crate::{
+    backoff::ExponentialBackoffConfig,
     display,
     preprocessor::Preprocessor,
+    retry_client::RetriableSuiClient,
     site::{
         builder::SitePtb,
         config::WSResources,
@@ -33,14 +35,7 @@ use crate::{
         SITE_MODULE,
     },
     summary::{SiteDataDiffSummary, Summarizable},
-    util::{
-        get_site_id_from_response,
-        id_to_base36,
-        load_wallet_context,
-        path_or_defaults_if_exist,
-        sign_and_send_ptb,
-    },
-    walrus::Walrus,
+    util::{get_site_id_from_response, id_to_base36, path_or_defaults_if_exist, sign_and_send_ptb},
     Config,
 };
 
@@ -156,13 +151,17 @@ impl SiteEditor {
     }
 
     pub async fn destroy(&self, site_id: ObjectID) -> Result<()> {
-        let mut wallet = load_wallet_context(&self.config.general.wallet)?;
+        let mut wallet = self.config.wallet()?;
         let ptb = SitePtb::new(self.config.package, Identifier::new(SITE_MODULE)?)?;
         let mut ptb = ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
-        let site = RemoteSiteFactory::new(&wallet.get_client().await?, self.config.package)
-            .await?
-            .get_from_chain(site_id)
-            .await?;
+        let site = RemoteSiteFactory::new(
+            &RetriableSuiClient::new_from_wallet(&wallet, ExponentialBackoffConfig::default())
+                .await?,
+            self.config.package,
+        )
+        .await?
+        .get_from_chain(site_id)
+        .await?;
 
         ptb.destroy(site.resources())?;
         let active_address = wallet.active_address()?;
@@ -209,16 +208,6 @@ impl SiteEditor<EditOptions> {
             display::done();
         }
 
-        let wallet = load_wallet_context(&self.config.general.wallet)?;
-
-        let walrus = Walrus::new(
-            self.config.walrus_binary(),
-            self.config.gas_budget(),
-            self.config.general.rpc_url.clone(),
-            self.config.general.walrus_config.clone(),
-            self.config.general.wallet.clone(),
-        );
-
         let (ws_resources, ws_resources_path) = load_ws_resources(
             &self.edit_options.publish_options.ws_resources,
             self.directory(),
@@ -231,7 +220,7 @@ impl SiteEditor<EditOptions> {
         }
 
         let mut resource_manager = ResourceManager::new(
-            walrus.clone(),
+            self.config.walrus_client(),
             ws_resources,
             ws_resources_path,
             self.edit_options.publish_options.max_concurrent,
@@ -247,8 +236,6 @@ impl SiteEditor<EditOptions> {
 
         let mut site_manager = SiteManager::new(
             self.config.clone(),
-            walrus,
-            wallet,
             self.edit_options.site_id.clone(),
             self.edit_options.publish_options.epochs,
             self.edit_options.when_upload.clone(),
@@ -337,7 +324,7 @@ fn print_summary(
 }
 
 /// Gets the configuration from the provided file, or looks in the default directory.
-fn load_ws_resources(
+pub(crate) fn load_ws_resources(
     path: &Option<PathBuf>,
     site_dir: &Path,
 ) -> Result<(Option<WSResources>, Option<PathBuf>)> {
