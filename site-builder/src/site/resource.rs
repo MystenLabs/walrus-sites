@@ -355,7 +355,11 @@ impl ResourceManager {
     /// Read a resource at a path.
     ///
     /// Ignores empty files.
-    pub async fn read_resource(&self, full_path: &Path, root: &Path) -> Result<Option<Resource>> {
+    pub async fn read_resource(
+        &self,
+        full_path: &Path,
+        resource_path: String,
+    ) -> Result<Option<Resource>> {
         if let Some(ws_path) = &self.ws_resources_path {
             if full_path == ws_path {
                 tracing::debug!(?full_path, "ignoring the ws-resources config file");
@@ -363,7 +367,6 @@ impl ResourceManager {
             }
         }
 
-        let resource_path = full_path_to_resource_path(full_path, root)?;
         let mut http_headers: BTreeMap<String, String> =
             ResourceManager::derive_http_headers(&self.ws_resources, &resource_path);
         let extension = full_path
@@ -463,7 +466,11 @@ impl ResourceManager {
 
         let futures = resource_paths
             .iter()
-            .map(|(full_path, _)| self.read_resource(full_path, root));
+            .map(|(full_path, _)| {
+                full_path_to_resource_path(full_path, root)
+                    .map(|resource_path| self.read_resource(full_path, resource_path))
+            })
+            .collect::<Result<Vec<_>>>()?;
 
         // Limit the amount of futures awaited concurrently.
         let concurrency_limit = self
