@@ -16,3 +16,4 @@ env/
 temp-landing-page/
 .env*.local
 .idea
+client_config.yaml
