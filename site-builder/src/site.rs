@@ -8,22 +8,28 @@ pub mod contracts;
 pub mod manager;
 pub mod resource;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 use anyhow::Result;
-use contracts::{get_sui_object, TypeOriginMap};
+use contracts::TypeOriginMap;
+use futures::future::try_join_all;
 use resource::{ResourceOp, ResourceSet};
-use sui_sdk::SuiClient;
 use sui_types::{base_types::ObjectID, dynamic_field::DynamicFieldInfo, TypeTag};
 
 use crate::{
     publish::WhenWalrusUpload,
+    retry_client::RetriableSuiClient,
     summary::SiteDataDiffSummary,
     types::{ResourceDynamicField, RouteOps, Routes, SuiDynamicField},
     util::{handle_pagination, type_origin_map_for_package},
 };
 
 pub const SITE_MODULE: &str = "site";
+
+/// The maximum number of dynamic fields to request at once.
+const DF_REQ_BATCH_SIZE: usize = 10;
+/// The delay between requests for dynamic fields.
+const DF_REQ_DELAY_MS: u64 = 100;
 
 /// The diff between two site data.
 #[derive(Debug)]
@@ -116,13 +122,16 @@ impl SiteData {
 
 /// Fetches remote sites.
 pub struct RemoteSiteFactory<'a> {
-    sui_client: &'a SuiClient,
+    sui_client: &'a RetriableSuiClient,
     type_origin_map: TypeOriginMap,
 }
 
 impl RemoteSiteFactory<'_> {
     /// Creates a new remote site factory.
-    pub async fn new(sui_client: &SuiClient, package_id: ObjectID) -> Result<RemoteSiteFactory> {
+    pub async fn new(
+        sui_client: &RetriableSuiClient,
+        package_id: ObjectID,
+    ) -> Result<RemoteSiteFactory> {
         let type_origin_map = type_origin_map_for_package(sui_client, package_id).await?;
         Ok(RemoteSiteFactory {
             sui_client,
@@ -134,23 +143,40 @@ impl RemoteSiteFactory<'_> {
     pub async fn get_from_chain(&self, site_id: ObjectID) -> Result<SiteData> {
         let dynamic_fields = self.get_all_dynamic_fields(site_id).await?;
         let resource_path_tag = self.resource_path_tag()?;
-        let resources = ResourceSet::from_iter(
-            futures::future::try_join_all(
-                dynamic_fields
+
+        // Chunking ensures that we do not make too many requests at once.
+        let futures = dynamic_fields.chunks(DF_REQ_BATCH_SIZE).map(|chunk| {
+            try_join_all(
+                chunk
                     .iter()
-                    // Try to extract the resources.
                     .filter(|field| field.name.type_ == resource_path_tag)
-                    .map(|field| {
-                        get_sui_object::<ResourceDynamicField>(self.sui_client, field.object_id)
+                    .map(|field| async {
+                        self.sui_client
+                            .get_sui_object::<ResourceDynamicField>(field.object_id)
+                            .await
+                            .map(|field| field.value)
                     }),
             )
-            .await?
-            .into_iter()
-            .map(|field| field.value),
+        });
+
+        let mut resources = ResourceSet::empty();
+        let delay = Duration::from_millis(DF_REQ_DELAY_MS);
+        let req_s = DF_REQ_BATCH_SIZE as f64 * 1.0 / delay.as_secs_f64();
+        tracing::info!(
+            batch_size = DF_REQ_BATCH_SIZE,
+            ?delay,
+            req_s,
+            "fetching the resources from the dynamic fields"
         );
 
-        let routes = self.get_routes(&dynamic_fields).await?;
+        for fut in futures {
+            tracing::debug!("fetching a batch of dynamic fields");
+            resources.extend(fut.await?);
+            tokio::time::sleep(delay).await;
+        }
 
+        tracing::debug!("fetching the routes from the dynamic fields");
+        let routes = self.get_routes(&dynamic_fields).await?;
         Ok(SiteData { resources, routes })
     }
 
@@ -159,12 +185,11 @@ impl RemoteSiteFactory<'_> {
             .iter()
             .find(|field| field.name.type_ == TypeTag::Vector(Box::new(TypeTag::U8)))
         {
-            let routes = get_sui_object::<SuiDynamicField<Vec<u8>, Routes>>(
-                self.sui_client,
-                routes_field.object_id,
-            )
-            .await?
-            .value;
+            let routes = self
+                .sui_client
+                .get_sui_object::<SuiDynamicField<Vec<u8>, Routes>>(routes_field.object_id)
+                .await?
+                .value;
             Ok(Some(routes))
         } else {
             Ok(None)
@@ -181,13 +206,10 @@ impl RemoteSiteFactory<'_> {
     }
 
     async fn get_all_dynamic_fields(&self, object_id: ObjectID) -> Result<Vec<DynamicFieldInfo>> {
-        let iter = handle_pagination(|cursor| {
-            self.sui_client
-                .read_api()
-                .get_dynamic_fields(object_id, cursor, None)
-        })
-        .await?
-        .collect();
+        let iter =
+            handle_pagination(|cursor| self.sui_client.get_dynamic_fields(object_id, cursor, None))
+                .await?
+                .collect();
         Ok(iter)
     }
 

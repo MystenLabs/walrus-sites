@@ -22,8 +22,10 @@ use sui_types::{
 };
 
 use crate::{
+    backoff::ExponentialBackoffConfig,
     display,
     preprocessor::Preprocessor,
+    retry_client::RetriableSuiClient,
     site::{
         builder::SitePtb,
         config::WSResources,
@@ -159,10 +161,14 @@ impl SiteEditor {
         let mut wallet = load_wallet_context(&self.config.general.wallet)?;
         let ptb = SitePtb::new(self.config.package, Identifier::new(SITE_MODULE)?)?;
         let mut ptb = ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
-        let site = RemoteSiteFactory::new(&wallet.get_client().await?, self.config.package)
-            .await?
-            .get_from_chain(site_id)
-            .await?;
+        let site = RemoteSiteFactory::new(
+            &RetriableSuiClient::new_from_wallet(&wallet, ExponentialBackoffConfig::default())
+                .await?,
+            self.config.package,
+        )
+        .await?
+        .get_from_chain(site_id)
+        .await?;
 
         ptb.destroy(site.resources())?;
         let active_address = wallet.active_address()?;

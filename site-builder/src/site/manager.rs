@@ -1,11 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::BTreeSet, str::FromStr};
+use std::{collections::BTreeSet, str::FromStr, time::Duration};
 
 use anyhow::{anyhow, Result};
 use sui_keys::keystore::AccountKeystore;
-use sui_sdk::{rpc_types::SuiTransactionBlockResponse, wallet_context::WalletContext, SuiClient};
+use sui_sdk::{rpc_types::SuiTransactionBlockResponse, wallet_context::WalletContext};
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
     transaction::{CallArg, ProgrammableTransaction},
@@ -21,8 +21,10 @@ use super::{
     SITE_MODULE,
 };
 use crate::{
+    backoff::ExponentialBackoffConfig,
     display,
     publish::WhenWalrusUpload,
+    retry_client::RetriableSuiClient,
     summary::SiteDataDiffSummary,
     util::{get_site_id_from_response, sign_and_send_ptb},
     walrus::Walrus,
@@ -30,6 +32,8 @@ use crate::{
 };
 
 const MAX_RESOURCES_PER_PTB: usize = 200;
+const OS_ERROR_DELAY: Duration = Duration::from_secs(1);
+const MAX_RETRIES: u32 = 10;
 
 /// The identifier for the new or existing site.
 ///
@@ -47,6 +51,7 @@ pub struct SiteManager {
     pub site_id: SiteIdentifier,
     pub epochs: u64,
     pub when_upload: WhenWalrusUpload,
+    pub backoff_config: ExponentialBackoffConfig,
 }
 
 impl SiteManager {
@@ -66,6 +71,8 @@ impl SiteManager {
             site_id,
             epochs,
             when_upload,
+            // TODO(giac): This should be configurable.
+            backoff_config: ExponentialBackoffConfig::default(),
         })
     }
 
@@ -127,11 +134,46 @@ impl SiteManager {
                 "Storing resource on Walrus: {}",
                 &resource.info.path
             ));
-            let _output = self
-                .walrus
-                .store(resource.full_path.clone(), self.epochs, false)
-                .await?;
-            display::done();
+
+            // Retry if the store operation fails with an os error.
+            // NOTE(giac): This can be improved when the rust sdk for the client is open sourced.
+            let mut retry_num = 0;
+            loop {
+                anyhow::ensure!(
+                    retry_num < MAX_RETRIES,
+                    "maximum number of retries exceeded"
+                );
+                tracing::debug!(retry_num, "attempting to store resource");
+                retry_num += 1;
+                let result = self
+                    .walrus
+                    .store(resource.full_path.clone(), self.epochs, false)
+                    .await;
+
+                match result {
+                    Ok(_) => {
+                        display::done();
+                        break;
+                    }
+                    Err(err) => {
+                        tracing::warn!(?err, "store operation failed");
+                        if !err.to_string().contains("os error 54") || retry_num >= MAX_RETRIES {
+                            return Err(err);
+                        } else if retry_num >= MAX_RETRIES {
+                            anyhow::bail!(
+                                "a network error occurred when calling the Walrus CLI, \
+                                and the maximum number of retries was exceeded"
+                            );
+                        } else {
+                            tracing::warn!(
+                                delay = ?OS_ERROR_DELAY,
+                                "calling the Walrus CLI encountered an OS network error, retrying"
+                            );
+                            tokio::time::sleep(OS_ERROR_DELAY).await;
+                        }
+                    }
+                }
+            }
         }
         Ok(())
     }
@@ -160,8 +202,12 @@ impl SiteManager {
 
         // Publish the first MAX_RESOURCES_PER_PTB resources, or all resources if there are fewer
         // than that.
-        tracing::debug!("preparing and committing the first PTB");
         let mut end = MAX_RESOURCES_PER_PTB.min(updates.resource_ops.len());
+        tracing::debug!(
+            total_ops = updates.resource_ops.len(),
+            end,
+            "preparing and committing the first PTB"
+        );
 
         ptb.add_resource_operations(&updates.resource_ops[..end])?;
         ptb.add_route_operations(&updates.route_ops)?;
@@ -185,7 +231,7 @@ impl SiteManager {
             }
         };
 
-        // Keep iterating to load resources
+        // Keep iterating to load resources.
         while end < updates.resource_ops.len() {
             let start = end;
             end = (end + MAX_RESOURCES_PER_PTB).min(updates.resource_ops.len());
@@ -222,8 +268,8 @@ impl SiteManager {
         .await
     }
 
-    async fn sui_client(&self) -> Result<SuiClient> {
-        self.wallet.get_client().await
+    async fn sui_client(&self) -> Result<RetriableSuiClient> {
+        RetriableSuiClient::new_from_wallet(&self.wallet, self.backoff_config.clone()).await
     }
 
     // TODO(giac): This is a copy of `[WalletContext::active_address`] that works without borrowing
