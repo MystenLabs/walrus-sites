@@ -257,6 +257,15 @@ impl ResourceSet {
         delete_operations.extend(create_operations);
         delete_operations
     }
+
+    /// Extends the set with the resources in the iterator.
+    pub fn extend<I, R>(&mut self, resources: I)
+    where
+        I: IntoIterator<Item = R>,
+        R: Into<Resource>,
+    {
+        self.inner.extend(resources.into_iter().map(Into::into));
+    }
 }
 
 impl<'a> IntoIterator for &'a ResourceSet {
@@ -448,6 +457,9 @@ impl ResourceManager {
     /// Recursively iterate a directory and load all [`Resources`][Resource] within.
     pub async fn read_dir(&mut self, root: &Path) -> Result<SiteData> {
         let resource_paths = Self::iter_dir(root, root)?;
+        if resource_paths.is_empty() {
+            return Ok(SiteData::empty());
+        }
 
         let futures = resource_paths
             .iter()
@@ -463,7 +475,7 @@ impl ResourceManager {
 
         let mut resources = ResourceSet::empty();
         while let Some(resource) = stream.next().await {
-            resources.inner.extend(resource?);
+            resources.extend(resource?);
         }
 
         Ok(SiteData::new(

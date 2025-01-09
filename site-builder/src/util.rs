@@ -14,14 +14,13 @@ use sui_sdk::{
         SuiTransactionBlockResponse,
     },
     wallet_context::WalletContext,
-    SuiClient,
 };
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
     transaction::{ProgrammableTransaction, TransactionData},
 };
 
-use crate::site::contracts::TypeOriginMap;
+use crate::{retry_client::RetriableSuiClient, site::contracts::TypeOriginMap};
 
 pub async fn sign_and_send_ptb(
     active_address: SuiAddress,
@@ -142,11 +141,10 @@ pub fn path_or_defaults_if_exist(path: &Option<PathBuf>, defaults: &[PathBuf]) -
 
 /// Gets the type origin map for a given package.
 pub(crate) async fn type_origin_map_for_package(
-    sui_client: &SuiClient,
+    sui_client: &RetriableSuiClient,
     package_id: ObjectID,
 ) -> Result<TypeOriginMap> {
     let Ok(Some(SuiRawData::Package(raw_package))) = sui_client
-        .read_api()
         .get_object_with_options(
             package_id,
             SuiObjectDataOptions::default().with_type().with_bcs(),

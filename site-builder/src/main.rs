@@ -1,9 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+mod backoff;
 mod display;
 mod preprocessor;
 mod publish;
+mod retry_client;
 mod site;
 mod summary;
 mod types;
@@ -12,9 +14,11 @@ mod walrus;
 use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};
+use backoff::ExponentialBackoffConfig;
 use clap::{Parser, Subcommand};
 use futures::TryFutureExt;
 use publish::{ContinuousEditing, PublishOptions, SiteEditor, WhenWalrusUpload};
+use retry_client::RetriableSuiClient;
 use serde::Deserialize;
 use site::{manager::SiteIdentifier, RemoteSiteFactory};
 use sui_types::base_types::ObjectID;
@@ -289,11 +293,15 @@ async fn run() -> Result<()> {
         // below will be monitored for changes.
         Commands::Sitemap { object } => {
             let wallet = load_wallet_context(&config.general.wallet)?;
-            let all_dynamic_fields =
-                RemoteSiteFactory::new(&wallet.get_client().await?, config.package)
-                    .await?
-                    .get_existing_resources(object)
-                    .await?;
+            let all_dynamic_fields = RemoteSiteFactory::new(
+                // TODO(giac): make the backoff configurable.
+                &RetriableSuiClient::new_from_wallet(&wallet, ExponentialBackoffConfig::default())
+                    .await?,
+                config.package,
+            )
+            .await?
+            .get_existing_resources(object)
+            .await?;
             println!("Pages in site at object id: {}", object);
             for (name, id) in all_dynamic_fields {
                 println!("  - {:<40} {:?}", name, id);
