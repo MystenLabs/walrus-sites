@@ -14,7 +14,7 @@ use sui_types::{
 
 use super::{
     builder::SitePtb,
-    resource::ResourceOp,
+    resource::{Resource, ResourceOp},
     RemoteSiteFactory,
     SiteData,
     SiteDataDiff,
@@ -58,15 +58,13 @@ impl SiteManager {
     /// Creates a new site manager.
     pub async fn new(
         config: Config,
-        walrus: Walrus,
-        wallet: WalletContext,
         site_id: SiteIdentifier,
         epochs: u64,
         when_upload: WhenWalrusUpload,
     ) -> Result<Self> {
         Ok(SiteManager {
-            walrus,
-            wallet,
+            walrus: config.walrus_client(),
+            wallet: config.wallet()?,
             config,
             site_id,
             epochs,
@@ -76,7 +74,7 @@ impl SiteManager {
         })
     }
 
-    /// Updates the site with the given [`Resource`](super::resource::Resource).
+    /// Updates the site with the given [`Resource`].
     ///
     /// If the site does not exist, it is created and updated. The resources that need to be updated
     /// or created are published to Walrus.
@@ -251,6 +249,40 @@ impl SiteManager {
         }
 
         Ok(result)
+    }
+
+    /// Adds a single resource to the site
+    pub async fn update_single_resource(&mut self, resource: Resource) -> Result<()> {
+        let ptb = SitePtb::new(
+            self.config.package,
+            Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
+        )?;
+
+        let SiteIdentifier::ExistingSite(site_id) = &self.site_id else {
+            anyhow::bail!("`add_single_resource` is only supported for existing sites");
+        };
+        let mut ptb = ptb.with_call_arg(&self.wallet.get_object_ref(*site_id).await?.into())?;
+
+        // First remove, then add the resource.
+        let operations = vec![
+            ResourceOp::Deleted(&resource),
+            ResourceOp::Created(&resource),
+        ];
+
+        // Upload to Walrus
+        tracing::debug!("uploading the resource to Walrus");
+        let walrus_ops = operations
+            .iter()
+            .filter(|u| u.is_walrus_update(&self.when_upload))
+            .collect::<Vec<_>>();
+        self.publish_to_walrus(&walrus_ops).await?;
+
+        // Create the PTB
+        tracing::debug!("modifying the site object on chain");
+        ptb.add_resource_operations(&operations)?;
+        self.sign_and_send_ptb(ptb.finish(), self.gas_coin_ref().await?)
+            .await?;
+        Ok(())
     }
 
     async fn sign_and_send_ptb(

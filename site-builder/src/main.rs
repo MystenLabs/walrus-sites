@@ -11,7 +11,7 @@ mod summary;
 mod types;
 mod util;
 mod walrus;
-use std::path::PathBuf;
+use std::{num::NonZeroU64, path::PathBuf};
 
 use anyhow::{anyhow, Result};
 use backoff::ExponentialBackoffConfig;
@@ -20,9 +20,16 @@ use futures::TryFutureExt;
 use publish::{ContinuousEditing, PublishOptions, SiteEditor, WhenWalrusUpload};
 use retry_client::RetriableSuiClient;
 use serde::Deserialize;
-use site::{manager::SiteIdentifier, RemoteSiteFactory};
+use site::{
+    config::WSResources,
+    manager::{SiteIdentifier, SiteManager},
+    resource::ResourceManager,
+    RemoteSiteFactory,
+};
+use sui_sdk::wallet_context::WalletContext;
 use sui_types::base_types::ObjectID;
 use util::path_or_defaults_if_exist;
+use walrus::Walrus;
 
 use crate::{
     preprocessor::Preprocessor,
@@ -171,6 +178,35 @@ enum Commands {
     /// the owner. Warning: this action is irreversible! Re-publishing the site will generate a
     /// different Site object ID.
     Destroy { object: ObjectID },
+    /// Adds or updates a single resource in a site, eventually replacing any pre-existing ones.
+    ///
+    /// The ws_resource file will still be used to determine the resource's headers.
+    UpdateResource {
+        /// The path to the resource to be added.
+        #[clap(long)]
+        resource: PathBuf,
+        /// The path the resource should have in the site.
+        ///
+        /// Should be in the form `/path/to/resource.html`, with a leading `/`.
+        #[clap(long)]
+        path: String,
+        /// The object ID of the Site object on Sui, to which the resource will be added.
+        #[clap(long)]
+        site_object: ObjectID,
+        /// The path to the Walrus sites resources file.
+        ///
+        /// This JSON configuration file defined HTTP resource headers and other utilities for your
+        /// files. By default, the file is expected to be named `ws-resources.json` and located in the
+        /// root of the site directory.
+        ///
+        /// The configuration file _will not_ be uploaded to Walrus.
+        #[clap(long)]
+        // TODO: deduplicate with the `publish_options` in the `Publish` and `Update` commands.
+        ws_resources: Option<PathBuf>,
+        /// The number of epochs for which to save the resources on Walrus.
+        #[clap(long)]
+        epochs: NonZeroU64,
+    },
 }
 
 /// The configuration for the site builder.
@@ -203,6 +239,22 @@ impl Config {
         self.general
             .gas_budget
             .expect("serde default => gas budget exists")
+    }
+
+    /// Creates a Walrus client with the configuration from `self`.
+    pub fn walrus_client(&self) -> Walrus {
+        Walrus::new(
+            self.walrus_binary(),
+            self.gas_budget(),
+            self.general.rpc_url.clone(),
+            self.general.walrus_config.clone(),
+            self.general.wallet.clone(),
+        )
+    }
+
+    /// Returns a [`WalletContext`] from the configuration.
+    pub fn wallet(&self) -> Result<WalletContext> {
+        load_wallet_context(&self.general.wallet)
     }
 }
 
@@ -292,11 +344,13 @@ async fn run() -> Result<()> {
         // Add a path to be watched. All files and directories at that path and
         // below will be monitored for changes.
         Commands::Sitemap { object } => {
-            let wallet = load_wallet_context(&config.general.wallet)?;
             let all_dynamic_fields = RemoteSiteFactory::new(
                 // TODO(giac): make the backoff configurable.
-                &RetriableSuiClient::new_from_wallet(&wallet, ExponentialBackoffConfig::default())
-                    .await?,
+                &RetriableSuiClient::new_from_wallet(
+                    &config.wallet()?,
+                    ExponentialBackoffConfig::default(),
+                )
+                .await?,
                 config.package,
             )
             .await?
@@ -314,6 +368,35 @@ async fn run() -> Result<()> {
         Commands::Destroy { object } => {
             let site_editor = SiteEditor::new(config);
             site_editor.destroy(object).await?;
+        }
+        Commands::UpdateResource {
+            resource,
+            path,
+            site_object,
+            ws_resources,
+            epochs,
+        } => {
+            let ws_res = ws_resources.as_ref().map(WSResources::read).transpose()?;
+            let resource_manager =
+                ResourceManager::new(config.walrus_client(), ws_res, ws_resources, None).await?;
+            let resource = resource_manager
+                .read_resource(&resource, path)
+                .await?
+                .ok_or(anyhow!(
+                    "could not read the resource at path: {}",
+                    resource.display()
+                ))?;
+
+            // TODO: make when upload configurable.
+            let mut site_manager = SiteManager::new(
+                config,
+                SiteIdentifier::ExistingSite(site_object),
+                epochs.get(),
+                WhenWalrusUpload::Always,
+            )
+            .await?;
+            site_manager.update_single_resource(resource).await?;
+            display::header("Resource updated successfully");
         }
     };
 
