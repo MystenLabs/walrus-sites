@@ -50,8 +50,9 @@ export class RPCSelector implements RPCSelectorInterface {
                     url: rpcUrl,
                     fetch: async (input, init) => {
                         try {
-                            // TODO: Add  here any Vercel caching options
+                            // TODO: Add  here any Vercel caching options e.g {headers: "range_header"}, {cache: '3600'});
                             return await fetch(input, init);
+
                         } catch (err: any) {
                             throw err;
                         }
