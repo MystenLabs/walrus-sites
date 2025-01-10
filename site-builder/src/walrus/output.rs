@@ -97,6 +97,15 @@ impl BlobStoreResult {
         }
     }
 }
+/// Blob store result with its file path.
+#[derive(Deserialize, Debug, Clone)]
+#[allow(unused)]
+pub struct BlobStoreResultWithPath {
+    /// The result of the store operation.
+    pub blob_store_result: BlobStoreResult,
+    /// The file path to the blob.
+    pub path: PathBuf,
+}
 
 /// Supported Walrus encoding types.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Default, Deserialize)]
@@ -148,7 +157,7 @@ pub struct Blob {
 /// The output of the `store` command.
 #[derive(Debug, Clone, Deserialize)]
 #[allow(unused)]
-pub struct StoreOutput(pub BlobStoreResult);
+pub struct StoreOutput(pub Vec<BlobStoreResultWithPath>);
 
 /// The output of the `read` command.
 #[serde_as]

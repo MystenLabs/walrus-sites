@@ -45,7 +45,7 @@ pub enum Command {
     /// Stores a blob to Walrus.
     Store {
         /// The path to the file to be stored.
-        file: PathBuf,
+        files: Vec<PathBuf>,
         /// The number of epochs for which to store the file.
         #[serde(default = "default::epochs")]
         epochs: u64,
@@ -155,9 +155,9 @@ impl WalrusCmdBuilder {
     }
 
     /// Adds a [`Command::Store`] command to the builder.
-    pub fn store(self, file: PathBuf, epochs: u64, force: bool) -> WalrusCmdBuilder<Command> {
+    pub fn store(self, files: Vec<PathBuf>, epochs: u64, force: bool) -> WalrusCmdBuilder<Command> {
         let command = Command::Store {
-            file,
+            files,
             epochs,
             force,
         };
