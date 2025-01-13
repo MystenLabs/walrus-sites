@@ -10,6 +10,7 @@
     "dependencies": {
         "@sentry/nextjs": "^8",
         "@sentry/node": "^8.38.0",
+        "@vercel/analytics": "^1.4.1",
         "@vercel/edge-config": "^1.4.0",
         "common": "workspace:common",
         "next": "14.2.15"
