@@ -11,18 +11,21 @@ import integrateLoggerWithSentry from "sentry_logger";
 import blocklistChecker from "custom_blocklist_checker";
 import { config } from "configuration_loader";
 import { standardUrlFetcher, premiumUrlFetcher } from "url_fetcher_factory";
+import { NextRequest } from "next/server";
+import { send_to_web_analytics } from "web_analytics";
 
 if (config.enableSentry) {
     // Only integrate Sentry on production.
     integrateLoggerWithSentry();
 }
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
     const originalUrl = req.headers.get("x-original-url");
     if (!originalUrl) {
         throw new Error("No original url found in request headers");
     }
     const url = new URL(originalUrl);
+    await send_to_web_analytics(req);
 
     const objectIdPath = getObjectIdLink(url.toString());
     const portalDomainNameLength = config.portalDomainNameLength;
