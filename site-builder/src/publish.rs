@@ -22,9 +22,10 @@ use sui_types::{
 };
 
 use crate::{
+    backoff::ExponentialBackoffConfig,
     display,
     preprocessor::Preprocessor,
-    publish::WhenWalrusUpload::Modified,
+    retry_client::RetriableSuiClient,
     site::{
         builder::SitePtb,
         config::WSResources,
@@ -41,7 +42,6 @@ use crate::{
         path_or_defaults_if_exist,
         sign_and_send_ptb,
     },
-    walrus::Walrus,
     Config,
 };
 
@@ -70,9 +70,7 @@ pub struct PublishOptions {
     /// The maximum number of concurrent calls to the Walrus CLI for the computation of blob IDs.
     #[clap(long)]
     max_concurrent: Option<NonZeroUsize>,
-
     /// By default, sites are deletable with site-builder delete command. By passing --permanent, the site is deleted only after `epochs` expiration.
-    #[clap(long)]
     permanent: Option<bool>,
 }
 
@@ -163,29 +161,17 @@ impl SiteEditor {
     pub async fn destroy(&self, site_id: ObjectID) -> Result<()> {
         // Delete blobs on Walrus
         let wallet_walrus = load_wallet_context(&self.config.general.wallet)?;
-
-        let all_dynamic_fields =
-            RemoteSiteFactory::new(&wallet_walrus.get_client().await?, self.config.package)
-                .await?
-                .get_existing_resources(site_id)
-                .await?;
-
-        let walrus = Walrus::new(
-            self.config.walrus_binary(),
-            self.config.gas_budget(),
-            self.config.general.rpc_url.clone(),
-            self.config.general.walrus_config.clone(),
-            self.config.general.wallet.clone(),
-        );
-        let mut site_manager = SiteManager::new(
-            self.config.clone(),
-            walrus,
-            wallet_walrus,
-            ExistingSite(site_id),
-            0,
-            Modified,
-            false,
+        let all_dynamic_fields = RemoteSiteFactory::new(
+            // TODO(giac): make the backoff configurable.
+            &RetriableSuiClient::new_from_wallet(
+                &wallet_walrus,
+                ExponentialBackoffConfig::default(),
+            )
+            .await?,
+            self.config.package,
         )
+        .await?
+        .get_existing_resources(site_id)
         .await?;
 
         tracing::debug!(
@@ -193,21 +179,33 @@ impl SiteEditor {
             &all_dynamic_fields,
         );
 
+        let mut site_manager = SiteManager::new(
+            self.config.clone(),
+            ExistingSite(site_id),
+            0,
+            WhenWalrusUpload::Always,
+            false,
+        )
+        .await?;
+
         site_manager.delete_from_walrus(all_dynamic_fields).await?;
 
         // Delete objects on SUI blockchain
-        let mut wallet_sui = load_wallet_context(&self.config.general.wallet)?;
-
+        let mut wallet = self.config.wallet()?;
         let ptb = SitePtb::new(self.config.package, Identifier::new(SITE_MODULE)?)?;
-        let mut ptb = ptb.with_call_arg(&wallet_sui.get_object_ref(site_id).await?.into())?;
-        let site = RemoteSiteFactory::new(&wallet_sui.get_client().await?, self.config.package)
-            .await?
-            .get_from_chain(site_id)
-            .await?;
+        let mut ptb = ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
+        let site = RemoteSiteFactory::new(
+            &RetriableSuiClient::new_from_wallet(&wallet, ExponentialBackoffConfig::default())
+                .await?,
+            self.config.package,
+        )
+        .await?
+        .get_from_chain(site_id)
+        .await?;
 
         ptb.destroy(site.resources())?;
-        let active_address = wallet_sui.active_address()?;
-        let gas_coin = wallet_sui
+        let active_address = wallet.active_address()?;
+        let gas_coin = wallet
             .gas_for_owner_budget(active_address, self.config.gas_budget(), BTreeSet::new())
             .await?
             .1
@@ -215,7 +213,7 @@ impl SiteEditor {
 
         sign_and_send_ptb(
             active_address,
-            &wallet_sui,
+            &wallet,
             ptb.finish(),
             gas_coin,
             self.config.gas_budget(),
@@ -250,16 +248,6 @@ impl SiteEditor<EditOptions> {
             display::done();
         }
 
-        let wallet = load_wallet_context(&self.config.general.wallet)?;
-
-        let walrus = Walrus::new(
-            self.config.walrus_binary(),
-            self.config.gas_budget(),
-            self.config.general.rpc_url.clone(),
-            self.config.general.walrus_config.clone(),
-            self.config.general.wallet.clone(),
-        );
-
         let (ws_resources, ws_resources_path) = load_ws_resources(
             &self.edit_options.publish_options.ws_resources,
             self.directory(),
@@ -272,7 +260,7 @@ impl SiteEditor<EditOptions> {
         }
 
         let mut resource_manager = ResourceManager::new(
-            walrus.clone(),
+            self.config.walrus_client(),
             ws_resources,
             ws_resources_path,
             self.edit_options.publish_options.max_concurrent,
@@ -288,12 +276,10 @@ impl SiteEditor<EditOptions> {
 
         let mut site_manager = SiteManager::new(
             self.config.clone(),
-            walrus,
-            wallet,
             self.edit_options.site_id.clone(),
             self.edit_options.publish_options.epochs,
             self.edit_options.when_upload.clone(),
-            self.edit_options.publish_options.permanent.unwrap_or(false),
+            false,
         )
         .await?;
         let (response, summary) = site_manager.update_site(&local_site_data).await?;
@@ -379,7 +365,7 @@ fn print_summary(
 }
 
 /// Gets the configuration from the provided file, or looks in the default directory.
-fn load_ws_resources(
+pub(crate) fn load_ws_resources(
     path: &Option<PathBuf>,
     site_dir: &Path,
 ) -> Result<(Option<WSResources>, Option<PathBuf>)> {

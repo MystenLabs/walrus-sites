@@ -20,9 +20,6 @@ use tokio::process::Command as CliCommand;
 
 use self::types::BlobId;
 use crate::walrus::command::WalrusCmdBuilder;
-// use num_bigint::BigUint;
-// use num_traits::{ToPrimitive, Zero};
-// use num_traits::Num;
 
 pub mod command;
 pub mod output;
@@ -46,7 +43,6 @@ pub struct Walrus {
 macro_rules! create_command {
     ($self:ident, $name:ident, $($arg:expr),*) => {{
         let json_input = $self.builder().$name($($arg),*).build().to_json()?;
-
         let output = $self
             .base_command()
             .arg(&json_input)
@@ -92,7 +88,7 @@ impl Walrus {
         force: bool,
         deletable: bool,
     ) -> Result<StoreOutput> {
-        create_command!(self, store, file, epochs, force, deletable)
+        create_command!(self, store, vec![file], epochs, force, deletable)
     }
 
     /// Issues a `delete` JSON command to the Walrus CLI, returning the parsed output.

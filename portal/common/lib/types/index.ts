@@ -37,7 +37,7 @@ export type Range = {
  * Checks if the range is well formed.
  */
 function isRangeValid(range: Range): boolean {
-    if (!range.start !== null && !range.end !== null) {
+    if (range.start == null && range.end == null) {
         return false;
     }
     if (range.start !== null && range.start < 0) {
@@ -105,7 +105,7 @@ export function isVersionedResource(resource: any): resource is VersionedResourc
 }
 
 /**
- * Routes is an opitonal dynamic field object belonging to each site.
+ * Routes is an optional dynamic field object belonging to each site.
  */
 export type Routes = {
     routes_list: Map<string, string>;

@@ -139,10 +139,12 @@ impl fmt::Display for StructTag<'_> {
     }
 }
 
+#[allow(dead_code)]
 pub(crate) async fn get_sui_object<U>(sui_client: &SuiClient, object_id: ObjectID) -> Result<U>
 where
     U: AssociatedContractStruct,
 {
+    let start = std::time::Instant::now();
     get_sui_object_from_object_response(
         &sui_client
             .read_api()
@@ -152,6 +154,13 @@ where
             )
             .await?,
     )
+    .inspect(|_| {
+        tracing::debug!(
+            %object_id,
+            elapsed = ?start.elapsed(),
+            "got sui object",
+        )
+    })
 }
 
 pub(crate) fn get_sui_object_from_object_response<U>(

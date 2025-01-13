@@ -14,7 +14,7 @@ if (config.enableSentry) {
         dsn: config.sentryDsn,
 
         // Define how likely traces are sampled. Adjust this value in production, or use tracesSampler for greater control.
-        tracesSampleRate: 0.01,
+        tracesSampleRate: config.sentryTracesSampleRate,
 
         // Setting this option to true will print useful information to the console while you're setting up Sentry.
         debug: false,
