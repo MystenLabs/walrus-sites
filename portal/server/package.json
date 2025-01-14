@@ -1,25 +1,26 @@
 {
-  "name": "server",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
-  },
-  "dependencies": {
-    "@sentry/nextjs": "^8.48.0",
-    "@sentry/node": "^8.48.0",
-    "@vercel/edge-config": "^1.4.0",
-    "common": "workspace:common",
-    "next": "^14.2.23"
-  },
-  "devDependencies": {
-    "@types/node": "^20.16.11",
-    "@types/react": "18.3.3",
-    "html-loader": "^5.1.0",
-    "prettier": "^3.3.3",
-    "tailwindcss": "^3.4.14",
-    "typescript": "^5.6.3"
-  }
+    "name": "server",
+    "version": "0.1.0",
+    "private": true,
+    "scripts": {
+        "dev": "next dev",
+        "build": "next build",
+        "start": "next start"
+    },
+    "dependencies": {
+        "@sentry/nextjs": "^8",
+        "@sentry/node": "^8.38.0",
+        "@vercel/analytics": "^1.4.1",
+        "@vercel/edge-config": "^1.4.0",
+        "common": "workspace:common",
+        "next": "14.2.15"
+    },
+    "devDependencies": {
+        "@types/node": "^20.16.11",
+        "@types/react": "18.3.3",
+        "html-loader": "^5.1.0",
+        "prettier": "^3.3.3",
+        "tailwindcss": "^3.4.14",
+        "typescript": "^5.6.3"
+    }
 }
