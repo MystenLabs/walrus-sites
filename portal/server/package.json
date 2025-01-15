@@ -13,7 +13,7 @@
         "@vercel/analytics": "^1.4.1",
         "@vercel/edge-config": "^1.4.0",
         "common": "workspace:common",
-        "next": "14.2.15"
+        "next": "14.2.21"
     },
     "devDependencies": {
         "@types/node": "^20.16.11",
