@@ -31,7 +31,6 @@ export function subdomainToObjectId(subdomain: string): string | null {
         });
         return isValidSuiObjectId(objectId) ? objectId : null;
     } catch (e) {
-        logger.error({ message: "Error converting subdomain to object id", error: e });
         return null;
     }
 }
