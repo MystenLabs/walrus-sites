@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
 use super::types::BlobId;
+use crate::EpochCountOrMax;
 
 /// Represents a call to the JSON mode of the Walrus CLI.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,8 +48,7 @@ pub enum Command {
         /// The path to the file to be stored.
         files: Vec<PathBuf>,
         /// The number of epochs for which to store the file.
-        #[serde(default = "default::epochs")]
-        epochs: u64,
+        epochs: EpochCountOrMax,
         /// Do not check for the blob status before storing it.
         ///
         /// This will create a new blob even if the blob is already certified for a sufficient
@@ -112,10 +112,6 @@ mod default {
     pub(crate) fn gas_budget() -> u64 {
         500_000_000
     }
-
-    pub(crate) fn epochs() -> u64 {
-        1
-    }
 }
 
 /// Helper struct to build [`WalrusJsonCmd`] instances.
@@ -155,7 +151,12 @@ impl WalrusCmdBuilder {
     }
 
     /// Adds a [`Command::Store`] command to the builder.
-    pub fn store(self, files: Vec<PathBuf>, epochs: u64, force: bool) -> WalrusCmdBuilder<Command> {
+    pub fn store(
+        self,
+        files: Vec<PathBuf>,
+        epochs: EpochCountOrMax,
+        force: bool,
+    ) -> WalrusCmdBuilder<Command> {
         let command = Command::Store {
             files,
             epochs,
