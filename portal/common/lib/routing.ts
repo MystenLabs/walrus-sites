@@ -99,11 +99,16 @@ export class WalrusSitesRouter {
             return undefined;
         }
 
-        // TODO: improve this using radix trees.
-        const res = Array.from(routes.routes_list.entries())
-            .filter(([pattern, _]) => new RegExp(`^${pattern.replace(/\*/g, ".*")}$`).test(path))
-            .reduce((a, b) => (a[0].length >= b[0].length ? a : b));
+        const filteredRoutes = Array.from(routes.routes_list.entries())
+                .filter(([pattern, _]) => new RegExp(`^${pattern.replace(/\*/g, ".*")}$`).test(path));
 
-        return res ? res[1] : undefined;
+        if (filteredRoutes.length === 0) {
+            logger.warn({ message: "No matching routes found.", path });
+            return undefined;
+        }
+
+        const res = filteredRoutes.reduce((a, b) => (a[0].length >= b[0].length ? a : b));
+
+        return res[1];
     }
 }
