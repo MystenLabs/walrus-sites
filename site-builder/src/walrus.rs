@@ -11,7 +11,7 @@ use output::{try_from_output, BlobIdOutput, InfoOutput, NShards, ReadOutput, Sto
 use tokio::process::Command as CliCommand;
 
 use self::types::BlobId;
-use crate::walrus::command::WalrusCmdBuilder;
+use crate::{walrus::command::WalrusCmdBuilder, EpochCountOrMax};
 
 pub mod command;
 pub mod output;
@@ -73,7 +73,12 @@ impl Walrus {
     /// Issues a `store` JSON command to the Walrus CLI, returning the parsed output.
     // NOTE: takes a mutable reference to ensure that only one store command is executed at every
     // time. The issue is that the inner wallet may lock coins if called in parallel.
-    pub async fn store(&mut self, file: PathBuf, epochs: u64, force: bool) -> Result<StoreOutput> {
+    pub async fn store(
+        &mut self,
+        file: PathBuf,
+        epochs: EpochCountOrMax,
+        force: bool,
+    ) -> Result<StoreOutput> {
         create_command!(self, store, vec![file], epochs, force)
     }
 

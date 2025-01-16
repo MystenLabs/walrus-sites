@@ -29,6 +29,7 @@ use crate::{
     util::{get_site_id_from_response, sign_and_send_ptb},
     walrus::Walrus,
     Config,
+    EpochCountOrMax,
 };
 
 const MAX_RESOURCES_PER_PTB: usize = 200;
@@ -49,7 +50,7 @@ pub struct SiteManager {
     pub walrus: Walrus,
     pub wallet: WalletContext,
     pub site_id: SiteIdentifier,
-    pub epochs: u64,
+    pub epochs: EpochCountOrMax,
     pub when_upload: WhenWalrusUpload,
     pub backoff_config: ExponentialBackoffConfig,
 }
@@ -59,7 +60,7 @@ impl SiteManager {
     pub async fn new(
         config: Config,
         site_id: SiteIdentifier,
-        epochs: u64,
+        epochs: EpochCountOrMax,
         when_upload: WhenWalrusUpload,
     ) -> Result<Self> {
         Ok(SiteManager {
@@ -145,7 +146,7 @@ impl SiteManager {
                 retry_num += 1;
                 let result = self
                     .walrus
-                    .store(resource.full_path.clone(), self.epochs, false)
+                    .store(resource.full_path.clone(), self.epochs.clone(), false)
                     .await;
 
                 match result {
