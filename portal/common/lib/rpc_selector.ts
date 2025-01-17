@@ -91,7 +91,8 @@ export class RPCSelector implements RPCSelectorInterface {
         const isValid = methodName === "call" && args[0] === "suix_resolveNameServiceAddress" && this.isValidSuiNSResponse(result)
         const isValidGetObject = methodName === "getObject" && this.isValidGetObjectResponse(result);
         const isValidMultiGetObject = methodName === "multiGetObjects" && this.isValidMultiGetObjectResponse(result);
-        if (isValid || isValidGetObject || isValidMultiGetObject) {
+        const isValidDynamicFieldObject = methodName === "getDynamicFieldObject" && this.isValidGetObjectResponse(result);
+        if (isValid || isValidGetObject || isValidMultiGetObject || isValidDynamicFieldObject) {
             return result
         }
         throw new Error("Invalid response from selected client");
@@ -113,7 +114,8 @@ export class RPCSelector implements RPCSelectorInterface {
                     const isValid = methodName === "call" && args[0] === "suix_resolveNameServiceAddress" && this.isValidSuiNSResponse(result)
                     const isValidGetObject = methodName === "getObject" && this.isValidGetObjectResponse(result);
                     const isValidMultiGetObject = methodName === "multiGetObjects" && this.isValidMultiGetObjectResponse(result);
-                    if (isValid || isValidGetObject || isValidMultiGetObject) {
+                    const isValidDynamicFieldObject = methodName === "getDynamicFieldObject" && this.isValidGetObjectResponse(result);
+                    if (isValid || isValidGetObject || isValidMultiGetObject || isValidDynamicFieldObject) {
                         resolve({ result, client });
                     }
                     reject(new Error(`Invalid response for methodName: ${methodName} and args: ${args}`));
@@ -130,16 +132,20 @@ export class RPCSelector implements RPCSelectorInterface {
             logger.info({ message: "RPC selected", rpcClientSelected: this.selectedClient.getURL() })
 
             return result;
-        } catch {
-            throw new Error(`Failed to contact fallback RPC clients.`);
+        } catch (error) {
+            throw new Error(`Failed to contact fallback RPC clients.`, error);
         }
     }
 
     private isValidGetObjectResponse(suiObjectResponse: SuiObjectResponse): boolean {
         const data = suiObjectResponse.data;
         const error = suiObjectResponse.error;
-        if (data && !error) {
+        if (data) {
             return true;
+        }
+        if (error) {
+            logger.warn({message: 'Failed to get object', error: error})
+            return true
         }
         return false
     }
@@ -151,7 +157,7 @@ export class RPCSelector implements RPCSelectorInterface {
     }
 
     private isValidSuiNSResponse(suinsResponse?: string): boolean {
-        return true // FIXME: Implement this
+        return suinsResponse ? true : false // FIXME: Implement this
     }
 
     public async getObject(input: GetObjectParams): Promise<SuiObjectResponse> {
