@@ -88,11 +88,13 @@ export class RPCSelector implements RPCSelectorInterface {
                 nullCurrentRPCClientUrl: this.selectedClient.getURL().toString()})
         }
 
-        if (this.isValidResponse(result)) {
-            return result;
-        } else {
-            throw new Error("Invalid response from selected client");
+        const isValid = methodName === "call" && args[0] === "suix_resolveNameServiceAddress" && this.isValidSuiNSResponse(result)
+        const isValidGetObject = methodName === "getObject" && this.isValidGetObjectResponse(result);
+        const isValidMultiGetObject = methodName === "multiGetObjects" && this.isValidMultiGetObjectResponse(result);
+        if (isValid || isValidGetObject || isValidMultiGetObject) {
+            return result
         }
+        throw new Error("Invalid response from selected client");
     }
 
     // Fallback to querying all clients using Promise.any.
@@ -106,16 +108,15 @@ export class RPCSelector implements RPCSelectorInterface {
                         return;
                     }
                     const result = await method.apply(client, args);
-                    if (result == null) {
-                        logger.info({
-                            message: "Result null from fallback client:",
-                            nullFallbackRPCClientUrl: client.getURL().toString()})
-                    }
-                    if (this.isValidResponse(result)) {
+
+                    // TODO: Refactor until L:120
+                    const isValid = methodName === "call" && args[0] === "suix_resolveNameServiceAddress" && this.isValidSuiNSResponse(result)
+                    const isValidGetObject = methodName === "getObject" && this.isValidGetObjectResponse(result);
+                    const isValidMultiGetObject = methodName === "multiGetObjects" && this.isValidMultiGetObjectResponse(result);
+                    if (isValid || isValidGetObject || isValidMultiGetObject) {
                         resolve({ result, client });
-                    } else {
-                        reject(new Error("Invalid response"));
                     }
+                    reject(new Error(`Invalid response for methodName: ${methodName} and args: ${args}`));
                 } catch (error: any) {
                     reject(error);
                 }
@@ -134,22 +135,23 @@ export class RPCSelector implements RPCSelectorInterface {
         }
     }
 
-    private isValidResponse(result: SuiObjectResponse | SuiObjectResponse[] | string): boolean {
-        // GetObject or getDynamicFieldObject
-        if (result == null) {
-            return false;
+    private isValidGetObjectResponse(suiObjectResponse: SuiObjectResponse): boolean {
+        const data = suiObjectResponse.data;
+        const error = suiObjectResponse.error;
+        if (data && !error) {
+            return true;
         }
+        return false
+    }
 
-        // SuiNS
-        if (typeof result === 'string') {
-            return result.trim().length > 0;
-        }
+    private isValidMultiGetObjectResponse(suiObjectResponseArray: SuiObjectResponse[]): boolean {
+       return suiObjectResponseArray.every((suiObjectResponse) => {
+           return this.isValidGetObjectResponse(suiObjectResponse);
+       });
+    }
 
-        // MultiGetObject
-        if (Array.isArray(result)) {
-            return result.some((item) => item != null);
-        }
-        return true;
+    private isValidSuiNSResponse(suinsResponse?: string): boolean {
+        return true // FIXME: Implement this
     }
 
     public async getObject(input: GetObjectParams): Promise<SuiObjectResponse> {
