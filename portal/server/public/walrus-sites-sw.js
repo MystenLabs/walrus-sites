@@ -18,4 +18,3 @@ self.addEventListener("activate", (_event) => {
             });
         });
 });
-Footer;
