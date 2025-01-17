@@ -157,7 +157,7 @@ export class RPCSelector implements RPCSelectorInterface {
     }
 
     private isValidSuiNSResponse(suinsResponse?: string): boolean {
-        return suinsResponse ? true : false // FIXME: Implement this
+        return true // FIXME: Implement this
     }
 
     public async getObject(input: GetObjectParams): Promise<SuiObjectResponse> {
