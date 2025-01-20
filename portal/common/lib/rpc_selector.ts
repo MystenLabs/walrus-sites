@@ -39,7 +39,7 @@ class WrappedSuiClient extends SuiClient {
             client: this as SuiClient,
             network: 'testnet' // TODO: get network from config
         });
-        const nameRecord = await suinsClient.getNameRecord(name) // TODO: invokeWithFailover
+        const nameRecord = await suinsClient.getNameRecord(name)
         return nameRecord
     }
 }
