@@ -3,7 +3,7 @@
 import { SITE_NAMES } from "./constants";
 import { RPCSelector } from "./rpc_selector";
 import logger from "./logger";
-import { NameRecord } from "@mysten/suins/src/types";
+import { NameRecord } from "./types";
 
 export class SuiNSResolver {
     constructor(private rpcSelector: RPCSelector) {}
