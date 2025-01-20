@@ -88,14 +88,7 @@ export class RPCSelector implements RPCSelectorInterface {
                 nullCurrentRPCClientUrl: this.selectedClient.getURL().toString()})
         }
 
-        const isValid = methodName === "call" && args[0] === "suix_resolveNameServiceAddress" && this.isValidSuiNSResponse(result)
-        const isValidGetObject = methodName === "getObject" && this.isValidGetObjectResponse(result);
-        const isValidMultiGetObject = methodName === "multiGetObjects" && this.isValidMultiGetObjectResponse(result);
-        const isValidDynamicFieldObject = methodName === "getDynamicFieldObject" && this.isValidGetObjectResponse(result);
-        if (isValid || isValidGetObject || isValidMultiGetObject || isValidDynamicFieldObject) {
-            return result
-        }
-        throw new Error("Invalid response from selected client");
+        return result
     }
 
     // Fallback to querying all clients using Promise.any.
@@ -109,16 +102,7 @@ export class RPCSelector implements RPCSelectorInterface {
                         return;
                     }
                     const result = await method.apply(client, args);
-
-                    // TODO: Refactor until L:120
-                    const isValid = methodName === "call" && args[0] === "suix_resolveNameServiceAddress" && this.isValidSuiNSResponse(result)
-                    const isValidGetObject = methodName === "getObject" && this.isValidGetObjectResponse(result);
-                    const isValidMultiGetObject = methodName === "multiGetObjects" && this.isValidMultiGetObjectResponse(result);
-                    const isValidDynamicFieldObject = methodName === "getDynamicFieldObject" && this.isValidGetObjectResponse(result);
-                    if (isValid || isValidGetObject || isValidMultiGetObject || isValidDynamicFieldObject) {
-                        resolve({ result, client });
-                    }
-                    reject(new Error(`Invalid response for methodName: ${methodName} and args: ${args}`));
+                    resolve({ result, client });
                 } catch (error: any) {
                     reject(error);
                 }
@@ -156,26 +140,34 @@ export class RPCSelector implements RPCSelectorInterface {
        });
     }
 
-    private isValidSuiNSResponse(suinsResponse?: string): boolean {
-        return true // FIXME: Implement this
-    }
-
     public async getObject(input: GetObjectParams): Promise<SuiObjectResponse> {
-        return this.invokeWithFailover<SuiObjectResponse>("getObject", [input]);
+        const suiObjectResponse = await this.invokeWithFailover<SuiObjectResponse>("getObject", [input]);
+        if (this.isValidGetObjectResponse(suiObjectResponse)) {
+            return suiObjectResponse
+        }
+        throw new Error("Invalid response from getObject.");
     }
 
     public async multiGetObjects(
         input: MultiGetObjectsParams,
     ): Promise<SuiObjectResponse[]> {
-        return this.invokeWithFailover<SuiObjectResponse[]>("multiGetObjects", [input]);
+        const suiObjectResponseArray = await this.invokeWithFailover<SuiObjectResponse[]>("multiGetObjects", [input]);
+        if (this.isValidMultiGetObjectResponse(suiObjectResponseArray)) {
+            return suiObjectResponseArray
+        }
+        throw new Error("Invalid response from multiGetObjects.");
     }
 
     public async getDynamicFieldObject(
         input: GetDynamicFieldObjectParams,
     ): Promise<SuiObjectResponse> {
-        return this.invokeWithFailover<SuiObjectResponse>("getDynamicFieldObject", [
+        const suiObjectResponse = await this.invokeWithFailover<SuiObjectResponse>("getDynamicFieldObject", [
             input,
         ]);
+        if (this.isValidGetObjectResponse(suiObjectResponse)) {
+            return suiObjectResponse
+        }
+        throw new Error("Invalid response from getDynamicFieldObject.");
     }
 
     public async call<T>(method: string, args: any[]): Promise<T> {
