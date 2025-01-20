@@ -88,11 +88,7 @@ export class RPCSelector implements RPCSelectorInterface {
                 nullCurrentRPCClientUrl: this.selectedClient.getURL().toString()})
         }
 
-        if (this.isValidResponse(result)) {
-            return result;
-        } else {
-            throw new Error("Invalid response from selected client");
-        }
+        return result
     }
 
     // Fallback to querying all clients using Promise.any.
@@ -106,16 +102,7 @@ export class RPCSelector implements RPCSelectorInterface {
                         return;
                     }
                     const result = await method.apply(client, args);
-                    if (result == null) {
-                        logger.info({
-                            message: "Result null from fallback client:",
-                            nullFallbackRPCClientUrl: client.getURL().toString()})
-                    }
-                    if (this.isValidResponse(result)) {
-                        resolve({ result, client });
-                    } else {
-                        reject(new Error("Invalid response"));
-                    }
+                    resolve({ result, client });
                 } catch (error: any) {
                     reject(error);
                 }
@@ -129,45 +116,58 @@ export class RPCSelector implements RPCSelectorInterface {
             logger.info({ message: "RPC selected", rpcClientSelected: this.selectedClient.getURL() })
 
             return result;
-        } catch {
+        } catch (error) {
             throw new Error(`Failed to contact fallback RPC clients.`);
         }
     }
 
-    private isValidResponse(result: SuiObjectResponse | SuiObjectResponse[] | string): boolean {
-        // GetObject or getDynamicFieldObject
-        if (result == null) {
-            return false;
+    private isValidGetObjectResponse(suiObjectResponse: SuiObjectResponse): boolean {
+        const data = suiObjectResponse.data;
+        const error = suiObjectResponse.error;
+        if (data) {
+            return true;
         }
+        if (error) {
+            logger.warn({message: 'Failed to get object', error: error})
+            return true
+        }
+        return false
+    }
 
-        // SuiNS
-        if (typeof result === 'string') {
-            return result.trim().length > 0;
-        }
-
-        // MultiGetObject
-        if (Array.isArray(result)) {
-            return result.some((item) => item != null);
-        }
-        return true;
+    private isValidMultiGetObjectResponse(suiObjectResponseArray: SuiObjectResponse[]): boolean {
+       return suiObjectResponseArray.every((suiObjectResponse) => {
+           return this.isValidGetObjectResponse(suiObjectResponse);
+       });
     }
 
     public async getObject(input: GetObjectParams): Promise<SuiObjectResponse> {
-        return this.invokeWithFailover<SuiObjectResponse>("getObject", [input]);
+        const suiObjectResponse = await this.invokeWithFailover<SuiObjectResponse>("getObject", [input]);
+        if (this.isValidGetObjectResponse(suiObjectResponse)) {
+            return suiObjectResponse
+        }
+        throw new Error("Invalid response from getObject.");
     }
 
     public async multiGetObjects(
         input: MultiGetObjectsParams,
     ): Promise<SuiObjectResponse[]> {
-        return this.invokeWithFailover<SuiObjectResponse[]>("multiGetObjects", [input]);
+        const suiObjectResponseArray = await this.invokeWithFailover<SuiObjectResponse[]>("multiGetObjects", [input]);
+        if (this.isValidMultiGetObjectResponse(suiObjectResponseArray)) {
+            return suiObjectResponseArray
+        }
+        throw new Error("Invalid response from multiGetObjects.");
     }
 
     public async getDynamicFieldObject(
         input: GetDynamicFieldObjectParams,
     ): Promise<SuiObjectResponse> {
-        return this.invokeWithFailover<SuiObjectResponse>("getDynamicFieldObject", [
+        const suiObjectResponse = await this.invokeWithFailover<SuiObjectResponse>("getDynamicFieldObject", [
             input,
         ]);
+        if (this.isValidGetObjectResponse(suiObjectResponse)) {
+            return suiObjectResponse
+        }
+        throw new Error("Invalid response from getDynamicFieldObject.");
     }
 
     public async call<T>(method: string, args: any[]): Promise<T> {

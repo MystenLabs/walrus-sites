@@ -16,8 +16,11 @@ export class SuiNSResolver {
         const suiObjectId: string = await this.rpcSelector.call<string>("call", ["suix_resolveNameServiceAddress", [
             subdomain + ".sui",
         ]]);
-        logger.info({ message: "resolved suins name", resolvedSuiNSName: subdomain, suiObjectId: suiObjectId });
-        return suiObjectId ? suiObjectId : null;
+        if (suiObjectId) {
+            logger.info({ message: "resolved suins name", resolvedSuiNSName: subdomain, suiObjectId: suiObjectId });
+            return suiObjectId;
+        }
+        return null;
     }
 
     hardcodedSubdmains(subdomain: string): string | null {
