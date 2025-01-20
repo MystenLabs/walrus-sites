@@ -129,7 +129,9 @@ export class RPCSelector implements RPCSelectorInterface {
 
             return result;
         } catch (error) {
-            throw new Error(`Failed to contact fallback RPC clients.`);
+            const message = `Failed to contact fallback RPC clients.`
+            logger.error({ message, error: error });
+            throw new Error(message);
         }
     }
 
