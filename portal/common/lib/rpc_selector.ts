@@ -184,7 +184,6 @@ export class RPCSelector implements RPCSelectorInterface {
 
     public async getNameRecord(name: string): Promise<NameRecord | null> {
         const nameRecord = await this.invokeWithFailover<NameRecord>('getNameRecord', [name])
-        console.log('DEBUG', nameRecord)
         return nameRecord
     }
 }
