@@ -1,7 +1,8 @@
 {
 		"dependencies": {
 				"@mysten/bcs": "^1.1.0",
-				"@mysten/sui": "^1.12.0",
+				"@mysten/sui": "1.18.1",
+				"@mysten/suins": "^0.6.3",
 				"base-x": "^4.0.0",
 				"pako": "^2.1.0",
 				"parse-domain": "8.0.2",

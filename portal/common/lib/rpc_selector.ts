@@ -8,6 +8,8 @@ import {
     SuiClient,
     SuiObjectResponse,
 } from "@mysten/sui/client";
+import { SuinsClient } from "@mysten/suins";
+import { NameRecord } from "@mysten/suins/src/types";
 import logger from "./logger";
 
 interface RPCSelectorInterface {
@@ -16,7 +18,6 @@ interface RPCSelectorInterface {
     getDynamicFieldObject(
         input: GetDynamicFieldObjectParams,
     ): Promise<SuiObjectResponse>;
-    call<T>(method: string, args: any[]): Promise<T>;
 }
 
 class WrappedSuiClient extends SuiClient {
@@ -30,10 +31,21 @@ class WrappedSuiClient extends SuiClient {
     public getURL(): string {
         return this.url;
     }
+
+    // Extends the SuiClient class to add a method to get a SuiNS record.
+    // Useful for treating the SuiClient as a SuiNS client during the invokeWithFailover method.
+    public async getNameRecord(name: string): Promise<NameRecord | null> {
+        const suinsClient = new SuinsClient({
+            client: this as SuiClient,
+            network: 'testnet' // TODO: get network from config
+        });
+        const nameRecord = await suinsClient.getNameRecord(name) // TODO: invokeWithFailover
+        return nameRecord
+    }
 }
 
+
 export class RPCSelector implements RPCSelectorInterface {
-    private static instance: RPCSelector;
     private clients: WrappedSuiClient[];
     private selectedClient: WrappedSuiClient | undefined;
 
@@ -170,7 +182,8 @@ export class RPCSelector implements RPCSelectorInterface {
         throw new Error("Invalid response from getDynamicFieldObject.");
     }
 
-    public async call<T>(method: string, args: any[]): Promise<T> {
-        return this.invokeWithFailover<T>(method, args);
+    public async getNameRecord(name: string): Promise<NameRecord | null> {
+        const nameRecord = await this.invokeWithFailover<NameRecord>('getNameRecord', [name])
+        return nameRecord
     }
 }

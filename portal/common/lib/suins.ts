@@ -3,6 +3,7 @@
 import { SITE_NAMES } from "./constants";
 import { RPCSelector } from "./rpc_selector";
 import logger from "./logger";
+import { NameRecord } from "@mysten/suins/src/types";
 
 export class SuiNSResolver {
     constructor(private rpcSelector: RPCSelector) {}
@@ -13,12 +14,15 @@ export class SuiNSResolver {
     */
     async resolveSuiNsAddress(subdomain: string
     ): Promise<string | null> {
-        const suiObjectId: string = await this.rpcSelector.call<string>("call", ["suix_resolveNameServiceAddress", [
-            subdomain + ".sui",
-        ]]);
-        if (suiObjectId) {
-            logger.info({ message: "resolved suins name", resolvedSuiNSName: subdomain, suiObjectId: suiObjectId });
-            return suiObjectId;
+        const nameRecord: NameRecord | null = await this.rpcSelector.getNameRecord(`${subdomain}.sui`);
+        if (nameRecord) {
+            const resolvedSuiNSName = nameRecord.walrusSiteId ?? nameRecord.targetAddress;
+            logger.info({
+                message: "Resolved SuiNS name",
+                subdomain,
+                resolvedSuiNSName
+            });
+            return resolvedSuiNSName;
         }
         return null;
     }
