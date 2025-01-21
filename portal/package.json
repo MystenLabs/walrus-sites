@@ -6,7 +6,6 @@
     "build:prod:worker": "pnpm --filter ./worker run build:prod",
     "build:dev:worker": "pnpm --filter ./worker run build:dev",
     "build:server": "pnpm --filter ./server run build",
-    "build": "pnpm --filter ./server run build",
     "serve:dev:server": "pnpm --filter ./server run dev",
     "serve:prod:server": "pnpm --filter ./server run start",
     "serve": "pnpm serve:dev:worker",
