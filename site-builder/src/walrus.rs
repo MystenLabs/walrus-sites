@@ -19,7 +19,7 @@ use output::{
 use tokio::process::Command as CliCommand;
 
 use self::types::BlobId;
-use crate::walrus::command::WalrusCmdBuilder;
+use crate::{walrus::command::WalrusCmdBuilder, EpochCountOrMax};
 
 pub mod command;
 pub mod output;
@@ -84,7 +84,7 @@ impl Walrus {
     pub async fn store(
         &mut self,
         file: PathBuf,
-        epochs: u64,
+        epochs: EpochCountOrMax,
         force: bool,
         deletable: bool,
     ) -> Result<StoreOutput> {

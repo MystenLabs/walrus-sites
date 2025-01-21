@@ -3,13 +3,11 @@
 
 use std::{
     collections::BTreeSet,
-    num::NonZeroUsize,
     path::{Path, PathBuf},
     sync::mpsc::channel,
 };
 
 use anyhow::{anyhow, Result};
-use clap::Parser;
 use notify::{RecursiveMode, Watcher};
 use sui_sdk::rpc_types::{
     SuiExecutionStatus,
@@ -43,36 +41,12 @@ use crate::{
         sign_and_send_ptb,
     },
     Config,
+    EpochCountOrMax,
+    NonZeroU32,
+    PublishOptions,
 };
 
 const DEFAULT_WS_RESOURCES_FILE: &str = "ws-resources.json";
-
-#[derive(Parser, Debug, Clone)]
-pub struct PublishOptions {
-    /// The directory containing the site sources.
-    pub directory: PathBuf,
-    /// The path to the Walrus sites resources file.
-    ///
-    /// This JSON configuration file defined HTTP resource headers and other utilities for your
-    /// files. By default, the file is expected to be named `ws-resources.json` and located in the
-    /// root of the site directory.
-    ///
-    /// The configuration file _will not_ be uploaded to Walrus.
-    #[clap(long)]
-    ws_resources: Option<PathBuf>,
-    /// The number of epochs for which to save the resources on Walrus.
-    #[clap(long, default_value_t = 1)]
-    pub epochs: u64,
-    /// Preprocess the directory before publishing.
-    /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
-    #[clap(long, action)]
-    pub list_directory: bool,
-    /// The maximum number of concurrent calls to the Walrus CLI for the computation of blob IDs.
-    #[clap(long)]
-    max_concurrent: Option<NonZeroUsize>,
-    /// By default, sites are deletable with site-builder delete command. By passing --permanent, the site is deleted only after `epochs` expiration.
-    permanent: Option<bool>,
-}
 
 /// The continuous editing options.
 #[derive(Debug, Clone)]
@@ -182,7 +156,7 @@ impl SiteEditor {
         let mut site_manager = SiteManager::new(
             self.config.clone(),
             ExistingSite(site_id),
-            0,
+            EpochCountOrMax::Epochs(NonZeroU32::new(0).unwrap()),
             WhenWalrusUpload::Always,
             false,
         )
@@ -277,9 +251,9 @@ impl SiteEditor<EditOptions> {
         let mut site_manager = SiteManager::new(
             self.config.clone(),
             self.edit_options.site_id.clone(),
-            self.edit_options.publish_options.epochs,
+            self.edit_options.publish_options.epochs.clone(),
             self.edit_options.when_upload.clone(),
-            false,
+            self.edit_options.publish_options.permanent.unwrap_or(false),
         )
         .await?;
         let (response, summary) = site_manager.update_site(&local_site_data).await?;

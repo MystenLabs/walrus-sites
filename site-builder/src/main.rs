@@ -11,15 +11,18 @@ mod summary;
 mod types;
 mod util;
 mod walrus;
-use std::{num::NonZeroU64, path::PathBuf};
+use std::{
+    num::{NonZeroU32, NonZeroUsize},
+    path::PathBuf,
+};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, ensure, Result};
 use backoff::ExponentialBackoffConfig;
 use clap::{Parser, Subcommand};
 use futures::TryFutureExt;
-use publish::{ContinuousEditing, PublishOptions, SiteEditor, WhenWalrusUpload};
+use publish::{ContinuousEditing, SiteEditor, WhenWalrusUpload};
 use retry_client::RetriableSuiClient;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use site::{
     config::WSResources,
     manager::{SiteIdentifier, SiteManager},
@@ -29,7 +32,7 @@ use site::{
 use sui_sdk::wallet_context::WalletContext;
 use sui_types::base_types::ObjectID;
 use util::path_or_defaults_if_exist;
-use walrus::Walrus;
+use walrus::{output::EpochCount, Walrus};
 
 use crate::{
     preprocessor::Preprocessor,
@@ -204,9 +207,44 @@ enum Commands {
         // TODO: deduplicate with the `publish_options` in the `Publish` and `Update` commands.
         ws_resources: Option<PathBuf>,
         /// The number of epochs for which to save the resources on Walrus.
-        #[clap(long)]
-        epochs: NonZeroU64,
+        ///
+        /// If set to `max`, the resources are stored for the maximum number of epochs allowed on
+        /// Walrus. Otherwise, the resources are stored for the specified number of epochs. The
+        /// number of epochs must be greater than 0.
+        #[clap(long, value_parser = EpochCountOrMax::parse_epoch_count)]
+        epochs: EpochCountOrMax,
     },
+}
+
+#[derive(Parser, Debug, Clone)]
+pub struct PublishOptions {
+    /// The directory containing the site sources.
+    pub directory: PathBuf,
+    /// The path to the Walrus sites resources file.
+    ///
+    /// This JSON configuration file defined HTTP resource headers and other utilities for your
+    /// files. By default, the file is expected to be named `ws-resources.json` and located in the
+    /// root of the site directory.
+    ///
+    /// The configuration file _will not_ be uploaded to Walrus.
+    #[clap(long)]
+    ws_resources: Option<PathBuf>,
+    /// The number of epochs for which to save the resources on Walrus.
+    ///
+    /// If set to `max`, the resources are stored for the maximum number of epochs allowed on
+    /// Walrus. Otherwise, the resources are stored for the specified number of epochs. The
+    /// number of epochs must be greater than 0.
+    #[clap(long, value_parser = EpochCountOrMax::parse_epoch_count)]
+    pub epochs: EpochCountOrMax,
+    /// Preprocess the directory before publishing.
+    /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
+    #[clap(long, action)]
+    pub list_directory: bool,
+    /// The maximum number of concurrent calls to the Walrus CLI for the computation of blob IDs.
+    #[clap(long)]
+    max_concurrent: Option<NonZeroUsize>,
+    /// By default, sites are deletable with site-builder delete command. By passing --permanent, the site is deleted only after `epochs` expiration.
+    permanent: Option<bool>,
 }
 
 /// The configuration for the site builder.
@@ -255,6 +293,53 @@ impl Config {
     /// Returns a [`WalletContext`] from the configuration.
     pub fn wallet(&self) -> Result<WalletContext> {
         load_wallet_context(&self.general.wallet)
+    }
+}
+
+/// The number of epochs to store the blobs for.
+///
+/// Can be either a non-zero number of epochs or the special value `max`, which will store the blobs
+/// for the maximum number of epochs allowed by the system object on chain.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EpochCountOrMax {
+    /// Store the blobs for the maximum number of epochs allowed.
+    #[serde(rename = "max")]
+    Max,
+    /// The number of epochs to store the blobs for.
+    #[serde(untagged)]
+    Epochs(NonZeroU32),
+}
+
+impl EpochCountOrMax {
+    fn parse_epoch_count(input: &str) -> Result<Self> {
+        if input == "max" {
+            Ok(Self::Max)
+        } else {
+            let epochs = input.parse::<u32>()?;
+            Ok(Self::Epochs(NonZeroU32::new(epochs).ok_or_else(|| {
+                anyhow!("invalid epoch count; please a number >0 or `max`")
+            })?))
+        }
+    }
+
+    /// Tries to convert the `EpochCountOrMax` into an `EpochCount` value.
+    ///
+    /// If the `EpochCountOrMax` is `Max`, the `max_epochs_ahead` is used as the maximum number of
+    /// epochs that can be stored ahead.
+    pub fn try_into_epoch_count(&self, max_epochs_ahead: EpochCount) -> anyhow::Result<EpochCount> {
+        match self {
+            EpochCountOrMax::Max => Ok(max_epochs_ahead),
+            EpochCountOrMax::Epochs(epochs) => {
+                let epochs = epochs.get();
+                ensure!(
+                    epochs <= max_epochs_ahead,
+                    "blobs can only be stored for up to {} epochs ahead; {} epochs were requested",
+                    max_epochs_ahead,
+                    epochs
+                );
+                Ok(epochs)
+            }
+        }
     }
 }
 
@@ -391,7 +476,7 @@ async fn run() -> Result<()> {
             let mut site_manager = SiteManager::new(
                 config,
                 SiteIdentifier::ExistingSite(site_object),
-                epochs.get(),
+                epochs,
                 WhenWalrusUpload::Always,
                 false,
             )

@@ -100,6 +100,7 @@ impl BlobStoreResult {
 /// Blob store result with its file path.
 #[derive(Deserialize, Debug, Clone)]
 #[allow(unused)]
+#[serde(rename_all = "camelCase")]
 pub struct BlobStoreResultWithPath {
     /// The result of the store operation.
     pub blob_store_result: BlobStoreResult,
@@ -157,6 +158,7 @@ pub struct Blob {
 /// The output of the `store` command.
 #[derive(Debug, Clone, Deserialize)]
 #[allow(unused)]
+#[serde(rename_all = "camelCase")]
 pub struct StoreOutput(pub Vec<BlobStoreResultWithPath>);
 
 /// The output of the `read` command.
