@@ -22,10 +22,15 @@ interface RPCSelectorInterface {
 
 class WrappedSuiClient extends SuiClient {
     private url: string;
+    private suinsClient: SuinsClient;
 
     constructor(url: string) {
         super({ url });
         this.url = url;
+        this.suinsClient = new SuinsClient({
+            client: this as SuiClient,
+            network: 'testnet' // TODO: get network from config
+        });
     }
 
     public getURL(): string {
@@ -35,12 +40,7 @@ class WrappedSuiClient extends SuiClient {
     // Extends the SuiClient class to add a method to get a SuiNS record.
     // Useful for treating the SuiClient as a SuiNS client during the invokeWithFailover method.
     public async getNameRecord(name: string): Promise<NameRecord | null> {
-        const suinsClient = new SuinsClient({
-            client: this as SuiClient,
-            network: 'testnet' // TODO: get network from config
-        });
-        const nameRecord = await suinsClient.getNameRecord(name)
-        return nameRecord
+        return await this.suinsClient.getNameRecord(name)
     }
 }
 
