@@ -153,16 +153,21 @@ impl SiteEditor {
             &all_dynamic_fields,
         );
 
-        let mut site_manager = SiteManager::new(
-            self.config.clone(),
-            ExistingSite(site_id),
-            EpochCountOrMax::Epochs(NonZeroU32::new(0).unwrap()),
-            WhenWalrusUpload::Always,
-            false,
-        )
-        .await?;
+        // Add warning if no deletable blobs found
+        if all_dynamic_fields.is_empty() {
+            println!("Warning: No deletable resources found. This may be because the site was created with permanent=true");
+        } else {
+            let mut site_manager = SiteManager::new(
+                self.config.clone(),
+                ExistingSite(site_id),
+                EpochCountOrMax::Epochs(NonZeroU32::new(0).unwrap()),
+                WhenWalrusUpload::Always,
+                false,
+            )
+            .await?;
 
-        site_manager.delete_from_walrus(all_dynamic_fields).await?;
+            site_manager.delete_from_walrus(all_dynamic_fields).await?;
+        }
 
         // Delete objects on SUI blockchain
         let mut wallet = self.config.wallet()?;
