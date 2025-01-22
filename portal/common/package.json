@@ -5,7 +5,7 @@
 				"base-x": "^4.0.0",
 				"pako": "^2.1.0",
 				"parse-domain": "8.0.2",
-				"vite": "^5.4.9"
+				"vite": "^5.4.12"
 		},
 		"devDependencies": {
 				"@codspeed/vitest-plugin": "^3.1.1",
