@@ -8,7 +8,9 @@ import {
     SuiClient,
     SuiObjectResponse,
 } from "@mysten/sui/client";
+import { SuinsClient } from "@mysten/suins";
 import logger from "./logger";
+import { NameRecord } from "./types";
 
 interface RPCSelectorInterface {
     getObject(input: GetObjectParams): Promise<SuiObjectResponse>;
@@ -16,24 +18,34 @@ interface RPCSelectorInterface {
     getDynamicFieldObject(
         input: GetDynamicFieldObjectParams,
     ): Promise<SuiObjectResponse>;
-    call<T>(method: string, args: any[]): Promise<T>;
 }
 
 class WrappedSuiClient extends SuiClient {
     private url: string;
+    private suinsClient: SuinsClient;
 
     constructor(url: string) {
         super({ url });
         this.url = url;
+        this.suinsClient = new SuinsClient({
+            client: this as SuiClient,
+            network: 'testnet' // TODO: get network from config
+        });
     }
 
     public getURL(): string {
         return this.url;
     }
+
+    // Extends the SuiClient class to add a method to get a SuiNS record.
+    // Useful for treating the SuiClient as a SuiNS client during the invokeWithFailover method.
+    public async getNameRecord(name: string): Promise<NameRecord | null> {
+        return await this.suinsClient.getNameRecord(name)
+    }
 }
 
+
 export class RPCSelector implements RPCSelectorInterface {
-    private static instance: RPCSelector;
     private clients: WrappedSuiClient[];
     private selectedClient: WrappedSuiClient | undefined;
 
@@ -117,7 +129,9 @@ export class RPCSelector implements RPCSelectorInterface {
 
             return result;
         } catch (error) {
-            throw new Error(`Failed to contact fallback RPC clients.`);
+            const message = `Failed to contact fallback RPC clients.`
+            logger.error({ message, error: error });
+            throw new Error(message);
         }
     }
 
@@ -170,7 +184,8 @@ export class RPCSelector implements RPCSelectorInterface {
         throw new Error("Invalid response from getDynamicFieldObject.");
     }
 
-    public async call<T>(method: string, args: any[]): Promise<T> {
-        return this.invokeWithFailover<T>(method, args);
+    public async getNameRecord(name: string): Promise<NameRecord | null> {
+        const nameRecord = await this.invokeWithFailover<NameRecord>('getNameRecord', [name])
+        return nameRecord
     }
 }
