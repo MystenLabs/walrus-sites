@@ -7,7 +7,7 @@ import { RPCSelector } from './rpc_selector';
 import { NameRecord } from './types';
 
 describe('resolveSuiNsAddress', () => {
-    const rpcSelector = new RPCSelector(process.env.RPC_URL_LIST!.split(','))
+    const rpcSelector = new RPCSelector(process.env.RPC_URL_LIST!.split(','), "testnet")
     const suiNSResolver = new SuiNSResolver(
         rpcSelector
     );

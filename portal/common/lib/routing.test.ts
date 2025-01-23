@@ -7,7 +7,7 @@ import { RPCSelector } from "./rpc_selector";
 
 const snakeSiteObjectId = "0x7a95e4be3948415b852fb287d455166a276d7a52f1a567b4a26b6b5e9c753158";
 const wsRouter = new WalrusSitesRouter(
-    new RPCSelector(process.env.RPC_URL_LIST!.split(",")),
+    new RPCSelector(process.env.RPC_URL_LIST!.split(","), "testnet"),
 );
 
 test.skip("getRoutes", async () => {
