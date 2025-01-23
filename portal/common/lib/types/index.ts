@@ -131,3 +131,8 @@ export type NameRecord = {
 	contentHash?: string;
 	walrusSiteId?: string;
 };
+
+/**
+ * The Sui client network type.
+ */
+export type Network = 'testnet' | 'mainnet';

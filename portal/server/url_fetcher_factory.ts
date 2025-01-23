@@ -15,8 +15,12 @@ import { config } from "configuration_loader";
 * while standard fetchers use standard RPC nodes.
 */
 class UrlFetcherFactory {
-    private static readonly premiumRpcSelector = new RPCSelector(config.premiumRpcUrlList);
-    private static readonly standardRpcSelector = new RPCSelector(config.rpcUrlList);
+    private static readonly premiumRpcSelector = new RPCSelector(
+        config.premiumRpcUrlList, config.suinsClientNetwork
+    );
+    private static readonly standardRpcSelector = new RPCSelector(
+        config.rpcUrlList, config.suinsClientNetwork
+    );
 
     public static premiumUrlFetcher(): UrlFetcher {
         return new UrlFetcher(
