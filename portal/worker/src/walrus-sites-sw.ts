@@ -20,6 +20,9 @@ const rpcUrlList = process.env.RPC_URL_LIST;
 if (!rpcUrlList) {
     throw new Error("Missing RPC_URL_LIST environment variable");
 }
+if (!['testnet', 'mainnet'].includes(rpcUrlList)) {
+    throw new Error("Invalid RPC_URL_LIST environment variable");
+}
 const suinsClientNetwork = process.env.SUINS_CLIENT_NETWORK;
 if (!suinsClientNetwork) {
     throw new Error("Missing SUINS_CLIENT_NETWORK environment variable");
