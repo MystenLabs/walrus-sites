@@ -44,7 +44,10 @@ module.exports = {
             ),
             'process.env.RPC_URL_LIST': JSON.stringify(
                 process.env.RPC_URL_LIST || undefined
-            )
+            ),
+            'process.env.SUINS_CLIENT_NETWORK': JSON.stringify(
+                process.env.SUINS_CLIENT_NETWORK || undefined
+            ),
         }),
         new CopyPlugin({
             patterns: [
