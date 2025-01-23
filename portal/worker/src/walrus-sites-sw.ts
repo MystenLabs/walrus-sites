@@ -10,6 +10,7 @@ import { ResourceFetcher } from "@lib/resource";
 import { RPCSelector } from "@lib/rpc_selector";
 import { SuiNSResolver } from "@lib/suins";
 import { WalrusSitesRouter } from "@lib/routing";
+import { Network } from "@lib/types";
 
 // This is to get TypeScript to recognize `clients` and `self` Default type of `self` is
 // `WorkerGlobalScope & typeof globalThis` https://github.com/microsoft/TypeScript/issues/14877
@@ -20,7 +21,14 @@ const rpcUrlList = process.env.RPC_URL_LIST;
 if (!rpcUrlList) {
     throw new Error("Missing RPC_URL_LIST environment variable");
 }
-const rpcSelector = new RPCSelector(rpcUrlList.split(','));
+const suinsClientNetwork = process.env.SUINS_CLIENT_NETWORK;
+if (!suinsClientNetwork) {
+    throw new Error("Missing SUINS_CLIENT_NETWORK environment variable");
+}
+if (!['testnet', 'mainnet'].includes(suinsClientNetwork)) {
+    throw new Error("Invalid SUINS_CLIENT_NETWORK environment variable");
+}
+const rpcSelector = new RPCSelector(rpcUrlList.split(','), suinsClientNetwork as Network);
 export const urlFetcher = new UrlFetcher(
     new ResourceFetcher(rpcSelector),
     new SuiNSResolver(rpcSelector),

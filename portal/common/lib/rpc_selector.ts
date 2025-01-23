@@ -10,7 +10,7 @@ import {
 } from "@mysten/sui/client";
 import { SuinsClient } from "@mysten/suins";
 import logger from "./logger";
-import { NameRecord } from "./types";
+import { NameRecord, Network } from "./types";
 
 interface RPCSelectorInterface {
     getObject(input: GetObjectParams): Promise<SuiObjectResponse>;
@@ -24,12 +24,12 @@ class WrappedSuiClient extends SuiClient {
     private url: string;
     private suinsClient: SuinsClient;
 
-    constructor(url: string) {
+    constructor(url: string, network: Network) {
         super({ url });
         this.url = url;
         this.suinsClient = new SuinsClient({
             client: this as SuiClient,
-            network: 'testnet' // TODO: get network from config
+            network
         });
     }
 
@@ -49,9 +49,9 @@ export class RPCSelector implements RPCSelectorInterface {
     private clients: WrappedSuiClient[];
     private selectedClient: WrappedSuiClient | undefined;
 
-    constructor(rpcURLs: string[]) {
+    constructor(rpcURLs: string[], network: Network) {
         // Initialize clients.
-        this.clients = rpcURLs.map((rpcUrl) => new WrappedSuiClient(rpcUrl));
+        this.clients = rpcURLs.map((rpcUrl) => new WrappedSuiClient(rpcUrl, network));
         this.selectedClient = undefined;
     }
 

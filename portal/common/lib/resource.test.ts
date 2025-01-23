@@ -42,7 +42,8 @@ vi.mock("./bcs_data_parsing", async (importOriginal) => {
 describe("fetchResource", () => {
     console.log("RPC URLS:", process.env.RPC_URL_LIST!.split(','));
     const rpcSelector = new RPCSelector(
-        process.env.RPC_URL_LIST!.split(',')
+        process.env.RPC_URL_LIST!.split(','),
+        'testnet'
     )
     const resourceFetcher = new ResourceFetcher(rpcSelector);
     // Mock SuiClient methods
