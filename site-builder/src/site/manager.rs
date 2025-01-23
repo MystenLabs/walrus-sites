@@ -122,13 +122,15 @@ impl SiteManager {
             for update in &walrus_updates {
                 let resource = update.inner();
 
-                let dry_run_output = self
+                let dry_run_outputs = self
                     .walrus
                     .dry_run_store(resource.full_path.clone(), self.epochs.clone(), !self.permanent, false)
                     .await?;
 
-                let storage_cost = dry_run_output.storage_cost;
-                total_storage_cost += storage_cost;
+                for dry_run_output in dry_run_outputs {
+                    let storage_cost = dry_run_output.storage_cost;
+                    total_storage_cost += storage_cost;
+                }
             }
         }
 

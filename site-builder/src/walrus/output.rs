@@ -161,11 +161,22 @@ pub struct Blob {
 #[serde(rename_all = "camelCase")]
 pub struct StoreOutput(pub Vec<BlobStoreResultWithPath>);
 
-// Result when attempting to store a blob.
+// The output of the `store --dry-run` command.
 #[serde_as]
 #[derive(Debug, Clone, Deserialize)]
+#[allow(unused)]
 #[serde(rename_all = "camelCase")]
 pub struct DryRunOutput {
+    /// The file path to the blob.
+    pub path: PathBuf,
+    /// The blob ID.
+    #[serde_as(as = "DisplayFromStr")]
+    pub blob_id: BlobId,
+    /// The size of the unencoded blob (in bytes).
+    pub unencoded_size: u64,
+    /// The size of the encoded blob (in bytes).
+    pub encoded_size: u64,
+    /// The storage cost (in MIST).
     pub storage_cost: u64,
 }
 

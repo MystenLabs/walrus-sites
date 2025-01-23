@@ -91,16 +91,19 @@ impl Walrus {
     }
 
     /// Issues a `store with dry run arg` JSON command to the Walrus CLI, returning the parsed output.
-    // NOTE: takes a mutable reference to ensure that only one store command is executed at every
-    // time. The issue is that the inner wallet may lock coins if called in parallel.
+    /// NOTE: Takes a mutable reference to ensure that only one store command is executed at any time.
+    /// The issue is that the inner wallet may lock coins if called in parallel.
     pub async fn dry_run_store(
         &mut self,
         file: PathBuf,
         epochs: EpochCountOrMax,
         deletable: bool,
         force: bool,
-    ) -> Result<DryRunOutput> {
+    ) -> Result<Vec<DryRunOutput>> {
         create_command!(self, store, vec![file], epochs, force, deletable, true)
+        // Deserialize the CLI output as a vector of DryRunOutput
+        // let results: Vec<DryRunOutput> = try_from_output(output)?;
+        // Ok(results)
     }
 
     /// Issues a `read` JSON command to the Walrus CLI, returning the parsed output.
