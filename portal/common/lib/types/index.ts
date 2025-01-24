@@ -117,3 +117,22 @@ export type Routes = {
 export function isRoutes(obj: any): obj is Routes {
     return obj && typeof obj.routes_list === "object" && obj.routes_list instanceof Map;
 }
+
+/**
+ * A NameRecord entry of SuiNS Names.
+ */
+export type NameRecord = {
+	name: string;
+	nftId: string;
+	targetAddress: string;
+	expirationTimestampMs: number;
+	data: Record<string, string>;
+	avatar?: string;
+	contentHash?: string;
+	walrusSiteId?: string;
+};
+
+/**
+ * The Sui client network type.
+ */
+export type Network = 'testnet' | 'mainnet';

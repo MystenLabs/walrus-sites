@@ -25,6 +25,7 @@ export type Configuration = {
     sentryAuthToken?: string;
     sentryDsn?: string;
     sentryTracesSampleRate?: number;
+    suinsClientNetwork: 'testnet' | 'mainnet'
 };
 
 /**
@@ -49,6 +50,7 @@ class ConfigurationLoader {
             sentryAuthToken: this.loadSentryAuthToken(),
             sentryDsn: this.loadSentryDsn(),
             sentryTracesSampleRate: this.loadSentryTracesSampleRate(),
+            suinsClientNetwork: this.loadSuinsClientNetwork()
         };
     }
 
@@ -172,6 +174,19 @@ class ConfigurationLoader {
             }
             return rate;
         }
+    }
+
+    private loadSuinsClientNetwork(): 'testnet' | 'mainnet' {
+        const suinsClientNetworkValue = process.env.SUINS_CLIENT_NETWORK;
+        if (suinsClientNetworkValue) {
+            if (suinsClientNetworkValue == 'testnet' || suinsClientNetworkValue == 'mainnet') {
+                return suinsClientNetworkValue
+            }
+            throw new Error(
+                "Incorrect SUINS_CLIENT_NETWORK value! Should be either 'testnet' or 'mainnet'"
+            )
+        }
+        throw new Error("No SUINS_CLIENT_NETWORK variable set!")
     }
 }
 
