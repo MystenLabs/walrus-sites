@@ -258,7 +258,7 @@ impl SiteEditor<EditOptions> {
             self.edit_options.site_id.clone(),
             self.edit_options.publish_options.epochs.clone(),
             self.edit_options.when_upload.clone(),
-            self.edit_options.publish_options.permanent.unwrap_or(false),
+            self.edit_options.publish_options.permanent,
         )
         .await?;
         let (response, summary) = site_manager.update_site(&local_site_data).await?;

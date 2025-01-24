@@ -213,6 +213,9 @@ enum Commands {
         /// number of epochs must be greater than 0.
         #[clap(long, value_parser = EpochCountOrMax::parse_epoch_count)]
         epochs: EpochCountOrMax,
+        /// By default, sites are deletable with site-builder delete command. By passing --permanent, the site is deleted only after `epochs` expiration.
+        #[clap(long, default_value = "false")]
+        permanent: bool,
     },
 }
 
@@ -244,7 +247,8 @@ pub struct PublishOptions {
     #[clap(long)]
     max_concurrent: Option<NonZeroUsize>,
     /// By default, sites are deletable with site-builder delete command. By passing --permanent, the site is deleted only after `epochs` expiration.
-    permanent: Option<bool>,
+    #[clap(default_value = "false")]
+    permanent: bool,
 }
 
 /// The configuration for the site builder.
@@ -460,6 +464,7 @@ async fn run() -> Result<()> {
             site_object,
             ws_resources,
             epochs,
+            permanent,
         } => {
             let ws_res = ws_resources.as_ref().map(WSResources::read).transpose()?;
             let resource_manager =
@@ -478,7 +483,7 @@ async fn run() -> Result<()> {
                 SiteIdentifier::ExistingSite(site_object),
                 epochs,
                 WhenWalrusUpload::Always,
-                false,
+                permanent,
             )
             .await?;
             site_manager.update_single_resource(resource).await?;
