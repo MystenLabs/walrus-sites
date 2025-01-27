@@ -78,17 +78,16 @@ pub enum Command {
         #[serde(skip_serializing_if = "Option::is_none")]
         n_shards: Option<NonZeroU16>,
         /// The RPC endpoint to which the Walrus CLI should connect to.
-        #[serde(default)]
-        #[serde(skip_serializing_if = "RpcArg::is_none")]
+        #[serde(flatten)]
         rpc_arg: RpcArg,
     },
     Info {
         /// The URL of the Sui RPC node to use.
-        #[serde(default)]
+        #[serde(flatten)]
         rpc_arg: RpcArg,
-        /// Print extended information for developers.
-        #[serde(default)]
-        dev: bool,
+        /// The specific info command to run.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        command: Option<InfoCommands>,
     },
 }
 
@@ -101,11 +100,24 @@ pub struct RpcArg {
     pub rpc_url: Option<String>,
 }
 
-impl RpcArg {
-    /// Checks if the inner RPC URL is `None`.
-    fn is_none(&self) -> bool {
-        self.rpc_url.is_none()
-    }
+/// Subcommands for the `info` command.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub enum InfoCommands {
+    /// Print all information listed below.
+    All,
+    /// Print epoch information.
+    Epoch,
+    /// Print storage information.
+    Storage,
+    /// Print size information.
+    Size,
+    /// Print price information.
+    Price,
+    /// Print byzantine fault tolerance (BFT) information.
+    Bft,
+    /// Print committee information.
+    Committee,
 }
 
 mod default {
@@ -196,9 +208,16 @@ impl WalrusCmdBuilder {
         self.with_command(command)
     }
 
-    /// Adds a [`Command::Info`] command to the builder.
-    pub fn info(self, rpc_arg: RpcArg, dev: bool) -> WalrusCmdBuilder<Command> {
-        let command = Command::Info { rpc_arg, dev };
+    /// Adds an [`Command::Info`] command to the builder.
+    pub fn info(
+        self,
+        rpc_arg: RpcArg,
+        subcommand: Option<InfoCommands>,
+    ) -> WalrusCmdBuilder<Command> {
+        let command = Command::Info {
+            rpc_arg,
+            command: subcommand,
+        };
         self.with_command(command)
     }
 }

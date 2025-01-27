@@ -3,7 +3,7 @@
 
 //! The output of running commands on the Walrus CLI.
 
-use std::{num::NonZeroU16, path::PathBuf, process::Output, time::Duration};
+use std::{num::NonZeroU16, path::PathBuf, process::Output};
 
 use anyhow::{anyhow, Context, Result};
 use serde::{de::DeserializeOwned, Deserialize};
@@ -185,35 +185,13 @@ pub struct BlobIdOutput {
     pub unencoded_length: u64,
 }
 
-/// The output of the `info` command.
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[allow(dead_code)]
-pub(crate) struct InfoOutput {
-    pub(crate) current_epoch: Epoch,
-    pub(crate) n_shards: NonZeroU16,
-    pub(crate) n_nodes: usize,
-    pub(crate) storage_unit_size: u64,
-    pub(crate) storage_price_per_unit_size: u64,
-    pub(crate) write_price_per_unit_size: u64,
-    pub(crate) max_blob_size: u64,
-    pub(crate) marginal_size: u64,
-    pub(crate) metadata_price: u64,
-    pub(crate) marginal_price: u64,
-    pub(crate) epoch_duration: Duration,
-    pub(crate) max_epochs_ahead: u32,
-    #[serde(skip_deserializing)]
-    pub(crate) example_blobs: String,
-    #[serde(skip_deserializing)]
-    pub(crate) dev_info: String,
-}
-
 /// The number of shards, which can be deserialized from the output of the `info` command.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[allow(dead_code)]
-pub(crate) struct NShards {
+pub(crate) struct StorageInfoOutput {
     pub(crate) n_shards: NonZeroU16,
+    pub(crate) n_nodes: usize,
 }
 
 pub fn try_from_output<T: DeserializeOwned>(output: Output) -> Result<T> {

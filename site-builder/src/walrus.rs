@@ -6,8 +6,8 @@
 use std::{num::NonZeroU16, path::PathBuf};
 
 use anyhow::{Context, Result};
-use command::RpcArg;
-use output::{try_from_output, BlobIdOutput, InfoOutput, NShards, ReadOutput, StoreOutput};
+use command::{InfoCommands, RpcArg};
+use output::{try_from_output, BlobIdOutput, ReadOutput, StorageInfoOutput, StoreOutput};
 use tokio::process::Command as CliCommand;
 
 use self::types::BlobId;
@@ -98,15 +98,10 @@ impl Walrus {
         create_command!(self, blob_id, file, n_shards, self.rpc_arg())
     }
 
-    /// Issues an `info` JSON command to the Walrus CLI, returning the parsed output.
-    #[allow(dead_code)]
-    pub async fn info(&self, dev: bool) -> Result<InfoOutput> {
-        create_command!(self, info, self.rpc_arg(), dev)
-    }
-
     /// Issues an `info` JSON command to the Walrus CLI, returning the number of shards.
     pub async fn n_shards(&self) -> Result<NonZeroU16> {
-        let n_shards: NShards = create_command!(self, info, self.rpc_arg(), false)?;
+        let n_shards: StorageInfoOutput =
+            create_command!(self, info, self.rpc_arg(), Some(InfoCommands::Storage))?;
         Ok(n_shards.n_shards)
     }
 
