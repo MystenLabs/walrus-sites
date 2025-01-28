@@ -23,16 +23,15 @@ enum StorageVariant {
 * Creates a blocklist checker instance based on the deduced storage variant.
 */
 class BlocklistCheckerFactory {
-    static instantiateBlocklistChecker(): BlocklistChecker {
+    static instantiateBlocklistChecker(): BlocklistChecker | undefined {
         const variant = BlocklistCheckerFactory.deduceStorageVariant();
         switch (variant) {
             case StorageVariant.VercelEdgeConfig:
                 return new VercelEdgeConfigBlocklistChecker();
             case StorageVariant.Redis:
                 return new RedisBlocklistChecker();
-            default:
-                throw new Error("Unsupported blocklist storage variant.");
         }
+        return undefined;
     }
 
     /**
