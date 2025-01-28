@@ -12,7 +12,7 @@ import assert from 'assert';
  * Validates whether a given identifier is present in the blocklist.
  * Requires blocklist to be enabled via ENABLE_ALLOWLIST environment variable.
  */
-class VercelBlocklistChecker implements BlocklistChecker {
+class VercelEdgeConfigBlocklistChecker implements BlocklistChecker {
     constructor() {
         assert(
             config.enableBlocklist,
@@ -27,6 +27,6 @@ class VercelBlocklistChecker implements BlocklistChecker {
 
 let blocklistChecker: BlocklistChecker | undefined;
 if (config.enableBlocklist) {
-    blocklistChecker = new VercelBlocklistChecker();
+    blocklistChecker = new VercelEdgeConfigBlocklistChecker();
 }
 export default blocklistChecker;
