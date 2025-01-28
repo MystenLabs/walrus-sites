@@ -6,6 +6,12 @@ import BlocklistChecker from "@lib/blocklist_checker";
 import { config } from 'configuration_loader';
 import assert from 'assert';
 
+/**
+ * Checks domains/IDs against Vercel's Edge Config blocklist
+ *
+ * Validates whether a given identifier is present in the blocklist.
+ * Requires blocklist to be enabled via ENABLE_ALLOWLIST environment variable.
+ */
 class VercelBlocklistChecker implements BlocklistChecker {
     constructor() {
         assert(
