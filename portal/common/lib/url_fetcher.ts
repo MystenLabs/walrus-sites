@@ -56,7 +56,7 @@ export class UrlFetcher {
 
         logger.debug({ message: "Resolved object id", resolvedObjectId: resolvedObjectId });
         logger.debug({ message: "Base36 version of the object id", base36OfObjectId: HEXtoBase36(resolvedObjectId) });
-        if (blocklistChecker && await blocklistChecker.isBlocked(resolvedObjectId)) {
+        if (blocklistChecker && await blocklistChecker.check(resolvedObjectId)) {
             return siteNotFound();
         }
 
