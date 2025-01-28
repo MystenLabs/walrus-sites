@@ -5,6 +5,7 @@ import { has } from '@vercel/edge-config';
 import BlocklistChecker from "@lib/blocklist_checker";
 import { config } from 'configuration_loader';
 import assert from 'assert';
+import { createClient } from 'redis';
 
 /**
  * Supported blocklist storage backends.
@@ -34,7 +35,7 @@ class BlocklistCheckerFactory {
 }
 
 /**
- * Checks domains/IDs against Vercel's Edge Config blocklist
+ * Checks domains/IDs against Vercel's Edge Config blocklist.
  *
  * Validates whether a given identifier is present in the blocklist.
  * Requires blocklist to be enabled via ENABLE_ALLOWLIST environment variable.
@@ -53,6 +54,32 @@ class VercelEdgeConfigBlocklistChecker implements BlocklistChecker {
 
     async check(id: string): Promise<boolean> {
         return has(id);
+    }
+}
+
+/**
+* Checks domains/IDs against a Redis blocklist.
+*/
+class RedisBlocklistChecker implements BlocklistChecker {
+    private client;
+    private connected = false;
+
+    constructor() {
+        this.client = createClient()
+            .on('error', err => console.log('Redis Client Error', err));
+    }
+
+    async check(id: string): Promise<boolean> {
+        if (!this.connected) {
+            await this.client.connect();
+            this.connected = true;
+        }
+        const value = await this.client.get(id);
+        return !!value;
+    }
+
+    async close() {
+        await this.client.disconnect();
     }
 }
 
