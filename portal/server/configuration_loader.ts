@@ -57,7 +57,7 @@ class ConfigurationLoader {
     }
 
     private loadEdgeConfig(): string | undefined {
-        return this.loadEnableBlocklist() ? process.env.EDGE_CONFIG : undefined;
+        return process.env.EDGE_CONFIG
     }
 
     private loadEdgeConfigAllowlist(): string | undefined {
@@ -72,7 +72,11 @@ class ConfigurationLoader {
         if (!isStringBoolean(enable)) {
             throw new Error('ENABLE_BLOCKLIST must be "true" or "false".');
         }
-        return toBoolean(enable);
+        const value = toBoolean(enable)
+        if(value && !this.loadRedisUrl() && !this.loadEdgeConfig()) {
+            throw new Error("ENABLE_BLOCKLIST is set to `true` but neither REDIS_URL nor EDGE_CONFIG is set.")
+        }
+        return value
     }
 
     private loadEnableAllowlist(): Boolean {
