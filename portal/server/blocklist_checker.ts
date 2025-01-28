@@ -20,15 +20,33 @@ enum StorageVariant {
 }
 
 /**
-* Creates a blocklist checker instance based on the provided storage variant.
+* Creates a blocklist checker instance based on the deduced storage variant.
 */
 class BlocklistCheckerFactory {
-    static createBlocklistChecker(variant: StorageVariant): BlocklistChecker {
+    static instantiateBlocklistChecker(): BlocklistChecker {
+        const variant = BlocklistCheckerFactory.deduceStorageVariant();
         switch (variant) {
             case StorageVariant.VercelEdgeConfig:
                 return new VercelEdgeConfigBlocklistChecker();
             case StorageVariant.Redis:
                 return new RedisBlocklistChecker();
+            default:
+                throw new Error("Unsupported blocklist storage variant.");
+        }
+    }
+
+    /**
+    * Based on the environment variables set, deduces the storage variant to use.
+    * @returns Either the storage variant or undefined if blocklist is disabled.
+    */
+    private static deduceStorageVariant(): StorageVariant | undefined {
+        if (!config.enableBlocklist) {
+            return
+        }
+        if (config.edgeConfig) {
+            return StorageVariant.VercelEdgeConfig;
+        } else if (config.redisUrl) {
+            return StorageVariant.Redis;
         }
     }
 }
@@ -64,7 +82,10 @@ class RedisBlocklistChecker implements BlocklistChecker {
     private connected = false;
 
     constructor() {
-        this.client = createClient()
+        if (!config.redisUrl) {
+            throw new Error("REDIS_URL variable is missing.");
+        }
+        this.client = createClient({url: config.redisUrl})
             .on('error', err => console.log('Redis Client Error', err));
     }
 
@@ -83,10 +104,5 @@ class RedisBlocklistChecker implements BlocklistChecker {
     }
 }
 
-let blocklistChecker: BlocklistChecker | undefined;
-if (config.enableBlocklist) {
-    blocklistChecker = BlocklistCheckerFactory.createBlocklistChecker(
-        StorageVariant.Redis
-    );
-}
+const blocklistChecker = BlocklistCheckerFactory.instantiateBlocklistChecker();
 export default blocklistChecker;

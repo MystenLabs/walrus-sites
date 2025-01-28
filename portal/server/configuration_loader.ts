@@ -26,6 +26,7 @@ export type Configuration = {
     sentryDsn?: string;
     sentryTracesSampleRate?: number;
     suinsClientNetwork: 'testnet' | 'mainnet'
+    redisUrl?: string;
 };
 
 /**
@@ -50,7 +51,8 @@ class ConfigurationLoader {
             sentryAuthToken: this.loadSentryAuthToken(),
             sentryDsn: this.loadSentryDsn(),
             sentryTracesSampleRate: this.loadSentryTracesSampleRate(),
-            suinsClientNetwork: this.loadSuinsClientNetwork()
+            suinsClientNetwork: this.loadSuinsClientNetwork(),
+            redisUrl: this.loadRedisUrl(),
         };
     }
 
@@ -187,6 +189,10 @@ class ConfigurationLoader {
             )
         }
         throw new Error("No SUINS_CLIENT_NETWORK variable set!")
+    }
+
+    private loadRedisUrl(): string | undefined {
+        return process.env.REDIS_URL;
     }
 }
 
