@@ -28,8 +28,7 @@ class BlocklistCheckerFactory {
             case StorageVariant.VercelEdgeConfig:
                 return new VercelEdgeConfigBlocklistChecker();
             case StorageVariant.Redis:
-                // TODO: Implement Redis blocklist checker.
-                throw new Error("Redis blocklist checker is not implemented yet.");
+                return new RedisBlocklistChecker();
         }
     }
 }
@@ -74,7 +73,8 @@ class RedisBlocklistChecker implements BlocklistChecker {
             await this.client.connect();
             this.connected = true;
         }
-        const value = await this.client.get(id);
+        const value = await this.client.SISMEMBER('walrus-sites-blocklist',id);
+        console.log('REDIS IS MEMBER', id, value)
         return !!value;
     }
 
@@ -86,7 +86,7 @@ class RedisBlocklistChecker implements BlocklistChecker {
 let blocklistChecker: BlocklistChecker | undefined;
 if (config.enableBlocklist) {
     blocklistChecker = BlocklistCheckerFactory.createBlocklistChecker(
-        StorageVariant.VercelEdgeConfig
+        StorageVariant.Redis
     );
 }
 export default blocklistChecker;
