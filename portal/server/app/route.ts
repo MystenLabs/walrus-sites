@@ -8,7 +8,7 @@ import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 import { isAllowed } from "allowlist_checker";
 import { siteNotFound } from "@lib/http/http_error_responses";
 import integrateLoggerWithSentry from "sentry_logger";
-import blocklistChecker from "custom_blocklist_checker";
+import blocklistChecker from "blocklist_checker";
 import { config } from "configuration_loader";
 import { standardUrlFetcher, premiumUrlFetcher } from "url_fetcher_factory";
 import { NextRequest } from "next/server";
