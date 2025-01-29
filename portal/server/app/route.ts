@@ -12,7 +12,7 @@ import blocklistChecker from "src/blocklist_checker";
 import { config } from "src/configuration_loader";
 import { standardUrlFetcher, premiumUrlFetcher } from "src/url_fetcher_factory";
 import { NextRequest } from "next/server";
-import { send_to_web_analytics } from "web_analytics";
+import { send_to_web_analytics } from "src/web_analytics";
 
 if (config.enableSentry) {
     // Only integrate Sentry on production.
