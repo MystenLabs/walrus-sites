@@ -4,7 +4,7 @@
 import { has } from '@vercel/edge-config';
 import BlocklistChecker from "@lib/blocklist_checker";
 import { config } from './configuration_loader';
-import { createClient } from 'redis';
+import RedisClientFacade from './redis_facade';
 
 /**
  * Supported blocklist storage backends.
@@ -26,7 +26,7 @@ class BlocklistCheckerFactory {
     /// Lazy instantiation is used to avoid unnecessary initialization of the checkers.
     private static readonly checkerMap = {
         [StorageVariant.VercelEdgeConfig]: () => new VercelEdgeConfigBlocklistChecker(),
-        [StorageVariant.Redis]: () => new RedisBlocklistChecker(),
+        [StorageVariant.Redis]: () => new RedisBlocklistChecker(config.redisUrl),
     } as const; // using const assertion to prevent accidental modification of the map's contents
 
     /**
@@ -79,26 +79,17 @@ class VercelEdgeConfigBlocklistChecker implements BlocklistChecker {
 * Checks domains/IDs against a Redis blocklist.
 */
 class RedisBlocklistChecker implements BlocklistChecker {
-    private client;
+    private client: RedisClientFacade;
 
-    constructor() {
-        if (!config.redisUrl) {
+    constructor(redisUrl?: string) {
+        if (!redisUrl) {
             throw new Error("REDIS_URL variable is missing.");
         }
-        this.client = createClient({url: config.redisUrl})
-            .on('error', err => console.log('Redis Client Error', err));
+        this.client = new RedisClientFacade(redisUrl);
     }
 
     async isBlocked(id: string): Promise<boolean> {
-        if (!this.client.isReady) {
-            await this.client.connect();
-        }
-        const value = await this.client.SISMEMBER('walrus-sites-blocklist',id);
-        return !!value;
-    }
-
-    async close() {
-        await this.client.disconnect();
+        return await this.client.isMemberOfSet('walrus-sites-blocklist', id);
     }
 }
 
