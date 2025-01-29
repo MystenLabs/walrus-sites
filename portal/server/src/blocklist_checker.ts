@@ -27,7 +27,7 @@ export class BlocklistCheckerFactory {
         if (!config.enableBlocklist) {
             return undefined;
         }
-        return CheckerBuilder.build(this.listCheckerVariantsMap)
+        return CheckerBuilder.buildBlocklistChecker(this.listCheckerVariantsMap)
     }
 }
 
