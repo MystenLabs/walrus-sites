@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { createClient, EdgeConfigClient } from '@vercel/edge-config';
-import { config } from 'src/configuration_loader';
+import { config } from './configuration_loader';
 
 let edgeConfigAllowlistClient: EdgeConfigClient | undefined;
 if (config.enableAllowlist){
