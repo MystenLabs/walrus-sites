@@ -68,7 +68,7 @@ class VercelEdgeConfigBlocklistChecker implements BlocklistChecker {
         )
     }
 
-    async check(id: string): Promise<boolean> {
+    async isBlocked(id: string): Promise<boolean> {
         return has(id);
     }
 }
@@ -88,7 +88,7 @@ class RedisBlocklistChecker implements BlocklistChecker {
             .on('error', err => console.log('Redis Client Error', err));
     }
 
-    async check(id: string): Promise<boolean> {
+    async isBlocked(id: string): Promise<boolean> {
         if (!this.connected) {
             await this.client.connect();
             this.connected = true;

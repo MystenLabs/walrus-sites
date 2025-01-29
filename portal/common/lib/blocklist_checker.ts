@@ -13,7 +13,7 @@ interface BlocklistChecker {
      * @param id The object id or suins domain to check if it is in the blocklist.
      * @returns True if the id or suins domain is in the blocklist, false otherwise.
      */
-    check: (id: string) => Promise<boolean>
+    isBlocked: (id: string) => Promise<boolean>
 
     /**
      * In case of any cleanup needed for the blocklist checker, this method should be called.
