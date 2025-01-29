@@ -6,7 +6,6 @@ import BlocklistChecker from "@lib/blocklist_checker";
 import { config } from './configuration_loader';
 import RedisClientFacade from './redis_client_facade';
 import { StorageVariant } from './enums';
-import { CheckerBuilder } from './list_checker_builder';
 
 /**
 * Creates a blocklist checker instance based on the deduced storage variant.
@@ -27,7 +26,20 @@ export class BlocklistCheckerFactory {
         if (!config.enableBlocklist) {
             return undefined;
         }
-        return CheckerBuilder.buildBlocklistChecker(this.listCheckerVariantsMap)
+        const variant = this.deduceStorageVariant();
+        return variant ? this.listCheckerVariantsMap[variant]() : undefined;
+    }
+
+    /**
+    * Based on the environment variables set, deduces the storage variant to use.
+    * @returns Either the storage variant or undefined.
+    */
+    private static deduceStorageVariant(): StorageVariant | undefined {
+        if (config.edgeConfig) {
+            return StorageVariant.VercelEdgeConfig;
+        } else if (config.redisUrl) {
+            return StorageVariant.Redis;
+        }
     }
 }
 

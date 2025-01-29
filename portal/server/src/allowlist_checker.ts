@@ -5,7 +5,6 @@ import { createClient, EdgeConfigClient } from '@vercel/edge-config';
 import { config } from './configuration_loader';
 import RedisClientFacade from './redis_client_facade';
 import { StorageVariant } from './enums';
-import { CheckerBuilder } from './list_checker_builder';
 import AllowlistChecker from './allowlist_checker_interface';
 
 /**
@@ -27,7 +26,20 @@ export class AllowlistCheckerFactory {
         if (!config.enableAllowlist) {
             return undefined;
         }
-        return CheckerBuilder.buildAllowlistChecker(this.listCheckerVariantsMap)
+        const variant = this.deduceStorageVariant();
+        return variant ? this.listCheckerVariantsMap[variant]() : undefined;
+    }
+
+    /**
+    * Based on the environment variables set, deduces the storage variant to use.
+    * @returns Either the storage variant or undefined.
+    */
+    private static deduceStorageVariant(): StorageVariant | undefined {
+        if (config.edgeConfigAllowlist) {
+            return StorageVariant.VercelEdgeConfig;
+        } else if (config.redisUrl) {
+            return StorageVariant.Redis;
+        }
     }
 }
 
