@@ -6,7 +6,7 @@ import BlocklistChecker from "@lib/blocklist_checker";
 import { config } from './configuration_loader';
 import RedisClientFacade from './redis_client_facade';
 import { StorageVariant } from './enums';
-import { CheckerBuilder } from './abstract_list_checker';
+import { CheckerBuilder } from './list_checker_builder';
 
 /**
 * Creates a blocklist checker instance based on the deduced storage variant.
