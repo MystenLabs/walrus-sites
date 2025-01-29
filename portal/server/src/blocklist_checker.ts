@@ -4,7 +4,7 @@
 import { has } from '@vercel/edge-config';
 import BlocklistChecker from "@lib/blocklist_checker";
 import { config } from './configuration_loader';
-import RedisClientFacade from './redis_facade';
+import RedisClientFacade from './redis_client_facade';
 
 /**
  * Supported blocklist storage backends.
