@@ -5,7 +5,7 @@ import { createClient, EdgeConfigClient } from '@vercel/edge-config';
 import { config } from './configuration_loader';
 import RedisClientFacade from './redis_client_facade';
 import { StorageVariant } from './enums';
-import { CheckerBuilder } from './abstract_list_checker';
+import { CheckerBuilder } from './list_checker_builder';
 import AllowlistChecker from './allowlist_checker_interface';
 
 /**
