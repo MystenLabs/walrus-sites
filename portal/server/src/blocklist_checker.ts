@@ -1,10 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { has } from '@vercel/edge-config';
+import { has } from "@vercel/edge-config";
 import BlocklistChecker from "@lib/blocklist_checker";
-import { config } from './configuration_loader';
-import { createClient } from 'redis';
+import { config } from "./configuration_loader";
+import { createClient } from "redis";
 
 /**
  * Supported blocklist storage backends.
@@ -19,8 +19,8 @@ enum StorageVariant {
 }
 
 /**
-* Creates a blocklist checker instance based on the deduced storage variant.
-*/
+ * Creates a blocklist checker instance based on the deduced storage variant.
+ */
 class BlocklistCheckerFactory {
     /// The map of storage variants to their respective blocklist checker constructors.
     /// Lazy instantiation is used to avoid unnecessary initialization of the checkers.
@@ -30,21 +30,21 @@ class BlocklistCheckerFactory {
     } as const; // using const assertion to prevent accidental modification of the map's contents
 
     /**
-    * Builds a blocklist checker instance based on the deduced storage variant.
-    * @returns A blocklist checker instance or undefined if blocklist is disabled.
-    */
+     * Builds a blocklist checker instance based on the deduced storage variant.
+     * @returns A blocklist checker instance or undefined if blocklist is disabled.
+     */
     static build(): BlocklistChecker | undefined {
         const variant = BlocklistCheckerFactory.deduceStorageVariant();
         return variant ? this.checkerMap[variant]() : undefined;
     }
 
     /**
-    * Based on the environment variables set, deduces the storage variant to use.
-    * @returns Either the storage variant or undefined if blocklist is disabled.
-    */
+     * Based on the environment variables set, deduces the storage variant to use.
+     * @returns Either the storage variant or undefined if blocklist is disabled.
+     */
     private static deduceStorageVariant(): StorageVariant | undefined {
         if (!config.enableBlocklist) {
-            return
+            return;
         }
         if (config.edgeConfig) {
             return StorageVariant.VercelEdgeConfig;
@@ -76,8 +76,8 @@ class VercelEdgeConfigBlocklistChecker implements BlocklistChecker {
 }
 
 /**
-* Checks domains/IDs against a Redis blocklist.
-*/
+ * Checks domains/IDs against a Redis blocklist.
+ */
 class RedisBlocklistChecker implements BlocklistChecker {
     private client;
 
@@ -85,15 +85,16 @@ class RedisBlocklistChecker implements BlocklistChecker {
         if (!config.redisUrl) {
             throw new Error("REDIS_URL variable is missing.");
         }
-        this.client = createClient({url: config.redisUrl})
-            .on('error', err => console.log('Redis Client Error', err));
+        this.client = createClient({ url: config.redisUrl }).on("error", (err) =>
+            console.log("Redis Client Error", err),
+        );
     }
 
     async isBlocked(id: string): Promise<boolean> {
         if (!this.client.isReady) {
             await this.client.connect();
         }
-        const value = await this.client.SISMEMBER('walrus-sites-blocklist',id);
+        const value = await this.client.SISMEMBER("walrus-sites-blocklist", id);
         return !!value;
     }
 
