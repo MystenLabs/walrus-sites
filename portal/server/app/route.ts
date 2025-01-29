@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
     const requestDomain = getDomain(url, Number(portalDomainNameLength));
 
     if (parsedUrl) {
-        if (blocklistChecker && await blocklistChecker.check(parsedUrl.subdomain)) {
+        if (blocklistChecker && await blocklistChecker.isBlocked(parsedUrl.subdomain)) {
             return siteNotFound();
         }
 
