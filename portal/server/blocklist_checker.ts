@@ -23,15 +23,20 @@ enum StorageVariant {
 * Creates a blocklist checker instance based on the deduced storage variant.
 */
 class BlocklistCheckerFactory {
+    /// The map of storage variants to their respective blocklist checker constructors.
+    /// Lazy instantiation is used to avoid unnecessary initialization of the checkers.
+    private static readonly checkerMap = {
+        [StorageVariant.VercelEdgeConfig]: () => new VercelEdgeConfigBlocklistChecker(),
+        [StorageVariant.Redis]: () => new RedisBlocklistChecker(),
+    } as const; // using const assertion to prevent accidental modification of the map's contents
+
+    /**
+    * Builds a blocklist checker instance based on the deduced storage variant.
+    * @returns A blocklist checker instance or undefined if blocklist is disabled.
+    */
     static build(): BlocklistChecker | undefined {
         const variant = BlocklistCheckerFactory.deduceStorageVariant();
-        switch (variant) {
-            case StorageVariant.VercelEdgeConfig:
-                return new VercelEdgeConfigBlocklistChecker();
-            case StorageVariant.Redis:
-                return new RedisBlocklistChecker();
-        }
-        return undefined;
+        return variant ? this.checkerMap[variant]() : undefined;
     }
 
     /**
