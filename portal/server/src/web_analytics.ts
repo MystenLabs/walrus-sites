@@ -4,7 +4,7 @@
 import { NextRequest } from "next/server";
 import { track } from "@vercel/analytics/server";
 import { getSubdomainAndPath } from "@lib/domain_parsing";
-import { config } from "src/configuration_loader";
+import { config } from "./configuration_loader";
 
 export async function send_to_web_analytics(request: NextRequest) {
     // Track only when the request is for an HTML page.
