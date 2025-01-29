@@ -6,7 +6,7 @@ import { ResourceFetcher } from "@lib/resource";
 import { RPCSelector } from "@lib/rpc_selector";
 import { SuiNSResolver } from "@lib/suins";
 import { WalrusSitesRouter } from "@lib/routing";
-import { config } from "src/configuration_loader";
+import { config } from "./configuration_loader";
 
 /**
 * A factory class for creating page fetchers.

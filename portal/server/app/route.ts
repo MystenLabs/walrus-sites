@@ -10,7 +10,7 @@ import { siteNotFound } from "@lib/http/http_error_responses";
 import integrateLoggerWithSentry from "src/sentry_logger";
 import blocklistChecker from "src/blocklist_checker";
 import { config } from "src/configuration_loader";
-import { standardUrlFetcher, premiumUrlFetcher } from "url_fetcher_factory";
+import { standardUrlFetcher, premiumUrlFetcher } from "src/url_fetcher_factory";
 import { NextRequest } from "next/server";
 import { send_to_web_analytics } from "web_analytics";
 
