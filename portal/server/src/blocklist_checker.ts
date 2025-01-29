@@ -19,7 +19,7 @@ export class BlocklistCheckerFactory {
     } as const; // using const assertion to prevent accidental modification of the map's contents
 
     /**
-    * Builds a blocklist checker instance based on the CheckerBuilder.
+    * Builds a blocklist checker instance.
     * @returns A blocklist checker instance or undefined if blocklist is disabled.
     */
     static build(): BlocklistChecker | undefined {

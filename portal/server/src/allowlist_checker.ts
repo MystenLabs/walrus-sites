@@ -19,7 +19,7 @@ export class AllowlistCheckerFactory {
     } as const; // using const assertion to prevent accidental modification of the map's contents
 
     /**
-    * Builds a allowlist checker instance based on the CheckerBuilder.
+    * Builds a allowlist checker instance.
     * @returns A allowlist checker instance or undefined if allowlist is disabled.
     */
     static build(): AllowlistChecker | undefined {
