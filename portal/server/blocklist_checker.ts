@@ -101,6 +101,7 @@ class RedisBlocklistChecker implements BlocklistChecker {
 
     async close() {
         await this.client.disconnect();
+        this.connected = false;
     }
 }
 
