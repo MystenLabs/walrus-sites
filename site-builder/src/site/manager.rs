@@ -115,7 +115,6 @@ impl SiteManager {
         tracing::debug!(operations=?site_updates, "list of operations computed");
 
         let walrus_updates = site_updates.get_walrus_updates(&self.when_upload);
-        let mut total_storage_cost = 0;
 
         if !walrus_updates.is_empty() {
             tracing::info!("Dry-running Walrus store operations");
@@ -157,15 +156,8 @@ impl SiteManager {
             display::done();
             result
         } else {
-            // No updates necessary
             SuiTransactionBlockResponse::default()
         };
-
-        // After applying on-chain updates, publish to Walrus if needed.
-        if !walrus_updates.is_empty() {
-            self.publish_to_walrus(&walrus_updates).await?;
-        }
-
         Ok((result, site_updates.summary(&self.when_upload)))
     }
 
