@@ -4,7 +4,6 @@
 import { has } from '@vercel/edge-config';
 import BlocklistChecker from "@lib/blocklist_checker";
 import { config } from 'configuration_loader';
-import assert from 'assert';
 import { createClient } from 'redis';
 
 /**
@@ -63,14 +62,12 @@ class BlocklistCheckerFactory {
  */
 class VercelEdgeConfigBlocklistChecker implements BlocklistChecker {
     constructor() {
-        assert(
-            config.enableBlocklist,
-            "ENABLE_BLOCKLIST variable is set to `false`."
-        );
-        assert(
-            config.edgeConfig,
-            "EDGE_CONFIG variable is missing."
-        )
+        if (!config.enableBlocklist) {
+            throw new Error("ENABLE_BLOCKLIST variable is set to `false`.");
+        }
+        if (!config.edgeConfig) {
+            throw new Error("EDGE_CONFIG variable is missing.");
+        }
     }
 
     async isBlocked(id: string): Promise<boolean> {
