@@ -80,7 +80,6 @@ class VercelEdgeConfigBlocklistChecker implements BlocklistChecker {
 */
 class RedisBlocklistChecker implements BlocklistChecker {
     private client;
-    private connected = false;
 
     constructor() {
         if (!config.redisUrl) {
@@ -91,9 +90,8 @@ class RedisBlocklistChecker implements BlocklistChecker {
     }
 
     async isBlocked(id: string): Promise<boolean> {
-        if (!this.connected) {
+        if (!this.client.isReady) {
             await this.client.connect();
-            this.connected = true;
         }
         const value = await this.client.SISMEMBER('walrus-sites-blocklist',id);
         return !!value;
@@ -101,7 +99,6 @@ class RedisBlocklistChecker implements BlocklistChecker {
 
     async close() {
         await this.client.disconnect();
-        this.connected = false;
     }
 }
 
