@@ -96,7 +96,6 @@ class RedisBlocklistChecker implements BlocklistChecker {
             this.connected = true;
         }
         const value = await this.client.SISMEMBER('walrus-sites-blocklist',id);
-        console.log('REDIS IS MEMBER', id, value)
         return !!value;
     }
 
