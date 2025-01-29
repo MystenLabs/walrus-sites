@@ -6,40 +6,28 @@ import BlocklistChecker from "@lib/blocklist_checker";
 import { config } from './configuration_loader';
 import RedisClientFacade from './redis_client_facade';
 import { StorageVariant } from './enums';
+import { CheckerBuilder } from './abstract_list_checker';
 
 /**
 * Creates a blocklist checker instance based on the deduced storage variant.
 */
-class BlocklistCheckerFactory {
+export class BlocklistCheckerFactory {
     /// The map of storage variants to their respective blocklist checker constructors.
     /// Lazy instantiation is used to avoid unnecessary initialization of the checkers.
-    private static readonly checkerMap = {
+    private static readonly listCheckerVariantsMap = {
         [StorageVariant.VercelEdgeConfig]: () => new VercelEdgeConfigBlocklistChecker(),
         [StorageVariant.Redis]: () => new RedisBlocklistChecker(config.redisUrl),
     } as const; // using const assertion to prevent accidental modification of the map's contents
 
     /**
-    * Builds a blocklist checker instance based on the deduced storage variant.
+    * Builds a blocklist checker instance based on the CheckerBuilder.
     * @returns A blocklist checker instance or undefined if blocklist is disabled.
     */
     static build(): BlocklistChecker | undefined {
-        const variant = BlocklistCheckerFactory.deduceStorageVariant();
-        return variant ? this.checkerMap[variant]() : undefined;
-    }
-
-    /**
-    * Based on the environment variables set, deduces the storage variant to use.
-    * @returns Either the storage variant or undefined if blocklist is disabled.
-    */
-    private static deduceStorageVariant(): StorageVariant | undefined {
         if (!config.enableBlocklist) {
-            return
+            return undefined;
         }
-        if (config.edgeConfig) {
-            return StorageVariant.VercelEdgeConfig;
-        } else if (config.redisUrl) {
-            return StorageVariant.Redis;
-        }
+        return CheckerBuilder.build(this.listCheckerVariantsMap)
     }
 }
 
