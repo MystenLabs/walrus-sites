@@ -5,18 +5,7 @@ import { has } from '@vercel/edge-config';
 import BlocklistChecker from "@lib/blocklist_checker";
 import { config } from './configuration_loader';
 import RedisClientFacade from './redis_client_facade';
-
-/**
- * Supported blocklist storage backends.
- *
- * - VercelEdgeConfig: Looks up a Vercel Edge Config db. Use this for portal deployments on Vercel.
- * - Redis: Provides the flexibility of implementing the blocklist in any platform that can integrate
- * a  Redis database.
- */
-enum StorageVariant {
-    VercelEdgeConfig = "vercelEdgeConfig",
-    Redis = "redis",
-}
+import { StorageVariant } from './enums';
 
 /**
 * Creates a blocklist checker instance based on the deduced storage variant.
