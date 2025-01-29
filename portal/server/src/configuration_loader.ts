@@ -26,6 +26,7 @@ export type Configuration = {
     sentryDsn?: string;
     sentryTracesSampleRate?: number;
     suinsClientNetwork: 'testnet' | 'mainnet'
+    redisUrl?: string;
 };
 
 /**
@@ -50,12 +51,13 @@ class ConfigurationLoader {
             sentryAuthToken: this.loadSentryAuthToken(),
             sentryDsn: this.loadSentryDsn(),
             sentryTracesSampleRate: this.loadSentryTracesSampleRate(),
-            suinsClientNetwork: this.loadSuinsClientNetwork()
+            suinsClientNetwork: this.loadSuinsClientNetwork(),
+            redisUrl: this.loadRedisUrl(),
         };
     }
 
     private loadEdgeConfig(): string | undefined {
-        return this.loadEnableBlocklist() ? process.env.EDGE_CONFIG : undefined;
+        return process.env.EDGE_CONFIG
     }
 
     private loadEdgeConfigAllowlist(): string | undefined {
@@ -70,7 +72,11 @@ class ConfigurationLoader {
         if (!isStringBoolean(enable)) {
             throw new Error('ENABLE_BLOCKLIST must be "true" or "false".');
         }
-        return toBoolean(enable);
+        const value = toBoolean(enable)
+        if(value && !this.loadRedisUrl() && !this.loadEdgeConfig()) {
+            throw new Error("ENABLE_BLOCKLIST is set to `true` but neither REDIS_URL nor EDGE_CONFIG is set.")
+        }
+        return value
     }
 
     private loadEnableAllowlist(): Boolean {
@@ -187,6 +193,10 @@ class ConfigurationLoader {
             )
         }
         throw new Error("No SUINS_CLIENT_NETWORK variable set!")
+    }
+
+    private loadRedisUrl(): string | undefined {
+        return process.env.REDIS_URL;
     }
 }
 

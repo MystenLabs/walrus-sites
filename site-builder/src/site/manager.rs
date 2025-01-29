@@ -76,7 +76,6 @@ impl SiteManager {
             site_id,
             epochs,
             when_upload,
-            // TODO(giac): This should be configurable.
             backoff_config: ExponentialBackoffConfig::default(),
             permanent,
         })

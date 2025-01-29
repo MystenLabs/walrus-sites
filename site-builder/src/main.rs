@@ -214,7 +214,8 @@ enum Commands {
         #[clap(long, value_parser = EpochCountOrMax::parse_epoch_count)]
         epochs: EpochCountOrMax,
         /// By default, sites are deletable with site-builder delete command. By passing --permanent, the site is deleted only after `epochs` expiration.
-        #[clap(long, default_value = "false")]
+        /// Make resources permanent (non-deletable)
+        #[clap(long, action = clap::ArgAction::SetTrue)]
         permanent: bool,
     },
 }
@@ -247,7 +248,8 @@ pub struct PublishOptions {
     #[clap(long)]
     max_concurrent: Option<NonZeroUsize>,
     /// By default, sites are deletable with site-builder delete command. By passing --permanent, the site is deleted only after `epochs` expiration.
-    #[clap(default_value = "false")]
+    /// Make resources permanent (non-deletable)
+    #[clap(long, action = clap::ArgAction::SetTrue)]
     permanent: bool,
 }
 
