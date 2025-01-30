@@ -75,7 +75,7 @@ const configurationSchema =
 			path: ["enableBlocklist"],
 	    },
   )
-  /// Extra refinements - Relations between
+  /// Extra refinements - Relations between environment variables:
   .refine(
     (data) => {
       if (data.enableAllowlist) {
