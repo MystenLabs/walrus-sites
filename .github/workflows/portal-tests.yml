@@ -16,17 +16,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        name: Install pnpm
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
         with:
           working-directory: common
-          version: 8
+          bun-version: 1.2.0
           run_install: true
 
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
       - name: Run tests
-        run: cd portal && pnpm run test:common
+        run: cd portal/common && bun run test
