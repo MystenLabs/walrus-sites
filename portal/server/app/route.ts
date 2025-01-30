@@ -5,7 +5,7 @@ import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
 import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 
-import { isAllowed } from "src/allowlist_checker";
+import allowlistChecker from "src/allowlist_checker";
 import { siteNotFound } from "@lib/http/http_error_responses";
 import integrateLoggerWithSentry from "src/sentry_logger";
 import blocklistChecker from "src/blocklist_checker";
@@ -48,7 +48,10 @@ export async function GET(req: NextRequest) {
             return siteNotFound();
         }
 
-        const urlFetcher = await isAllowed(parsedUrl.subdomain ?? '') ? premiumUrlFetcher : standardUrlFetcher;
+        const urlFetcher = await allowlistChecker?.isAllowed(
+            parsedUrl.subdomain ?? ''
+        ) ? premiumUrlFetcher : standardUrlFetcher;
+
         if (requestDomain == portalDomain && parsedUrl.subdomain) {
             return await urlFetcher.resolveDomainAndFetchUrl(parsedUrl, null, blocklistChecker);
         }

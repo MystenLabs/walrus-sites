@@ -1,51 +1,40 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { has } from "@vercel/edge-config";
+import { has } from '@vercel/edge-config';
 import BlocklistChecker from "@lib/blocklist_checker";
-import { config } from "./configuration_loader";
-import { createClient } from "redis";
+import { config } from './configuration_loader';
+import RedisClientFacade from './redis_client_facade';
+import { StorageVariant } from './enums';
 
 /**
- * Supported blocklist storage backends.
- *
- * - VercelEdgeConfig: Looks up a Vercel Edge Config db. Use this for portal deployments on Vercel.
- * - Redis: Provides the flexibility of implementing the blocklist in any platform that can integrate
- * a  Redis database.
- */
-enum StorageVariant {
-    VercelEdgeConfig = "vercelEdgeConfig",
-    Redis = "redis",
-}
-
-/**
- * Creates a blocklist checker instance based on the deduced storage variant.
- */
-class BlocklistCheckerFactory {
+* Creates a blocklist checker instance based on the deduced storage variant.
+*/
+export class BlocklistCheckerFactory {
     /// The map of storage variants to their respective blocklist checker constructors.
     /// Lazy instantiation is used to avoid unnecessary initialization of the checkers.
-    private static readonly checkerMap = {
+    private static readonly listCheckerVariantsMap = {
         [StorageVariant.VercelEdgeConfig]: () => new VercelEdgeConfigBlocklistChecker(),
-        [StorageVariant.Redis]: () => new RedisBlocklistChecker(),
+        [StorageVariant.Redis]: () => new RedisBlocklistChecker(config.redisUrl),
     } as const; // using const assertion to prevent accidental modification of the map's contents
 
     /**
-     * Builds a blocklist checker instance based on the deduced storage variant.
-     * @returns A blocklist checker instance or undefined if blocklist is disabled.
-     */
+    * Builds a blocklist checker instance.
+    * @returns A blocklist checker instance or undefined if blocklist is disabled.
+    */
     static build(): BlocklistChecker | undefined {
-        const variant = BlocklistCheckerFactory.deduceStorageVariant();
-        return variant ? this.checkerMap[variant]() : undefined;
+        if (!config.enableBlocklist) {
+            return undefined;
+        }
+        const variant = this.deduceStorageVariant();
+        return variant ? this.listCheckerVariantsMap[variant]() : undefined;
     }
 
     /**
-     * Based on the environment variables set, deduces the storage variant to use.
-     * @returns Either the storage variant or undefined if blocklist is disabled.
-     */
+    * Based on the environment variables set, deduces the storage variant to use.
+    * @returns Either the storage variant or undefined.
+    */
     private static deduceStorageVariant(): StorageVariant | undefined {
-        if (!config.enableBlocklist) {
-            return;
-        }
         if (config.edgeConfig) {
             return StorageVariant.VercelEdgeConfig;
         } else if (config.redisUrl) {
@@ -76,30 +65,20 @@ class VercelEdgeConfigBlocklistChecker implements BlocklistChecker {
 }
 
 /**
- * Checks domains/IDs against a Redis blocklist.
- */
+* Checks domains/IDs against a Redis blocklist.
+*/
 class RedisBlocklistChecker implements BlocklistChecker {
-    private client;
+    private client: RedisClientFacade;
 
-    constructor() {
-        if (!config.redisUrl) {
+    constructor(redisUrl?: string) {
+        if (!redisUrl) {
             throw new Error("REDIS_URL variable is missing.");
         }
-        this.client = createClient({ url: config.redisUrl }).on("error", (err) =>
-            console.log("Redis Client Error", err),
-        );
+        this.client = new RedisClientFacade(redisUrl);
     }
 
     async isBlocked(id: string): Promise<boolean> {
-        if (!this.client.isReady) {
-            await this.client.connect();
-        }
-        const value = await this.client.SISMEMBER("walrus-sites-blocklist", id);
-        return !!value;
-    }
-
-    async close() {
-        await this.client.disconnect();
+        return await this.client.isMemberOfSet('walrus-sites-blocklist', id);
     }
 }
 
