@@ -8,5 +8,11 @@
   ],
   "keywords": ["walrus", "sui", "sui-ns", "sites"],
   "author": "Mysten Labs",
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "scripts": {
+    "build:worker": "bun -F worker build:prod",
+    "worker": "bun -F worker serve:prod",
+    "build:server": "bun -F server build",
+    "server": "bun -F server start"
+  }
 }
