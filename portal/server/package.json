@@ -18,6 +18,7 @@
         "zod": "^3.24.1"
     },
     "devDependencies": {
+        "@types/bun": "^1.2.1",
         "@types/node": "^20.16.11",
         "@types/react": "18.3.3",
         "html-loader": "^5.1.0",
