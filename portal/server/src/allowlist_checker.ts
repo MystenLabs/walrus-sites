@@ -15,7 +15,7 @@ export class AllowlistCheckerFactory {
     /// Lazy instantiation is used to avoid unnecessary initialization of the checkers.
     private static readonly listCheckerVariantsMap = {
         [StorageVariant.VercelEdgeConfig]: () => new VercelEdgeConfigAllowlistChecker(),
-        [StorageVariant.Redis]: () => new RedisAllowlistChecker(config.blocklistRedisUrl),
+        [StorageVariant.Redis]: () => new RedisAllowlistChecker(config.allowlistRedisUrl),
     } as const; // using const assertion to prevent accidental modification of the map's contents
 
     /**
