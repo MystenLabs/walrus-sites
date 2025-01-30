@@ -10,8 +10,8 @@
   "author": "Mysten Labs",
   "license": "Apache-2.0",
   "scripts": {
-    "build:worker": "bun -F worker build:prod",
-    "worker": "bun -F worker serve:prod",
+    "build:worker": "pnpm -F worker build:prod",
+    "worker": "pnpm -F worker serve:prod",
     "build:server": "bun -F server build",
     "server": "bun -F server start"
   }
