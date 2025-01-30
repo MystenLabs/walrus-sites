@@ -3,8 +3,6 @@ name: codspeed-benchmarks
 on:
   # Run on pushes to the main branch
   push:
-    branches:
-      - "main"
   # Run on pull requests
   pull_request:
   # `workflow_dispatch` allows CodSpeed to trigger backtest
