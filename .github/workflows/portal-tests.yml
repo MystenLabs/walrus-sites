@@ -5,19 +5,14 @@ on:
   pull_request:
 
 jobs:
-  test:
+  run-tests:
+    name: Run common lib unit tests
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          working-directory: common
-          bun-version: 1.2.0
-          run_install: true
-
-      - name: Run tests
-        run: cd portal/common && bun run test
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Run Bun commands
+        working-directory: portal/common
+        run: |
+          bun install
+          bun run test
