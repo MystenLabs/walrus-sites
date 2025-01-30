@@ -1,6 +1,7 @@
 {
     "framework": null,
-    "installCommand": "bun install",
-    "buildCommand": "bun build:worker",
+    "installCommand": "pnpm install",
+    "buildCommand": "pnpm run build:worker",
+    "devCommand": "pnpm run worker",
     "outputDirectory": "worker/dist"
 }
