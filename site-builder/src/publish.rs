@@ -160,7 +160,7 @@ impl SiteEditor {
             let mut site_manager = SiteManager::new(
                 self.config.clone(),
                 ExistingSite(site_id),
-                EpochCountOrMax::Epochs(NonZeroU32::new(0).unwrap()),
+                EpochCountOrMax::Epochs(NonZeroU32::new(1).unwrap()),
                 WhenWalrusUpload::Always,
                 false,
             )
