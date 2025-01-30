@@ -13,20 +13,21 @@ export default class RedisClientFacade {
     }
 
     /**
-     * Checks if a member exists in a Redis set
-     * @param set The name of the set
-     * @param member The value to check for membership
-     * @returns Promise<boolean> indicating presence in set
+     * Checks if a key exists in a Redis database.
+     * @param key The key to check for existence.
+     * @returns Promise<boolean> indicating presence of the key.
      */
-    async isMemberOfSet(set: string, member: string): Promise<boolean> {
+    async keyExists(key: string): Promise<boolean> {
         try {
             if (!this.client.isReady) {
                 await this.client.connect();
             }
-            const value = await this.client.SISMEMBER(set, member);
+            const value = await this.client.EXISTS(key);
             return !!value;
         } catch (error) {
-            logger.error({ message: `Error Redis check: "${member}" contains "${set}"?`, error });
+            logger.error({
+                message: `Error Redis check: checking the presence of "${key}".`, error
+            });
             await this.client.disconnect();
             throw error;
         }

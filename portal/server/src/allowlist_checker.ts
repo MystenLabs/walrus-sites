@@ -82,7 +82,7 @@ class RedisAllowlistChecker implements AllowlistChecker {
     }
 
     async isAllowed(id: string): Promise<boolean> {
-        return await this.client.isMemberOfSet('walrus-sites-allowlist', id);
+        return await this.client.keyExists(id);
     }
 }
 

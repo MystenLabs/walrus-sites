@@ -78,7 +78,7 @@ class RedisBlocklistChecker implements BlocklistChecker {
     }
 
     async isBlocked(id: string): Promise<boolean> {
-        return await this.client.isMemberOfSet('walrus-sites-blocklist', id);
+        return await this.client.keyExists(id);
     }
 }
 
