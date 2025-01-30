@@ -34,47 +34,48 @@ const configurationSchema =
 	    landingPageOidB36: z
 			.string()
 			.regex(/^[0-9a-z]+$/i, "Must be a valid base36 string"),
-	  portalDomainNameLength: z
+	    portalDomainNameLength: z
 				.string()
 				.optional()
 				.transform((val) => (val ? Number(val) : undefined))
 				.refine((val) => val === undefined || val > 0, {
 					message: "PORTAL_DOMAIN_NAME_LENGTH must be a positive number",
 				}),
-	  premiumRpcUrlList: z
-				.string()
-				.nonempty("PREMIUM_RPC_URL_LIST must not be empty")
-				.transform((val) => val.split(",")),
-	  rpcUrlList: z
-				.string()
-				.nonempty("RPC_URL_LIST must not be empty")
-				.transform((val) => val.trim().split(",")),
-	  enableSentry: stringBoolean,
-	  sentryAuthToken: z.string().optional(),
-	  sentryDsn: z.string().optional(),
-	  sentryTracesSampleRate: z
+		premiumRpcUrlList: z.preprocess(
+				(val) => typeof val === 'string' ? val.trim().split(',') : val,
+				z.array(z.string().url())
+			),
+	  	rpcUrlList: z.preprocess(
+				(val) => typeof val === 'string' ? val.trim().split(',') : val,
+				z.array(z.string().url())
+			),
+		enableSentry: stringBoolean,
+	  	sentryAuthToken: z.string().optional(),
+		sentryDsn: z.string().optional(),
+	  	sentryTracesSampleRate: z
 				.string()
 				.optional()
 				.transform((val) => (val ? Number(val) : undefined))
 				.refine((val) => val === undefined || (val >= 0 && val <= 1), {
 					message: "SENTRY_TRACES_SAMPLE_RATE must be between 0 and 1",
 				}),
-	  suinsClientNetwork: z.enum(["testnet", "mainnet"]),
-	  blocklistRedisUrl: z.string().optional(),
-	  allowlistRedisUrl: z.string().optional(),})
-  .refine(
-    (data) => {
-      if (data.enableBlocklist) {
-        return data.blocklistRedisUrl || data.edgeConfig;
-      }
-      return true;
-    },
-    {
-      message:
-        "ENABLE_BLOCKLIST is true but neither BLOCKLIST_REDIS_URL nor EDGE_CONFIG is set.",
-      path: ["enableBlocklist"],
-    },
+	    suinsClientNetwork: z.enum(["testnet", "mainnet"]),
+	    blocklistRedisUrl: z.string().optional(),
+	    allowlistRedisUrl: z.string().optional(),})
+  	.refine(
+   	(data) => {
+    	if (data.enableBlocklist) {
+	    	return data.blocklistRedisUrl || data.edgeConfig;
+     	}
+	    	return true;
+	    },
+	    {
+	      	message:
+				"ENABLE_BLOCKLIST is true but neither BLOCKLIST_REDIS_URL nor EDGE_CONFIG is set.",
+			path: ["enableBlocklist"],
+	    },
   )
+  /// Extra refinements - Relations between
   .refine(
     (data) => {
       if (data.enableAllowlist) {
