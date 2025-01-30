@@ -63,7 +63,7 @@ class ConfigurationLoader {
     }
 
     private loadEdgeConfigAllowlist(): string | undefined {
-        return this.loadEnableAllowlist() ? process.env.EDGE_CONFIG_ALLOWLIST : undefined;
+        return process.env.EDGE_CONFIG_ALLOWLIST;
     }
 
     private loadEnableBlocklist(): Boolean {
