@@ -15,4 +15,3 @@ env/
 *.log
 temp-landing-page/
 .env*.local
-next-env.d.ts
