@@ -1,0 +1,146 @@
+<!--
+  Copyright (c) Mysten Labs, Inc.
+  SPDX-License-Identifier: Apache-2.0
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>404 Walrus Site Not Found</title>
+    </head>
+    <script>
+    function getPortalName() {
+        const url = new URL(window.location.href);
+        const domainParts = url.host.split('.');
+        const portalName = domainParts.slice(-2).join('.');
+        if (portalName.includes('localhost')) {
+            return 'http://localhost' + `:${url.port}`
+        }
+        return `https://${portalName}`
+    };
+
+    window.onload = function() {
+        const portalLink = document.getElementById('portalLink');
+        portalLink.href = getPortalName();
+    };
+    </script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f8f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            width: 100vw;
+        }
+        main {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            width: 100vw;
+            padding: 0 80px 0 80px;
+        }
+        .content-div {
+            flex: 1 1 0%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            row-gap: 40px;
+            max-width:600px;
+            margin-top: 40px;
+        }
+        .main-div {
+            width: 100%;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: black;
+            gap: 40px;
+        }
+        .center {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+        }
+        .InterTightMedium {
+            font-family: 'Inter', sans-serif;
+            font-weight: 500;
+            font-size: 16px;
+            line-height: 24px;
+        }
+        .InterTightBold {
+            font-family: 'Inter', sans-serif;
+            font-weight: 700;
+        }
+        footer {
+            padding: 30px 0px 30px 0px;
+            width: 100%;
+            font-size: 14px; /* Set text size to 16px */
+            color: #696969;
+            line-height: 100%; /* 14px */
+            letter-spacing: 0.14px;
+            border-top: 1px solid rgba(105, 105, 105, 0.3); /* Only set the top border */
+            border-right: 0px;
+            border-bottom: 0px;
+            border-left: 0px;
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+        }
+        @media (max-width: 768px) {
+        footer {
+            flex-direction: column;
+            padding: 20px 0 20px 0;
+            gap: 10px;
+        }
+        main {
+            padding: 0 40px 0 40px;
+        }
+        }
+        .terms-policies {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            gap: 32px;
+        }
+    </style>
+    <body>
+        <main>
+            <div class="main-div">
+                <div class="content-div">
+                    <div class="center InterTightMedium" style="color: #696969;">
+                        <div style="font-size: 88px; line-height: 160%;">🙅🏽</div>
+                        <div style="font-size: 16px; line-height: 160%;">${message}</div>
+                        <div style="font-size: 16px; line-height: 160%;">${secondaryMessage}</div>
+                        <a id="portalLink" style="color: #696969; font-size: 16px; line-height: 160%;">Open the landing page</a>
+                    </div>
+                </div>
+                <footer class="InterTightBold">
+                    <div>
+                        Copyright 2024 © Mysten Labs, Inc.
+                    </div>
+                    <div class="terms-policies">
+                        <a href="https://docs.walrus.site/walrus-sites/tos.html" target="_blank" style="text-decoration: none; color: #696969;">
+                            Terms of Service
+                        </a>
+                        <a href="https://docs.walrus.site/walrus-sites/privacy.html" target="_blank" style="text-decoration: none; color: #696969;">
+                            Privacy Policy
+                        </a>
+                    </div>
+                </footer>
+            </div>
+        </main>
+    </body>
+</html>
