@@ -1,8 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import template_404 from "../../static/404-page.template.html";
-import hash_mismatch from "../../static/hash-mismatch.html"
+// import template_404 from "../../static/404-page.template.html";
+// import hash_mismatch from "../../static/hash-mismatch.html"
 import { HttpStatusCodes } from "./http_status_codes";
 
 const mainNotFoundErrorMessage = "You have reached the end of the internet, please turn back!"
@@ -26,9 +26,10 @@ export function fullNodeFail(): Response {
 }
 
 function Response404(message: String, secondaryMessage?: String): Response {
-    const interpolated = template_404
-        .replace("${message}", message)
-        .replace("${secondaryMessage}", secondaryMessage ?? '')
+    // const interpolated = template_404
+    //     .replace("${message}", message)
+    //     .replace("${secondaryMessage}", secondaryMessage ?? '')
+    const interpolated = 'FIXME' // FIXME
     return new Response(interpolated, {
         status: 404,
         headers: {
@@ -43,6 +44,7 @@ function Response404(message: String, secondaryMessage?: String): Response {
 * the blob hash (checksum).
 */
 export function generateHashErrorResponse(): Response {
+	const hash_mismatch = 'FIXME' // FIXME
     return new Response(hash_mismatch, {
         status: HttpStatusCodes.UNPROCESSABLE_CONTENT,
         headers: {
