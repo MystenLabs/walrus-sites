@@ -12,7 +12,6 @@ import blocklistChecker from "src/blocklist_checker";
 import { config } from "src/configuration_loader";
 import { standardUrlFetcher, premiumUrlFetcher } from "src/url_fetcher_factory";
 import { NextRequest } from "next/server";
-import { send_to_web_analytics } from "src/web_analytics";
 
 if (config.enableSentry) {
     // Only integrate Sentry on production.
@@ -23,12 +22,12 @@ console.log(`Running Bun HTTP server at port ${3000}...`);
 Bun.serve({
 	async fetch(req: NextRequest) {
 		const originalUrl = req.url;
+
 		if (!originalUrl) {
 			console.log('DEBUG', originalUrl)
 			throw new Error("No original url found in request headers");
 		}
 		const url = new URL(originalUrl);
-		await send_to_web_analytics(req);
 
 		const objectIdPath = getObjectIdLink(url.toString());
 		const portalDomainNameLength = config.portalDomainNameLength;

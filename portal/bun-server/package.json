@@ -14,7 +14,7 @@
     "zod": "^3.24.1"
   },
   "scripts": {
-  	"serve": "bun index.ts"
+  	"dev": "bun --watch index.ts"
   },
   "paths": {
       "@lib/*": ["../common/lib/*"]
