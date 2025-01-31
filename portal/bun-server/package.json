@@ -14,7 +14,8 @@
     "zod": "^3.24.1"
   },
   "scripts": {
-  	"dev": "bun --watch index.ts"
+  	"dev": "bun --watch index.ts",
+   	"build": "bun build ./index.ts --outdir ./out --target bun"
   },
   "paths": {
       "@lib/*": ["../common/lib/*"]

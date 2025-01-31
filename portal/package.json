@@ -15,6 +15,7 @@
     "worker": "bun -F worker serve:prod",
     "build:server": "bun -F server build",
     "server": "bun -F server start",
+    "build:bun-server": "bun -F bun-server build",
     "bun-server": "bun -F bun-server start"
   }
 }
