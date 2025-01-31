@@ -26,7 +26,8 @@ export type Configuration = {
     sentryDsn?: string;
     sentryTracesSampleRate?: number;
     suinsClientNetwork: 'testnet' | 'mainnet'
-    redisUrl?: string;
+    blocklistRedisUrl?: string;
+    allowlistRedisUrl?: string;
 };
 
 /**
@@ -52,7 +53,8 @@ class ConfigurationLoader {
             sentryDsn: this.loadSentryDsn(),
             sentryTracesSampleRate: this.loadSentryTracesSampleRate(),
             suinsClientNetwork: this.loadSuinsClientNetwork(),
-            redisUrl: this.loadRedisUrl(),
+            blocklistRedisUrl: this.loadBlocklistRedisUrl(),
+            allowlistRedisUrl: this.loadAllowlistRedisUrl(),
         };
     }
 
@@ -61,7 +63,7 @@ class ConfigurationLoader {
     }
 
     private loadEdgeConfigAllowlist(): string | undefined {
-        return this.loadEnableAllowlist() ? process.env.EDGE_CONFIG_ALLOWLIST : undefined;
+        return process.env.EDGE_CONFIG_ALLOWLIST;
     }
 
     private loadEnableBlocklist(): Boolean {
@@ -73,7 +75,7 @@ class ConfigurationLoader {
             throw new Error('ENABLE_BLOCKLIST must be "true" or "false".');
         }
         const value = toBoolean(enable)
-        if(value && !this.loadRedisUrl() && !this.loadEdgeConfig()) {
+        if(value && !this.loadBlocklistRedisUrl() && !this.loadEdgeConfig()) {
             throw new Error("ENABLE_BLOCKLIST is set to `true` but neither REDIS_URL nor EDGE_CONFIG is set.")
         }
         return value
@@ -87,7 +89,11 @@ class ConfigurationLoader {
         if (!isStringBoolean(enable)) {
             throw new Error('ENABLE_ALLOWLIST must be "true" or "false".');
         }
-        return toBoolean(enable);
+        const value = toBoolean(enable)
+        if(value && !this.loadAllowlistRedisUrl() && !this.loadEdgeConfigAllowlist()) {
+            throw new Error("ENABLE_ALLOWLIST is set to `true` but neither REDIS_URL nor EDGE_CONFIG_ALLOWLIST is set.")
+        }
+        return value
     }
 
     private loadLandingPageOidB36(): string {
@@ -195,8 +201,12 @@ class ConfigurationLoader {
         throw new Error("No SUINS_CLIENT_NETWORK variable set!")
     }
 
-    private loadRedisUrl(): string | undefined {
-        return process.env.REDIS_URL;
+    private loadBlocklistRedisUrl(): string | undefined {
+        return process.env.BLOCKLIST_REDIS_URL;
+    }
+
+    private loadAllowlistRedisUrl(): string | undefined {
+        return process.env.ALLOWLIST_REDIS_URL;
     }
 }
 

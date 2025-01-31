@@ -15,7 +15,7 @@ export class AllowlistCheckerFactory {
     /// Lazy instantiation is used to avoid unnecessary initialization of the checkers.
     private static readonly listCheckerVariantsMap = {
         [StorageVariant.VercelEdgeConfig]: () => new VercelEdgeConfigAllowlistChecker(),
-        [StorageVariant.Redis]: () => new RedisAllowlistChecker(config.redisUrl),
+        [StorageVariant.Redis]: () => new RedisAllowlistChecker(config.allowlistRedisUrl),
     } as const; // using const assertion to prevent accidental modification of the map's contents
 
     /**
@@ -37,7 +37,7 @@ export class AllowlistCheckerFactory {
     private static deduceStorageVariant(): StorageVariant | undefined {
         if (config.edgeConfigAllowlist) {
             return StorageVariant.VercelEdgeConfig;
-        } else if (config.redisUrl) {
+        } else if (config.allowlistRedisUrl) {
             return StorageVariant.Redis;
         }
     }
@@ -82,7 +82,7 @@ class RedisAllowlistChecker implements AllowlistChecker {
     }
 
     async isAllowed(id: string): Promise<boolean> {
-        return await this.client.isMemberOfSet('walrus-sites-allowlist', id);
+        return await this.client.keyExists(id);
     }
 }
 

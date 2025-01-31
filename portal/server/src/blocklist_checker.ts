@@ -15,7 +15,7 @@ export class BlocklistCheckerFactory {
     /// Lazy instantiation is used to avoid unnecessary initialization of the checkers.
     private static readonly listCheckerVariantsMap = {
         [StorageVariant.VercelEdgeConfig]: () => new VercelEdgeConfigBlocklistChecker(),
-        [StorageVariant.Redis]: () => new RedisBlocklistChecker(config.redisUrl),
+        [StorageVariant.Redis]: () => new RedisBlocklistChecker(config.blocklistRedisUrl),
     } as const; // using const assertion to prevent accidental modification of the map's contents
 
     /**
@@ -37,7 +37,7 @@ export class BlocklistCheckerFactory {
     private static deduceStorageVariant(): StorageVariant | undefined {
         if (config.edgeConfig) {
             return StorageVariant.VercelEdgeConfig;
-        } else if (config.redisUrl) {
+        } else if (config.blocklistRedisUrl) {
             return StorageVariant.Redis;
         }
     }
@@ -78,7 +78,7 @@ class RedisBlocklistChecker implements BlocklistChecker {
     }
 
     async isBlocked(id: string): Promise<boolean> {
-        return await this.client.isMemberOfSet('walrus-sites-blocklist', id);
+        return await this.client.keyExists(id);
     }
 }
 
