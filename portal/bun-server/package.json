@@ -1,0 +1,25 @@
+{
+  "name": "bun-server",
+  "module": "index.ts",
+  "type": "module",
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@sentry/nextjs": "^8",
+    "@sentry/node": "^8.49.0",
+    "@vercel/analytics": "^1.4.1",
+    "@vercel/edge-config": "^1.4.0",
+    "common": "workspace:common",
+    "next": "14.2.21",
+    "redis": "^4.7.0",
+    "zod": "^3.24.1"
+  },
+  "scripts": {
+  	"serve": "bun index.ts"
+  },
+  "paths": {
+      "@lib/*": ["../common/lib/*"]
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
