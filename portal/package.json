@@ -4,7 +4,8 @@
   "workspaces": [
     "common",
 	"worker",
-	"server"
+	"server",
+	"bun-server"
   ],
   "keywords": ["walrus", "sui", "sui-ns", "sites"],
   "author": "Mysten Labs",
@@ -13,6 +14,8 @@
     "build:worker": "bun -F worker build:prod",
     "worker": "bun -F worker serve:prod",
     "build:server": "bun -F server build",
-    "server": "bun -F server start"
+    "server": "bun -F server start",
+    "build:bun-server": "bun -F bun-server build",
+    "bun-server": "bun -F bun-server start"
   }
 }
