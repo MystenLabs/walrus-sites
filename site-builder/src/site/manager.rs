@@ -195,7 +195,15 @@ impl SiteManager {
         for (name, blob_id) in blobs.iter() {
             tracing::debug!(name, "deleting blob from Walrus");
             display::action(format!("Deleting resource from Walrus: {}", blob_id,));
-            let _output = self.walrus.delete(blob_id.to_string()).await?;
+            let output = self.walrus.delete(blob_id.to_string()).await?;
+
+            // Check if the blob was actually deleted
+            if output.objectId != *blob_id.to_string() {
+                display::error(format!(
+                    "Could not delete blob {}, may be already deleted or may be a permanent blob",
+                    blob_id
+                ));
+            }
             display::done();
         }
         Ok(())

@@ -191,9 +191,9 @@ pub struct BlobIdOutput {
 #[allow(non_snake_case)]
 pub struct DestroyOutput {
     /// The objectId deleted.
-    objectId: String,
+    pub objectId: String,
     /// The blobs deleted.
-    deletedBlobs: Vec<String>,
+    pub deletedBlobs: Vec<String>,
 }
 
 /// The number of shards, which can be deserialized from the output of the `info` command.
