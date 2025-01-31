@@ -14,7 +14,8 @@
         "@vercel/edge-config": "^1.4.0",
         "common": "workspace:common",
         "next": "14.2.21",
-        "redis": "^4.7.0"
+        "redis": "^4.7.0",
+        "zod": "^3.24.1"
     },
     "devDependencies": {
         "@types/node": "^20.16.11",
