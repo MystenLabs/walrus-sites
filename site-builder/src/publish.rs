@@ -27,14 +27,22 @@ use crate::{
     site::{
         builder::SitePtb,
         config::WSResources,
-        manager::{SiteIdentifier, SiteManager},
+        manager::{SiteIdentifier, SiteIdentifier::ExistingSite, SiteManager},
         resource::ResourceManager,
         RemoteSiteFactory,
         SITE_MODULE,
     },
     summary::{SiteDataDiffSummary, Summarizable},
-    util::{get_site_id_from_response, id_to_base36, path_or_defaults_if_exist, sign_and_send_ptb},
+    util::{
+        get_site_id_from_response,
+        id_to_base36,
+        load_wallet_context,
+        path_or_defaults_if_exist,
+        sign_and_send_ptb,
+    },
     Config,
+    EpochCountOrMax,
+    NonZeroU32,
     PublishOptions,
 };
 
@@ -125,6 +133,43 @@ impl SiteEditor {
     }
 
     pub async fn destroy(&self, site_id: ObjectID) -> Result<()> {
+        // Delete blobs on Walrus
+        let wallet_walrus = load_wallet_context(&self.config.general.wallet)?;
+        let all_dynamic_fields = RemoteSiteFactory::new(
+            // TODO(giac): make the backoff configurable.
+            &RetriableSuiClient::new_from_wallet(
+                &wallet_walrus,
+                ExponentialBackoffConfig::default(),
+            )
+            .await?,
+            self.config.package,
+        )
+        .await?
+        .get_existing_resources(site_id)
+        .await?;
+
+        tracing::debug!(
+            "Retrieved blobs and deleting them: {:?}",
+            &all_dynamic_fields,
+        );
+
+        // Add warning if no deletable blobs found
+        if all_dynamic_fields.is_empty() {
+            println!("Warning: No deletable resources found. This may be because the site was created with permanent=true");
+        } else {
+            let mut site_manager = SiteManager::new(
+                self.config.clone(),
+                ExistingSite(site_id),
+                EpochCountOrMax::Epochs(NonZeroU32::new(1).unwrap()),
+                WhenWalrusUpload::Always,
+                false,
+            )
+            .await?;
+
+            site_manager.delete_from_walrus(all_dynamic_fields).await?;
+        }
+
+        // Delete objects on SUI blockchain
         let mut wallet = self.config.wallet()?;
         let ptb = SitePtb::new(self.config.package, Identifier::new(SITE_MODULE)?)?;
         let mut ptb = ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
@@ -213,6 +258,7 @@ impl SiteEditor<EditOptions> {
             self.edit_options.site_id.clone(),
             self.edit_options.publish_options.epochs.clone(),
             self.edit_options.when_upload.clone(),
+            self.edit_options.publish_options.permanent,
         )
         .await?;
         let (response, summary) = site_manager.update_site(&local_site_data).await?;

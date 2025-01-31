@@ -55,6 +55,7 @@ pub enum Command {
         /// duration.
         #[serde(default)]
         force: bool,
+        deletable: bool,
     },
     /// Reads a blob from Walrus.
     Read {
@@ -68,6 +69,11 @@ pub enum Command {
         /// The RPC endpoint to which the Walrus CLI should connect to.
         #[serde(default)]
         rpc_arg: RpcArg,
+    },
+    /// Deletes a blob from Walrus.
+    Delete {
+        /// The objectID of the blob to be deleted.
+        object_id: String,
     },
     BlobId {
         file: PathBuf,
@@ -168,12 +174,20 @@ impl WalrusCmdBuilder {
         files: Vec<PathBuf>,
         epochs: EpochCountOrMax,
         force: bool,
+        deletable: bool,
     ) -> WalrusCmdBuilder<Command> {
         let command = Command::Store {
             files,
             epochs,
             force,
+            deletable,
         };
+        self.with_command(command)
+    }
+
+    /// Adds a [`Command::Delete`] command to the builder.
+    pub fn delete(self, object_id: String) -> WalrusCmdBuilder<Command> {
+        let command = Command::Delete { object_id };
         self.with_command(command)
     }
 

@@ -11,8 +11,10 @@ use output::{try_from_output, BlobIdOutput, ReadOutput, StorageInfoOutput, Store
 use tokio::process::Command as CliCommand;
 
 use self::types::BlobId;
-use crate::{walrus::command::WalrusCmdBuilder, EpochCountOrMax};
-
+use crate::{
+    walrus::{command::WalrusCmdBuilder, output::DestroyOutput},
+    EpochCountOrMax,
+};
 pub mod command;
 pub mod output;
 pub mod types;
@@ -78,8 +80,14 @@ impl Walrus {
         file: PathBuf,
         epochs: EpochCountOrMax,
         force: bool,
+        deletable: bool,
     ) -> Result<StoreOutput> {
-        create_command!(self, store, vec![file], epochs, force)
+        create_command!(self, store, vec![file], epochs, force, deletable)
+    }
+
+    /// Issues a `delete` JSON command to the Walrus CLI, returning the parsed output.
+    pub async fn delete(&mut self, object_id: String) -> Result<DestroyOutput> {
+        create_command!(self, delete, object_id)
     }
 
     /// Issues a `read` JSON command to the Walrus CLI, returning the parsed output.

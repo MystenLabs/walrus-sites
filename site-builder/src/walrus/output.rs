@@ -185,6 +185,17 @@ pub struct BlobIdOutput {
     pub unencoded_length: u64,
 }
 
+/// The output of the `destroy` command.
+#[derive(Debug, Clone, Deserialize)]
+#[allow(unused)]
+#[allow(non_snake_case)]
+pub struct DestroyOutput {
+    /// The objectId deleted.
+    pub objectId: String,
+    /// The blobs deleted.
+    pub deletedBlobs: Vec<String>,
+}
+
 /// The number of shards, which can be deserialized from the output of the `info` command.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]

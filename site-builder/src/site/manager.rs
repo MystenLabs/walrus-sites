@@ -1,7 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::BTreeSet, str::FromStr, time::Duration};
+use std::{
+    collections::{BTreeSet, HashMap},
+    str::FromStr,
+    time::Duration,
+};
 
 use anyhow::{anyhow, Result};
 use sui_keys::keystore::AccountKeystore;
@@ -53,6 +57,7 @@ pub struct SiteManager {
     pub epochs: EpochCountOrMax,
     pub when_upload: WhenWalrusUpload,
     pub backoff_config: ExponentialBackoffConfig,
+    pub permanent: bool,
 }
 
 impl SiteManager {
@@ -62,6 +67,7 @@ impl SiteManager {
         site_id: SiteIdentifier,
         epochs: EpochCountOrMax,
         when_upload: WhenWalrusUpload,
+        permanent: bool,
     ) -> Result<Self> {
         Ok(SiteManager {
             walrus: config.walrus_client(),
@@ -70,8 +76,8 @@ impl SiteManager {
             site_id,
             epochs,
             when_upload,
-            // TODO(giac): This should be configurable.
             backoff_config: ExponentialBackoffConfig::default(),
+            permanent,
         })
     }
 
@@ -121,6 +127,8 @@ impl SiteManager {
 
     /// Publishes the resources to Walrus.
     async fn publish_to_walrus<'b>(&mut self, updates: &[&ResourceOp<'b>]) -> Result<()> {
+        let deletable = !self.permanent;
+
         for update in updates.iter() {
             let resource = update.inner();
             tracing::debug!(
@@ -146,7 +154,12 @@ impl SiteManager {
                 retry_num += 1;
                 let result = self
                     .walrus
-                    .store(resource.full_path.clone(), self.epochs.clone(), false)
+                    .store(
+                        resource.full_path.clone(),
+                        self.epochs.clone(),
+                        false,
+                        deletable,
+                    )
                     .await;
 
                 match result {
@@ -173,6 +186,25 @@ impl SiteManager {
                     }
                 }
             }
+        }
+        Ok(())
+    }
+
+    /// Deletes the resources from Walrus.
+    pub async fn delete_from_walrus<'b>(&mut self, blobs: HashMap<String, ObjectID>) -> Result<()> {
+        for (name, blob_id) in blobs.iter() {
+            tracing::debug!(name, "deleting blob from Walrus");
+            display::action(format!("Deleting resource from Walrus: {}", blob_id,));
+            let output = self.walrus.delete(blob_id.to_string()).await?;
+
+            // Check if the blob was actually deleted
+            if output.objectId != *blob_id.to_string() {
+                display::error(format!(
+                    "Could not delete blob {}, may be already deleted or may be a permanent blob",
+                    blob_id
+                ));
+            }
+            display::done();
         }
         Ok(())
     }
