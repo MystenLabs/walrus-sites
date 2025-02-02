@@ -52,7 +52,7 @@ export class BlocklistCheckerFactory {
 class VercelEdgeConfigBlocklistChecker implements BlocklistChecker {
     constructor() {
         if (!config.enableBlocklist) {
-            throw new Error("ENABLE_BLOCKLIST variable is set to `false`.");
+            throw new Error("ENABLE_BLOCKLIST variable is set to false.");
         }
         if (!config.edgeConfig) {
             throw new Error("EDGE_CONFIG variable is missing.");
@@ -60,7 +60,12 @@ class VercelEdgeConfigBlocklistChecker implements BlocklistChecker {
     }
 
     async isBlocked(id: string): Promise<boolean> {
-        return has(id);
+        try {
+            return await has(id);
+        } catch (e) {
+            console.error("Error checking blocklist via Edge Config:", e);
+            return false; // Return false on error or handle as needed
+        }
     }
 }
 
@@ -72,13 +77,18 @@ class RedisBlocklistChecker implements BlocklistChecker {
 
     constructor(redisUrl?: string) {
         if (!redisUrl) {
-            throw new Error("REDIS_URL variable is missing.");
+            throw new Error("REDIS_URL is required to initialize RedisBlocklistChecker.");
         }
         this.client = new RedisClientFacade(redisUrl);
     }
 
     async isBlocked(id: string): Promise<boolean> {
-        return await this.client.keyExists(id);
+        try {
+            return await this.client.keyExists(id);
+        } catch (e) {
+            console.error("Error checking blocklist via Redis:", e);
+            return false; // Return false on error or handle as needed
+        }
     }
 }
 
