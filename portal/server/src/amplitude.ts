@@ -34,12 +34,6 @@ export async function sendToAmplitude(request: NextRequest): Promise<void> {
 		amplitude.track({
 			device_id: generateDeviceId(request.headers.get("user-agent")),
 	    	event_type: "page_view",
-	      	event_properties: {
-	        	url: request.url,
-	          	referrer: request.headers.get("referer") ?? "direct",
-		        user_agent: request.headers.get("user-agent") ?? undefined,
-			},
-      		ip: request.headers.get("x-forwarded-for") ?? undefined, // TODO: Parse using a lib
   	    })
 	} catch (e) {
 		console.warn("Amplitude could not track event: ", e);
