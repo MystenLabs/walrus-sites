@@ -5,7 +5,7 @@ import { NextRequest } from "next/server";
 import { track } from "@vercel/analytics/server";
 import { isHtmlPage, extractCustomEventProperties } from "./utils";
 
-export async function send_to_web_analytics(request: NextRequest) {
+export async function sendToWebAnalytics(request: NextRequest) {
     if (isHtmlPage(request)) {
         try {
         	const custom_event_properties = extractCustomEventProperties(request);
