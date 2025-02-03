@@ -2,31 +2,17 @@ name: Portal Unit Tests
 
 on:
   push:
-    branches:
-      - main
   pull_request:
-    branches:
-      - main
 
 jobs:
-  test:
+  run-tests:
+    name: Run common lib unit tests
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        name: Install pnpm
-        with:
-          working-directory: common
-          version: 8
-          run_install: true
-
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Run tests
-        run: cd portal && pnpm run test:common
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Run Bun commands
+        working-directory: portal/common
+        run: |
+          bun install
+          bun run test

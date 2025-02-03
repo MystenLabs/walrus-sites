@@ -18,10 +18,8 @@
 		"webpack-merge": "^6.0.1"
 	},
 	"scripts": {
-		"serve": "webpack serve --config webpack.config.dev.js",
+		"serve:dev": "webpack serve --config webpack.config.dev.js",
 		"serve:prod": "webpack serve --config webpack.config.prod.js",
-		"build": "pnpm build:prod",
-		"dev": "pnpm build:dev",
 		"build:dev": "webpack --config webpack.config.dev.js",
 		"build:prod": "webpack --no-watch --config webpack.config.prod.js"
 	}

@@ -1,19 +1,18 @@
 {
   "name": "portal",
   "description": "Central point of the walrus-sites portal workspace.",
-  "scripts": {
-    "build:worker": "pnpm --filter ./worker run build:prod",
-    "build:prod:worker": "pnpm --filter ./worker run build:prod",
-    "build:dev:worker": "pnpm --filter ./worker run build:dev",
-    "build:server": "pnpm --filter ./server run build",
-    "serve:dev:server": "pnpm --filter ./server run dev",
-    "serve:prod:server": "pnpm --filter ./server run start",
-    "serve": "pnpm serve:dev:worker",
-    "serve:dev:worker": "pnpm --filter ./worker run serve",
-    "serve:prod:worker": "pnpm --filter ./worker run serve:prod",
-    "test:common": "pnpm --filter ./common run test"
-  },
-  "keywords": [],
+  "workspaces": [
+    "common",
+	"worker",
+	"server"
+  ],
+  "keywords": ["walrus", "sui", "sui-ns", "sites"],
   "author": "Mysten Labs",
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "scripts": {
+    "build:worker": "bun -F worker build:prod",
+    "worker": "bun -F worker serve:prod",
+    "build:server": "bun -F server build",
+    "server": "bun -F server start"
+  }
 }

@@ -15,8 +15,8 @@ involves loading objects from chain, decoding them, and serving them as response
 A local portal can be run from this directory using `pnpm`:
 
 ```shell
-pnpm install
-pnpm serve
+bun install
+bun serve:prod
 ```
 
 These commands will build the development version of the portal, serve it to `http://localhost:8080`, and watch for any changes in the source files to

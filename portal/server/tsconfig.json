@@ -19,7 +19,6 @@
         ],
         "baseUrl": "./",
         "paths": {
-            "@static/*": ["../common/static/*"],
             "@lib/*": ["../common/lib/*"]
         },
         "types": ["../common/lib/custom.d.ts"]
