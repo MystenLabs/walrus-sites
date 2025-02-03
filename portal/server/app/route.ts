@@ -30,9 +30,9 @@ export async function GET(req: NextRequest) {
     // Send the page view event to either Amplitude or Vercel Web Analytics.
     if (config.amplitudeApiKey) {
 		await sendToAmplitude(req);
-	} else {
-		await sendToWebAnalytics(req);
 	}
+    // If web analytics are disabled, the event will not be sent.
+	await sendToWebAnalytics(req);
 
     const objectIdPath = getObjectIdLink(url.toString());
     const portalDomainNameLength = config.portalDomainNameLength;
