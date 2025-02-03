@@ -13,11 +13,20 @@ import { config } from "src/configuration_loader";
 import { standardUrlFetcher, premiumUrlFetcher } from "src/url_fetcher_factory";
 import { NextRequest } from "next/server";
 import { send_to_web_analytics } from "src/web_analytics";
+import * as amplitude from "@amplitude/analytics-node";
 
 if (config.enableSentry) {
     // Only integrate Sentry on production.
     integrateLoggerWithSentry();
 }
+amplitude.init(process.env.AMPLITUDE_API_KEY!,{
+	// Events queued in memory will flush when number of events exceed upload threshold
+	// Default value is 30
+	flushQueueSize: 50,
+	// Events queue will flush every certain milliseconds based on setting
+	// Default value is 10000 milliseconds
+	flushIntervalMillis: 20000,
+});
 
 export async function GET(req: NextRequest) {
     const originalUrl = req.headers.get("x-original-url");
@@ -25,7 +34,18 @@ export async function GET(req: NextRequest) {
         throw new Error("No original url found in request headers");
     }
     const url = new URL(originalUrl);
-    await send_to_web_analytics(req);
+
+    // await send_to_web_analytics(req);
+    amplitude.track({
+        event_type: "page_view",
+        user_id: req.headers.get("x-user-id") || "anonymous",
+        event_properties: {
+            url: originalUrl,
+            referrer: req.headers.get("referer") || "direct",
+            user_agent: req.headers.get("user-agent") || "unknown",
+        },
+        ip: req.headers.get("x-forwarded-for") || req.ip,
+    })
 
     const objectIdPath = getObjectIdLink(url.toString());
     const portalDomainNameLength = config.portalDomainNameLength;
