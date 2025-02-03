@@ -25,6 +25,7 @@ const configurationSchema =
 		suinsClientNetwork: env.SUINS_CLIENT_NETWORK,
 		blocklistRedisUrl: env.BLOCKLIST_REDIS_URL,
 		allowlistRedisUrl: env.ALLOWLIST_REDIS_URL,
+		amplitudeApiKey: env.AMPLITUDE_API_KEY,
 	}),
 	z.object({
 		edgeConfig: z.string().optional(),
@@ -61,7 +62,9 @@ const configurationSchema =
 				}),
 	    suinsClientNetwork: z.enum(["testnet", "mainnet"]),
 	    blocklistRedisUrl: z.string().optional(),
-	    allowlistRedisUrl: z.string().optional(),})
+	    allowlistRedisUrl: z.string().optional(),
+		amplitudeApiKey: z.string().optional(),
+	})
   	.refine(
    	(data) => {
     	if (data.enableBlocklist) {

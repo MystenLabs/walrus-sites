@@ -4,6 +4,7 @@
 import { NextRequest } from "next/server";
 import { getSubdomainAndPath } from "@lib/domain_parsing";
 import { config } from "./configuration_loader";
+import crypto from 'crypto';
 
 /**
 * Check if the request is for an HTML page.
@@ -41,6 +42,15 @@ export function extractCustomEventProperties(request: NextRequest): CustomEventP
         originalUrl: request.headers.get("x-original-url") || "Unknown",
         subdomain: parsedUrl?.subdomain
     };
+}
+
+/**
+* Generate a hash of a string.
+* @param {string} input - The input string to hash.
+* @returns {string} - The resulting first N characters of the hash.
+*/
+export function generateHash(input: string, n = 10 ): string {
+	return crypto.createHash('sha256').update(input).digest('hex').substring(0, n);
 }
 
 // As of this writing, vercel pro plan supports at most 2 custom event props.
