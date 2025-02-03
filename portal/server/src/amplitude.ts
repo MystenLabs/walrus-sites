@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import * as amplitude from "@amplitude/analytics-node";
-import { generateHash } from "./utils";
+import { generateHash, isHtmlPage } from "./utils";
 import { config } from "./configuration_loader";
 import logger from "@lib/logger";
+import { NextRequest } from "next/server";
 
 if (config.amplitudeApiKey) {
 	amplitude.init(process.env.AMPLITUDE_API_KEY!,{
@@ -19,23 +20,26 @@ if (config.amplitudeApiKey) {
 
 /**
 * Sends a page view event to Amplitude.
-* @param req - The incoming request to the portal.
+* @param request - The incoming request to the portal.
 */
-export async function sendToAmplitude(req: Request): Promise<void> {
+export async function sendToAmplitude(request: NextRequest): Promise<void> {
+	if (!isHtmlPage(request)) {
+		return;
+	}
 	if (!config.amplitudeApiKey) {
 		logger.warn({ message: "Amplitude API key not found. Skipping tracking." });
 		return;
 	}
 	try {
 		amplitude.track({
-			device_id: generateDeviceId(req.headers.get("user-agent")),
+			device_id: generateDeviceId(request.headers.get("user-agent")),
 	    	event_type: "page_view",
 	      	event_properties: {
-	        	url: req.url,
-	          	referrer: req.headers.get("referer") ?? "direct",
-		        user_agent: req.headers.get("user-agent") ?? undefined,
+	        	url: request.url,
+	          	referrer: request.headers.get("referer") ?? "direct",
+		        user_agent: request.headers.get("user-agent") ?? undefined,
 			},
-      		ip: req.headers.get("x-forwarded-for") ?? undefined, // TODO: Parse using a lib
+      		ip: request.headers.get("x-forwarded-for") ?? undefined, // TODO: Parse using a lib
   	    })
 	} catch (e) {
 		console.warn("Amplitude could not track event: ", e);
