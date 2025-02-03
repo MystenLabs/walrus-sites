@@ -159,7 +159,7 @@ export class UrlFetcher {
         // We have a resource, get the range header.
         logger.info({ message: "Add the range headers of the resource", range: JSON.stringify(result.range)});
         let range_header = optionalRangeToRequestHeaders(result.range);
-        const contents = await fetch(
+        const contents = await this.fetchWithRetry(
             aggregatorEndpoint(result.blob_id, this.aggregatorUrl), { headers: range_header }
         );
         if (!contents.ok) {
@@ -195,5 +195,47 @@ export class UrlFetcher {
                 "x-unix-time-cached": Date.now().toString(),
             },
         });
+    }
+
+    /**
+     * Attempts to fetch a resource from the given input URL or Request object, with retry logic.
+     *
+     * Retries the fetch operation up to a specified number of attempts in case of failure,
+     * with a delay between each retry. Logs the status and error messages during retries.
+     *
+     * @param input - The URL, URL object, or Request object representing the resource to fetch.
+     * @param init - Optional fetch options such as headers, method, and body.
+     * @param retries - The maximum number of retry attempts (default is 3).
+     * @param delayMs - The delay in milliseconds between retry attempts (default is 1000ms).
+     * @returns A promise that resolves with the successful `Response` object or rejects with the last error.
+     */
+    private async fetchWithRetry(
+        input: string | URL | globalThis.Request,
+        init?: RequestInit,
+        retries: number = 3,
+        delayMs: number = 1000
+    ): Promise<Response> {
+        let lastError: unknown;
+
+        for (let attempt = 1; attempt <= retries; attempt++) {
+            try {
+                const response = await fetch(input, init);
+                return response;
+            } catch (error) {
+                console.error(`Attempt ${attempt} encountered an error: ${(error as Error).message}`);
+                lastError = error;
+            }
+
+            // Wait before retrying
+            if (attempt < retries) {
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+            }
+        }
+
+        // If an exception occurred, throw it
+        if (lastError) {
+            console.error(`All ${retries} fetch attempts failed. Throwing last error.`);
+            throw lastError instanceof Error ? lastError : new Error('Unknown error occurred');
+        }
     }
 }
