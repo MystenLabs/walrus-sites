@@ -237,5 +237,6 @@ export class UrlFetcher {
             console.error(`All ${retries} fetch attempts failed. Throwing last error.`);
             throw lastError instanceof Error ? lastError : new Error('Unknown error occurred');
         }
+        return await fetch(input, init);
     }
 }
