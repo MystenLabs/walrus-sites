@@ -12,7 +12,8 @@ import blocklistChecker from "src/blocklist_checker";
 import { config } from "src/configuration_loader";
 import { standardUrlFetcher, premiumUrlFetcher } from "src/url_fetcher_factory";
 import { NextRequest } from "next/server";
-import { send_to_web_analytics } from "src/web_analytics";
+import { sendToWebAnalytics } from "src/web_analytics";
+import { sendToAmplitude } from "src/amplitude";
 
 if (config.enableSentry) {
     // Only integrate Sentry on production.
@@ -25,7 +26,13 @@ export async function GET(req: NextRequest) {
         throw new Error("No original url found in request headers");
     }
     const url = new URL(originalUrl);
-    await send_to_web_analytics(req);
+
+    // Send the page view event to either Amplitude or Vercel Web Analytics.
+    if (config.amplitudeApiKey) {
+		await sendToAmplitude(req);
+	}
+    // If web analytics are disabled, the event will not be sent.
+	await sendToWebAnalytics(req);
 
     const objectIdPath = getObjectIdLink(url.toString());
     const portalDomainNameLength = config.portalDomainNameLength;
