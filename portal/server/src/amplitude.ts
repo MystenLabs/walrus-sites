@@ -42,7 +42,7 @@ export async function sendToAmplitude(request: NextRequest): Promise<void> {
 
 /**
 * Generates a device ID based on the user agent string.
-* @param userAgent - device & browser details. Default is a random string.
+* @param userAgent - device & browser details.
 * @returns A hashed device ID.
 */
 function generateDeviceId(userAgent: string | null): string {
