@@ -13,7 +13,7 @@ import crypto from 'crypto';
 * @param {NextRequest} request - The request object.
 * @returns {Boolean} - True if the request is for an HTML page, false otherwise.
 */
-export function isHtmlPage(request: NextRequest): Boolean{
+export function isHtmlPage(request: NextRequest): Boolean {
     // This is to avoid tracking requests for static assets like images, css, etc.
     // Cuts down costs since we are tracking less events.
     const parsedUrl = getSubdomainAndPath(
@@ -23,7 +23,11 @@ export function isHtmlPage(request: NextRequest): Boolean{
     if (!parsedUrl?.path) {
     	throw new Error("No path found in parsed URL");
     }
-    return parsedUrl?.path?.endsWith('.html')
+    const contentTypeIsHtml = request.headers.get('content-type')?.startsWith('text/html')
+    // Used as fallback when content type is undefined.
+    const pathEndsWithHTML = parsedUrl?.path?.endsWith('.html')
+
+    return contentTypeIsHtml ?? pathEndsWithHTML;
 }
 
 
