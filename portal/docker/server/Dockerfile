@@ -3,42 +3,51 @@
 FROM oven/bun:1 AS base
 WORKDIR /usr/src/app
 
+# environment variables
+ARG ENABLE_ALLOWLIST="false"
+ENV ENABLE_ALLOWLIST=${ENABLE_ALLOWLIST}
+
+ARG ENABLE_BLOCKLIST="false"
+ENV ENABLE_BLOCKLIST=${ENABLE_BLOCKLIST}
+
+ARG ENABLE_SENTRY="false"
+ENV ENABLE_SENTRY=${ENABLE_SENTRY}
+
+ARG LANDING_PAGE_OID_B36="41qecxqcyzqm8gl0cp2fqd6iq62j0jo5thr39nb0bsg39acnib"
+ENV LANDING_PAGE_OID_B36=${LANDING_PAGE_OID_B36}
+
+ARG PORTAL_DOMAIN_NAME_LENGTH="21"
+ENV PORTAL_DOMAIN_NAME_LENGTH=${PORTAL_DOMAIN_NAME_LENGTH}
+
+ARG PREMIUM_RPC_URL_LIST="https://fullnode.testnet.sui.io"
+ENV PREMIUM_RPC_URL_LIST=${PREMIUM_RPC_URL_LIST}
+
+ARG RPC_URL_LIST="https://fullnode.testnet.sui.io,https://testnet.suiet.app"
+ENV RPC_URL_LIST=${RPC_URL_LIST}
+
+ARG SUINS_CLIENT_NETWORK="testnet"
+ENV SUINS_CLIENT_NETWORK=${SUINS_CLIENT_NETWORK}
+
 # install dependencies into temp directory
 # this will cache them and speed up future builds
 FROM base AS install
-RUN mkdir -p /temp/dev
-COPY package.json bun.lock /temp/dev/
-COPY common /temp/dev/common
-COPY server /temp/dev/server
-COPY worker /temp/dev/worker
-RUN cd /temp/dev && bun install --frozen-lockfile
-
-# install with --production (exclude devDependencies)
 RUN mkdir -p /temp/prod
 COPY package.json bun.lock /temp/prod/
 COPY common /temp/prod/common
 COPY server /temp/prod/server
 COPY worker /temp/prod/worker
-RUN cd /temp/prod && bun install --frozen-lockfile --production
-
-# copy node_modules from temp directory
-# then copy all (non-ignored) project files into the image
-FROM base AS prerelease
-COPY --from=install /temp/dev/node_modules node_modules
-COPY . .
-
-# [optional] tests & build
-# ENV NODE_ENV=production
+RUN cd /temp/prod && bun install --frozen-lockfile
+RUN cd /temp/prod && bun run build:server
 
 # copy production dependencies and source code into final image
 FROM base AS release
 COPY --from=install /temp/prod/node_modules node_modules
-COPY --from=prerelease /usr/src/app/server server
-COPY --from=prerelease /usr/src/app/package.json .
-COPY --from=prerelease /usr/src/app/server/.env.example server/.env.production
+COPY --from=install /temp/prod/package.json .
+COPY --from=install /temp/prod/server/package.json server/package.json
+COPY --from=install /temp/prod/server/.next server/.next
 
 # run the app
 USER bun
 EXPOSE 3000/tcp
 ENV NODE_ENV=production
-ENTRYPOINT [ "bun", "run", "server:prod" ]
+CMD [ "bun", "run", "server:prod" ]
