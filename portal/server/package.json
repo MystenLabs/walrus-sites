@@ -5,7 +5,8 @@
     "scripts": {
         "dev": "next dev",
         "build": "next build",
-        "start": "next start"
+        "start": "next start",
+        "start:prod": "NODE_ENV=production next start -H 0.0.0.0 -p 3000"
     },
     "dependencies": {
         "@sentry/nextjs": "^8",
