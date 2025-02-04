@@ -12,8 +12,8 @@ if (config.amplitudeApiKey) {
 		// Events queued in memory will flush when number of events exceed upload threshold
 		// Default value is 30
 		flushQueueSize: 50,
-		// Events queue will flush every certain milliseconds based on setting
-		// Default value is 10000 milliseconds
+		// Events queue will flush every certain milliseconds based on setting.
+		// Default value is 10000 milliseconds.
 		flushIntervalMillis: 5000, // TODO increase this to 20000 for production use.
 	});
 }
