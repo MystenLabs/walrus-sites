@@ -28,7 +28,7 @@ COPY --from=install /temp/dev/node_modules node_modules
 COPY . .
 
 # [optional] tests & build
-ENV NODE_ENV=production
+# ENV NODE_ENV=production
 
 # copy production dependencies and source code into final image
 FROM base AS release
@@ -40,5 +40,5 @@ COPY --from=prerelease /usr/src/app/server/.env.example server/.env.production
 # run the app
 USER bun
 EXPOSE 3000/tcp
-ENV HOST=0.0.0.0
+ENV NODE_ENV=production
 ENTRYPOINT [ "bun", "run", "server:prod" ]
