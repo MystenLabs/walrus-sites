@@ -3,7 +3,7 @@
 FROM oven/bun:1 AS base
 WORKDIR /usr/src/app
 
-# environment variables
+# environment variables, can be overridden by docker build --build-arg <arg>=<value>
 ARG ENABLE_ALLOWLIST="false"
 ENV ENABLE_ALLOWLIST=${ENABLE_ALLOWLIST}
 
