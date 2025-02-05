@@ -6,6 +6,8 @@ import { generateHash, isHtmlPage } from "./utils";
 import { config } from "./configuration_loader";
 import logger from "@lib/logger";
 import { NextRequest } from "next/server";
+import { getSubdomainAndPath } from "@lib/domain_parsing";
+import uaparser from "ua-parser-js";
 
 if (config.amplitudeApiKey) {
 	amplitude.init(process.env.AMPLITUDE_API_KEY!,{
@@ -14,7 +16,7 @@ if (config.amplitudeApiKey) {
 		flushQueueSize: 50,
 		// Events queue will flush every certain milliseconds based on setting.
 		// Default value is 10000 milliseconds.
-		flushIntervalMillis: 20000, // Increase this to at least 10000 for production use.
+		flushIntervalMillis: 3000, // Increase this to at least 10000 for production use.
 	});
 }
 
@@ -34,6 +36,7 @@ export async function sendToAmplitude(request: NextRequest): Promise<void> {
 		amplitude.track({
 			device_id: generateDeviceId(request.headers.get("user-agent")),
 	    	event_type: "page_view",
+			user_properties: extractUserProperties(request),
   	    })
 	} catch (e) {
 		console.warn("Amplitude could not track event: ", e);
@@ -48,4 +51,36 @@ export async function sendToAmplitude(request: NextRequest): Promise<void> {
 function generateDeviceId(userAgent: string | null): string {
 	const defaultDeviceId = "1234567890";
 	return generateHash(userAgent || defaultDeviceId);
+}
+
+type AmplitudeUserProperties = {[key: string]: any;} | undefined
+
+/**
+* Extracts user properties to be used in Amplitude from the incoming request.
+* @param request - The incoming request to the portal.
+* @returns
+*/
+function extractUserProperties(request: NextRequest): AmplitudeUserProperties {
+	const domainDetails = getSubdomainAndPath(request.nextUrl)
+	const userAgentHeader = request.headers.get("user-agent")
+	if (!userAgentHeader) {
+		logger.warn("User agent header not found in request.")
+		return undefined;
+	}
+	const ua = new uaparser.UAParser(userAgentHeader)
+	const userProperties = {
+		os: `${ua.getOS().name} ${ua.getOS().version}`,
+		device: ua.getDevice().model,
+		deviceFamily: ua.getDevice().vendor,
+		region: request.geo?.region,
+		country: request.geo?.country,
+		location_lat: request.geo?.latitude,
+		location_lng: request.geo?.longitude,
+		language: request.headers.get("accept-language"),
+		ip: request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip"),
+		extra: {
+			walrus_site_subdomain: domainDetails?.subdomain,
+		},
+	}
+	return userProperties;
 }
