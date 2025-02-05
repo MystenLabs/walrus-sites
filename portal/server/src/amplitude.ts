@@ -33,10 +33,28 @@ export async function sendToAmplitude(request: NextRequest): Promise<void> {
 		return;
 	}
 	try {
+		const domainDetails = getSubdomainAndPath(request.nextUrl)
+		let ua;
+		try {
+			ua = new uaparser.UAParser(request.headers.get("user-agent") ?? undefined);
+		} catch (e) {
+			console.warn("Could not parse user agent: ", e);
+		}
 		amplitude.track({
+			os_name: ua?.getOS().name,
+			os_version: ua?.getOS().version,
 			device_id: generateDeviceId(request.headers.get("user-agent")),
 	    	event_type: "page_view",
-			user_properties: extractUserProperties(request),
+			region: request.geo?.region,
+			country: request.geo?.country,
+			location_lat: Number(request.geo?.latitude),
+			location_lng: Number(request.geo?.longitude),
+			language: request.headers.get("accept-language") ?? undefined,
+			ip: request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip") ?? undefined,
+			extra: {
+				walrus_site_subdomain: domainDetails?.subdomain,
+			},
+			user_agent: request.headers.get("user-agent") ?? undefined,
   	    })
 	} catch (e) {
 		console.warn("Amplitude could not track event: ", e);
@@ -51,36 +69,4 @@ export async function sendToAmplitude(request: NextRequest): Promise<void> {
 function generateDeviceId(userAgent: string | null): string {
 	const defaultDeviceId = "1234567890";
 	return generateHash(userAgent || defaultDeviceId);
-}
-
-type AmplitudeUserProperties = {[key: string]: any;} | undefined
-
-/**
-* Extracts user properties to be used in Amplitude from the incoming request.
-* @param request - The incoming request to the portal.
-* @returns
-*/
-function extractUserProperties(request: NextRequest): AmplitudeUserProperties {
-	const domainDetails = getSubdomainAndPath(request.nextUrl)
-	const userAgentHeader = request.headers.get("user-agent")
-	if (!userAgentHeader) {
-		logger.warn("User agent header not found in request.")
-		return undefined;
-	}
-	const ua = new uaparser.UAParser(userAgentHeader)
-	const userProperties = {
-		os: `${ua.getOS().name} ${ua.getOS().version}`,
-		device: ua.getDevice().model,
-		deviceFamily: ua.getDevice().vendor,
-		region: request.geo?.region,
-		country: request.geo?.country,
-		location_lat: request.geo?.latitude,
-		location_lng: request.geo?.longitude,
-		language: request.headers.get("accept-language"),
-		ip: request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip"),
-		extra: {
-			walrus_site_subdomain: domainDetails?.subdomain,
-		},
-	}
-	return userProperties;
 }
