@@ -20,14 +20,11 @@ export function isHtmlPage(request: NextRequest): Boolean {
         request.nextUrl,
         Number(config.portalDomainNameLength)
     );
-    if (!parsedUrl?.path) {
-    	throw new Error("No path found in parsed URL");
-    }
     const contentTypeIsHtml = request.headers.get('content-type')?.startsWith('text/html')
     // Used as fallback when content type is undefined.
     const pathEndsWithHTML = parsedUrl?.path?.endsWith('.html')
 
-    return contentTypeIsHtml ?? pathEndsWithHTML;
+    return contentTypeIsHtml ?? !!pathEndsWithHTML;
 }
 
 
