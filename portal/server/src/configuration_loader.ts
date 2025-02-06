@@ -14,6 +14,7 @@ const configurationSchema =
 		edgeConfigAllowlist: env.EDGE_CONFIG_ALLOWLIST,
 		enableBlocklist: env.ENABLE_BLOCKLIST,
 		enableAllowlist: env.ENABLE_ALLOWLIST,
+		enableVercelWebAnalytics: env.ENABLE_VERCEL_WEB_ANALYTICS,
 		landingPageOidB36: env.LANDING_PAGE_OID_B36,
 		portalDomainNameLength: env.PORTAL_DOMAIN_NAME_LENGTH,
 		premiumRpcUrlList: env.PREMIUM_RPC_URL_LIST,
@@ -51,6 +52,7 @@ const configurationSchema =
 				z.array(z.string().url())
 			),
 		enableSentry: stringBoolean,
+		enableVercelWebAnalytics: stringBoolean,
 	  	sentryAuthToken: z.string().optional(),
 		sentryDsn: z.string().optional(),
 	  	sentryTracesSampleRate: z
