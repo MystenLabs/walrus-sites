@@ -6,6 +6,8 @@ import { generateHash, isHtmlPage } from "./utils";
 import { config } from "./configuration_loader";
 import logger from "@lib/logger";
 import { NextRequest } from "next/server";
+import { getSubdomainAndPath } from "@lib/domain_parsing";
+import uaparser from "ua-parser-js";
 
 if (config.amplitudeApiKey) {
 	amplitude.init(process.env.AMPLITUDE_API_KEY!,{
@@ -31,9 +33,28 @@ export async function sendToAmplitude(request: NextRequest): Promise<void> {
 		return;
 	}
 	try {
+		const domainDetails = getSubdomainAndPath(request.nextUrl)
+		let ua;
+		try {
+			ua = new uaparser.UAParser(request.headers.get("user-agent") ?? undefined);
+		} catch (e) {
+			console.warn("Could not parse user agent: ", e);
+		}
 		amplitude.track({
+			os_name: ua?.getOS().name,
+			os_version: ua?.getOS().version,
 			device_id: generateDeviceId(request.headers.get("user-agent")),
 	    	event_type: "page_view",
+			region: request.geo?.region,
+			country: request.geo?.country,
+			location_lat: Number(request.geo?.latitude),
+			location_lng: Number(request.geo?.longitude),
+			language: request.headers.get("accept-language") ?? undefined,
+			ip: request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip") ?? undefined,
+			extra: {
+				walrus_site_subdomain: domainDetails?.subdomain,
+			},
+			user_agent: request.headers.get("user-agent") ?? undefined,
   	    })
 	} catch (e) {
 		console.warn("Amplitude could not track event: ", e);
