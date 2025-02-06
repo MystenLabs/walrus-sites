@@ -31,9 +31,9 @@ export async function GET(req: NextRequest) {
     if (config.amplitudeApiKey) {
 		await sendToAmplitude(req);
 	}
-    // If web analytics are disabled, the event will not be sent.
-	await sendToWebAnalytics(req);
-
+    if (config.enableVercelWebAnalytics) {
+		await sendToWebAnalytics(req);
+	}
     const objectIdPath = getObjectIdLink(url.toString());
     const portalDomainNameLength = config.portalDomainNameLength;
     if (objectIdPath) {
