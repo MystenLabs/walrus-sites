@@ -45,7 +45,7 @@ export async function sendToAmplitude(request: NextRequest): Promise<void> {
 			os_version: ua?.getOS().version,
 			device_id: generateDeviceId(request.headers.get("user-agent")),
 			device_manufacturer: ua?.getDevice().vendor,
-			platform: ua?.getBrowser().type,
+			platform: ua?.getDevice().type,
 	    	event_type: "page_view",
 			region: request.geo?.region,
 			country: request.geo?.country,
