@@ -44,6 +44,8 @@ export async function sendToAmplitude(request: NextRequest): Promise<void> {
 			os_name: ua?.getOS().name,
 			os_version: ua?.getOS().version,
 			device_id: generateDeviceId(request.headers.get("user-agent")),
+			device_manufacturer: ua?.getDevice().vendor,
+			platform: ua?.getBrowser().type,
 	    	event_type: "page_view",
 			region: request.geo?.region,
 			country: request.geo?.country,
@@ -51,8 +53,10 @@ export async function sendToAmplitude(request: NextRequest): Promise<void> {
 			location_lng: Number(request.geo?.longitude),
 			language: request.headers.get("accept-language") ?? undefined,
 			ip: request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip") ?? undefined,
-			extra: {
-				walrus_site_subdomain: domainDetails?.subdomain,
+			event_properties: {
+				extra: {
+					subdomain: domainDetails?.subdomain,
+				},
 			},
 			user_agent: request.headers.get("user-agent") ?? undefined,
   	    })
