@@ -212,12 +212,12 @@ export class UrlFetcher {
     private async fetchWithRetry(
         input: string | URL | globalThis.Request,
         init?: RequestInit,
-        retries: number = 3,
+        retries: number = 1,
         delayMs: number = 1000
     ): Promise<Response> {
         let lastError: unknown;
 
-        for (let attempt = 1; attempt <= retries; attempt++) {
+        for (let attempt = 0; attempt <= retries; attempt++) {
             try {
                 const response = await fetch(input, init);
                 return response;
@@ -231,12 +231,7 @@ export class UrlFetcher {
                 await new Promise(resolve => setTimeout(resolve, delayMs));
             }
         }
-
-        // If an exception occurred, throw it
-        if (lastError) {
-            console.error(`All ${retries} fetch attempts failed. Throwing last error.`);
-            throw lastError instanceof Error ? lastError : new Error('Unknown error occurred');
-        }
-        return await fetch(input, init);
+        // All retry attempts failed; throw the last encountered error.
+        throw lastError instanceof Error ? lastError : new Error('Unknown error occurred in fetchWithRetry');
     }
 }
