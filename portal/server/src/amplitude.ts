@@ -56,6 +56,7 @@ export async function sendToAmplitude(request: NextRequest): Promise<void> {
 			event_properties: {
 				extra: {
 					subdomain: domainDetails?.subdomain,
+					originalUrl: request.headers.get('x-original-url'),
 				},
 			},
 			user_agent: request.headers.get("user-agent") ?? undefined,
