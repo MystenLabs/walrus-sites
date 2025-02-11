@@ -203,7 +203,7 @@ export class UrlFetcher {
      * Retries the fetch operation up to a specified number of attempts in case of failure,
      * with a delay between each retry. Logs the status and error messages during retries.
      *
-     * @param input - The URL, URL object, or Request object representing the resource to fetch.
+     * @param input - The URL string, URL object, or Request object representing the resource to fetch.
      * @param init - Optional fetch options such as headers, method, and body.
      * @param retries - The maximum number of retry attempts (default is 3).
      * @param delayMs - The delay in milliseconds between retry attempts (default is 1000ms).
