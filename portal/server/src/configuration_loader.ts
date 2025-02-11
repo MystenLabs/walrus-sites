@@ -63,8 +63,15 @@ const configurationSchema =
 					message: "SENTRY_TRACES_SAMPLE_RATE must be between 0 and 1",
 				}),
 	    suinsClientNetwork: z.enum(["testnet", "mainnet"]),
-	    blocklistRedisUrl: z.string().optional(),
-	    allowlistRedisUrl: z.string().optional(),
+	    blocklistRedisUrl: z.string().url({message: "BLOCKLIST_REDIS_URL is not a valid URL!"}).optional().refine(
+				// Ensure that the database number is specified and is 0 - this is the blocklist database.
+				(val) => val === undefined || val.endsWith('0')
+			),
+	    allowlistRedisUrl: z.string().url({message: "ALLOWLIST_REDIS_URL is not a valid URL!"}).optional()
+			.refine(
+				// Ensure that the database number is specified and is 1 - this is the allowlist database.
+				(val) => val === undefined || val.endsWith('1')
+			),
 		amplitudeApiKey: z.string().optional(),
 	})
   	.refine(
