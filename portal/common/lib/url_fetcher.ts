@@ -14,6 +14,7 @@ import {
     noObjectIdFound,
     fullNodeFail,
     generateHashErrorResponse,
+    resourceNotFound,
 } from "./http/http_error_responses";
 import { aggregatorEndpoint } from "./aggregator";
 import { toBase64 } from "@mysten/bcs";
@@ -72,29 +73,49 @@ export class UrlFetcher {
         // Fetch the URL using the initial path.
         const fetchPromise = await this.fetchUrl(resolvedObjectId, parsedUrl.path);
 
+        // If the fetch of the initial path succeeds, return the response.
+        if (fetchPromise.status !== HttpStatusCodes.NOT_FOUND) {
+            return fetchPromise;
+        }
+
         // If the fetch fails, check if the path can be matched using
         // the Routes DF and fetch the redirected path.
-        if (fetchPromise.status == HttpStatusCodes.NOT_FOUND) {
-            const routes = await routesPromise;
-            if (!routes) {
-                logger.warn({
-                    message: "No routes found for the object ID",
-                    resolvedObjectIdNoRoutes: resolvedObjectId
-                });
-                return siteNotFound();
-            }
-            let matchingRoute: string | undefined;
-            matchingRoute = this.wsRouter.matchPathToRoute(parsedUrl.path, routes);
-            if (!matchingRoute) {
+        const routes = await routesPromise;
+
+        if (!routes) {
+            logger.warn({
+                message: "No routes found for the object ID",
+                resolvedObjectIdNoRoutes: resolvedObjectId
+            });
+            // Fall through to 404.html check
+        }
+
+        // Try matching route if routes exist
+        if (routes) {
+            const matchingRoute = this.wsRouter.matchPathToRoute(parsedUrl.path, routes);
+            if (matchingRoute) {
+                // If the route is found, fetch the redirected path.
+                const routeResponse = await this.fetchUrl(resolvedObjectId, matchingRoute);
+                if (routeResponse.status !== HttpStatusCodes.NOT_FOUND) {
+                    return routeResponse;
+                }
+            } else {
                 logger.warn({
                     message: `No matching route found for ${parsedUrl.path}`,
                     resolvedObjectIdNoMatchingRoute: resolvedObjectId
                 });
-                return siteNotFound();
             }
-            return this.fetchUrl(resolvedObjectId, matchingRoute);
         }
-        return fetchPromise;
+
+        // Try to fetch 404.html
+        if (parsedUrl.path !== "/404.html") {
+            const notFoundPage = await this.fetchUrl(resolvedObjectId, "/404.html");
+            if (notFoundPage.status !== HttpStatusCodes.NOT_FOUND) {
+                return notFoundPage;
+            }
+        }
+
+        return siteNotFound();
     }
 
     async resolveObjectId(
@@ -145,13 +166,7 @@ export class UrlFetcher {
         logger.info({message: 'Fetching URL', objectId: objectId, path: path});
         const result = await this.resourceFetcher.fetchResource(objectId, path, new Set<string>());
         if (!isResource(result) || !result.blob_id) {
-            if (path !== "/404.html") {
-                logger.warn({ message: "Resource not found. Fetching /404.html ...", path });
-                return this.fetchUrl(objectId, "/404.html");
-            } else {
-                logger.warn({ message: "Walrus Site not found!", objectId, path });
-                return siteNotFound();
-            }
+            return resourceNotFound();
         }
 
         logger.info({ message: "Successfully fetched resource!", fetchedResourceResult: JSON.stringify(result) });

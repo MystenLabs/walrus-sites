@@ -25,6 +25,13 @@ export function fullNodeFail(): Response {
     return Response404("Failed to contact the full node.");
 }
 
+export function resourceNotFound(): Response {
+    return Response404(
+        mainNotFoundErrorMessage,
+        "Resource not found: The requested resource does not exist."
+    );
+}
+
 function Response404(message: String, secondaryMessage?: String): Response {
     const interpolated = template_404
         .replace("${message}", message)
