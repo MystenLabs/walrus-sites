@@ -26,7 +26,8 @@ class UrlFetcherFactory {
         return new UrlFetcher(
             new ResourceFetcher(this.premiumRpcSelector),
             new SuiNSResolver(this.premiumRpcSelector),
-            new WalrusSitesRouter(this.premiumRpcSelector)
+            new WalrusSitesRouter(this.premiumRpcSelector),
+            config.suinsClientNetwork
         );
     }
 
@@ -34,7 +35,8 @@ class UrlFetcherFactory {
         return new UrlFetcher(
             new ResourceFetcher(this.standardRpcSelector),
             new SuiNSResolver(this.standardRpcSelector),
-            new WalrusSitesRouter(this.standardRpcSelector)
+            new WalrusSitesRouter(this.standardRpcSelector),
+            config.suinsClientNetwork
         );
     }
 }

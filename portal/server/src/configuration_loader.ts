@@ -23,7 +23,7 @@ const configurationSchema =
 		sentryAuthToken: env.SENTRY_AUTH_TOKEN,
 		sentryDsn: env.SENTRY_DSN,
 		sentryTracesSampleRate: env.SENTRY_TRACES_SAMPLE_RATE,
-		suinsClientNetwork: env.SUINS_CLIENT_NETWORK,
+		suinsClientNetwork: env.SUINS_CLIENT_NETWORK, // TODO(alex): rename this to NETWORK
 		blocklistRedisUrl: env.BLOCKLIST_REDIS_URL,
 		allowlistRedisUrl: env.ALLOWLIST_REDIS_URL,
 		amplitudeApiKey: env.AMPLITUDE_API_KEY,
