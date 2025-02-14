@@ -48,6 +48,9 @@ module.exports = {
             'process.env.SUINS_CLIENT_NETWORK': JSON.stringify(
                 process.env.SUINS_CLIENT_NETWORK || undefined
             ),
+            'process.env.AGGREGATOR_URL': JSON.stringify(
+                process.env.AGGREGATOR_URL || undefined
+            ),
         }),
         new CopyPlugin({
             patterns: [

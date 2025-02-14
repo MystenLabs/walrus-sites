@@ -65,7 +65,7 @@ self.addEventListener("fetch", async (event) => {
 
     const walrusPath = getBlobIdLink(urlString);
     if (walrusPath) {
-        const aggregatorUrl = "https://aggregator.walrus-testnet.walrus.space"
+        const aggregatorUrl = process.env.AGGREGATOR_URL ?? "https://aggregator.walrus-testnet.walrus.space"
         event.respondWith(redirectToAggregatorUrlResponse(scope, walrusPath, aggregatorUrl));
         return;
     }
