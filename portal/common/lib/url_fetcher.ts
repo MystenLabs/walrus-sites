@@ -30,7 +30,7 @@ export class UrlFetcher {
     constructor(
         private resourceFetcher: ResourceFetcher,
         private suinsResolver: SuiNSResolver,
-        private wsRouter: WalrusSitesRouter
+        private wsRouter: WalrusSitesRouter,
     ){}
 
     /**
@@ -157,7 +157,10 @@ export class UrlFetcher {
         // We have a resource, get the range header.
         logger.info({ message: "Add the range headers of the resource", range: JSON.stringify(result.range)});
         let range_header = optionalRangeToRequestHeaders(result.range);
-        const contents = await fetch(aggregatorEndpoint(result.blob_id), { headers: range_header });
+        const aggregatorUrl = "https://aggregator.walrus-testnet.walrus.space" // TODO(alex): derive from env vars & network
+        const contents = await fetch(
+            aggregatorEndpoint(result.blob_id, aggregatorUrl), { headers: range_header }
+        );
         if (!contents.ok) {
             logger.error(
                 {

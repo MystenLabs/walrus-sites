@@ -6,6 +6,7 @@ import { describe, expect, test } from "vitest";
 import { redirectToPortalURLResponse, redirectToAggregatorUrlResponse } from "./redirects";
 import { DomainDetails } from "./types/index";
 
+const mockAggregatorUrl = "https://aggregator.walrus-testnet.walrus.space";
 const redirectToPortalURLTestCases: [string, DomainDetails, string][] = [
     [
         "https://example.com",
@@ -62,7 +63,7 @@ describe("redirectToAggregatorUrlResponse", () => {
     redirectToAggregatorUrlTestCases.forEach(([input, blobId, expected]) => {
         test(`${input} with blobId: ${blobId} -> ${expected}`, () => {
             const scope = new URL(input);
-            const response = redirectToAggregatorUrlResponse(scope, blobId);
+            const response = redirectToAggregatorUrlResponse(scope, blobId, mockAggregatorUrl);
             expect(response.status).toBe(302);
             expect(response.headers.get("Location")).toBe(expected);
         });
