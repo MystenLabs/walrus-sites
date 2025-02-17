@@ -27,6 +27,7 @@ const configurationSchema =
 		blocklistRedisUrl: env.BLOCKLIST_REDIS_URL,
 		allowlistRedisUrl: env.ALLOWLIST_REDIS_URL,
 		amplitudeApiKey: env.AMPLITUDE_API_KEY,
+		aggregatorUrl: env.AGGREGATOR_URL,
 	}),
 	z.object({
 		edgeConfig: z.string().optional(),
@@ -75,6 +76,7 @@ const configurationSchema =
 				{message: "ALLOWLIST_REDIS_URL must end with '1' to use the allowlist database."}
 			),
 		amplitudeApiKey: z.string().optional(),
+		aggregatorUrl: z.string().url({message: "AGGREGATOR_URL is not a valid URL!"}),
 	})
   	.refine(
    	(data) => {
