@@ -23,10 +23,12 @@ const configurationSchema =
 		sentryAuthToken: env.SENTRY_AUTH_TOKEN,
 		sentryDsn: env.SENTRY_DSN,
 		sentryTracesSampleRate: env.SENTRY_TRACES_SAMPLE_RATE,
-		suinsClientNetwork: env.SUINS_CLIENT_NETWORK,
+		suinsClientNetwork: env.SUINS_CLIENT_NETWORK, // TODO(alex): rename this to NETWORK
 		blocklistRedisUrl: env.BLOCKLIST_REDIS_URL,
 		allowlistRedisUrl: env.ALLOWLIST_REDIS_URL,
 		amplitudeApiKey: env.AMPLITUDE_API_KEY,
+		aggregatorUrl: env.AGGREGATOR_URL,
+		sitePackage: env.SITE_PACKAGE,
 	}),
 	z.object({
 		edgeConfig: z.string().optional(),
@@ -75,6 +77,8 @@ const configurationSchema =
 				{message: "ALLOWLIST_REDIS_URL must end with '1' to use the allowlist database."}
 			),
 		amplitudeApiKey: z.string().optional(),
+		aggregatorUrl: z.string().url({message: "AGGREGATOR_URL is not a valid URL!"}),
+		sitePackage: z.string().refine((val) => val.length === 66 && /^0x[0-9a-fA-F]+$/.test(val)),
 	})
   	.refine(
    	(data) => {

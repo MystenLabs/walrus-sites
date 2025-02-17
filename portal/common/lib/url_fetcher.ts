@@ -22,6 +22,7 @@ import { WalrusSitesRouter } from "./routing";
 import { HttpStatusCodes } from "./http/http_status_codes";
 import logger from "./logger";
 import BlocklistChecker from "./blocklist_checker";
+import {Network} from "@mysten/suins";
 
 /**
 * Includes all the logic for fetching the URL contents of a walrus site.
@@ -30,7 +31,8 @@ export class UrlFetcher {
     constructor(
         private resourceFetcher: ResourceFetcher,
         private suinsResolver: SuiNSResolver,
-        private wsRouter: WalrusSitesRouter
+        private wsRouter: WalrusSitesRouter,
+        private aggregatorUrl: string,
     ){}
 
     /**
@@ -157,7 +159,9 @@ export class UrlFetcher {
         // We have a resource, get the range header.
         logger.info({ message: "Add the range headers of the resource", range: JSON.stringify(result.range)});
         let range_header = optionalRangeToRequestHeaders(result.range);
-        const contents = await fetch(aggregatorEndpoint(result.blob_id), { headers: range_header });
+        const contents = await fetch(
+            aggregatorEndpoint(result.blob_id, this.aggregatorUrl), { headers: range_header }
+        );
         if (!contents.ok) {
             logger.error(
                 {

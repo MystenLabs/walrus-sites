@@ -31,6 +31,12 @@ ENV RPC_URL_LIST=${RPC_URL_LIST}
 ARG SUINS_CLIENT_NETWORK="testnet"
 ENV SUINS_CLIENT_NETWORK=${SUINS_CLIENT_NETWORK}
 
+ARG AGGREGATOR_URL="https://aggregator.walrus-testnet.walrus.space"
+ENV AGGREGATOR_URL=${AGGREGATOR_URL}
+
+ARG SITE_PACKAGE="0xc5bebae319fc9d2a9dc858b7484cdbd6ef219decf4662dc81a11dc69bb7a5fa7"
+ENV SITE_PACKAGE=${SITE_PACKAGE}
+
 # install dependencies into temp directory
 # this will cache them and speed up future builds
 FROM base AS install

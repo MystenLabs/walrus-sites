@@ -43,7 +43,9 @@ export async function GET(req: NextRequest) {
     const walrusPath: string | null = getBlobIdLink(url.toString());
     if (walrusPath) {
         console.log(`Redirecting to aggregator url response: ${req.url} from ${objectIdPath}`);
-        return redirectToAggregatorUrlResponse(url, walrusPath);
+
+        const aggregatorUrl = "https://aggregator.walrus-testnet.walrus.space"
+        return redirectToAggregatorUrlResponse(url, walrusPath, aggregatorUrl);
     }
 
     const parsedUrl = getSubdomainAndPath(url, Number(portalDomainNameLength));

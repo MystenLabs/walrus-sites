@@ -28,11 +28,13 @@ if (!suinsClientNetwork) {
 if (!['testnet', 'mainnet'].includes(suinsClientNetwork)) {
     throw new Error("Invalid SUINS_CLIENT_NETWORK environment variable");
 }
+const aggregatorUrl = process.env.AGGREGATOR_URL;
 const rpcSelector = new RPCSelector(rpcUrlList.split(','), suinsClientNetwork as Network);
 export const urlFetcher = new UrlFetcher(
-    new ResourceFetcher(rpcSelector),
+    new ResourceFetcher(rpcSelector, process.env.SITE_PACKAGE),
     new SuiNSResolver(rpcSelector),
-    new WalrusSitesRouter(rpcSelector)
+    new WalrusSitesRouter(rpcSelector),
+    aggregatorUrl,
 );
 
 self.addEventListener("install", (_event) => {
@@ -65,7 +67,7 @@ self.addEventListener("fetch", async (event) => {
 
     const walrusPath = getBlobIdLink(urlString);
     if (walrusPath) {
-        event.respondWith(redirectToAggregatorUrlResponse(scope, walrusPath));
+        event.respondWith(redirectToAggregatorUrlResponse(scope, walrusPath, aggregatorUrl));
         return;
     }
 

@@ -22,9 +22,9 @@ export function redirectToPortalURLResponse(
 /**
  * Redirects to the aggregator URL.
  */
-export function redirectToAggregatorUrlResponse(scope: URL, blobId: string): Response {
+export function redirectToAggregatorUrlResponse(scope: URL, blobId: string, aggregatorUrl: string): Response {
     // Redirect to the walrus site for the specified domain and path
-    const redirectUrl = aggregatorEndpoint(blobId);
+    const redirectUrl = aggregatorEndpoint(blobId, aggregatorUrl);
     logger.info({ message: "Redirecting to the Walrus Blob link", redirectUrl: redirectUrl });
     return makeRedirectResponse(redirectUrl.href);
 }
