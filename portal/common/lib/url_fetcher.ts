@@ -32,7 +32,7 @@ export class UrlFetcher {
         private resourceFetcher: ResourceFetcher,
         private suinsResolver: SuiNSResolver,
         private wsRouter: WalrusSitesRouter,
-        private network: Network,
+        private aggregatorUrl: string,
     ){}
 
     /**
@@ -160,7 +160,7 @@ export class UrlFetcher {
         logger.info({ message: "Add the range headers of the resource", range: JSON.stringify(result.range)});
         let range_header = optionalRangeToRequestHeaders(result.range);
         const contents = await fetch(
-            aggregatorEndpoint(result.blob_id, this.deriveAggregatorUrl()), { headers: range_header }
+            aggregatorEndpoint(result.blob_id, this.aggregatorUrl), { headers: range_header }
         );
         if (!contents.ok) {
             logger.error(
@@ -195,19 +195,5 @@ export class UrlFetcher {
                 "x-unix-time-cached": Date.now().toString(),
             },
         });
-    }
-
-    /**
-     * Derives the aggregator URL based on the network type.
-     *
-     * @return {string} Returns the derived aggregator URL.
-     */
-    private deriveAggregatorUrl() : string {
-        switch (this.network) {
-            // TODO: to improve this, we can parse the aggregator URLs from a config file or env variables.
-            case "testnet": return "https://aggregator.walrus-testnet.walrus.space";
-            case "mainnet": throw new Error("Aggregator URL not yet available on mainnet");
-            default: throw new Error("Invalid network type");
-        }
     }
 }
