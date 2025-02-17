@@ -45,7 +45,7 @@ describe("fetchResource", () => {
         process.env.RPC_URL_LIST!.split(','),
         'testnet'
     )
-    const resourceFetcher = new ResourceFetcher(rpcSelector);
+    const resourceFetcher = new ResourceFetcher(rpcSelector, "0x123");
     // Mock SuiClient methods
     const multiGetObjects = vi.spyOn(rpcSelector, 'multiGetObjects');
 

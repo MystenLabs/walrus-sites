@@ -51,6 +51,9 @@ module.exports = {
             'process.env.AGGREGATOR_URL': JSON.stringify(
                 process.env.AGGREGATOR_URL || undefined
             ),
+            'process.env.SITE_PACKAGE': JSON.stringify(
+                process.env.SITE_PACKAGE || undefined
+            ),
         }),
         new CopyPlugin({
             patterns: [

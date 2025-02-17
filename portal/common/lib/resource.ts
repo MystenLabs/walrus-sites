@@ -4,7 +4,7 @@
 import { HttpStatusCodes } from "./http/http_status_codes";
 import { SuiObjectData, SuiObjectResponse } from "@mysten/sui/client";
 import { Resource, VersionedResource } from "./types";
-import { MAX_REDIRECT_DEPTH, RESOURCE_PATH_MOVE_TYPE } from "./constants";
+import { MAX_REDIRECT_DEPTH } from "./constants";
 import { checkRedirect } from "./redirects";
 import { fromBase64 } from "@mysten/bcs";
 import { ResourcePathStruct, DynamicFieldStruct, ResourceStruct } from "./bcs_data_parsing";
@@ -13,8 +13,23 @@ import { bcs } from "@mysten/bcs";
 import { RPCSelector } from "./rpc_selector";
 import logger from "./logger";
 
+/**
+ * The ResourceFetcher class is responsible for fetching resources associated with a site.
+ * It handles potential redirects and ensures that resources are fetched recursively up to a maximum depth.
+ *
+ * @class ResourceFetcher
+ * @param {RPCSelector} rpcSelector - An instance of RPCSelector to interact with the Sui network.
+ * @param {string} sitePackage - The package name of the site.
+ */
 export class ResourceFetcher {
-    constructor(private rpcSelector: RPCSelector) {}
+	/// The string representing the ResourcePath struct in the walrus_site package.
+	private readonly resourcePathMoveType: string;
+    constructor(
+    	private rpcSelector: RPCSelector,
+     	sitePackage: string,
+    ) {
+    	this.resourcePathMoveType = sitePackage + "::site::ResourcePath";
+    }
 
     /**
      * Fetches a resource of a site.
@@ -47,7 +62,7 @@ export class ResourceFetcher {
         // making a request to the network.
         const dynamicFieldId = deriveDynamicFieldID(
             objectId,
-            RESOURCE_PATH_MOVE_TYPE,
+            this.resourcePathMoveType,
             bcs.string().serialize(path).toBytes(),
         );
 

@@ -31,7 +31,7 @@ if (!['testnet', 'mainnet'].includes(suinsClientNetwork)) {
 const aggregatorUrl = process.env.AGGREGATOR_URL;
 const rpcSelector = new RPCSelector(rpcUrlList.split(','), suinsClientNetwork as Network);
 export const urlFetcher = new UrlFetcher(
-    new ResourceFetcher(rpcSelector),
+    new ResourceFetcher(rpcSelector, process.env.SITE_PACKAGE),
     new SuiNSResolver(rpcSelector),
     new WalrusSitesRouter(rpcSelector),
     aggregatorUrl,
