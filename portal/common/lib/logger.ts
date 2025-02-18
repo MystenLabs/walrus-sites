@@ -24,10 +24,10 @@ type LoggingPredicate = (args: any) => void;
     /// @param warnPredicate Function for warning messages.
     /// @param errorPredicate Function for error messages.
     constructor(
-        debugPredicate: LoggingPredicate = console.debug,
-        logPredicate: LoggingPredicate = console.log,
-        warnPredicate: LoggingPredicate = console.warn,
-        errorPredicate: LoggingPredicate = console.error
+		debugPredicate: LoggingPredicate = (value) => console.debug(JSON.stringify(value).replace('\n', '')),
+        logPredicate: LoggingPredicate = (value) => console.log(JSON.stringify(value).replace('\n', '')),
+        warnPredicate: LoggingPredicate = (value) => console.warn(JSON.stringify(value).replace('\n', '')),
+        errorPredicate: LoggingPredicate = (value) => console.error(JSON.stringify(value).replace('\n', ''))
     ) {
         this.debugPredicate = debugPredicate;
         this.infoPredicate = logPredicate;
