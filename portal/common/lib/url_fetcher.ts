@@ -212,18 +212,35 @@ export class UrlFetcher {
     private async fetchWithRetry(
         input: string | URL | globalThis.Request,
         init?: RequestInit,
-        retries: number = 1,
+        retries: number = 2,
         delayMs: number = 1000
     ): Promise<Response> {
         let lastError: unknown;
 
+        if (retries < 0) {
+            logger.warn({
+                message: `Invalid retries value (${retries}). Falling back to a single fetch call.`
+            });
+            return fetch(input, init);
+        }
+
         for (let attempt = 0; attempt <= retries; attempt++) {
             try {
                 const response = await fetch(input, init);
+                if (response.status === 500) {
+                    if (attempt === retries) {
+                        return response;
+                    }
+                    throw new Error("Server responded with status 500");
+                }
                 return response;
             } catch (error) {
-                console.error(`Attempt ${attempt} encountered an error: ${(error as Error).message}`);
-                lastError = error;
+                logger.error({
+                    message: "Fetch attempt failed",
+                    attempt: attempt + 1,
+                    totalAttempts: retries + 1,
+                    error: error instanceof Error ? error.message : error,
+                });
             }
 
             // Wait before retrying
