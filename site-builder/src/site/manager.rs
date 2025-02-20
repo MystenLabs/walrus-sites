@@ -10,15 +10,12 @@ use std::{
 use anyhow::{anyhow, Result};
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{
-    rpc_types::{
-        SuiTransactionBlockEffectsAPI,
-        SuiTransactionBlockResponse,
-    },
+    rpc_types::SuiTransactionBlockResponse,
     wallet_context::WalletContext,
 };
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
-    transaction::{CallArg, ProgrammableTransaction, TransactionData},
+    transaction::{CallArg, ProgrammableTransaction},
     Identifier,
 };
 
@@ -115,6 +112,8 @@ impl SiteManager {
         tracing::debug!(operations=?site_updates, "list of operations computed");
 
         let walrus_updates = site_updates.get_walrus_updates(&self.when_upload);
+
+        let mut total_storage_cost = 0;
 
         if !walrus_updates.is_empty() {
             tracing::info!("Dry-running Walrus store operations");
