@@ -40,6 +40,19 @@ pub enum RegisterBlobOp {
     ReuseStorage { encoded_length: u64 },
     /// A registration was already present.
     ReuseRegistration { encoded_length: u64 },
+    /// The blob was already certified, but its lifetime is too short.
+    ReuseAndExtend {
+        encoded_length: u64,
+        // The number of epochs extended wrt the original epoch end.
+        epochs_extended: EpochCount,
+    },
+    /// The blob was registered, but not certified, and its lifetime is shorter than
+    /// the desired one.
+    ReuseAndExtendNonCertified {
+        encoded_length: u64,
+        // The number of epochs extended wrt the original epoch end.
+        epochs_extended: EpochCount,
+    },
 }
 
 /// Result when attempting to store a blob.
