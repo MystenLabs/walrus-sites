@@ -9,10 +9,7 @@ use std::{
 
 use anyhow::{anyhow, Result};
 use sui_keys::keystore::AccountKeystore;
-use sui_sdk::{
-    rpc_types::SuiTransactionBlockResponse,
-    wallet_context::WalletContext,
-};
+use sui_sdk::{rpc_types::SuiTransactionBlockResponse, wallet_context::WalletContext};
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
     transaction::{CallArg, ProgrammableTransaction},
@@ -22,10 +19,7 @@ use sui_types::{
 use super::{
     builder::SitePtb,
     resource::{Resource, ResourceOp},
-    RemoteSiteFactory,
-    SiteData,
-    SiteDataDiff,
-    SITE_MODULE,
+    RemoteSiteFactory, SiteData, SiteDataDiff, SITE_MODULE,
 };
 use crate::{
     backoff::ExponentialBackoffConfig,
@@ -35,8 +29,7 @@ use crate::{
     summary::SiteDataDiffSummary,
     util::{get_site_id_from_response, sign_and_send_ptb},
     walrus::Walrus,
-    Config,
-    EpochCountOrMax,
+    Config, EpochCountOrMax,
 };
 
 const MAX_RESOURCES_PER_PTB: usize = 200;
@@ -122,7 +115,12 @@ impl SiteManager {
 
                 let dry_run_outputs = self
                     .walrus
-                    .dry_run_store(resource.full_path.clone(), self.epochs.clone(), !self.permanent, false)
+                    .dry_run_store(
+                        resource.full_path.clone(),
+                        self.epochs.clone(),
+                        !self.permanent,
+                        false,
+                    )
                     .await?;
 
                 for dry_run_output in dry_run_outputs {
