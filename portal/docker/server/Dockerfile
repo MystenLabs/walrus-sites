@@ -59,4 +59,4 @@ COPY --from=install /temp/prod/server/.next server/.next
 USER bun
 EXPOSE 3000/tcp
 ENV NODE_ENV=production
-CMD [ "bun", "run", "server:prod" ]
+CMD [ "bun", "run", "server" ]
