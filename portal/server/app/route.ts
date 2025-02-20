@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
 
     // Send the page view event to either Amplitude or Vercel Web Analytics.
     if (config.amplitudeApiKey) {
-		await sendToAmplitude(req);
+		await sendToAmplitude(req, url);
 	}
     if (config.enableVercelWebAnalytics) {
 		await sendToWebAnalytics(req);

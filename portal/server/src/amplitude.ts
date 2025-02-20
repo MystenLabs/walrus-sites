@@ -7,7 +7,7 @@ import { config } from "./configuration_loader";
 import logger from "@lib/logger";
 import { NextRequest } from "next/server";
 import { getSubdomainAndPath } from "@lib/domain_parsing";
-import uaparser from "ua-parser-js";
+import { UAParser } from "ua-parser-js";
 
 if (config.amplitudeApiKey) {
 	amplitude.init(process.env.AMPLITUDE_API_KEY!,{
@@ -24,7 +24,7 @@ if (config.amplitudeApiKey) {
 * Sends a page view event to Amplitude.
 * @param request - The incoming request to the portal.
 */
-export async function sendToAmplitude(request: NextRequest): Promise<void> {
+export async function sendToAmplitude(request: NextRequest, originalUrl: URL): Promise<void> {
 	if (!isHtmlPage(request)) {
 		return;
 	}
@@ -33,33 +33,40 @@ export async function sendToAmplitude(request: NextRequest): Promise<void> {
 		return;
 	}
 	try {
-		const domainDetails = getSubdomainAndPath(request.nextUrl)
+        // use originalUrl due to nextUrl would be http://localhost:3000/something behind a LB or reverse proxy
+		const domainDetails = getSubdomainAndPath(originalUrl)
 		let ua;
-		try {
-			ua = new uaparser.UAParser(request.headers.get("user-agent") ?? undefined);
-		} catch (e) {
-			console.warn("Could not parse user agent: ", e);
-		}
+        let ua_header = request.headers.get("user-agent");
+        if (!!ua_header) {
+            try {
+                ua = UAParser(ua_header);
+            } catch (e) {
+                console.warn("Could not parse user agent: ", e);
+            }
+        }
+        let x_forwarded_for_ip = request.headers.get("x-forwarded-for")
+        /// only use the first ip address in the x-forwarded-for header, as LB will add multiple ips that could lead to wrong geo location
+        let ip = x_forwarded_for_ip ? x_forwarded_for_ip.split(",")[0] : request.headers.get("x-real-ip") ?? undefined;
 		amplitude.track({
-			os_name: ua?.getOS().name,
-			os_version: ua?.getOS().version,
-			device_id: generateDeviceId(request.headers.get("user-agent")),
-			device_manufacturer: ua?.getDevice().vendor,
-			platform: ua?.getDevice().type,
+			os_name: ua?.os.name,
+			os_version: ua?.os.version,
+			device_id: generateDeviceId(ip, ua_header),
+			device_manufacturer: ua?.device.vendor,
+			platform: ua?.device.type,
 	    	event_type: "page_view",
 			region: request.geo?.region,
 			country: request.geo?.country,
 			location_lat: Number(request.geo?.latitude),
 			location_lng: Number(request.geo?.longitude),
 			language: request.headers.get("accept-language") ?? undefined,
-			ip: request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip") ?? undefined,
+			ip: ip,
 			event_properties: {
 				extra: {
 					subdomain: domainDetails?.subdomain,
 					originalUrl: request.headers.get('x-original-url'),
 				},
 			},
-			user_agent: request.headers.get("user-agent") ?? undefined,
+			user_agent: ua_header ?? undefined,
   	    })
 	} catch (e) {
 		console.warn("Amplitude could not track event: ", e);
@@ -67,11 +74,13 @@ export async function sendToAmplitude(request: NextRequest): Promise<void> {
 }
 
 /**
-* Generates a device ID based on the user agent string.
+* Generates a device ID based on the user agent string and ip addressj.
+* @param ip - ip address.
 * @param userAgent - device & browser details.
 * @returns A hashed device ID.
 */
-function generateDeviceId(userAgent: string | null): string {
-	const defaultDeviceId = "1234567890";
-	return generateHash(userAgent || defaultDeviceId);
+function generateDeviceId(ip: string | undefined, userAgent: string | null): string {
+	const defaultDeviceId = "1234567890"
+    let ip_str = ip ?? ""
+    return generateHash(userAgent+ip_str || defaultDeviceId);
 }
