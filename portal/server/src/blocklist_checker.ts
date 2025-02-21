@@ -62,6 +62,16 @@ class VercelEdgeConfigBlocklistChecker implements BlocklistChecker {
     async isBlocked(id: string): Promise<boolean> {
         return has(id);
     }
+
+    // edge config does not require initialization, so we do nothing
+    async init(): Promise<void> {
+        return;
+    }
+
+    // edge config does not support pinging, so we always return true
+    async ping(): Promise<boolean> {
+        return true;
+    }
 }
 
 /**
@@ -80,7 +90,20 @@ class RedisBlocklistChecker implements BlocklistChecker {
     async isBlocked(id: string): Promise<boolean> {
         return await this.client.keyExists(id);
     }
+
+    async init(): Promise<void> {
+        await this.client.connect();
+    }
+
+    async ping(): Promise<boolean> {
+        return await this.client.ping();
+    }
 }
 
 const blocklistChecker = BlocklistCheckerFactory.build();
+// Initialize in an IIFE instead of top-level await
+(async () => {
+    await blocklistChecker?.init();
+})();
+
 export default blocklistChecker;
