@@ -63,6 +63,11 @@ class VercelEdgeConfigAllowlistChecker implements AllowlistChecker {
         this.edgeConfigAllowlistClient = createClient(config.edgeConfigAllowlist);
     }
 
+    // edge config does not require initialization, so we do nothing
+    async init(): Promise<void> {
+        return;
+    }
+
     async isAllowed(id: string): Promise<boolean> {
         return await this.edgeConfigAllowlistClient.has(id);
     }
@@ -86,6 +91,10 @@ class RedisAllowlistChecker implements AllowlistChecker {
         this.client = new RedisClientFacade(redisUrl);
     }
 
+    async init(): Promise<void> {
+        await this.client.connect();
+    }
+
     async isAllowed(id: string): Promise<boolean> {
         return await this.client.keyExists(id);
     }
@@ -96,4 +105,9 @@ class RedisAllowlistChecker implements AllowlistChecker {
 }
 
 const allowlistChecker = AllowlistCheckerFactory.build();
+// Initialize in an IIFE instead of top-level await
+(async () => {
+    await allowlistChecker?.init();
+})();
+
 export default allowlistChecker;

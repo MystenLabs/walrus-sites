@@ -3,6 +3,11 @@
 
 export default interface AllowlistChecker {
     /**
+     * Initializes the allowlist checker.
+     */
+    init: () => Promise<void>;
+
+    /**
      * Checks if the object id or suins domain of a walrus site object is in the allowlist.
      * @param id The object id or suins domain to check if it is in the allowlist.
      * @returns True if the id or suins domain is in the allowlist, false otherwise.
