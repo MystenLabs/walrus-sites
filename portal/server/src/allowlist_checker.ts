@@ -66,6 +66,11 @@ class VercelEdgeConfigAllowlistChecker implements AllowlistChecker {
     async isAllowed(id: string): Promise<boolean> {
         return await this.edgeConfigAllowlistClient.has(id);
     }
+
+    // edge config does not support pinging and the client handles the connection, so we always return true
+    async ping(): Promise<boolean> {
+        return true;
+    }
 }
 
 /**
@@ -83,6 +88,10 @@ class RedisAllowlistChecker implements AllowlistChecker {
 
     async isAllowed(id: string): Promise<boolean> {
         return await this.client.keyExists(id);
+    }
+
+    async ping(): Promise<boolean> {
+        return await this.client.ping();
     }
 }
 

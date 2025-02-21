@@ -20,6 +20,12 @@ interface BlocklistChecker {
      * Examples of cleanup include closing any open connections or releasing resources.
      */
     close?: () => void;
+
+    /**
+     * Pings the blocklist checker to check if it is healthy.
+     * @returns True if the blocklist checker is healthy, false otherwise.
+     */
+    ping: () => Promise<boolean>;
 }
 
 export default BlocklistChecker;

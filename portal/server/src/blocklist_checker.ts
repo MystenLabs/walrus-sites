@@ -62,6 +62,11 @@ class VercelEdgeConfigBlocklistChecker implements BlocklistChecker {
     async isBlocked(id: string): Promise<boolean> {
         return has(id);
     }
+
+    // edge config does not support pinging, so we always return true
+    async ping(): Promise<boolean> {
+        return true;
+    }
 }
 
 /**
@@ -79,6 +84,10 @@ class RedisBlocklistChecker implements BlocklistChecker {
 
     async isBlocked(id: string): Promise<boolean> {
         return await this.client.keyExists(id);
+    }
+
+    async ping(): Promise<boolean> {
+        return await this.client.ping();
     }
 }
 
