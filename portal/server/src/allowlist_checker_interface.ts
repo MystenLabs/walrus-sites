@@ -14,4 +14,10 @@ export default interface AllowlistChecker {
      * Examples of cleanup include closing any open connections or releasing resources.
      */
     close?: () => void;
+
+    /**
+     * Pings the allowlist checker to check if it is healthy.
+     * @returns True if the allowlist checker is healthy, false otherwise.
+     */
+    ping: () => Promise<boolean>;
 }
