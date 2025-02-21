@@ -9,6 +9,11 @@
  */
 interface BlocklistChecker {
     /**
+     * Initializes the blocklist checker.
+     */
+    init: () => Promise<void>;
+
+    /**
      * Checks if the object id or suins domain of a walrus site object is in the blocklist.
      * @param id The object id or suins domain to check if it is in the blocklist.
      * @returns True if the id or suins domain is in the blocklist, false otherwise.

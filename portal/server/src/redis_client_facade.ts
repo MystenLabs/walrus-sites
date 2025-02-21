@@ -34,15 +34,11 @@ export default class RedisClientFacade {
         await this.client.disconnect();
     }
 
+    async connect(): Promise<void> {
+        await this.client.connect();
+    }
+
     async ping(): Promise<boolean> {
-        try {
-            const result = await this.client.ping();
-            return result === 'PONG';
-        } catch (error) {
-            logger.error({
-                message: `Error Redis ping: pinging the Redis client.`, error
-            });
-            return false;
-        }
+        return await this.client.ping() === 'PONG';
     }
 }
