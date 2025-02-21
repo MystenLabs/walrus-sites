@@ -110,12 +110,49 @@ impl SiteManager {
 
         let walrus_updates = site_updates.get_walrus_updates(&self.when_upload);
 
+        let mut total_storage_cost = 0;
+
         if !walrus_updates.is_empty() {
-            self.publish_to_walrus(&walrus_updates).await?;
+            tracing::info!("Dry-running Walrus store operations");
+            for update in &walrus_updates {
+                let resource = update.inner();
+
+                let dry_run_outputs = self
+                    .walrus
+                    .dry_run_store(
+                        resource.full_path.clone(),
+                        self.epochs.clone(),
+                        !self.permanent,
+                        false,
+                    )
+                    .await?;
+
+                for dry_run_output in dry_run_outputs {
+                    let storage_cost = dry_run_output.storage_cost;
+                    total_storage_cost += storage_cost;
+                }
+            }
         }
 
+        // Check if there are any updates to the site on-chain.
         let result = if site_updates.has_updates() {
-            display::action("Updating the Walrus Site object on Sui");
+            // Before doing the actual execution, perform a dry run
+            display::action(format!(
+                "Estimated Storage Cost for this publish/update (Gas Cost Excluded): {} FROST",
+                total_storage_cost
+            ));
+
+            // Add user confirmation prompt.
+            display::action("Waiting for user confirmation...");
+            if !dialoguer::Confirm::new()
+                .with_prompt("Do you want to proceed with these updates?")
+                .default(true)
+                .interact()?
+            {
+                display::error("Update cancelled by user");
+                return Err(anyhow!("Update cancelled by user"));
+            }
+            display::action("Applying the Walrus Site object updates on Sui");
             let result = self.execute_sui_updates(&site_updates).await?;
             display::done();
             result
