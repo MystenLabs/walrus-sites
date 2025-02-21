@@ -19,7 +19,10 @@ use sui_types::{
 use super::{
     builder::SitePtb,
     resource::{Resource, ResourceOp},
-    RemoteSiteFactory, SiteData, SiteDataDiff, SITE_MODULE,
+    RemoteSiteFactory,
+    SiteData,
+    SiteDataDiff,
+    SITE_MODULE,
 };
 use crate::{
     backoff::ExponentialBackoffConfig,
@@ -29,7 +32,8 @@ use crate::{
     summary::SiteDataDiffSummary,
     util::{get_site_id_from_response, sign_and_send_ptb},
     walrus::Walrus,
-    Config, EpochCountOrMax,
+    Config,
+    EpochCountOrMax,
 };
 
 const MAX_RESOURCES_PER_PTB: usize = 200;
@@ -133,7 +137,7 @@ impl SiteManager {
         // Check if there are any updates to the site on-chain.
         let result = if site_updates.has_updates() {
             // Before doing the actual execution, perform a dry run
-            display::action(&format!(
+            display::action(format!(
                 "Estimated Storage Cost for this publish/update (Gas Cost Excluded): {} FROST",
                 total_storage_cost
             ));
