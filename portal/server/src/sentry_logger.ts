@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import logger from "@lib/logger";
-import * as Sentry from "@sentry/node";
+import * as Sentry from "@sentry/bun";
 
 function addLoggingArgsToSentry(args: { [key: string]: any }) {
     Object.entries(args).forEach(([key, value]) => {

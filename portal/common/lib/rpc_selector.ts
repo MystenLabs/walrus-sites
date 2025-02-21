@@ -130,7 +130,7 @@ export class RPCSelector implements RPCSelectorInterface {
             return result;
         } catch (error) {
             const message = `Failed to contact fallback RPC clients.`
-            logger.error({ message, error: error });
+            logger.error({ message, error: JSON.stringify(error) });
             throw new Error(message);
         }
     }
@@ -142,7 +142,7 @@ export class RPCSelector implements RPCSelectorInterface {
             return true;
         }
         if (error) {
-            logger.warn({message: 'Failed to get object', error: error})
+            logger.warn({message: 'Failed to get object', error: JSON.stringify(error)})
             return true
         }
         return false
