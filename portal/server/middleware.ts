@@ -8,7 +8,7 @@ export function middleware(request: NextRequest) {
     const urlOriginal = extractUrlFrom(request)
     const alreadyAtRoot = request.nextUrl.pathname === '/'
     // Bypass middleware for walrus-sites-sw.js
-    if (request.nextUrl.pathname.endsWith('walrus-sites-sw.js')) {
+    if (request.nextUrl.pathname.endsWith('walrus-sites-sw.js') || request.nextUrl.pathname === '/api/healthz') {
         return NextResponse.next()
     }
     if (alreadyAtRoot) {
