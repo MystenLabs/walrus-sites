@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { WalrusSitesRouter } from "./routing";
-import { test, expect, describe } from "vitest";
+import { test, expect, describe, vi, beforeEach } from "vitest";
 import { RPCSelector } from "./rpc_selector";
 import { UrlFetcher } from "./url_fetcher";
 import { ResourceFetcher } from "./resource";
@@ -55,13 +55,39 @@ testCases.forEach(([requestPath, _]) => {
 });
 
 describe('routing tests', () => {
-    test("should check routes before 404.html", async () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
 
+    test("should check routes before 404.html", async () => {
         const urlFetcher = new UrlFetcher(
             new ResourceFetcher(rpcSelector),
             new SuiNSResolver(rpcSelector),
             wsRouter
         );
+
+        const fetchUrlSpy = vi.spyOn(urlFetcher, 'fetchUrl');
+        // Mock the fetchUrl method to return a test.html and 404.html response
+        fetchUrlSpy.mockImplementation(async (objectId: string, path: string) => {
+            switch (path) {
+                case '/test.html':
+                    return new Response("test.html content", { status: 200 });
+                case '/404.html':
+                    return new Response("404 page content", { status: 200 });
+                default:
+                    return new Response(null, { status: 404 });
+            }
+        });
+
+        const getRoutesSpy = vi.spyOn(wsRouter, 'getRoutes');
+        // Mock the getRoutes method to return a test.html route
+        getRoutesSpy.mockImplementation(async () => {
+            return {
+                routes_list: new Map([
+                    ['/test', '/test.html']
+                ])
+            };
+        });
 
         const siteObjectId = "0x0977d45a9adb8af8405c0698b0e049de05f8c89da75ca16ac6a6cba76031519f";
 
@@ -94,5 +120,5 @@ describe('routing tests', () => {
 
         // Verify we didn't get 404.html content
         expect(actualContent).not.toBe(notFoundContent);
-    }, { timeout: 30000 });
+    });
 });
