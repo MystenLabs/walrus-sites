@@ -11,6 +11,8 @@ import { SuiNSResolver } from "./suins";
 const snakeSiteObjectId = "0x7a95e4be3948415b852fb287d455166a276d7a52f1a567b4a26b6b5e9c753158";
 const rpcSelector = new RPCSelector(process.env.RPC_URL_LIST!.split(","), "testnet");
 const wsRouter = new WalrusSitesRouter(rpcSelector);
+const aggregatorUrl = process.env.AGGREGATOR_URL;
+const sitePackage = process.env.SITE_PACKAGE;
 
 test.skip("getRoutes", async () => {
     // TODO: when you make sure get_routes fetches
@@ -61,9 +63,10 @@ describe('routing tests', () => {
 
     test("should check routes before 404.html", async () => {
         const urlFetcher = new UrlFetcher(
-            new ResourceFetcher(rpcSelector),
+            new ResourceFetcher(rpcSelector, sitePackage),
             new SuiNSResolver(rpcSelector),
-            wsRouter
+            wsRouter,
+            aggregatorUrl
         );
 
         const fetchUrlSpy = vi.spyOn(urlFetcher, 'fetchUrl');
