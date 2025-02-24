@@ -48,6 +48,20 @@ COPY portal/worker /temp/prod/worker
 RUN cd /temp/prod && bun install --frozen-lockfile
 RUN cd /temp/prod && bun run build:server
 
+# debug image target
+FROM base as debug
+RUN apt update && apt install -y curl netcat-traditional
+COPY --from=install /temp/prod/node_modules node_modules
+COPY --from=install /temp/prod/package.json .
+COPY --from=install /temp/prod/server/package.json server/package.json
+COPY --from=install /temp/prod/server/.next server/.next
+
+# run the app
+USER bun
+EXPOSE 3000/tcp
+ENV NODE_ENV=development
+CMD [ "bun", "run", "server" ]
+
 # copy production dependencies and source code into final image
 FROM base AS release
 COPY --from=install /temp/prod/node_modules node_modules

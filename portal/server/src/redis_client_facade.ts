@@ -9,7 +9,8 @@ export default class RedisClientFacade {
 
     constructor(redisUrl: string) {
         this.client = createClient({url: redisUrl})
-            .on('error', err => console.log('Redis Client Error', err));
+            .on('error', err => console.log('Redis Client Error', err))
+            .on('connect', () => console.log('Redis Client Connected'));
     }
 
     /**
@@ -19,21 +20,25 @@ export default class RedisClientFacade {
      */
     async keyExists(key: string): Promise<boolean> {
         try {
-            if (!this.client.isReady) {
-                await this.client.connect();
-            }
             const value = await this.client.EXISTS(key);
             return !!value;
         } catch (error) {
             logger.error({
                 message: `Error Redis check: checking the presence of "${key}".`, error
             });
-            await this.client.disconnect();
             throw error;
         }
     }
 
     async close() {
         await this.client.disconnect();
+    }
+
+    async connect(): Promise<void> {
+        await this.client.connect();
+    }
+
+    async ping(): Promise<boolean> {
+        return await this.client.ping() === 'PONG';
     }
 }
