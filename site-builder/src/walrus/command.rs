@@ -56,6 +56,7 @@ pub enum Command {
         #[serde(default)]
         force: bool,
         deletable: bool,
+        //dry_run
         #[serde(default)]
         dry_run: bool,
     },

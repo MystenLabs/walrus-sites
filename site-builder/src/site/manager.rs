@@ -58,6 +58,7 @@ pub struct SiteManager {
     pub when_upload: WhenWalrusUpload,
     pub backoff_config: ExponentialBackoffConfig,
     pub permanent: bool,
+    pub dry_run: bool,
 }
 
 impl SiteManager {
@@ -68,6 +69,7 @@ impl SiteManager {
         epochs: EpochCountOrMax,
         when_upload: WhenWalrusUpload,
         permanent: bool,
+        dry_run: bool,
     ) -> Result<Self> {
         Ok(SiteManager {
             walrus: config.walrus_client(),
@@ -78,7 +80,37 @@ impl SiteManager {
             when_upload,
             backoff_config: ExponentialBackoffConfig::default(),
             permanent,
+            dry_run,
         })
+    }
+
+    /// Perform a dry-run of Walrus store operations for the given updates
+    /// and return the total storage cost that would be incurred.
+    async fn dry_run_walrus_store(
+        &mut self,
+        walrus_updates: &Vec<&ResourceOp<'_>>, // Replace `YourUpdateType` with the real type
+    ) -> anyhow::Result<u64> {
+        tracing::info!("Dry-running Walrus store operations");
+        let mut total_storage_cost = 0u64;
+
+        for update in walrus_updates {
+            let resource = update.inner(); // Adjust if your updates return the resource differently
+            let dry_run_outputs = self
+                .walrus
+                .dry_run_store(
+                    resource.full_path.clone(),
+                    self.epochs.clone(),
+                    !self.permanent,
+                    false, // Adjust or parameterize as needed
+                )
+                .await?;
+
+            for dry_run_output in dry_run_outputs {
+                total_storage_cost += dry_run_output.storage_cost;
+            }
+        }
+
+        Ok(total_storage_cost)
     }
 
     /// Updates the site with the given [`Resource`].
@@ -110,48 +142,31 @@ impl SiteManager {
 
         let walrus_updates = site_updates.get_walrus_updates(&self.when_upload);
 
-        let mut total_storage_cost = 0;
-
         if !walrus_updates.is_empty() {
-            tracing::info!("Dry-running Walrus store operations");
-            for update in &walrus_updates {
-                let resource = update.inner();
+            if self.dry_run {
+                let total_storage_cost = self.dry_run_walrus_store(&walrus_updates).await?;
+                // Before doing the actual execution, perform a dry run
+                display::action(format!(
+                    "Estimated Storage Cost for this publish/update (Gas Cost Excluded): {} FROST",
+                    total_storage_cost
+                ));
 
-                let dry_run_outputs = self
-                    .walrus
-                    .dry_run_store(
-                        resource.full_path.clone(),
-                        self.epochs.clone(),
-                        !self.permanent,
-                        false,
-                    )
-                    .await?;
-
-                for dry_run_output in dry_run_outputs {
-                    let storage_cost = dry_run_output.storage_cost;
-                    total_storage_cost += storage_cost;
+                // Add user confirmation prompt.
+                display::action("Waiting for user confirmation...");
+                if !dialoguer::Confirm::new()
+                    .with_prompt("Do you want to proceed with these updates?")
+                    .default(true)
+                    .interact()?
+                {
+                    display::error("Update cancelled by user");
+                    return Err(anyhow!("Update cancelled by user"));
                 }
             }
+            self.publish_to_walrus(&walrus_updates).await?;
         }
 
         // Check if there are any updates to the site on-chain.
         let result = if site_updates.has_updates() {
-            // Before doing the actual execution, perform a dry run
-            display::action(format!(
-                "Estimated Storage Cost for this publish/update (Gas Cost Excluded): {} FROST",
-                total_storage_cost
-            ));
-
-            // Add user confirmation prompt.
-            display::action("Waiting for user confirmation...");
-            if !dialoguer::Confirm::new()
-                .with_prompt("Do you want to proceed with these updates?")
-                .default(true)
-                .interact()?
-            {
-                display::error("Update cancelled by user");
-                return Err(anyhow!("Update cancelled by user"));
-            }
             display::action("Applying the Walrus Site object updates on Sui");
             let result = self.execute_sui_updates(&site_updates).await?;
             display::done();
@@ -345,6 +360,26 @@ impl SiteManager {
             .iter()
             .filter(|u| u.is_walrus_update(&self.when_upload))
             .collect::<Vec<_>>();
+
+        //Perform dry run
+        if self.dry_run {
+            let total_storage_cost = self.dry_run_walrus_store(&walrus_ops).await?;
+            // Before doing the actual execution, perform a dry run
+            display::action(format!(
+                "Estimated Storage Cost for this publish/update (Gas Cost Excluded): {} FROST",
+                total_storage_cost
+            ));
+            // Add user confirmation prompt.
+            display::action("Waiting for user confirmation...");
+            if !dialoguer::Confirm::new()
+                .with_prompt("Do you want to proceed with these updates?")
+                .default(true)
+                .interact()?
+            {
+                display::error("Update cancelled by user");
+                return Err(anyhow!("Update cancelled by user"));
+            }
+        }
         self.publish_to_walrus(&walrus_ops).await?;
 
         // Create the PTB
