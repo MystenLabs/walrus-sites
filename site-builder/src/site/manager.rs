@@ -88,20 +88,20 @@ impl SiteManager {
     /// and return the total storage cost that would be incurred.
     async fn dry_run_walrus_store(
         &mut self,
-        walrus_updates: &Vec<&ResourceOp<'_>>, // Replace `YourUpdateType` with the real type
+        walrus_updates: &Vec<&ResourceOp<'_>>,
     ) -> anyhow::Result<u64> {
         tracing::info!("Dry-running Walrus store operations");
         let mut total_storage_cost = 0u64;
 
         for update in walrus_updates {
-            let resource = update.inner(); // Adjust if your updates return the resource differently
+            let resource = update.inner();
             let dry_run_outputs = self
                 .walrus
                 .dry_run_store(
                     resource.full_path.clone(),
                     self.epochs.clone(),
                     !self.permanent,
-                    false, // Adjust or parameterize as needed
+                    false,
                 )
                 .await?;
 
