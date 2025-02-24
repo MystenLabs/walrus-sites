@@ -91,7 +91,7 @@ impl SiteManager {
         walrus_updates: &Vec<&ResourceOp<'_>>,
     ) -> anyhow::Result<u64> {
         tracing::info!("Dry-running Walrus store operations");
-        let mut total_storage_cost = 0u64;
+        let mut total_storage_cost = 0;
 
         for update in walrus_updates {
             let resource = update.inner();
