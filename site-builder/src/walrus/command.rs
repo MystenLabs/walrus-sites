@@ -56,6 +56,9 @@ pub enum Command {
         #[serde(default)]
         force: bool,
         deletable: bool,
+        //dry_run
+        #[serde(default)]
+        dry_run: bool,
     },
     /// Reads a blob from Walrus.
     Read {
@@ -175,12 +178,14 @@ impl WalrusCmdBuilder {
         epochs: EpochCountOrMax,
         force: bool,
         deletable: bool,
+        dry_run: bool,
     ) -> WalrusCmdBuilder<Command> {
         let command = Command::Store {
             files,
             epochs,
             force,
             deletable,
+            dry_run,
         };
         self.with_command(command)
     }

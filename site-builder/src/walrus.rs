@@ -7,7 +7,14 @@ use std::{num::NonZeroU16, path::PathBuf};
 
 use anyhow::{Context, Result};
 use command::{InfoCommands, RpcArg};
-use output::{try_from_output, BlobIdOutput, ReadOutput, StorageInfoOutput, StoreOutput};
+use output::{
+    try_from_output,
+    BlobIdOutput,
+    DryRunOutput,
+    ReadOutput,
+    StorageInfoOutput,
+    StoreOutput,
+};
 use tokio::process::Command as CliCommand;
 
 use self::types::BlobId;
@@ -82,12 +89,23 @@ impl Walrus {
         force: bool,
         deletable: bool,
     ) -> Result<StoreOutput> {
-        create_command!(self, store, vec![file], epochs, force, deletable)
+        create_command!(self, store, vec![file], epochs, force, deletable, false)
     }
 
     /// Issues a `delete` JSON command to the Walrus CLI, returning the parsed output.
     pub async fn delete(&mut self, object_id: String) -> Result<DestroyOutput> {
         create_command!(self, delete, object_id)
+    }
+
+    /// Issues a `store with dry run arg` JSON command to the Walrus CLI, returning the parsed output.
+    pub async fn dry_run_store(
+        &mut self,
+        file: PathBuf,
+        epochs: EpochCountOrMax,
+        deletable: bool,
+        force: bool,
+    ) -> Result<Vec<DryRunOutput>> {
+        create_command!(self, store, vec![file], epochs, force, deletable, true)
     }
 
     /// Issues a `read` JSON command to the Walrus CLI, returning the parsed output.

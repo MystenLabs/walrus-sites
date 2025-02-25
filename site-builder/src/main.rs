@@ -217,6 +217,9 @@ enum Commands {
         /// Make resources permanent (non-deletable)
         #[clap(long, action = clap::ArgAction::SetTrue)]
         permanent: bool,
+        /// Perform a dry run (you'll be asked for confirmation before committing changes).
+        #[clap(long)]
+        dry_run: bool,
     },
 }
 
@@ -251,6 +254,9 @@ pub struct PublishOptions {
     /// Make resources permanent (non-deletable)
     #[clap(long, action = clap::ArgAction::SetTrue)]
     permanent: bool,
+    /// Perform a dry run (you'll be asked for confirmation before committing changes).
+    #[clap(long)]
+    dry_run: bool,
 }
 
 /// The configuration for the site builder.
@@ -467,6 +473,7 @@ async fn run() -> Result<()> {
             ws_resources,
             epochs,
             permanent,
+            dry_run,
         } => {
             let ws_res = ws_resources.as_ref().map(WSResources::read).transpose()?;
             let resource_manager =
@@ -486,6 +493,7 @@ async fn run() -> Result<()> {
                 epochs,
                 WhenWalrusUpload::Always,
                 permanent,
+                dry_run,
             )
             .await?;
             site_manager.update_single_resource(resource).await?;

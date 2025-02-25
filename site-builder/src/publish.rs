@@ -163,6 +163,7 @@ impl SiteEditor {
                 EpochCountOrMax::Epochs(NonZeroU32::new(1).unwrap()),
                 WhenWalrusUpload::Always,
                 false,
+                false,
             )
             .await?;
 
@@ -259,6 +260,7 @@ impl SiteEditor<EditOptions> {
             self.edit_options.publish_options.epochs.clone(),
             self.edit_options.when_upload.clone(),
             self.edit_options.publish_options.permanent,
+            self.edit_options.publish_options.dry_run,
         )
         .await?;
         let (response, summary) = site_manager.update_site(&local_site_data).await?;
