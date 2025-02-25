@@ -1,0 +1,7 @@
+{
+    "framework": null,
+    "installCommand": "bun install",
+    "buildCommand": "bun run build:prod",
+    "devCommand": "bun run serve:prod",
+    "outputDirectory": "dist"
+}

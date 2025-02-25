@@ -1,7 +1,0 @@
-{
-    "framework": null,
-    "installCommand": "bun install",
-    "buildCommand": "bun run build:worker",
-    "devCommand": "bun run worker",
-    "outputDirectory": "worker/dist"
-}
