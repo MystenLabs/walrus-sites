@@ -3,6 +3,7 @@
 
 import { Hono } from "hono";
 import redisClient from "./redis";
+import { bearerAuth } from "hono/bearer-auth";
 
 enum STATUS {
 	OK = 200,
@@ -11,7 +12,12 @@ enum STATUS {
 	DELETED = 200,
 }
 
+const token = process.env.BEARER_TOKEN;
+if (!token) {
+	throw new Error("BEARER_TOKEN environment variable is not set");
+}
 const app = new Hono();
+app.use('/*', bearerAuth({ token }))
 
 app.get("/", async (c) => {
 	return c.text(
@@ -45,7 +51,7 @@ app.delete("/:domain", async (c) => {
 	const { domain } = c.req.param();
 	await redisClient.delete(domain);
 	console.info(`(DELETE) removed: ${domain}`);
-	return c.text(`Received domain: ${domain}`, STATUS.OK);
+	return c.text(`Deleted domain: ${domain}`, STATUS.OK);
 });
 
 export default app;
