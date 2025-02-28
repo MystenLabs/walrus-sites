@@ -63,7 +63,7 @@ COPY --from=install /temp/prod/node_modules node_modules
 COPY --from=install /temp/prod/package.json .
 COPY --from=install /temp/prod/server/package.json server/package.json
 COPY --from=install /temp/prod/server/.next server/.next
-COPY --from=install /temp/prod/server/public public/
+COPY --from=install /temp/prod/server/public server/public/
 
 # run the app
 USER bun
@@ -77,7 +77,7 @@ COPY --from=install /temp/prod/node_modules node_modules
 COPY --from=install /temp/prod/package.json .
 COPY --from=install /temp/prod/server/package.json server/package.json
 COPY --from=install /temp/prod/server/.next server/.next
-COPY --from=install /temp/prod/server/public public/
+COPY --from=install /temp/prod/server/public server/public/
 
 # run the app
 USER bun
