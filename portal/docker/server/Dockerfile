@@ -3,6 +3,10 @@
 FROM oven/bun:1 AS base
 WORKDIR /usr/src/app
 
+# install dependencies into temp directory
+# this will cache them and speed up future builds
+FROM base AS install
+
 RUN apt-get update -y
 RUN apt-get install -y ca-certificates
 
@@ -44,14 +48,12 @@ ENV AGGREGATOR_URL=${AGGREGATOR_URL}
 ARG SITE_PACKAGE="0xc5bebae319fc9d2a9dc858b7484cdbd6ef219decf4662dc81a11dc69bb7a5fa7"
 ENV SITE_PACKAGE=${SITE_PACKAGE}
 
-# install dependencies into temp directory
-# this will cache them and speed up future builds
-FROM base AS install
 RUN mkdir -p /temp/prod
 COPY portal/package.json portal/bun.lock /temp/prod/
 COPY portal/common /temp/prod/common
 COPY portal/server /temp/prod/server
 COPY portal/worker /temp/prod/worker
+COPY public/ /temp/prod/public
 RUN cd /temp/prod && bun install --frozen-lockfile
 RUN cd /temp/prod && bun run build:server
 
@@ -62,6 +64,7 @@ COPY --from=install /temp/prod/node_modules node_modules
 COPY --from=install /temp/prod/package.json .
 COPY --from=install /temp/prod/server/package.json server/package.json
 COPY --from=install /temp/prod/server/.next server/.next
+COPY --from=install /temp/prod/public public/
 
 # run the app
 USER bun
@@ -75,6 +78,7 @@ COPY --from=install /temp/prod/node_modules node_modules
 COPY --from=install /temp/prod/package.json .
 COPY --from=install /temp/prod/server/package.json server/package.json
 COPY --from=install /temp/prod/server/.next server/.next
+COPY --from=install /temp/prod/public public/
 
 # run the app
 USER bun
