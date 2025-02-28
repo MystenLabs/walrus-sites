@@ -53,7 +53,7 @@ COPY portal/package.json portal/bun.lock /temp/prod/
 COPY portal/common /temp/prod/common
 COPY portal/server /temp/prod/server
 COPY portal/worker /temp/prod/worker
-COPY public/ /temp/prod/public
+COPY portal/public /temp/prod/public
 RUN cd /temp/prod && bun install --frozen-lockfile
 RUN cd /temp/prod && bun run build:server
 
