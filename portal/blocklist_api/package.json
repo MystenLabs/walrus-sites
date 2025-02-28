@@ -5,7 +5,8 @@
     "start": "bun run src/index.ts --env-file .env.local"
   },
   "dependencies": {
-    "hono": "^4.7.2"
+    "hono": "^4.7.2",
+    "redis": "^4.7.0"
   },
   "devDependencies": {
     "@types/bun": "latest"
