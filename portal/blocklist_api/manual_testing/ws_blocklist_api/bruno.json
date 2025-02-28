@@ -10,6 +10,6 @@
   "filesCount": 0,
   "presets": {
     "requestType": "http",
-    "requestUrl": "localhost:3005"
+    "requestUrl": "http://localhost:3000"
   }
 }
