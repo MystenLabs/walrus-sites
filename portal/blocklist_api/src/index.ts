@@ -13,6 +13,12 @@ enum STATUS {
 
 const app = new Hono();
 
+app.get("/", async (c) => {
+	return c.text(
+		"Blocklist API ready. Use GET/PUT/DELETE operations with /:domain to manage entries.",
+	STATUS.OK);
+});
+
 app.get("/health", async (c) => {
 	return c.text("OK", STATUS.OK);
 });
