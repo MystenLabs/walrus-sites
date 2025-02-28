@@ -84,9 +84,9 @@ class RedisClientFacade {
     }
 }
 
-const redisUrl = process.env.REDIS_URL;
+const redisUrl = process.env.REDIS_WRITE_URL;
 if (!redisUrl) {
-	throw new Error("REDIS_URL is not set.");
+	throw new Error("REDIS_WRITE_URL is not set.");
 }
 if (!redisUrl.endsWith('0')) {
 	throw new Error("The blocklist database should have a `0` index.");

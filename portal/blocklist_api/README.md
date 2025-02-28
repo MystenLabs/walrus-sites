@@ -17,7 +17,7 @@ bun run dev
 ```
 
 Environment Variables:
-- `REDIS_URL`: The URL of the Redis server.
+- `REDIS_WRITE_URL`: The URL of the Redis server.
 - `BEARER_TOKEN`: The bearer token for authentication.
 
 ### Docker
