@@ -53,7 +53,6 @@ COPY portal/package.json portal/bun.lock /temp/prod/
 COPY portal/common /temp/prod/common
 COPY portal/server /temp/prod/server
 COPY portal/worker /temp/prod/worker
-COPY portal/public /temp/prod/public
 RUN cd /temp/prod && bun install --frozen-lockfile
 RUN cd /temp/prod && bun run build:server
 
@@ -78,7 +77,7 @@ COPY --from=install /temp/prod/node_modules node_modules
 COPY --from=install /temp/prod/package.json .
 COPY --from=install /temp/prod/server/package.json server/package.json
 COPY --from=install /temp/prod/server/.next server/.next
-COPY --from=install /temp/prod/public public/
+COPY --from=install /temp/prod/server/public public/
 
 # run the app
 USER bun
