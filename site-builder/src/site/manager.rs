@@ -8,6 +8,7 @@ use std::{
 };
 
 use anyhow::{anyhow, Result};
+use itertools::Itertools as _;
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{rpc_types::SuiTransactionBlockResponse, wallet_context::WalletContext};
 use sui_types::{
@@ -31,7 +32,7 @@ use crate::{
     retry_client::RetriableSuiClient,
     summary::SiteDataDiffSummary,
     util::{get_site_id_from_response, sign_and_send_ptb},
-    walrus::Walrus,
+    walrus::{output::DestroyOutput, Walrus},
     Config,
     EpochCountOrMax,
 };
@@ -244,20 +245,19 @@ impl SiteManager {
 
     /// Deletes the resources from Walrus.
     pub async fn delete_from_walrus<'b>(&mut self, blobs: HashMap<String, ObjectID>) -> Result<()> {
-        for (name, blob_id) in blobs.iter() {
-            tracing::debug!(name, "deleting blob from Walrus");
-            display::action(format!("Deleting resource from Walrus: {}", blob_id,));
-            let output = self.walrus.delete(blob_id.to_string()).await?;
+        let object_ids = blobs.values().cloned().collect::<Vec<_>>();
+        tracing::debug!("deleting {} blob IDs from Walrus", object_ids.len());
+        display::action(format!(
+            "Deleting {} resources from Walrus: {}",
+            object_ids.len(),
+            object_ids.iter().map(|id| id.to_string()).join(", ")
+        ));
 
-            // Check if the blob was actually deleted
-            if output.objectId != *blob_id.to_string() {
-                display::error(format!(
-                    "Could not delete blob {}, may be already deleted or may be a permanent blob",
-                    blob_id
-                ));
-            }
-            display::done();
-        }
+        let DestroyOutput(_delete_outputs) = self.walrus.delete(object_ids).await?;
+
+        // TODO: Some error handling here?
+
+        display::done();
         Ok(())
     }
 

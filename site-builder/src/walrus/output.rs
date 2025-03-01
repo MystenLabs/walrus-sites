@@ -220,13 +220,18 @@ pub struct BlobIdOutput {
 
 /// The output of the `destroy` command.
 #[derive(Debug, Clone, Deserialize)]
-#[allow(unused)]
-#[allow(non_snake_case)]
-pub struct DestroyOutput {
+pub struct DestroyOutput(pub Vec<DeleteOutput>);
+
+/// The output of the `destroy` command.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
+pub struct DeleteOutput {
     /// The objectId deleted.
-    pub objectId: String,
+    // TODO: Check if we need another hierarchy level here.
+    pub object_id: String,
     /// The blobs deleted.
-    pub deletedBlobs: Vec<String>,
+    pub deleted_blobs: Vec<Blob>,
 }
 
 /// The number of shards, which can be deserialized from the output of the `info` command.
