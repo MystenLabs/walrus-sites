@@ -122,12 +122,13 @@ pub struct BlobStoreResultWithPath {
 }
 
 /// Supported Walrus encoding types.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Default, Deserialize)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Deserialize)]
 #[repr(u8)]
 pub enum EncodingType {
-    /// Default RaptorQ encoding.
-    #[default]
-    RedStuff = 0,
+    /// Original RedStuff encoding using the RaptorQ erasure code.
+    RedStuffRaptorQ = 0,
+    /// RedStuff using the Reed-Solomon erasure code.
+    RS2 = 1,
 }
 
 /// Sui object for storage resources.
