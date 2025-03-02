@@ -8,6 +8,7 @@ use std::{num::NonZeroU16, path::PathBuf};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
+use sui_types::base_types::ObjectID;
 
 use super::types::BlobId;
 use crate::EpochCountOrMax;
@@ -76,7 +77,8 @@ pub enum Command {
     /// Deletes a blob from Walrus.
     Delete {
         /// The objectID of the blob to be deleted.
-        object_id: String,
+        #[serde_as(as = "Vec<DisplayFromStr>")]
+        object_ids: Vec<ObjectID>,
     },
     BlobId {
         file: PathBuf,
@@ -191,8 +193,8 @@ impl WalrusCmdBuilder {
     }
 
     /// Adds a [`Command::Delete`] command to the builder.
-    pub fn delete(self, object_id: String) -> WalrusCmdBuilder<Command> {
-        let command = Command::Delete { object_id };
+    pub fn delete(self, object_ids: Vec<ObjectID>) -> WalrusCmdBuilder<Command> {
+        let command = Command::Delete { object_ids };
         self.with_command(command)
     }
 
