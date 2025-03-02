@@ -4,6 +4,7 @@
 import { Hono } from "hono";
 import redisClient from "./redis";
 import { bearerAuth } from "hono/bearer-auth";
+import { except } from 'hono/combine'
 
 enum STATUS {
 	OK = 200,
@@ -17,7 +18,7 @@ if (!token) {
 	throw new Error("BEARER_TOKEN environment variable is not set");
 }
 const app = new Hono();
-app.use('/*', bearerAuth({ token }))
+app.use('/*', except('/health', bearerAuth({ token })))
 
 app.get("/", async (c) => {
 	return c.text(
