@@ -2,6 +2,8 @@
 module walrus_site::site {
     use std::string::String;
     use sui::{dynamic_field as df, vec_map};
+    use sui::display;
+    use sui::package::Publisher;
 
     /// The name of the dynamic field containing the routes.
     const ROUTES_FIELD: vector<u8> = b"routes";
@@ -10,11 +12,18 @@ module walrus_site::site {
     const EResourceDoesNotExist: u64 = 0;
     const ERangeStartGreaterThanRangeEnd: u64 = 1;
     const EStartAndEndRangeAreNone: u64 = 2;
+    const ENotAuthorized: u64 = 3;
 
     /// The site published on Sui.
     public struct Site has key, store {
         id: UID,
         name: String,
+        link: Option<String>,
+        image_url: Option<String>,
+        description: Option<String>,
+        project_url: Option<String>,
+        creator: Option<String>,
+        metadata: Option<String>
     }
 
     /// A resource in a site.
@@ -53,10 +62,25 @@ module walrus_site::site {
     }
 
     /// Creates a new site.
-    public fun new_site(name: String, ctx: &mut TxContext): Site {
+    public fun new_site(
+    	name: String,
+    	link: Option<String>,
+	    image_url: Option<String>,
+	    description: Option<String>,
+	    project_url: Option<String>,
+	    creator: Option<String>,
+		metadata: Option<String>,
+     	ctx: &mut TxContext
+    ): Site {
         Site {
             id: object::new(ctx),
             name,
+            link,
+            image_url,
+            description,
+            project_url,
+            creator,
+            metadata
         }
     }
 
@@ -211,5 +235,45 @@ module walrus_site::site {
             ..,
         } = site;
         id.delete();
+    }
+
+    #[allow(lint(self_transfer))]
+    /// Define a Display for the Site objects.
+    public fun set_site_display(
+    	publisher: &Publisher,
+     	ctx: &mut TxContext
+    ) {
+    	// Check if the `Publisher` has the authority over the Display.
+	   	// Checks if the type is from the same module, hence the
+    	assert!(publisher.from_module<Site>(), ENotAuthorized);
+	    // Checks if the type is from the same package.
+		assert!(publisher.from_package<Site>(), ENotAuthorized);
+
+      	let keys = vector[
+            b"name".to_string(),
+            b"link".to_string(),
+            b"image_url".to_string(),
+            b"description".to_string(),
+            b"project_url".to_string(),
+            b"creator".to_string(),
+            b"metadata".to_string()
+        ];
+
+	    let values = vector[
+	        b"{name}".to_string(),
+	        b"{link}".to_string(),
+	        b"{image_url}".to_string(),
+	        b"{description}".to_string(),
+	        b"{project_url}".to_string(),
+	        b"{creator}".to_string(),
+			b"{metadata}".to_string()
+	    ];
+
+		let mut display = display::new_with_fields<Site>(
+        	publisher, keys, values, ctx
+    	);
+
+	    display.update_version();
+    	transfer::public_transfer(display, ctx.sender());
     }
 }
