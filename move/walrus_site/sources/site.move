@@ -245,7 +245,7 @@ module walrus_site::site {
 
     #[allow(lint(self_transfer))]
     /// Define a Display for the Site objects.
-    public fun set_site_display(publisher: &Publisher, ctx: &mut TxContext) {
+    fun set_site_display(publisher: &Publisher, ctx: &mut TxContext) {
         let keys = vector[
             b"name".to_string(),
             b"link".to_string(),
