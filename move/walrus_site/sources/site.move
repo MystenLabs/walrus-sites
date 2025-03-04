@@ -20,8 +20,9 @@ public struct Site has key, store {
     description: Option<String>,
     project_url: Option<String>,
     creator: Option<String>,
-    metadata: Option<String>,
 }
+
+
 
 /// A resource in a site.
 public struct Resource has drop, store {
@@ -76,7 +77,6 @@ public fun new_site(
     description: Option<String>,
     project_url: Option<String>,
     creator: Option<String>,
-    metadata: Option<String>,
     ctx: &mut TxContext,
 ): Site {
     Site {
@@ -87,7 +87,6 @@ public fun new_site(
         description,
         project_url,
         creator,
-        metadata,
     }
 }
 
@@ -254,7 +253,6 @@ fun init_site_display(publisher: &Publisher, ctx: &mut TxContext): Display<Site>
         b"description".to_string(),
         b"project_url".to_string(),
         b"creator".to_string(),
-        b"metadata".to_string(),
     ];
 
     let values = vector[
@@ -264,7 +262,6 @@ fun init_site_display(publisher: &Publisher, ctx: &mut TxContext): Display<Site>
         b"{description}".to_string(),
         b"{project_url}".to_string(),
         b"{creator}".to_string(),
-        b"{metadata}".to_string(),
     ];
 
     let mut d = display::new_with_fields<Site>(
