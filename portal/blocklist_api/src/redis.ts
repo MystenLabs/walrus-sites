@@ -19,11 +19,6 @@ class RedisClientFacade {
      */
     async exists(key: string): Promise<boolean> {
         try {
-        	const open = this.client.isReady
-        	if (!!!open) {
-         		console.log(`Client is ${open ? 'not' :''}open`)
-        		await this.client.connect();
-        	}
             const value = await this.client.EXISTS(key);
             return !!value;
         } catch (error) {
