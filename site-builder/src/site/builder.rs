@@ -5,6 +5,7 @@ use anyhow::Result;
 use serde::Serialize;
 use sui_types::{
     base_types::{ObjectID, SuiAddress},
+    parse_sui_type_tag,
     programmable_transaction_builder::ProgrammableTransactionBuilder,
     transaction::{Argument, CallArg, ProgrammableTransaction},
     Identifier,
@@ -17,6 +18,9 @@ use super::{
     RouteOps,
 };
 use crate::{site::contracts, types::Range};
+
+pub const MOVE_STDLIB: &str = "0x1";
+pub const OPTION: &str = "option";
 
 pub struct SitePtb<T = ()> {
     pt_builder: ProgrammableTransactionBuilder,
@@ -73,11 +77,33 @@ impl<T> SitePtb<T> {
     pub fn create_site(&mut self, site_name: &str) -> Result<Argument> {
         tracing::debug!(site=%site_name, "new Move call: creating site");
         let name_arg = self.pt_builder.input(pure_call_arg(&site_name)?)?;
+        let none_arg = self.none_site_argument();
         Ok(self.add_programmable_move_call(
             contracts::site::new_site.identifier(),
             vec![],
-            vec![name_arg],
+            // TODO(alex): parse the site arguments from a config file passed
+            // as input from the user.
+            vec![
+                name_arg, // name
+                none_arg, // link
+                none_arg, // image_url
+                none_arg, // description
+                none_arg, // project_url
+                none_arg, // creator
+                none_arg, // metadata
+            ],
         ))
+    }
+
+    fn none_site_argument(&mut self) -> Argument {
+        let site_argument = parse_sui_type_tag("0x2::option::Option<0x1::string::String>").unwrap();
+        self.pt_builder.programmable_move_call(
+            ObjectID::from_hex_literal(MOVE_STDLIB).unwrap(),
+            Identifier::new(OPTION).unwrap(),
+            Identifier::new("none").unwrap(),
+            vec![site_argument],
+            vec![],
+        )
     }
 
     pub fn add_programmable_move_call(
