@@ -63,7 +63,6 @@ module walrus_site::site_tests {
                 option::some(b"This is a test site.".to_string()),
                 option::none(),
                 option::none(),
-                option::some(b"{commit: c1a132}".to_string()),
                 scenario.ctx(),
             );
             transfer::public_transfer(site, owner)
