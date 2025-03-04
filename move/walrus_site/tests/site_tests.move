@@ -58,6 +58,12 @@ module walrus_site::site_tests {
         {
             let site = walrus_site::site::new_site(
                 b"Example".to_string(),
+                option::some(b"https://<b36>.walrus.site".to_string()),
+                option::some(b"https://<b36>.walrus.site/image.png".to_string()),
+                option::some(b"This is a test site.".to_string()),
+                option::none(),
+                option::none(),
+                option::some(b"{commit: c1a132}".to_string()),
                 scenario.ctx(),
             );
             transfer::public_transfer(site, owner)
