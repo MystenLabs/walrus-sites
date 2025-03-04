@@ -297,3 +297,8 @@ fun init_site_display(publisher: &Publisher, ctx: &mut TxContext): Display<Site>
     d.update_version();
     d
 }
+
+#[test_only]
+public fun init_for_testing(ctx: &mut TxContext) {
+    init(SITE {}, ctx);
+}

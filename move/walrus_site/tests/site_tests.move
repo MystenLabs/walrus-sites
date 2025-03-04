@@ -1,6 +1,8 @@
 #[test_only]
 module walrus_site::site_tests {
     use walrus_site::site::{ERangeStartGreaterThanRangeEnd, EStartAndEndRangeAreNone, Site, Range};
+    use walrus_site::site::init_for_testing;
+    use sui::test_scenario;
 
     #[test]
     #[expected_failure(abort_code = EStartAndEndRangeAreNone)]
@@ -51,7 +53,6 @@ module walrus_site::site_tests {
     /// checking many of the contract's functions.
     #[test]
     fun test_site_flow_with_resources_and_routes() {
-        use sui::test_scenario;
         let owner = @0xCAFE;
         let mut scenario = test_scenario::begin(owner);
         // Create a site.
@@ -153,5 +154,15 @@ module walrus_site::site_tests {
             walrus_site::site::burn(site);
         };
         scenario.end();
+    }
+
+    #[test]
+    fun test_init() {
+		let owner = @0xCAFE;
+		let mut scenario = test_scenario::begin(owner);
+	    {
+	        init_for_testing(scenario.ctx());
+	    };
+		scenario.end();
     }
 }
