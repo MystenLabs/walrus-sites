@@ -11,6 +11,7 @@ enum STATUS {
 	NOT_FOUND = 404,
 	CREATED = 201,
 	DELETED = 200,
+	INTERNAL_SERVER_ERROR = 500,
 }
 
 const token = process.env.BEARER_TOKEN;
@@ -27,6 +28,10 @@ app.get("/", async (c) => {
 });
 
 app.get("/health", async (c) => {
+    const ping = await redisClient.ping();
+    if (!ping) {
+        return c.text("UNHEALTHY", STATUS.INTERNAL_SERVER_ERROR);
+    }
 	return c.text("OK", STATUS.OK);
 });
 
