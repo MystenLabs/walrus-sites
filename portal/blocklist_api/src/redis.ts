@@ -1,15 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { createClient } from "redis";
+import { createClient } from 'redis';
 
 class RedisClientFacade {
     private readonly client;
 
     constructor(redisUrl: string) {
-        this.client = createClient({ url: redisUrl })
-            .on("error", (err) => console.log("Redis Client Error", err))
-            .on("connect", () => console.log("Redis Client Connected"));
+        this.client = createClient({url: redisUrl})
+            .on('error', err => console.log('Redis Client Error', err))
+            .on('connect', () => console.log('Redis Client Connected'));
     }
 
     /**
@@ -27,10 +27,10 @@ class RedisClientFacade {
     }
 
     /**
-     * Sets a key in a Redis database.
-     * @param key The key to set.
-     * @returns Promise<void> indicating completion of the operation.
-     */
+    * Sets a key in a Redis database.
+    * @param key The key to set.
+    * @returns Promise<void> indicating completion of the operation.
+    */
     async set(key: string): Promise<void> {
         try {
             await this.client.SET(key, "");
@@ -40,10 +40,10 @@ class RedisClientFacade {
     }
 
     /**
-     * Deletes a key from a Redis database.
-     * @param key The key to delete.
-     * @returns Promise<void> indicating completion of the operation.
-     */
+    * Deletes a key from a Redis database.
+    * @param key The key to delete.
+    * @returns Promise<void> indicating completion of the operation.
+    */
     async delete(key: string): Promise<void> {
         try {
             await this.client.DEL(key);
@@ -61,30 +61,32 @@ class RedisClientFacade {
     }
 
     /**
-     * Closes the Redis client connection.
-     * @returns Promise<void> indicating completion of the operation.
-     */
+    * Closes the Redis client connection.
+    * @returns Promise<void> indicating completion of the operation.
+    */
     async close(): Promise<void> {
-        if (this.client.isReady) {
-            await this.client.disconnect();
-        }
+	   	if (this.client.isReady) {
+	  		await this.client.disconnect();
+	   	}
     }
 
     /**
-     * Checks the Redis server uptime status.
-     * @returns Promise<boolean> indicating the server's PONG response.
-     */
+    * Checks the Redis server uptime status.
+    * @returns Promise<boolean> indicating the server's PONG response.
+    */
     async ping(): Promise<boolean> {
-        return (await this.client.ping()) === "PONG";
+        return await this.client.ping() === 'PONG';
     }
 }
 
 const redisUrl = process.env.REDIS_WRITE_URL;
 if (!redisUrl) {
-    throw new Error("REDIS_WRITE_URL is not set.");
+	throw new Error("REDIS_WRITE_URL is not set.");
 }
-if (!redisUrl.endsWith("0")) {
-    throw new Error("The blocklist database should have a `0` index.");
+if (!redisUrl.endsWith('0')) {
+	throw new Error("The blocklist database should have a `0` index.");
 }
-const redisClient = new RedisClientFacade(redisUrl);
+const redisClient = new RedisClientFacade(
+	redisUrl
+);
 export default redisClient;
