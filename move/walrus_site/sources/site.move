@@ -302,3 +302,13 @@ fun init_site_display(publisher: &Publisher, ctx: &mut TxContext): Display<Site>
 public fun init_for_testing(ctx: &mut TxContext) {
     init(SITE {}, ctx);
 }
+
+#[test_only]
+public fun get_site_name(site: &Site): String {
+	site.name
+}
+
+#[test_only]
+public fun get_site_link(site: &Site): Option<String> {
+	site.link
+}

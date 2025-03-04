@@ -3,6 +3,7 @@ module walrus_site::site_tests {
     use walrus_site::site::{ERangeStartGreaterThanRangeEnd, EStartAndEndRangeAreNone, Site, Range};
     use walrus_site::site::init_for_testing;
     use sui::test_scenario;
+    use walrus_site::site::{get_site_name, get_site_link};
 
     #[test]
     #[expected_failure(abort_code = EStartAndEndRangeAreNone)]
@@ -69,6 +70,10 @@ module walrus_site::site_tests {
                 metadata,
                 scenario.ctx(),
             );
+
+            assert!(get_site_name(&site) == b"Example".to_string());
+            assert!(get_site_link(&site).borrow() == b"https://<b36>.walrus.site".to_string());
+
             transfer::public_transfer(site, owner)
         };
 
