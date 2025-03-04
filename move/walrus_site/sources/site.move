@@ -10,7 +10,6 @@ module walrus_site::site {
     const EResourceDoesNotExist: u64 = 0;
     const ERangeStartGreaterThanRangeEnd: u64 = 1;
     const EStartAndEndRangeAreNone: u64 = 2;
-    const ENotAuthorized: u64 = 3;
 
     /// The site published on Sui.
     public struct Site has key, store {
@@ -247,12 +246,6 @@ module walrus_site::site {
     #[allow(lint(self_transfer))]
     /// Define a Display for the Site objects.
     public fun set_site_display(publisher: &Publisher, ctx: &mut TxContext) {
-        // Check if the `Publisher` has the authority over the Display.
-        // Checks if the type is from the same module, hence the
-        assert!(publisher.from_module<Site>(), ENotAuthorized);
-        // Checks if the type is from the same package.
-        assert!(publisher.from_package<Site>(), ENotAuthorized);
-
         let keys = vector[
             b"name".to_string(),
             b"link".to_string(),
