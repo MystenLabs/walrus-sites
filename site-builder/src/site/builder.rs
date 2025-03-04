@@ -5,7 +5,6 @@ use anyhow::Result;
 use serde::Serialize;
 use sui_types::{
     base_types::{ObjectID, SuiAddress},
-    parse_sui_type_tag,
     programmable_transaction_builder::ProgrammableTransactionBuilder,
     transaction::{Argument, CallArg, ProgrammableTransaction},
     Identifier,
@@ -19,7 +18,6 @@ use super::{
 };
 use crate::{site::contracts, types::Range};
 
-pub const MOVE_STDLIB: &str = "0x1";
 pub const OPTION: &str = "option";
 
 pub struct SitePtb<T = ()> {
@@ -77,33 +75,51 @@ impl<T> SitePtb<T> {
     pub fn create_site(&mut self, site_name: &str) -> Result<Argument> {
         tracing::debug!(site=%site_name, "new Move call: creating site");
         let name_arg = self.pt_builder.input(pure_call_arg(&site_name)?)?;
-        let none_arg = self.none_site_argument();
+        let metadata = self.create_metadata();
         Ok(self.add_programmable_move_call(
             contracts::site::new_site.identifier(),
             vec![],
-            // TODO(alex): parse the site arguments from a config file passed
-            // as input from the user.
-            vec![
-                name_arg, // name
-                none_arg, // link
-                none_arg, // image_url
-                none_arg, // description
-                none_arg, // project_url
-                none_arg, // creator
-                none_arg, // metadata
-            ],
+            vec![name_arg, metadata],
         ))
     }
 
-    fn none_site_argument(&mut self) -> Argument {
-        let site_argument = parse_sui_type_tag("0x2::option::Option<0x1::string::String>").unwrap();
+    fn create_metadata(&mut self) -> Argument {
+        let link = self.create_optional_metadata_field(Some("https://walrus.site".to_string()));
+        let image_url =
+            self.create_optional_metadata_field(Some("https://walrus.site".to_string()));
+        let description = self.create_optional_metadata_field(None);
+        let project_url = self.create_optional_metadata_field(None);
+        let creator = self.create_optional_metadata_field(None);
         self.pt_builder.programmable_move_call(
-            ObjectID::from_hex_literal(MOVE_STDLIB).unwrap(),
-            Identifier::new(OPTION).unwrap(),
-            Identifier::new("none").unwrap(),
-            vec![site_argument],
+            self.package,
+            self.module.clone(),
+            Identifier::new("create_metadata").unwrap(),
             vec![],
+            vec![link, image_url, description, project_url, creator],
         )
+    }
+
+    fn create_optional_metadata_field(&mut self, field: Option<String>) -> Argument {
+        let option_module = Identifier::new(OPTION).unwrap();
+        match field {
+            Some(field) => {
+                let value = self.pt_builder.pure(field).unwrap();
+                self.pt_builder.programmable_move_call(
+                    self.package,
+                    option_module.clone(),
+                    Identifier::new("some").unwrap(),
+                    vec![],
+                    vec![value],
+                )
+            }
+            None => self.pt_builder.programmable_move_call(
+                self.package,
+                option_module.clone(),
+                Identifier::new("none").unwrap(),
+                vec![],
+                vec![],
+            ),
+        }
     }
 
     pub fn add_programmable_move_call(
