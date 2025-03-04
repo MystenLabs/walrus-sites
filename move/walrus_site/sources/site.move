@@ -3,7 +3,7 @@ module walrus_site::site {
     use std::string::String;
     use sui::{dynamic_field as df, vec_map};
     use sui::display;
-    use sui::package::Publisher;
+    use sui::package::{Self, Publisher};
 
     /// The name of the dynamic field containing the routes.
     const ROUTES_FIELD: vector<u8> = b"routes";
@@ -59,6 +59,15 @@ module walrus_site::site {
     /// The routes for a site.
     public struct Routes has drop, store {
         route_list: vec_map::VecMap<String, String>,
+    }
+
+    /// One-Time-Witness for the module.
+    public struct SITE has drop {}
+
+    fun init(otw: SITE, ctx: &mut TxContext) {
+    	let publisher = package::claim(otw, ctx);
+     	set_site_display(&publisher, ctx);
+      	transfer::public_transfer(publisher, ctx.sender());
     }
 
     /// Creates a new site.
