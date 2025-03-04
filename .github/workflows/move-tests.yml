@@ -41,9 +41,6 @@ jobs:
           curl -L "https://github.com/MystenLabs/sui/releases/download/$VERSION/sui-$VERSION-ubuntu-x86_64.tgz" -o sui.tgz
           sudo tar -xvzf sui.tgz -C /usr/local/bin
 
-      - name: Install required toolchain
-        run: rustup toolchain install 1.83-x86_64-unknown-linux-musl
-
       # Run Tests with Coverage
       - name: Run tests
         run: sui-debug move test --coverage
