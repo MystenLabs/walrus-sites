@@ -19,10 +19,17 @@ public struct Site has key, store {
     image_url: Option<String>,
     description: Option<String>,
     project_url: Option<String>,
-    creator: Option<String>,
+    creator: Option<String>
 }
 
-
+/// A struct that contains the Site's metadata.
+public struct Metadata has copy, drop, store {
+    link: Option<String>,
+    image_url: Option<String>,
+    description: Option<String>,
+    project_url: Option<String>,
+    creator: Option<String>
+}
 
 /// A resource in a site.
 public struct Resource has drop, store {
@@ -72,13 +79,16 @@ fun init(otw: SITE, ctx: &mut TxContext) {
 /// Creates a new site.
 public fun new_site(
     name: String,
-    link: Option<String>,
-    image_url: Option<String>,
-    description: Option<String>,
-    project_url: Option<String>,
-    creator: Option<String>,
+    metadata: Metadata,
     ctx: &mut TxContext,
 ): Site {
+	let Metadata {
+		link,
+		image_url,
+		description,
+		project_url,
+		creator
+	} = metadata;
     Site {
         id: object::new(ctx),
         name,
@@ -86,8 +96,21 @@ public fun new_site(
         image_url,
         description,
         project_url,
-        creator,
+        creator
     }
+}
+
+/// Creates a new Metadata object.
+public fun new_metadata(
+	link: Option<String>, image_url: Option<String>, description: Option<String>,
+	project_url: Option<String>, creator: Option<String>): Metadata {
+		Metadata {
+			link,
+			image_url,
+			description,
+			project_url,
+			creator,
+		}
 }
 
 /// Optionally creates a new Range object.
