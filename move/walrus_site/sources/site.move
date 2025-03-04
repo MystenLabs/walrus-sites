@@ -1,9 +1,7 @@
 /// The module exposes the functionality to create and update Walrus sites.
 module walrus_site::site {
     use std::string::String;
-    use sui::{dynamic_field as df, vec_map};
-    use sui::display;
-    use sui::package::{Self, Publisher};
+    use sui::{display, dynamic_field as df, package::{Self, Publisher}, vec_map};
 
     /// The name of the dynamic field containing the routes.
     const ROUTES_FIELD: vector<u8> = b"routes";
@@ -23,7 +21,7 @@ module walrus_site::site {
         description: Option<String>,
         project_url: Option<String>,
         creator: Option<String>,
-        metadata: Option<String>
+        metadata: Option<String>,
     }
 
     /// A resource in a site.
@@ -65,21 +63,21 @@ module walrus_site::site {
     public struct SITE has drop {}
 
     fun init(otw: SITE, ctx: &mut TxContext) {
-    	let publisher = package::claim(otw, ctx);
-     	set_site_display(&publisher, ctx);
-      	transfer::public_transfer(publisher, ctx.sender());
+        let publisher = package::claim(otw, ctx);
+        set_site_display(&publisher, ctx);
+        transfer::public_transfer(publisher, ctx.sender());
     }
 
     /// Creates a new site.
     public fun new_site(
-    	name: String,
-    	link: Option<String>,
-	    image_url: Option<String>,
-	    description: Option<String>,
-	    project_url: Option<String>,
-	    creator: Option<String>,
-		metadata: Option<String>,
-     	ctx: &mut TxContext
+        name: String,
+        link: Option<String>,
+        image_url: Option<String>,
+        description: Option<String>,
+        project_url: Option<String>,
+        creator: Option<String>,
+        metadata: Option<String>,
+        ctx: &mut TxContext,
     ): Site {
         Site {
             id: object::new(ctx),
@@ -89,7 +87,7 @@ module walrus_site::site {
             description,
             project_url,
             creator,
-            metadata
+            metadata,
         }
     }
 
@@ -248,41 +246,41 @@ module walrus_site::site {
 
     #[allow(lint(self_transfer))]
     /// Define a Display for the Site objects.
-    public fun set_site_display(
-    	publisher: &Publisher,
-     	ctx: &mut TxContext
-    ) {
-    	// Check if the `Publisher` has the authority over the Display.
-	   	// Checks if the type is from the same module, hence the
-    	assert!(publisher.from_module<Site>(), ENotAuthorized);
-	    // Checks if the type is from the same package.
-		assert!(publisher.from_package<Site>(), ENotAuthorized);
+    public fun set_site_display(publisher: &Publisher, ctx: &mut TxContext) {
+        // Check if the `Publisher` has the authority over the Display.
+        // Checks if the type is from the same module, hence the
+        assert!(publisher.from_module<Site>(), ENotAuthorized);
+        // Checks if the type is from the same package.
+        assert!(publisher.from_package<Site>(), ENotAuthorized);
 
-      	let keys = vector[
+        let keys = vector[
             b"name".to_string(),
             b"link".to_string(),
             b"image_url".to_string(),
             b"description".to_string(),
             b"project_url".to_string(),
             b"creator".to_string(),
-            b"metadata".to_string()
+            b"metadata".to_string(),
         ];
 
-	    let values = vector[
-	        b"{name}".to_string(),
-	        b"{link}".to_string(),
-	        b"{image_url}".to_string(),
-	        b"{description}".to_string(),
-	        b"{project_url}".to_string(),
-	        b"{creator}".to_string(),
-			b"{metadata}".to_string()
-	    ];
+        let values = vector[
+            b"{name}".to_string(),
+            b"{link}".to_string(),
+            b"{image_url}".to_string(),
+            b"{description}".to_string(),
+            b"{project_url}".to_string(),
+            b"{creator}".to_string(),
+            b"{metadata}".to_string(),
+        ];
 
-		let mut display = display::new_with_fields<Site>(
-        	publisher, keys, values, ctx
-    	);
+        let mut display = display::new_with_fields<Site>(
+            publisher,
+            keys,
+            values,
+            ctx,
+        );
 
-	    display.update_version();
-    	transfer::public_transfer(display, ctx.sender());
+        display.update_version();
+        transfer::public_transfer(display, ctx.sender());
     }
 }
