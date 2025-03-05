@@ -18,8 +18,6 @@ use super::{
 };
 use crate::{site::contracts, types::Range};
 
-pub const OPTION: &str = "option";
-
 pub struct SitePtb<T = ()> {
     pt_builder: ProgrammableTransactionBuilder,
     site_argument: T,
@@ -75,7 +73,7 @@ impl<T> SitePtb<T> {
     pub fn create_site(&mut self, site_name: &str) -> Result<Argument> {
         tracing::debug!(site=%site_name, "new Move call: creating site");
         let name_arg = self.pt_builder.input(pure_call_arg(&site_name)?)?;
-        let metadata = self.create_metadata();
+        let metadata = self.new_metadata();
         Ok(self.add_programmable_move_call(
             contracts::site::new_site.identifier(),
             vec![],
@@ -83,43 +81,25 @@ impl<T> SitePtb<T> {
         ))
     }
 
-    fn create_metadata(&mut self) -> Argument {
-        let link = self.create_optional_metadata_field(Some("https://walrus.site".to_string()));
-        let image_url =
-            self.create_optional_metadata_field(Some("https://walrus.site".to_string()));
-        let description = self.create_optional_metadata_field(None);
-        let project_url = self.create_optional_metadata_field(None);
-        let creator = self.create_optional_metadata_field(None);
+    fn new_metadata(&mut self) -> Argument {
+        let link = self
+            .pt_builder
+            .pure(Some("https://walrus.site".to_string()))
+            .unwrap();
+        let image_url = self
+            .pt_builder
+            .pure(Some("https://walrus.site".to_string()))
+            .unwrap();
+        let description = self.pt_builder.pure(None::<String>).unwrap();
+        let project_url = self.pt_builder.pure(None::<String>).unwrap();
+        let creator = self.pt_builder.pure(None::<String>).unwrap();
         self.pt_builder.programmable_move_call(
             self.package,
-            self.module.clone(),
-            Identifier::new("create_metadata").unwrap(),
+            Identifier::new("site").unwrap(),
+            Identifier::new("new_metadata").unwrap(),
             vec![],
             vec![link, image_url, description, project_url, creator],
         )
-    }
-
-    fn create_optional_metadata_field(&mut self, field: Option<String>) -> Argument {
-        let option_module = Identifier::new(OPTION).unwrap();
-        match field {
-            Some(field) => {
-                let value = self.pt_builder.pure(field).unwrap();
-                self.pt_builder.programmable_move_call(
-                    self.package,
-                    option_module.clone(),
-                    Identifier::new("some").unwrap(),
-                    vec![],
-                    vec![value],
-                )
-            }
-            None => self.pt_builder.programmable_move_call(
-                self.package,
-                option_module.clone(),
-                Identifier::new("none").unwrap(),
-                vec![],
-                vec![],
-            ),
-        }
     }
 
     pub fn add_programmable_move_call(
