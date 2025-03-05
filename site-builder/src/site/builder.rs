@@ -105,7 +105,7 @@ impl<T> SitePtb<T> {
 
         self.pt_builder.programmable_move_call(
             self.package,
-            Identifier::new("site").unwrap(),
+            self.module.clone(),
             Identifier::new("new_metadata").unwrap(),
             vec![],
             args,
@@ -116,7 +116,7 @@ impl<T> SitePtb<T> {
         let none_arg = self.pt_builder.pure(None::<String>).unwrap();
         self.pt_builder.programmable_move_call(
             self.package,
-            Identifier::new("site").unwrap(),
+            self.module.clone(),
             Identifier::new("new_metadata").unwrap(),
             vec![],
             vec![
