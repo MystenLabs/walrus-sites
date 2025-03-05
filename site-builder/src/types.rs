@@ -126,3 +126,12 @@ pub struct Range {
     pub start: Option<u64>,
     pub end: Option<u64>,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Metadata {
+    pub link: Option<String>,
+    pub image_url: Option<String>,
+    pub description: Option<String>,
+    pub project_url: Option<String>,
+    pub creator: Option<String>,
+}
