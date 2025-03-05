@@ -162,6 +162,49 @@ module walrus_site::site_tests {
     }
 
     #[test]
+    fun test_update_metadata() {
+	    let owner = @0xCAFE;
+	    let mut scenario = test_scenario::begin(owner);
+	    // Create a site.
+	    {
+	    	let metadata = walrus_site::site::new_metadata(
+	            option::some(b"https://<b36>.walrus.site".to_string()),
+	            option::some(b"https://<b36>.walrus.site/image.png".to_string()),
+	            option::some(b"This is a test site.".to_string()),
+	            option::none(),
+	            option::none(),
+	        );
+	        let site = walrus_site::site::new_site(
+	            b"Example".to_string(),
+	            metadata,
+	            scenario.ctx(),
+	        );
+
+	        assert!(get_site_name(&site) == b"Example".to_string());
+	        assert!(get_site_link(&site).borrow() == b"https://<b36>.walrus.site".to_string());
+
+	        transfer::public_transfer(site, owner)
+	    };
+
+	    // Rename site and add a resource with headers to the site.
+	    scenario.next_tx(owner);
+	    {
+	        let mut site = scenario.take_from_sender<Site>();
+	        // Update the site metadata.
+	        let metadata = walrus_site::site::new_metadata(
+	            option::some(b"https://<b36>.walrus.site".to_string()),
+	            option::some(b"https://<b36>.walrus.site/image.png".to_string()),
+	            option::some(b"I am just updating the site metadata.".to_string()),
+	            option::none(),
+	            option::none(),
+	        );
+	        walrus_site::site::update_metadata(&mut site, metadata);
+	        transfer::public_transfer(site, owner)
+	    };
+		scenario.end();
+    }
+
+    #[test]
     fun test_init() {
 		let owner = @0xCAFE;
 		let mut scenario = test_scenario::begin(owner);

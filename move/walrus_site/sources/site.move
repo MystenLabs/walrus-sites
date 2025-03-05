@@ -175,6 +175,22 @@ public fun update_name(site: &mut Site, new_name: String) {
     site.name = new_name
 }
 
+/// Update the site metadata.
+public fun update_metadata(site: &mut Site, metadata: Metadata) {
+	let Metadata {
+		link,
+		image_url,
+		description,
+		project_url,
+		creator
+	} = metadata;
+    site.link = link;
+    site.image_url = image_url;
+    site.description = description;
+    site.project_url = project_url;
+    site.creator = creator;
+}
+
 /// Adds a resource to an existing site.
 public fun add_resource(site: &mut Site, resource: Resource) {
     let path_obj = new_path(resource.path);
