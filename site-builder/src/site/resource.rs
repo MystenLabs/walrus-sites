@@ -624,6 +624,7 @@ mod tests {
         Some(WSResources {
             headers: Some(headers),
             routes: None,
+            metadata: None,
         })
     }
 }

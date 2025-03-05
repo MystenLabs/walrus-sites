@@ -475,7 +475,11 @@ async fn run() -> Result<()> {
             permanent,
             dry_run,
         } => {
-            let ws_res = ws_resources.as_ref().map(WSResources::read).transpose()?;
+            let ws_res = ws_resources
+                .clone()
+                .as_ref()
+                .map(WSResources::read)
+                .transpose()?;
             let resource_manager =
                 ResourceManager::new(config.walrus_client(), ws_res, ws_resources, None).await?;
             let resource = resource_manager
@@ -485,7 +489,6 @@ async fn run() -> Result<()> {
                     "could not read the resource at path: {}",
                     resource.display()
                 ))?;
-
             // TODO: make when upload configurable.
             let mut site_manager = SiteManager::new(
                 config,
@@ -494,6 +497,7 @@ async fn run() -> Result<()> {
                 WhenWalrusUpload::Always,
                 permanent,
                 dry_run,
+                None, // TODO: update the site metadata.
             )
             .await?;
             site_manager.update_single_resource(resource).await?;
