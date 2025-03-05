@@ -82,7 +82,7 @@ impl<T> SitePtb<T> {
         let name_arg = self.pt_builder.input(pure_call_arg(&site_name)?)?;
         let metadata_arg = match metadata {
             Some(metadata) => self.new_metadata(metadata),
-            None => self.empty_metadata(),
+            None => self.new_metadata(Metadata::default()),
         };
         Ok(self.add_programmable_move_call(
             contracts::site::new_site.identifier(),
@@ -92,12 +92,13 @@ impl<T> SitePtb<T> {
     }
 
     fn new_metadata(&mut self, metadata: Metadata) -> Argument {
+        let defaults = Metadata::default();
         let args = [
-            metadata.link,
-            metadata.image_url,
-            metadata.description,
-            metadata.project_url,
-            metadata.creator,
+            metadata.link.or(defaults.link),
+            metadata.image_url.or(defaults.image_url),
+            metadata.description.or(defaults.description),
+            metadata.project_url.or(defaults.project_url),
+            metadata.creator.or(defaults.creator),
         ]
         .into_iter()
         .map(|val| self.pt_builder.pure(val).unwrap())
@@ -109,23 +110,6 @@ impl<T> SitePtb<T> {
             Identifier::new("new_metadata").unwrap(),
             vec![],
             args,
-        )
-    }
-
-    fn empty_metadata(&mut self) -> Argument {
-        let none_arg = self.pt_builder.pure(None::<String>).unwrap();
-        self.pt_builder.programmable_move_call(
-            self.package,
-            self.module.clone(),
-            Identifier::new("new_metadata").unwrap(),
-            vec![],
-            vec![
-                none_arg, // link
-                none_arg, // image_url
-                none_arg, // description
-                none_arg, // project_url
-                none_arg, // creator
-            ],
         )
     }
 

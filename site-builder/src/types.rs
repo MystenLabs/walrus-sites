@@ -150,3 +150,15 @@ pub struct Metadata {
     pub project_url: Option<String>,
     pub creator: Option<String>,
 }
+
+impl Default for Metadata {
+    fn default() -> Self {
+        Self {
+            link: None,
+            image_url: Some("https://www.walrus.xyz/walrus-site".to_string()),
+            description: Some("A walrus site created using Walrus and Sui!".to_string()),
+            project_url: None,
+            creator: None,
+        }
+    }
+}
