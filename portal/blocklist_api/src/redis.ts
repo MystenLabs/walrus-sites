@@ -89,4 +89,8 @@ if (!redisUrl.endsWith('0')) {
 const redisClient = new RedisClientFacade(
 	redisUrl
 );
+(async () => {
+    await redisClient.connect();
+})();
+
 export default redisClient;
