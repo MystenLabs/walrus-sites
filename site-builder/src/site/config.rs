@@ -7,7 +7,7 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use super::Routes;
-use crate::types::HttpHeaders;
+use crate::types::{HttpHeaders, Metadata};
 
 /// Deserialized object of the file's `ws-resource.json` contents.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -18,6 +18,9 @@ pub struct WSResources {
     /// The HTTP headers to be set for the resources.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub routes: Option<Routes>,
+    /// The attributes used inside the Display object.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Metadata>,
 }
 
 impl WSResources {
@@ -54,6 +57,16 @@ mod tests {
             }
         "#;
 
+    const METADATA: &str = r#"
+        "metadata": {
+            "link": "https://subdomain.walrus.site",
+            "image_url": "https://subdomain.walrus.site/image.png",
+            "description": "This is walrus site.",
+            "project_url": "https://github.com/MystenLabs/walrus-sites/",
+            "creator": "MystenLabs"
+        }
+    "#;
+
     #[test]
     fn test_read_ws_resources() {
         let header_data = format!("{{{}}}", HEADER_DATA);
@@ -62,5 +75,7 @@ mod tests {
         serde_json::from_str::<WSResources>(&route_data).expect("parsing should succeed");
         let route_header_data = format!("{{{},{}}}", HEADER_DATA, ROUTE_DATA);
         serde_json::from_str::<WSResources>(&route_header_data).expect("parsing should succeed");
+        let all_fields_included = format!("{{{},{},{}}}", HEADER_DATA, ROUTE_DATA, METADATA);
+        serde_json::from_str::<WSResources>(&all_fields_included).expect("parsing should succeed");
     }
 }

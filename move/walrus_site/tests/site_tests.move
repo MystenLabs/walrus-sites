@@ -1,6 +1,15 @@
 #[test_only]
 module walrus_site::site_tests {
-    use walrus_site::site::{ERangeStartGreaterThanRangeEnd, EStartAndEndRangeAreNone, Site, Range};
+    use sui::test_scenario;
+    use walrus_site::site::{
+        ERangeStartGreaterThanRangeEnd,
+        EStartAndEndRangeAreNone,
+        Site,
+        Range,
+        init_for_testing,
+        get_site_name,
+        get_site_link
+    };
 
     #[test]
     #[expected_failure(abort_code = EStartAndEndRangeAreNone)]
@@ -51,15 +60,26 @@ module walrus_site::site_tests {
     /// checking many of the contract's functions.
     #[test]
     fun test_site_flow_with_resources_and_routes() {
-        use sui::test_scenario;
         let owner = @0xCAFE;
         let mut scenario = test_scenario::begin(owner);
         // Create a site.
         {
+            let metadata = walrus_site::site::new_metadata(
+                option::some(b"https://<b36>.walrus.site".to_string()),
+                option::some(b"https://<b36>.walrus.site/image.png".to_string()),
+                option::some(b"This is a test site.".to_string()),
+                option::none(),
+                option::none(),
+            );
             let site = walrus_site::site::new_site(
                 b"Example".to_string(),
+                metadata,
                 scenario.ctx(),
             );
+
+            assert!(get_site_name(&site) == b"Example".to_string());
+            assert!(get_site_link(&site).borrow() == b"https://<b36>.walrus.site".to_string());
+
             transfer::public_transfer(site, owner)
         };
 
@@ -143,6 +163,59 @@ module walrus_site::site_tests {
         {
             let site = scenario.take_from_sender<Site>();
             walrus_site::site::burn(site);
+        };
+        scenario.end();
+    }
+
+    #[test]
+    fun test_update_metadata() {
+        let owner = @0xCAFE;
+        let mut scenario = test_scenario::begin(owner);
+        // Create a site.
+        {
+            let metadata = walrus_site::site::new_metadata(
+                option::some(b"https://<b36>.walrus.site".to_string()),
+                option::some(b"https://<b36>.walrus.site/image.png".to_string()),
+                option::some(b"This is a test site.".to_string()),
+                option::none(),
+                option::none(),
+            );
+            let site = walrus_site::site::new_site(
+                b"Example".to_string(),
+                metadata,
+                scenario.ctx(),
+            );
+
+            assert!(get_site_name(&site) == b"Example".to_string());
+            assert!(get_site_link(&site).borrow() == b"https://<b36>.walrus.site".to_string());
+
+            transfer::public_transfer(site, owner)
+        };
+
+        // Rename site and add a resource with headers to the site.
+        scenario.next_tx(owner);
+        {
+            let mut site = scenario.take_from_sender<Site>();
+            // Update the site metadata.
+            let metadata = walrus_site::site::new_metadata(
+                option::some(b"https://<b36>.walrus.site".to_string()),
+                option::some(b"https://<b36>.walrus.site/image.png".to_string()),
+                option::some(b"I am just updating the site metadata.".to_string()),
+                option::none(),
+                option::none(),
+            );
+            walrus_site::site::update_metadata(&mut site, metadata);
+            transfer::public_transfer(site, owner)
+        };
+        scenario.end();
+    }
+
+    #[test]
+    fun test_init() {
+        let owner = @0xCAFE;
+        let mut scenario = test_scenario::begin(owner);
+        {
+            init_for_testing(scenario.ctx());
         };
         scenario.end();
     }

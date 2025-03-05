@@ -164,6 +164,7 @@ impl SiteEditor {
                 WhenWalrusUpload::Always,
                 false,
                 false,
+                None,
             )
             .await?;
 
@@ -241,7 +242,7 @@ impl SiteEditor<EditOptions> {
 
         let mut resource_manager = ResourceManager::new(
             self.config.walrus_client(),
-            ws_resources,
+            ws_resources.clone(),
             ws_resources_path,
             self.edit_options.publish_options.max_concurrent,
         )
@@ -254,6 +255,11 @@ impl SiteEditor<EditOptions> {
         display::done();
         tracing::debug!(?local_site_data, "resources loaded from directory");
 
+        let site_metadata = match ws_resources {
+            Some(value) => value.metadata,
+            None => None,
+        };
+
         let mut site_manager = SiteManager::new(
             self.config.clone(),
             self.edit_options.site_id.clone(),
@@ -261,6 +267,7 @@ impl SiteEditor<EditOptions> {
             self.edit_options.when_upload.clone(),
             self.edit_options.publish_options.permanent,
             self.edit_options.publish_options.dry_run,
+            site_metadata,
         )
         .await?;
         let (response, summary) = site_manager.update_site(&local_site_data).await?;

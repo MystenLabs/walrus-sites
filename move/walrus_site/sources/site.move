@@ -1,7 +1,7 @@
 /// The module exposes the functionality to create and update Walrus sites.
 module walrus_site::site {
     use std::string::String;
-    use sui::{dynamic_field as df, vec_map};
+    use sui::{display::{Self, Display}, dynamic_field as df, package::{Self, Publisher}, vec_map};
 
     /// The name of the dynamic field containing the routes.
     const ROUTES_FIELD: vector<u8> = b"routes";
@@ -15,6 +15,20 @@ module walrus_site::site {
     public struct Site has key, store {
         id: UID,
         name: String,
+        link: Option<String>,
+        image_url: Option<String>,
+        description: Option<String>,
+        project_url: Option<String>,
+        creator: Option<String>,
+    }
+
+    /// A struct that contains the Site's metadata.
+    public struct Metadata has copy, drop, store {
+        link: Option<String>,
+        image_url: Option<String>,
+        description: Option<String>,
+        project_url: Option<String>,
+        creator: Option<String>,
     }
 
     /// A resource in a site.
@@ -52,11 +66,50 @@ module walrus_site::site {
         route_list: vec_map::VecMap<String, String>,
     }
 
+    /// One-Time-Witness for the module.
+    public struct SITE has drop {}
+
+    fun init(otw: SITE, ctx: &mut TxContext) {
+        let publisher = package::claim(otw, ctx);
+        let d = init_site_display(&publisher, ctx);
+        transfer::public_transfer(d, ctx.sender());
+        transfer::public_transfer(publisher, ctx.sender());
+    }
+
     /// Creates a new site.
-    public fun new_site(name: String, ctx: &mut TxContext): Site {
+    public fun new_site(name: String, metadata: Metadata, ctx: &mut TxContext): Site {
+        let Metadata {
+            link,
+            image_url,
+            description,
+            project_url,
+            creator,
+        } = metadata;
         Site {
             id: object::new(ctx),
             name,
+            link,
+            image_url,
+            description,
+            project_url,
+            creator,
+        }
+    }
+
+    /// Creates a new Metadata object.
+    public fun new_metadata(
+        link: Option<String>,
+        image_url: Option<String>,
+        description: Option<String>,
+        project_url: Option<String>,
+        creator: Option<String>,
+    ): Metadata {
+        Metadata {
+            link,
+            image_url,
+            description,
+            project_url,
+            creator,
         }
     }
 
@@ -120,6 +173,22 @@ module walrus_site::site {
     /// Updates the name of a site.
     public fun update_name(site: &mut Site, new_name: String) {
         site.name = new_name
+    }
+
+    /// Update the site metadata.
+    public fun update_metadata(site: &mut Site, metadata: Metadata) {
+        let Metadata {
+            link,
+            image_url,
+            description,
+            project_url,
+            creator,
+        } = metadata;
+        site.link = link;
+        site.image_url = image_url;
+        site.description = description;
+        site.project_url = project_url;
+        site.creator = creator;
     }
 
     /// Adds a resource to an existing site.
@@ -211,5 +280,52 @@ module walrus_site::site {
             ..,
         } = site;
         id.delete();
+    }
+
+    #[allow(lint(self_transfer))]
+    /// Define a Display for the Site objects.
+    fun init_site_display(publisher: &Publisher, ctx: &mut TxContext): Display<Site> {
+        let keys = vector[
+            b"name".to_string(),
+            b"link".to_string(),
+            b"image_url".to_string(),
+            b"description".to_string(),
+            b"project_url".to_string(),
+            b"creator".to_string(),
+        ];
+
+        let values = vector[
+            b"{name}".to_string(),
+            b"{link}".to_string(),
+            b"{image_url}".to_string(),
+            b"{description}".to_string(),
+            b"{project_url}".to_string(),
+            b"{creator}".to_string(),
+        ];
+
+        let mut d = display::new_with_fields<Site>(
+            publisher,
+            keys,
+            values,
+            ctx,
+        );
+
+        d.update_version();
+        d
+    }
+
+    #[test_only]
+    public fun init_for_testing(ctx: &mut TxContext) {
+        init(SITE {}, ctx);
+    }
+
+    #[test_only]
+    public fun get_site_name(site: &Site): String {
+        site.name
+    }
+
+    #[test_only]
+    public fun get_site_link(site: &Site): Option<String> {
+        site.link
     }
 }

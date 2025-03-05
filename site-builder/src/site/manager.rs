@@ -30,6 +30,7 @@ use crate::{
     publish::WhenWalrusUpload,
     retry_client::RetriableSuiClient,
     summary::SiteDataDiffSummary,
+    types::Metadata,
     util::{get_site_id_from_response, sign_and_send_ptb},
     walrus::Walrus,
     Config,
@@ -59,6 +60,7 @@ pub struct SiteManager {
     pub backoff_config: ExponentialBackoffConfig,
     pub permanent: bool,
     pub dry_run: bool,
+    pub metadata: Option<Metadata>,
 }
 
 impl SiteManager {
@@ -70,6 +72,7 @@ impl SiteManager {
         when_upload: WhenWalrusUpload,
         permanent: bool,
         dry_run: bool,
+        metadata: Option<Metadata>,
     ) -> Result<Self> {
         Ok(SiteManager {
             walrus: config.walrus_client(),
@@ -81,6 +84,7 @@ impl SiteManager {
             backoff_config: ExponentialBackoffConfig::default(),
             permanent,
             dry_run,
+            metadata,
         })
     }
 
@@ -280,7 +284,9 @@ impl SiteManager {
             SiteIdentifier::ExistingSite(site_id) => {
                 ptb.with_call_arg(&self.wallet.get_object_ref(*site_id).await?.into())?
             }
-            SiteIdentifier::NewSite(site_name) => ptb.with_create_site(site_name)?,
+            SiteIdentifier::NewSite(site_name) => {
+                ptb.with_create_site(site_name, self.metadata.clone())?
+            }
         };
 
         // Publish the first MAX_RESOURCES_PER_PTB resources, or all resources if there are fewer
