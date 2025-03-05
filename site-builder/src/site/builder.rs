@@ -16,7 +16,10 @@ use super::{
     resource::{Resource, ResourceOp},
     RouteOps,
 };
-use crate::{site::contracts, types::Range};
+use crate::{
+    site::contracts,
+    types::{Metadata, Range},
+};
 
 pub struct SitePtb<T = ()> {
     pt_builder: ProgrammableTransactionBuilder,
@@ -57,8 +60,12 @@ impl SitePtb {
     }
 
     /// Makes the call to create a new site and keeps the resulting argument.
-    pub fn with_create_site(mut self, site_name: &str) -> Result<SitePtb<Argument>> {
-        let argument = self.create_site(site_name)?;
+    pub fn with_create_site(
+        mut self,
+        site_name: &str,
+        metadata: Option<Metadata>,
+    ) -> Result<SitePtb<Argument>> {
+        let argument = self.create_site(site_name, metadata)?;
         self.with_arg(argument)
     }
 }
@@ -70,35 +77,55 @@ impl<T> SitePtb<T> {
     }
 
     /// Move call to create a new Walrus site.
-    pub fn create_site(&mut self, site_name: &str) -> Result<Argument> {
+    pub fn create_site(&mut self, site_name: &str, metadata: Option<Metadata>) -> Result<Argument> {
         tracing::debug!(site=%site_name, "new Move call: creating site");
         let name_arg = self.pt_builder.input(pure_call_arg(&site_name)?)?;
-        let metadata = self.new_metadata();
+        let metadata_arg = match metadata {
+            Some(metadata) => self.new_metadata(metadata),
+            None => self.empty_metadata(),
+        };
         Ok(self.add_programmable_move_call(
             contracts::site::new_site.identifier(),
             vec![],
-            vec![name_arg, metadata],
+            vec![name_arg, metadata_arg],
         ))
     }
 
-    fn new_metadata(&mut self) -> Argument {
-        let link = self
-            .pt_builder
-            .pure(Some("https://walrus.site".to_string()))
-            .unwrap();
-        let image_url = self
-            .pt_builder
-            .pure(Some("https://walrus.site".to_string()))
-            .unwrap();
-        let description = self.pt_builder.pure(None::<String>).unwrap();
-        let project_url = self.pt_builder.pure(None::<String>).unwrap();
-        let creator = self.pt_builder.pure(None::<String>).unwrap();
+    fn new_metadata(&mut self, metadata: Metadata) -> Argument {
+        let args = [
+            metadata.link,
+            metadata.image_url,
+            metadata.description,
+            metadata.project_url,
+            metadata.creator,
+        ]
+        .into_iter()
+        .map(|val| self.pt_builder.pure(val).unwrap())
+        .collect::<Vec<_>>();
+
         self.pt_builder.programmable_move_call(
             self.package,
             Identifier::new("site").unwrap(),
             Identifier::new("new_metadata").unwrap(),
             vec![],
-            vec![link, image_url, description, project_url, creator],
+            args,
+        )
+    }
+
+    fn empty_metadata(&mut self) -> Argument {
+        let none_arg = self.pt_builder.pure(None::<String>).unwrap();
+        self.pt_builder.programmable_move_call(
+            self.package,
+            Identifier::new("site").unwrap(),
+            Identifier::new("new_metadata").unwrap(),
+            vec![],
+            vec![
+                none_arg, // link
+                none_arg, // image_url
+                none_arg, // description
+                none_arg, // project_url
+                none_arg, // creator
+            ],
         )
     }
 
