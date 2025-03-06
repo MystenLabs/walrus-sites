@@ -66,7 +66,8 @@ describe('routing tests', () => {
             new ResourceFetcher(rpcSelector, sitePackage),
             new SuiNSResolver(rpcSelector),
             wsRouter,
-            aggregatorUrl
+            aggregatorUrl,
+            true
         );
 
         const fetchUrlSpy = vi.spyOn(urlFetcher, 'fetchUrl');

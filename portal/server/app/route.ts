@@ -14,6 +14,7 @@ import { standardUrlFetcher, premiumUrlFetcher } from "src/url_fetcher_factory";
 import { NextRequest } from "next/server";
 import { sendToWebAnalytics } from "src/web_analytics";
 import { sendToAmplitude } from "src/amplitude";
+import { Base36toHex } from "@lib/objectId_operations";
 
 if (config.enableSentry) {
     // Only integrate Sentry on production.
@@ -70,13 +71,15 @@ export async function GET(req: NextRequest) {
     if (atBaseUrl) {
         console.log("Serving the landing page from walrus...");
         // Always use the premium page fetcher for the landing page (when available).
+        // The landing page is an exception to the B36_DOMAIN_RESOLUTION_SUPPORT rule.
+        // It will always resolve to an objectId.
         const urlFetcher = config.enableAllowlist ? premiumUrlFetcher : standardUrlFetcher;
         const response = await urlFetcher.resolveDomainAndFetchUrl(
             {
                 subdomain: config.landingPageOidB36,
                 path: parsedUrl?.path ?? "/index.html",
             },
-            null,
+            Base36toHex(config.landingPageOidB36),
             blocklistChecker
         );
         return response;

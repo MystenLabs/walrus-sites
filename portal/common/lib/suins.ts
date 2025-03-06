@@ -27,7 +27,7 @@ export class SuiNSResolver {
         return null;
     }
 
-    hardcodedSubdmains(subdomain: string): string | null {
+    hardcodedSubdomains(subdomain: string): string | null {
         if (subdomain in SITE_NAMES) {
             return SITE_NAMES[subdomain];
         }
