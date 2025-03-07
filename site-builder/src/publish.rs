@@ -338,9 +338,15 @@ fn print_summary(
     };
 
     println!(
-        "Browse the resulting site at: https://{}.{}",
-        id_to_base36(&object_id)?,
-        config.portal
+        r#"To browse the site, you have the following options:
+        1. Run a local portal, and browse the site through it: e.g. http://{base36_id}.localhost:3000
+           (more info: https://docs.walrus.site/walrus-sites/portal.html#running-the-portal-locally)
+        2. Use a third-party portal (e.g. walrus.site), which will require a SuiNS name.
+           First, buy a SuiNS name at suins.io (e.g. example-domain), then point it to the site object ID.
+           Finally, browse it with: https://example-domain.{portal}
+           "#,
+        base36_id = id_to_base36(&object_id)?,
+        portal = config.portal
     );
     Ok(())
 }
