@@ -1,5 +1,7 @@
 # Walrus Sites!
 
+[![License](https://img.shields.io/github/license/MystenLabs/walrus-sites)](https://github.com/MystenLabs/walrus-sites/blob/main/LICENSE)
+
 Walrus Sites are "web"-sites built using decentralized tech such as [Walrus][walrus-link]
 a decentralized storage network, and the [Sui blockchain][sui-link].
 
