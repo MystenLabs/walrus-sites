@@ -23,7 +23,6 @@ import { WalrusSitesRouter } from "./routing";
 import { HttpStatusCodes } from "./http/http_status_codes";
 import logger from "./logger";
 import BlocklistChecker from "./blocklist_checker";
-import {Network} from "@mysten/suins";
 
 /**
 * Includes all the logic for fetching the URL contents of a walrus site.
@@ -34,6 +33,7 @@ export class UrlFetcher {
         private suinsResolver: SuiNSResolver,
         private wsRouter: WalrusSitesRouter,
         private aggregatorUrl: string,
+        private b36DomainResolutionSupport: boolean
     ){}
 
     /**
@@ -121,37 +121,38 @@ export class UrlFetcher {
     async resolveObjectId(
         parsedUrl: DomainDetails,
     ): Promise<string | Response> {
-        let objectId = this.suinsResolver.hardcodedSubdmains(parsedUrl.subdomain);
-        if (!objectId && !parsedUrl.subdomain.includes(".")) {
+    	// Resolve to an objectId using a hard-coded subdomain.
+    	const hardCodedObjectId = this.suinsResolver.hardcodedSubdomains(parsedUrl.subdomain);
+		if (hardCodedObjectId) return hardCodedObjectId;
+
+        // If b36 subdomains are supported, resolve them by converting them to a hex object id.
+		const isSuiNSDomain = parsedUrl.subdomain.includes(".");
+		const isb36Domain = !isSuiNSDomain;
+        if (this.b36DomainResolutionSupport && isb36Domain) {
             // Try to convert the subdomain to an object ID NOTE: This effectively _disables_ any SuiNs
             // name that is the base36 encoding of an object ID (i.e., a 32-byte string). This is
             // desirable, prevents people from getting suins names that are the base36 encoding the
             // object ID of a target site (with the goal of hijacking non-suins queries).
-            //
-            // If the subdomain contains `.`, it is a SuiNS name, and we should not convert it.
-            objectId = subdomainToObjectId(parsedUrl.subdomain);
+			const resolvedB36toHex = subdomainToObjectId(parsedUrl.subdomain);
+			if (resolvedB36toHex) return resolvedB36toHex;
         }
-        if (!objectId) {
-            // Check if there is a SuiNs name
-            try {
-                objectId = await this.suinsResolver.resolveSuiNsAddress(parsedUrl.subdomain);
-                if (!objectId) {
-                    logger.warn({
-                        message: "Could not resolve SuiNs domain. Does the domain exist?",
-                        subdomain: parsedUrl.subdomain,
-                    })
-                    return noObjectIdFound();
-                }
-                return objectId;
-            } catch {
-                logger.error({
-                    message: "Failed to contact the full node while resolving suins domain",
-                    subdomain: parsedUrl.subdomain
-                });
-                return fullNodeFail();
-            }
+
+        // Resolve the SuiNS domain to an object id.
+        try {
+            const objectId = await this.suinsResolver.resolveSuiNsAddress(parsedUrl.subdomain);
+            if (objectId) return objectId;
+            logger.warn({
+                message: "Could not resolve SuiNs domain. Does the domain exist?",
+                subdomain: parsedUrl.subdomain,
+            })
+            return noObjectIdFound();
+        } catch {
+            logger.error({
+                message: "Failed to contact the full node while resolving suins domain",
+                subdomain: parsedUrl.subdomain
+            });
+            return fullNodeFail();
         }
-        return objectId;
     }
 
     /**

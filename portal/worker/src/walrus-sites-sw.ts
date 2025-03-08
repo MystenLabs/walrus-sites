@@ -35,6 +35,7 @@ export const urlFetcher = new UrlFetcher(
     new SuiNSResolver(rpcSelector),
     new WalrusSitesRouter(rpcSelector),
     aggregatorUrl,
+    true // b36 domain support should always be enabled for service workers.
 );
 
 self.addEventListener("install", (_event) => {

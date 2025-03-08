@@ -48,6 +48,9 @@ ENV AGGREGATOR_URL=${AGGREGATOR_URL}
 ARG SITE_PACKAGE="0xc5bebae319fc9d2a9dc858b7484cdbd6ef219decf4662dc81a11dc69bb7a5fa7"
 ENV SITE_PACKAGE=${SITE_PACKAGE}
 
+ARG B36_DOMAIN_RESOLUTION_SUPPORT="true"
+ENV B36_DOMAIN_RESOLUTION_SUPPORT=${B36_DOMAIN_RESOLUTION_SUPPORT}
+
 RUN mkdir -p /temp/prod
 COPY portal/package.json portal/bun.lock /temp/prod/
 COPY portal/common /temp/prod/common
