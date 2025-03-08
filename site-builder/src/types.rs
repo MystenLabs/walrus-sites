@@ -82,8 +82,23 @@ impl AssociatedContractStruct for SuiResource {
 pub struct HttpHeaders(pub BTreeMap<String, String>);
 
 /// The routes of a site.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Routes(pub BTreeMap<String, String>);
+
+impl<'de> Deserialize<'de> for Routes {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        if deserializer.is_human_readable() {
+            let routes: BTreeMap<String, String> = Deserialize::deserialize(deserializer)?;
+            Ok(Self(routes))
+        } else {
+            let routes: Vec<(String, String)> = Deserialize::deserialize(deserializer)?;
+            Ok(Self(routes.into_iter().collect()))
+        }
+    }
+}
 
 impl Routes {
     pub fn empty() -> Self {
