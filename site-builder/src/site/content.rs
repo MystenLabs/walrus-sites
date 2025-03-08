@@ -7,7 +7,7 @@ use anyhow::{anyhow, Result};
 use clap::ValueEnum;
 
 #[derive(Debug, ValueEnum, Clone, Copy, PartialEq, Eq, Ord, PartialOrd)]
-#[clap(rename_all = "lowercase")]
+#[value_enum(rename_all = "lowercase")]
 pub enum ContentEncoding {
     PlainText,
     // TODO(giac): Enable GZIP once decided what to do with the encoding.
