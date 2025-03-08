@@ -31,48 +31,47 @@ bin_version::bin_version!();
 const SITES_CONFIG_NAME: &str = "./sites-config.yaml";
 
 #[derive(Parser, Debug)]
-#[clap(rename_all = "kebab-case", version = VERSION, propagate_version = true)]
+#[command(rename_all = "kebab-case", version = VERSION, propagate_version = true)]
 struct Args {
     /// The path to the configuration file for the site builder.
-    #[clap(short, long)]
+    #[arg(short, long)]
     config: Option<PathBuf>,
-    #[clap(flatten)]
+    #[command(flatten)]
     general: GeneralArgs,
     #[command(subcommand)]
     command: Commands,
 }
 
 #[derive(Parser, Clone, Debug, Deserialize)]
-#[clap(rename_all = "kebab-case")]
+#[command(rename_all = "kebab-case")]
 pub(crate) struct GeneralArgs {
     /// The URL or the RPC endpoint to connect the client to.
     ///
     /// Can be specified as a CLI argument or in the config.
-    #[clap(long)]
+    #[arg(long)]
     rpc_url: Option<String>,
     /// The path to the Sui Wallet config.
     ///
     /// Can be specified as a CLI argument or in the config.
-    #[clap(long)]
+    #[arg(long)]
     wallet: Option<PathBuf>,
     /// The path or name of the walrus binary.
     ///
     /// The Walrus binary will then be called with this configuration to perform actions on Walrus.
     /// Can be specified as a CLI argument or in the config.
-    #[clap(long)]
+    #[arg(long)]
     #[serde(default = "default::walrus_binary")]
     walrus_binary: Option<String>,
     /// The path to the configuration for the Walrus client.
     ///
     /// This will be passed to the calls to the Walrus binary.
     /// Can be specified as a CLI argument or in the config.
-    #[clap(long)]
+    #[arg(long)]
     walrus_config: Option<PathBuf>,
     /// The gas budget for the operations on Sui.
     ///
     /// Can be specified as a CLI argument or in the config.
-    #[clap(long)]
-    #[clap(short, long)]
+    #[arg(short, long)]
     #[serde(default = "default::gas_budget")]
     gas_budget: Option<u64>,
 }
@@ -123,29 +122,29 @@ impl GeneralArgs {
 }
 
 #[derive(Subcommand, Debug)]
-#[clap(rename_all = "kebab-case")]
+#[command(rename_all = "kebab-case")]
 enum Commands {
     /// Publish a new site on Sui.
     Publish {
-        #[clap(flatten)]
+        #[command(flatten)]
         publish_options: PublishOptions,
         /// The name of the site.
-        #[clap(short, long, default_value = "test site")]
+        #[arg(short, long, default_value = "test site")]
         site_name: String,
     },
     /// Update an existing site.
     Update {
-        #[clap(flatten)]
+        #[command(flatten)]
         publish_options: PublishOptions,
         /// The object ID of a partially published site to be completed.
         object_id: ObjectID,
-        #[clap(short, long, action)]
+        #[arg(short, long, action)]
         watch: bool,
         /// Publish all resources to Sui and Walrus, even if they may be already present.
         ///
         /// This can be useful in case the Walrus devnet is reset, but the resources are still
         /// available on Sui.
-        #[clap(long, action)]
+        #[arg(long, action)]
         force: bool,
     },
     /// Convert an object ID in hex format to the equivalent Base36 format.
