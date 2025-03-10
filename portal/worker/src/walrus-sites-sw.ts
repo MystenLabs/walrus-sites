@@ -60,13 +60,13 @@ self.addEventListener("fetch", async (event) => {
     if (portalDomainNameLengthString) {
         portalDomainNameLength = Number(portalDomainNameLengthString);
     }
-    const objectIdPath = getObjectIdLink(urlString);
+    const objectIdPath = getObjectIdLink(url);
     if (objectIdPath) {
         event.respondWith(redirectToPortalURLResponse(scope, objectIdPath, portalDomainNameLength));
         return;
     }
 
-    const walrusPath = getBlobIdLink(urlString);
+    const walrusPath = getBlobIdLink(url);
     if (walrusPath) {
         event.respondWith(redirectToAggregatorUrlResponse(scope, walrusPath, aggregatorUrl));
         return;

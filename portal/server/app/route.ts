@@ -35,13 +35,13 @@ export async function GET(req: NextRequest) {
     if (config.enableVercelWebAnalytics) {
 		await sendToWebAnalytics(req);
 	}
-    const objectIdPath = getObjectIdLink(url.toString());
+    const objectIdPath = getObjectIdLink(url);
     const portalDomainNameLength = config.portalDomainNameLength;
     if (objectIdPath) {
         console.log(`Redirecting to portal url response: ${url.toString()} from ${objectIdPath}`);
         return redirectToPortalURLResponse(url, objectIdPath, portalDomainNameLength);
     }
-    const walrusPath: string | null = getBlobIdLink(url.toString());
+    const walrusPath: string | null = getBlobIdLink(url);
     if (walrusPath) {
         console.log(`Redirecting to aggregator url response: ${req.url} from ${objectIdPath}`);
 
