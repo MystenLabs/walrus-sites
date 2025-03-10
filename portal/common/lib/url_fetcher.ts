@@ -5,6 +5,7 @@ import {
     DomainDetails,
     isResource,
     optionalRangeToHeaders as optionalRangeToRequestHeaders,
+	Routes,
 } from "./types/index";
 import { subdomainToObjectId, HEXtoBase36 } from "./objectId_operations";
 import { SuiNSResolver } from "./suins";
@@ -257,6 +258,7 @@ export class UrlFetcher {
                     totalAttempts: retries + 1,
                     error: error instanceof Error ? error.message : error,
                 });
+				lastError = error;
             }
 
             // Wait before retrying
