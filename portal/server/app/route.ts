@@ -67,7 +67,9 @@ export async function GET(req: NextRequest) {
         }
     }
 
-    const atBaseUrl = portalDomain == url.host.split(":")[0];
+	const hostname = url.host.split(":")[0];
+	const isLocalhost = hostname == '127.0.0.1'
+    const atBaseUrl = portalDomain == hostname || isLocalhost;
     if (atBaseUrl) {
         console.log("Serving the landing page from walrus...");
         // Always use the premium page fetcher for the landing page (when available).
