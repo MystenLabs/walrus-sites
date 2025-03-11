@@ -3,6 +3,7 @@
 
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import CookieMonster from 'src/cookie_monster'
 
 export function middleware(request: NextRequest) {
     const urlOriginal = extractUrlFrom(request)
@@ -19,6 +20,7 @@ export function middleware(request: NextRequest) {
     const urlRedirect = new URL('/', request.url)
     const response = NextResponse.rewrite(urlRedirect)
     response.headers.set('x-original-url', urlOriginal)
+    CookieMonster.eatCookies(request, response)
     return response
 }
 
