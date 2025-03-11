@@ -16,6 +16,9 @@ export class CookieMonster {
 		return
 	}
 
+	/**
+	* Deletes the existing cookies by adding an artificial expired date.
+	*/
 	private static eatExistingCookies(request: Request, response: Response) {
 		// If there are existing cookies, eat (delete) them.
 		const cookieHeader = request.headers.get('Cookie');
