@@ -24,6 +24,6 @@
         },
         "types": ["../common/lib/custom.d.ts", "@types/bun"]
     },
-    "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+    "include": ["**/*.ts", "**/*.tsx"],
     "exclude": ["node_modules"]
 }
