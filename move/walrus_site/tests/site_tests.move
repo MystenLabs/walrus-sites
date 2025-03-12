@@ -64,7 +64,7 @@ module walrus_site::site_tests {
         let mut scenario = test_scenario::begin(owner);
         // Create a site.
         {
-            let metadata = walrus_site::site::new_metadata(
+            let metadata = walrus_site::metadata::new_metadata(
                 option::some(b"https://<b36>.walrus.site".to_string()),
                 option::some(b"https://<b36>.walrus.site/image.png".to_string()),
                 option::some(b"This is a test site.".to_string()),
@@ -173,7 +173,7 @@ module walrus_site::site_tests {
         let mut scenario = test_scenario::begin(owner);
         // Create a site.
         {
-            let metadata = walrus_site::site::new_metadata(
+            let metadata = walrus_site::metadata::new_metadata(
                 option::some(b"https://<b36>.walrus.site".to_string()),
                 option::some(b"https://<b36>.walrus.site/image.png".to_string()),
                 option::some(b"This is a test site.".to_string()),
@@ -197,7 +197,7 @@ module walrus_site::site_tests {
         {
             let mut site = scenario.take_from_sender<Site>();
             // Update the site metadata.
-            let metadata = walrus_site::site::new_metadata(
+            let metadata = walrus_site::metadata::new_metadata(
                 option::some(b"https://<b36>.walrus.site".to_string()),
                 option::some(b"https://<b36>.walrus.site/image.png".to_string()),
                 option::some(b"I am just updating the site metadata.".to_string()),
