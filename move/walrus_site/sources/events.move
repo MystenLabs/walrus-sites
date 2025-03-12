@@ -3,7 +3,7 @@ module walrus_site::events {
     use sui::event;
     use walrus_site::metadata::Metadata;
 
-    public struct SiteCreated has copy, drop {
+    public struct SiteCreatedEvent has copy, drop {
         site_id: ID,
         site_name: String,
         site_metadata_link: Option<String>,
@@ -13,18 +13,18 @@ module walrus_site::events {
         site_metadata_creator: Option<String>,
     }
 
-    public struct SiteBurned has copy, drop {
+    public struct SiteBurnedEvent has copy, drop {
         site_id: ID,
     }
 
-    public struct SiteNameUpdate has copy, drop {
+    public struct SiteNameUpdateEvent has copy, drop {
         site_id: ID,
         old_name: String,
         new_name: String,
     }
 
     public fun emit_site_created(site_id: ID, name: String, metadata: &Metadata) {
-        event::emit(SiteCreated {
+        event::emit(SiteCreatedEvent {
             site_id,
             site_name: name,
             site_metadata_link: metadata.link(),
@@ -36,13 +36,13 @@ module walrus_site::events {
     }
 
     public fun emit_site_burned(site_id: ID) {
-        event::emit(SiteBurned {
+        event::emit(SiteBurnedEvent {
             site_id,
         });
     }
 
     public fun emit_site_update_name(site_id: ID, old_name: String, new_name: String) {
-        event::emit(SiteNameUpdate {
+        event::emit(SiteNameUpdateEvent {
             site_id,
             old_name,
             new_name,
