@@ -21,11 +21,7 @@ if (config.enableSentry) {
 }
 
 export default async function main(req: Request) {
-	const originalUrl = req.headers.get("x-original-url");
-	if (!originalUrl) {
-		throw new Error("No original url found in request headers");
-	}
-	const url = new URL(originalUrl);
+	const url = new URL(req.url);
 
 	// Send the page view event to either Amplitude or Vercel Web Analytics.
 	if (config.amplitudeApiKey) {
@@ -84,5 +80,5 @@ export default async function main(req: Request) {
 		return response;
 	}
 
-	return new Response(`Resource at ${originalUrl} not found!`, { status: 404 });
+	return new Response(`Resource at ${url} not found!`, { status: 404 });
 }
