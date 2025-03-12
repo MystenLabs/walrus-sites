@@ -5,22 +5,22 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import CookieMonster from 'src/cookie_monster'
 
-export function middleware(request: NextRequest) {
+export function middleware(request: NextRequest, response: NextResponse) {
+	response = NextResponse.next()
+	CookieMonster.eatCookies(request, response)
     const urlOriginal = extractUrlFrom(request)
     const alreadyAtRoot = request.nextUrl.pathname === '/'
     // Bypass middleware for walrus-sites-sw.js
-    if (request.nextUrl.pathname.endsWith('walrus-sites-sw.js') || request.nextUrl.pathname === '/api/healthz') {
-        return NextResponse.next()
-    }
+	if (request.nextUrl.pathname.endsWith('walrus-sites-sw.js') || request.nextUrl.pathname === '/api/healthz') {
+		return response
+	}
     if (alreadyAtRoot) {
-        const response = NextResponse.next()
         response.headers.set('x-original-url', urlOriginal)
         return response
     }
     const urlRedirect = new URL('/', request.url)
-    const response = NextResponse.rewrite(urlRedirect)
+    response = NextResponse.rewrite(urlRedirect)
     response.headers.set('x-original-url', urlOriginal)
-    CookieMonster.eatCookies(request, response)
     return response
 }
 
