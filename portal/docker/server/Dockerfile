@@ -63,9 +63,8 @@ FROM base as debug
 RUN apt update && apt install -y curl netcat-traditional
 COPY --from=install /temp/prod/node_modules node_modules
 COPY --from=install /temp/prod/package.json .
-COPY --from=install /temp/prod/server/package.json server/package.json
-COPY --from=install /temp/prod/server/public server/public/
-COPY --from=install /temp/prod/server/index.ts server/index.ts
+COPY --from=install /temp/prod/common ./common
+COPY --from=install /temp/prod/server ./server
 
 # run the app
 USER bun
@@ -77,9 +76,8 @@ CMD [ "bun", "run", "server" ]
 FROM base AS release
 COPY --from=install /temp/prod/node_modules node_modules
 COPY --from=install /temp/prod/package.json .
-COPY --from=install /temp/prod/server/package.json server/package.json
-COPY --from=install /temp/prod/server/public server/public/
-COPY --from=install /temp/prod/server/index.ts server/index.ts
+COPY --from=install /temp/prod/common ./common
+COPY --from=install /temp/prod/server ./server
 
 # run the app
 USER bun
