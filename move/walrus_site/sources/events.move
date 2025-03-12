@@ -23,7 +23,7 @@ module walrus_site::events {
         new_name: String,
     }
 
-    public fun emit_site_created(site_id: ID, name: String, metadata: &Metadata) {
+    public(package) fun emit_site_created(site_id: ID, name: String, metadata: &Metadata) {
         event::emit(SiteCreatedEvent {
             site_id,
             site_name: name,
@@ -35,13 +35,13 @@ module walrus_site::events {
         });
     }
 
-    public fun emit_site_burned(site_id: ID) {
+    public(package) fun emit_site_burned(site_id: ID) {
         event::emit(SiteBurnedEvent {
             site_id,
         });
     }
 
-    public fun emit_site_update_name(site_id: ID, old_name: String, new_name: String) {
+    public(package) fun emit_site_update_name(site_id: ID, old_name: String, new_name: String) {
         event::emit(SiteNameUpdateEvent {
             site_id,
             old_name,
