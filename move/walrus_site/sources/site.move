@@ -1,11 +1,11 @@
 /// The module exposes the functionality to create and update Walrus sites.
 module walrus_site::site {
     use std::string::String;
-    use sui::{
-    	display::{Self, Display}, dynamic_field as df, package::{Self, Publisher}, vec_map
+    use sui::{display::{Self, Display}, dynamic_field as df, package::{Self, Publisher}, vec_map};
+    use walrus_site::{
+        events::{emit_site_created, emit_site_burned, emit_site_update_name},
+        metadata::Metadata
     };
-    use walrus_site::events::{emit_site_created, emit_site_burned, emit_site_update_name};
-    use walrus_site::metadata::{Metadata};
 
     /// The name of the dynamic field containing the routes.
     const ROUTES_FIELD: vector<u8> = b"routes";
@@ -82,9 +82,11 @@ module walrus_site::site {
             project_url: metadata.project_url(),
             creator: metadata.creator(),
         };
-       	emit_site_created(
-      		object::id(&site), name, &metadata
-       	);
+        emit_site_created(
+            object::id(&site),
+            name,
+            &metadata,
+        );
         site
     }
 
@@ -147,10 +149,12 @@ module walrus_site::site {
 
     /// Updates the name of a site.
     public fun update_name(site: &mut Site, new_name: String) {
-    	emit_site_update_name(
-     		object::id(site), site.name, new_name
-     	);
-   		site.name = new_name
+        emit_site_update_name(
+            object::id(site),
+            site.name,
+            new_name,
+        );
+        site.name = new_name
     }
 
     /// Update the site metadata.
@@ -246,8 +250,8 @@ module walrus_site::site {
     /// delete the dynamic fields, they will become unaccessible and you will not be able to delete
     /// them in the future.
     public fun burn(site: Site) {
-    	emit_site_burned(object::id(&site));
-    	let Site {
+        emit_site_burned(object::id(&site));
+        let Site {
             id,
             ..,
         } = site;
