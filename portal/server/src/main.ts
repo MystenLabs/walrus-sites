@@ -11,7 +11,6 @@ import integrateLoggerWithSentry from "src/sentry_logger";
 import blocklistChecker from "src/blocklist_checker";
 import { config } from "src/configuration_loader";
 import { standardUrlFetcher, premiumUrlFetcher } from "src/url_fetcher_factory";
-import { NextRequest } from "next/server";
 import { sendToWebAnalytics } from "src/web_analytics";
 import { sendToAmplitude } from "src/amplitude";
 import { Base36toHex } from "@lib/objectId_operations";
@@ -21,7 +20,7 @@ if (config.enableSentry) {
     integrateLoggerWithSentry();
 }
 
-export default async function main(req: NextRequest) {
+export default async function main(req: Request) {
 	const originalUrl = req.headers.get("x-original-url");
 	if (!originalUrl) {
 		throw new Error("No original url found in request headers");
