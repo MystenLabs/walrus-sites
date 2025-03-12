@@ -17,7 +17,7 @@ export async function decompressData(
 		}
 
 		const encodingIsSupported = ["gzip", "deflate", "deflate-raw"].includes(contentEncoding);
-
+		if (!encodingIsSupported) logger.warn({message: `Unsupported encoding: ${contentEncoding}.`})
 		if (encodingIsSupported) {
 			let decompressed: Uint8Array;
 			switch (contentEncoding) {
