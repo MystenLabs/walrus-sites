@@ -1,7 +1,11 @@
 /// The module exposes the functionality to create and update Walrus sites.
 module walrus_site::site {
     use std::string::String;
-    use sui::{display::{Self, Display}, dynamic_field as df, package::{Self, Publisher}, vec_map};
+    use sui::{
+    	display::{Self, Display}, dynamic_field as df, package::{Self, Publisher}, vec_map
+    };
+    use walrus_site::events::{emit_site_created, emit_site_burned, emit_site_update_name};
+    use walrus_site::metadata::{Metadata};
 
     /// The name of the dynamic field containing the routes.
     const ROUTES_FIELD: vector<u8> = b"routes";
@@ -15,15 +19,6 @@ module walrus_site::site {
     public struct Site has key, store {
         id: UID,
         name: String,
-        link: Option<String>,
-        image_url: Option<String>,
-        description: Option<String>,
-        project_url: Option<String>,
-        creator: Option<String>,
-    }
-
-    /// A struct that contains the Site's metadata.
-    public struct Metadata has copy, drop, store {
         link: Option<String>,
         image_url: Option<String>,
         description: Option<String>,
@@ -78,39 +73,19 @@ module walrus_site::site {
 
     /// Creates a new site.
     public fun new_site(name: String, metadata: Metadata, ctx: &mut TxContext): Site {
-        let Metadata {
-            link,
-            image_url,
-            description,
-            project_url,
-            creator,
-        } = metadata;
-        Site {
+        let site = Site {
             id: object::new(ctx),
             name,
-            link,
-            image_url,
-            description,
-            project_url,
-            creator,
-        }
-    }
-
-    /// Creates a new Metadata object.
-    public fun new_metadata(
-        link: Option<String>,
-        image_url: Option<String>,
-        description: Option<String>,
-        project_url: Option<String>,
-        creator: Option<String>,
-    ): Metadata {
-        Metadata {
-            link,
-            image_url,
-            description,
-            project_url,
-            creator,
-        }
+            link: metadata.link(),
+            image_url: metadata.image_url(),
+            description: metadata.description(),
+            project_url: metadata.project_url(),
+            creator: metadata.creator(),
+        };
+       	emit_site_created(
+      		object::id(&site), name, &metadata
+       	);
+        site
     }
 
     /// Optionally creates a new Range object.
@@ -172,23 +147,19 @@ module walrus_site::site {
 
     /// Updates the name of a site.
     public fun update_name(site: &mut Site, new_name: String) {
-        site.name = new_name
+    	emit_site_update_name(
+     		object::id(site), site.name, new_name
+     	);
+   		site.name = new_name
     }
 
     /// Update the site metadata.
     public fun update_metadata(site: &mut Site, metadata: Metadata) {
-        let Metadata {
-            link,
-            image_url,
-            description,
-            project_url,
-            creator,
-        } = metadata;
-        site.link = link;
-        site.image_url = image_url;
-        site.description = description;
-        site.project_url = project_url;
-        site.creator = creator;
+        site.link = metadata.link();
+        site.image_url = metadata.image_url();
+        site.description = metadata.description();
+        site.project_url = metadata.project_url();
+        site.creator = metadata.creator();
     }
 
     /// Adds a resource to an existing site.
@@ -275,7 +246,8 @@ module walrus_site::site {
     /// delete the dynamic fields, they will become unaccessible and you will not be able to delete
     /// them in the future.
     public fun burn(site: Site) {
-        let Site {
+    	emit_site_burned(object::id(&site));
+    	let Site {
             id,
             ..,
         } = site;
