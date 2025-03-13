@@ -260,7 +260,6 @@ public fun burn(site: Site) {
     id.delete();
 }
 
-#[allow(lint(self_transfer))]
 /// Define a Display for the Site objects.
 fun init_site_display(publisher: &Publisher, ctx: &mut TxContext): Display<Site> {
     let keys = vector[
