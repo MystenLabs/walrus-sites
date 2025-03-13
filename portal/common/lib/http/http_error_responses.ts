@@ -34,8 +34,7 @@ export function resourceNotFound(): Response {
 
 export function genericError(): Response {
 	return Response404(
-		mainNotFoundErrorMessage,
-		"Something went wrong with your request!"
+		mainNotFoundErrorMessage
 	)
 }
 
