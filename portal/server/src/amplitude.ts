@@ -5,7 +5,6 @@ import * as amplitude from "@amplitude/analytics-node";
 import { generateHash, isHtmlPage } from "./utils";
 import { config } from "./configuration_loader";
 import logger from "@lib/logger";
-import { NextRequest } from "next/server";
 import { getSubdomainAndPath } from "@lib/domain_parsing";
 import { UAParser } from "ua-parser-js";
 
@@ -24,7 +23,7 @@ if (config.amplitudeApiKey) {
 * Sends a page view event to Amplitude.
 * @param request - The incoming request to the portal.
 */
-export async function sendToAmplitude(request: NextRequest, originalUrl: URL): Promise<void> {
+export async function sendToAmplitude(request: Request, originalUrl: URL): Promise<void> {
 	if (!isHtmlPage(request)) {
 		return;
 	}
@@ -54,10 +53,6 @@ export async function sendToAmplitude(request: NextRequest, originalUrl: URL): P
 			device_manufacturer: ua?.device.vendor,
 			platform: ua?.device.type,
 	    	event_type: "page_view",
-			region: request.geo?.region,
-			country: request.geo?.country,
-			location_lat: Number(request.geo?.latitude),
-			location_lng: Number(request.geo?.longitude),
 			language: request.headers.get("accept-language") ?? undefined,
 			ip: ip,
 			event_properties: {

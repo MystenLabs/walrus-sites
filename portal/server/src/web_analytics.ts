@@ -1,7 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { NextRequest } from "next/server";
 import { track } from "@vercel/analytics/server";
 import { isHtmlPage, extractCustomEventProperties } from "./utils";
 
@@ -9,7 +8,7 @@ import { isHtmlPage, extractCustomEventProperties } from "./utils";
 * Sends a page view event to Vercel Web Analytics.
 * @param request - The incoming request to the portal.
 */
-export async function sendToWebAnalytics(request: NextRequest) {
+export async function sendToWebAnalytics(request: Request) {
     if (isHtmlPage(request)) {
         try {
         	const custom_event_properties = extractCustomEventProperties(request);
