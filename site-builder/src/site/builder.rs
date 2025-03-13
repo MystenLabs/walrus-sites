@@ -106,7 +106,7 @@ impl<T> SitePtb<T> {
 
         self.pt_builder.programmable_move_call(
             self.package,
-            self.module.clone(),
+            Identifier::new("metadata").unwrap(),
             Identifier::new("new_metadata").unwrap(),
             vec![],
             args,
