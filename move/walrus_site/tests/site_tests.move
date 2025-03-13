@@ -205,7 +205,7 @@ fun test_update_metadata() {
             option::none(),
             option::none(),
         );
-        walrus_site::site::update_metadata(&mut site, metadata);
+        site.update_metadata(metadata);
         transfer::public_transfer(site, owner)
     };
     scenario.end();
