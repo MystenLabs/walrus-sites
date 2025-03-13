@@ -1,8 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import template_404 from "../../html_templates/404-page.template.html";
-import hash_mismatch from "../../html_templates/hash-mismatch.html";
+import template_404 from "../../html_templates/404-page.template.html" with { type: "text" };
+import hash_mismatch from "../../html_templates/hash-mismatch.html" with { type: "text" };;
 import { HttpStatusCodes } from "./http_status_codes";
 
 const mainNotFoundErrorMessage = "You have reached the end of the internet, please turn back!"
