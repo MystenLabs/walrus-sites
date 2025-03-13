@@ -1,6 +1,5 @@
 {
     "installCommand": "bun install",
     "buildCommand": "",
-    "devCommand": "bun run start",
-    "outputDirectory": "."
+    "devCommand": "bun run start"
 }
