@@ -3,8 +3,7 @@
     "version": "0.1.0",
     "private": true,
     "scripts": {
-        "dev": "bun --hot run index.ts",
-        "start": "bun run index.ts"
+        "start": "bun --hot run index.ts"
     },
     "dependencies": {
         "@amplitude/analytics-node": "^1.3.6",
