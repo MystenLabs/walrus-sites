@@ -47,3 +47,23 @@ public fun project_url(metadata: &Metadata): Option<String> {
 public fun creator(metadata: &Metadata): Option<String> {
     metadata.creator
 }
+
+public fun set_link(metadata: &mut Metadata, link: Option<String>) {
+    metadata.link = link;
+}
+
+public fun set_image_url(metadata: &mut Metadata, image_url: Option<String>) {
+    metadata.image_url = image_url;
+}
+
+public fun set_description(metadata: &mut Metadata, description: Option<String>) {
+    metadata.description = description;
+}
+
+public fun set_project_url(metadata: &mut Metadata, project_url: Option<String>) {
+    metadata.project_url = project_url;
+}
+
+public fun set_creator(metadata: &mut Metadata, creator: Option<String>) {
+    metadata.creator = creator;
+}
