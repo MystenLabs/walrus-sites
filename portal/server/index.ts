@@ -3,6 +3,7 @@
 
 import { serve, ServeOptions } from "bun";
 import blocklist_healthcheck from "src/blocklist_healthcheck";
+import CookieMonster from "src/cookie_monster";
 import main from "src/main";
 
 const PORT = 3000;
@@ -19,7 +20,9 @@ serve({
 		}),
 	},
 	// The main flow of all other requests is here.
-	fetch(request: Request) {
-		return main(request)
+	async fetch(request: Request) {
+		const response = await main(request)
+		CookieMonster.eatCookies(request, response)
+		return response
 	}
 } as ServeOptions);
