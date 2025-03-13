@@ -291,17 +291,31 @@ fun init_site_display(publisher: &Publisher, ctx: &mut TxContext): Display<Site>
     d
 }
 
-#[test_only]
-public fun init_for_testing(ctx: &mut TxContext) {
-    init(SITE {}, ctx);
-}
-
-#[test_only]
 public fun get_site_name(site: &Site): String {
     site.name
 }
 
-#[test_only]
 public fun get_site_link(site: &Site): Option<String> {
     site.link
+}
+
+public fun get_site_image_url(site: &Site): Option<String> {
+    site.image_url
+}
+
+public fun get_site_description(site: &Site): Option<String> {
+    site.description
+}
+
+public fun get_site_project_url(site: &Site): Option<String> {
+    site.project_url
+}
+
+public fun get_site_creator(site: &Site): Option<String> {
+    site.creator
+}
+
+#[test_only]
+public fun init_for_testing(ctx: &mut TxContext) {
+    init(SITE {}, ctx);
 }
