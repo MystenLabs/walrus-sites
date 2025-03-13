@@ -19,7 +19,6 @@ export function getObjectIdLink(url: URL): DomainDetails | null {
         logger.info({ message: "Matched sui link", parsedDomainDetails: parsedDomainDetails });
         return parsedDomainDetails;
     }
-	console.log('DEBUG', url);
     return null;
 }
 
