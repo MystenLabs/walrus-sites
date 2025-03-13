@@ -4,6 +4,7 @@
 import { serve, ServeOptions } from "bun";
 import blocklist_healthcheck from "src/blocklist_healthcheck";
 import CookieMonster from "src/cookie_monster";
+import { genericError } from "@lib/http/http_error_responses";
 import main from "src/main";
 
 const PORT = 3000;
@@ -21,8 +22,12 @@ serve({
 	},
 	// The main flow of all other requests is here.
 	async fetch(request: Request) {
-		const response = await main(request)
-		CookieMonster.eatCookies(request, response)
-		return response
+		try {
+			const response = await main(request)
+			CookieMonster.eatCookies(request, response)
+			return response
+		} catch (e) {
+			return genericError()
+		}
 	}
 } as ServeOptions);

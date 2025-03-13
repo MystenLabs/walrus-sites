@@ -32,6 +32,13 @@ export function resourceNotFound(): Response {
     );
 }
 
+export function genericError(): Response {
+	return Response404(
+		mainNotFoundErrorMessage,
+		"Something went wrong with your request!"
+	)
+}
+
 function Response404(message: String, secondaryMessage?: String): Response {
     const interpolated = template_404
         .replace("${message}", message)
