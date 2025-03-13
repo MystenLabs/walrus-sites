@@ -84,7 +84,9 @@ fun test_site_flow_with_resources_and_routes() {
 
         assert!(get_site_name(&site) == b"Example".to_string());
         assert!(get_site_link(&site).borrow() == b"https://<b36>.walrus.site".to_string());
-        assert!(get_site_image_url(&site).borrow() == b"https://<b36>.walrus.site/image.png".to_string());
+        assert!(
+            get_site_image_url(&site).borrow() == b"https://<b36>.walrus.site/image.png".to_string(),
+        );
         assert!(get_site_description(&site).borrow() == b"This is a test site.".to_string());
         assert!(get_site_project_url(&site).is_none());
         assert!(get_site_creator(&site).is_none());
