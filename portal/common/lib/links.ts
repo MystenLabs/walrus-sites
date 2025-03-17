@@ -13,7 +13,7 @@ import logger from "./logger";
  */
 export function getObjectIdLink(url: URL): DomainDetails | null {
     logger.info({ message: "Trying to extract the sui link from:", originalUrl: url.href});
-    const suiResult = /^https:\/\/(.+)\.suiobj\/(.*)$/.exec(url.href);
+    const suiResult = /^https:\/\/(.+)\.suiobj.invalid\/(.*)$/.exec(url.href);
     if (suiResult) {
         const parsedDomainDetails = { subdomain: suiResult[1], path: "/" + suiResult[2] };
         logger.info({ message: "Matched sui link", parsedDomainDetails: parsedDomainDetails });
@@ -30,7 +30,7 @@ export function getObjectIdLink(url: URL): DomainDetails | null {
  */
 export function getBlobIdLink(url: URL): string | null {
     logger.info({ message: "Trying to extract the walrus link from:", originalUrl: url.href });
-    const walrusResult = /^https:\/\/blobid\.walrus\/(.+)$/.exec(url.href);
+    const walrusResult = /^https:\/\/blobid\.walrus.invalid\/(.+)$/.exec(url.href);
     if (walrusResult) {
         logger.info({ message: "Matched walrus link using blobid.walrus", walrusResult: walrusResult[1]});
         return walrusResult[1];
