@@ -1,16 +1,16 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import template_404 from "../../html_templates/404-page.template.html" with { type: "text" };
-import hash_mismatch from "../../html_templates/hash-mismatch.html" with { type: "text" };;
-import { HttpStatusCodes } from "./http_status_codes";
+import template_404 from "../../html_templates/404-page.template.html" with { type: "text" }
+import hash_mismatch from "../../html_templates/hash-mismatch.html" with { type: "text" }
+import { HttpStatusCodes } from "./http_status_codes"
 
-const mainNotFoundErrorMessage = "You have reached the end of the internet, please turn back!"
+const mainNotFoundErrorMessage = "Well, this is awkward." //You have reached the end of the internet, please turn back!"
 
 export function siteNotFound(): Response {
     return Response404(
         mainNotFoundErrorMessage,
-        "Invalid URL: The object ID is not a valid Walrus Site."
+        "We promise our storage protocol is rock-solid, but this page seems to have gone on a coffee break." //Invalid URL: The object ID is not a valid Walrus Site."
     );
 }
 
@@ -33,9 +33,9 @@ export function resourceNotFound(): Response {
 }
 
 export function genericError(): Response {
-	return Response404(
-		mainNotFoundErrorMessage
-	)
+    return Response404(
+        mainNotFoundErrorMessage
+    )
 }
 
 function Response404(message: String, secondaryMessage?: String): Response {
