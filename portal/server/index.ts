@@ -13,7 +13,13 @@ serve({
 	port: PORT,
 	// Special Walrus Sites routes.
 	routes: {
-		"/api/healthz": await blocklist_healthcheck(),
+		"/__wal__/*": async (req: Request) => {
+			console.log("debug", req.url)
+			if (req.url.endsWith("/healthz")) {
+				return await blocklist_healthcheck()
+			}
+			new Response("Not found!", {status: 404, statusText: "This special wal path does not exist."})
+ 		},
 		"/walrus-sites-sw.js": new Response(await Bun.file("./public/walrus-sites-sw.js").bytes(), {
 			headers: {
 				"Content-Type": "application/javascript",
