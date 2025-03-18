@@ -1,9 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-// Copyright (c) 2023, Mysten Labs, Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 import { MeterProvider } from "@opentelemetry/sdk-metrics"
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus"
 import { Attributes, Counter, Meter, Histogram } from "@opentelemetry/api"
