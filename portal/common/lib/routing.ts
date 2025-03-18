@@ -1,20 +1,21 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { SuiObjectResponse } from "@mysten/sui/client";
-import { Routes } from "./types";
-import { DynamicFieldStruct, RoutesStruct } from "./bcs_data_parsing";
-import { bcs, fromBase64 } from "@mysten/bcs";
-import logger from "./logger";
-import { RPCSelector } from "./rpc_selector";
-import { deriveDynamicFieldID } from "@mysten/sui/utils";
+import { SuiObjectResponse } from "@mysten/sui/client"
+import { Routes } from "./types"
+import { DynamicFieldStruct, RoutesStruct } from "./bcs_data_parsing"
+import { bcs, fromBase64 } from "@mysten/bcs"
+import logger from "./logger"
+import { RPCSelector } from "./rpc_selector"
+import { deriveDynamicFieldID } from "@mysten/sui/utils"
+import { instrumentationFacade } from "./instrumentation"
 
 /**
  * The WalrusSiteRouter class is responsible for handling the routing logic for published
  * Walrus Sites, depending by the definition of the `routes` field inside the `ws-resources.json`.
  */
 export class WalrusSitesRouter {
-    constructor(private rpcSelector: RPCSelector) {}
+    constructor (private rpcSelector: RPCSelector) { }
 
     /**
      * Gets the Routes dynamic field of the site object.
@@ -25,11 +26,16 @@ export class WalrusSitesRouter {
      * @returns The routes list.
      */
     public async getRoutes(siteObjectId: string): Promise<Routes | undefined> {
+        const reqStartTime = Date.now();
+
         logger.info({ message: "Fetching routes dynamic field.", siteObjectId });
         const routesObj = await this.fetchRoutesDynamicFieldObject(siteObjectId);
         const objectData = routesObj.data;
         if (objectData && objectData.bcs && objectData.bcs.dataType === "moveObject") {
-            return this.parseRoutesData(objectData.bcs.bcsBytes);
+            const parsedRoutes = this.parseRoutesData(objectData.bcs.bcsBytes);
+            const routingDuration = Date.now() - reqStartTime;
+            instrumentationFacade.recordRoutingTime(routingDuration, siteObjectId);
+            return parsedRoutes
         }
         if (!objectData) {
             logger.warn({
@@ -55,6 +61,9 @@ export class WalrusSitesRouter {
      * @returns The routes object.
      */
     private async fetchRoutesDynamicFieldObject(siteObjectId: string): Promise<SuiObjectResponse> {
+
+        const reqStartTime = Date.now();
+
         const routesMoveType = "vector<u8>";
         const dynamicFieldId = deriveDynamicFieldID(
             siteObjectId,
@@ -65,6 +74,10 @@ export class WalrusSitesRouter {
             id: dynamicFieldId,
             options: { showBcs: true },
         });
+
+        const fetchRoutesDynamicFieldObjectDuration = Date.now() - reqStartTime;
+        instrumentationFacade.recordFetchRoutesDynamicFieldObjectTime(fetchRoutesDynamicFieldObjectDuration, siteObjectId);
+
         return dfObjectResponse;
     }
 
@@ -100,7 +113,7 @@ export class WalrusSitesRouter {
         }
 
         const filteredRoutes = Array.from(routes.routes_list.entries())
-                .filter(([pattern, _]) => new RegExp(`^${pattern.replace(/\*/g, ".*")}$`).test(path));
+            .filter(([pattern, _]) => new RegExp(`^${pattern.replace(/\*/g, ".*")}$`).test(path));
 
         if (filteredRoutes.length === 0) {
             logger.warn({ message: "No matching routes found.", path });
