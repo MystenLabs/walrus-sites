@@ -60,12 +60,15 @@ self.addEventListener("fetch", async (event) => {
     if (portalDomainNameLengthString) {
         portalDomainNameLength = Number(portalDomainNameLengthString);
     }
+
+    // This will only work for service-worker portals.
     const objectIdPath = getObjectIdLink(url);
     if (objectIdPath) {
         event.respondWith(redirectToPortalURLResponse(scope, objectIdPath, portalDomainNameLength));
         return;
     }
 
+    // This will only work for service-worker portals.
     const walrusPath = getBlobIdLink(url);
     if (walrusPath) {
         event.respondWith(redirectToAggregatorUrlResponse(scope, walrusPath, aggregatorUrl));

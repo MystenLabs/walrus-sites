@@ -30,20 +30,7 @@ export default async function main(req: Request) {
 	if (config.enableVercelWebAnalytics) {
 		await sendToWebAnalytics(req);
 	}
-	const objectIdPath = getObjectIdLink(url);
 	const portalDomainNameLength = config.portalDomainNameLength;
-	if (objectIdPath) {
-		console.log(`Redirecting to portal url response: ${url.toString()} from ${objectIdPath}`);
-		return redirectToPortalURLResponse(url, objectIdPath, portalDomainNameLength);
-	}
-	const walrusPath: string | null = getBlobIdLink(url);
-	if (walrusPath) {
-		console.log(`Redirecting to aggregator url response: ${req.url} from ${objectIdPath}`);
-
-		const aggregatorUrl = "https://aggregator.walrus-testnet.walrus.space"
-		return redirectToAggregatorUrlResponse(url, walrusPath, aggregatorUrl);
-	}
-
 	const parsedUrl = getSubdomainAndPath(url, Number(portalDomainNameLength));
 	const portalDomain = getDomain(url, Number(portalDomainNameLength));
 	const requestDomain = getDomain(url, Number(portalDomainNameLength));
