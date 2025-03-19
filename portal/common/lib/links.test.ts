@@ -6,13 +6,13 @@ import { getObjectIdLink, getBlobIdLink } from './links';
 import { DomainDetails } from './types';
 
 const getObjectIdLinkTestCases: [string, DomainDetails | null][] = [
-    ["https://example.suiobj/resource/path", { subdomain: "example", path: "/resource/path" }],
-    // ["https://another-example.suiobj/another/resource/path",
-        // { subdomain: "another-example", path: "/another/resource/path" }],
-    // ["https://invalidsite.com/something", null],
-    // ["https://example.suiobj/", { subdomain: "example", path: "/" }],
-    // ["https://example.suiobj", null],
-    // ["https://example.suiobj/resource", { subdomain: "example", path: "/resource" }],
+    ["https://example.suiobj.invalid/resource/path", { subdomain: "example", path: "/resource/path" }],
+    ["https://another-example.suiobj.invalid/another/resource/path",
+        { subdomain: "another-example", path: "/another/resource/path" }],
+    ["https://invalidsite.com/something", null],
+    ["https://example.suiobj.invalid/", { subdomain: "example", path: "/" }],
+    ["https://example.suiobj.invalid", { subdomain: "example", path: "/" }],
+    ["https://example.suiobj.invalid/resource", { subdomain: "example", path: "/resource" }],
 ];
 
 describe('getObjectIdLink', () => {
@@ -27,12 +27,12 @@ describe('getObjectIdLink', () => {
 });
 
 const getBlobIdLinkTestCases: [string, string | null][] = [
-    ["https://blobid.walrus/blob-id-123", "blob-id-123"],
-    ["https://blobid.walrus/another-blob-id", "another-blob-id"],
+    ["https://blobid.walrus.invalid/blob-id-123", "blob-id-123"],
+    ["https://blobid.walrus.invalid/another-blob-id", "another-blob-id"],
     ["https://invalidsite.com/something", null],
-    ["https://blobid.walrus/", null],
-    ["https://blobid.walrus", null],
-    ["https://blobid.walrus/blob-id-456", "blob-id-456"],
+    ["https://blobid.walrus.invalid/", null],
+    ["https://blobid.walrus.invalid", null],
+    ["https://blobid.walrus.invalid/blob-id-456", "blob-id-456"],
 ];
 
 describe('getBlobIdLink', () => {
