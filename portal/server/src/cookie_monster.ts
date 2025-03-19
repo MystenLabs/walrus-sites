@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import * as cookie from 'cookie'
+import psl from 'psl'
 
 export class CookieMonster {
 	/**
@@ -12,38 +13,70 @@ export class CookieMonster {
 	*/
 	static eatCookies(request: Request, response: Response) {
 		CookieMonster.eatExistingCookies(request, response)
-		CookieMonster.eatNewCookies(request)
 		return
 	}
 
 	/**
 	* Deletes the existing cookies by adding an artificial expired date.
+	* Also handles subdomains by setting cookies for both the full domain and parent domain.
 	*/
 	private static eatExistingCookies(request: Request, response: Response) {
 		// If there are existing cookies, eat (delete) them.
 		const cookieHeader = request.headers.get('Cookie');
-		let cookies: Record<string, string | undefined>;
+		const host = request.headers.get('Host') || '';
+		const fullDomain = host.split(':')[0];
+
 		if (cookieHeader) {
-			cookies = cookie.parse(cookieHeader);
-			// For each cookie, set it to expire in the past
+			const cookies = cookie.parse(cookieHeader);
+			console.log('Cookies:', cookies);
+			// For each cookie, set it to expire in the past for both the full domain and parent domain
 			Object.keys(cookies).forEach(name => {
-				response.headers.set('Set-Cookie',
-					cookie.serialize(name, '', {
-						expires: new Date(0), // Set to epoch time
-						path: '/' // Match the cookie path
-					})
-				);
+				const parentDomains = CookieMonster.getCookieParentDomains(fullDomain);
+				// Eat cookie for the full domain
+				const opts: cookie.CookieSerializeOptions = {
+					expires: new Date(1),
+					path: '/',
+					httpOnly: true,
+				}
+				response.headers.append('Set-Cookie', cookie.serialize(name, 'deleted', fullDomain ? { expires: new Date(1), path: '/', httpOnly: true, domain: fullDomain } : opts));
+
+				// Eat cookie for the parent domains
+				for (let parentDomain of parentDomains) {
+					console.log(`Clearing cookie ${name} for parentDomain', parentDomain`);
+					opts.domain = parentDomain;
+					response.headers.append('Set-Cookie', cookie.serialize(name, 'deleted', opts));
+				}
 			});
 		}
 	}
 
-	private static eatNewCookies(request: Request) {
-		// If a request tries to set a new cookie, do not permit it.
-		const setCookieHeader = request.headers.get('Set-Cookie');
-		if (setCookieHeader) {
-			// Remove Set-Cookie header from the request
-			request.headers.delete('Set-Cookie');
+	/**
+	* Gets the parent domain if it's not a public suffix.
+	* For example: walrusadventures.walrus.site -> walrus.site
+	*/
+	private static getParentDomain(host: string): string | null {
+		const parts = host.split('.');
+		if (parts.length < 2) return null;
+
+		// Remove the first part (subdomain) and join the rest
+		const parentDomain = parts.slice(1).join('.');
+		return parentDomain;
+	}
+
+	private static getCookieParentDomains(host: string): string[] {
+		const parentDomains = [];
+		let currentParentDomain = this.getParentDomain(host);
+		while (currentParentDomain) {
+			const parsedPsl = psl.parse(currentParentDomain);
+			if (!parsedPsl.sld) {
+				break;
+			} else {
+				console.log(`sld for ${currentParentDomain} is ${parsedPsl.sld}`);
+			}
+			parentDomains.push(currentParentDomain);
+			currentParentDomain = this.getParentDomain(currentParentDomain);
 		}
+		return parentDomains;
 	}
 }
 
