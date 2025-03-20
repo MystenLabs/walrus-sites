@@ -82,7 +82,7 @@ const configurationSchema =
 		aggregatorUrl: z.string().url({message: "AGGREGATOR_URL is not a valid URL!"}),
 		sitePackage: z.string().refine((val) => val.length === 66 && /^0x[0-9a-fA-F]+$/.test(val)),
 		b36DomainResolutionSupport: stringBoolean,
-		bringYourOwnDomain: stringBoolean.optional(),
+		bringYourOwnDomain: stringBoolean.optional().transform((val) => val ? val : false),
 	})
   	.refine(
    	(data) => {
