@@ -27,6 +27,7 @@ export class WalrusSitesRouter {
      */
     public async getRoutes(siteObjectId: string): Promise<Routes | undefined> {
         const reqStartTime = Date.now();
+        instrumentationFacade.increaseRequestsMade(1, siteObjectId);
 
         logger.info({ message: "Fetching routes dynamic field.", siteObjectId });
         const routesObj = await this.fetchRoutesDynamicFieldObject(siteObjectId);
