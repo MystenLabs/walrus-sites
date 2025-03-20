@@ -14,6 +14,7 @@ import { instrumentationFacade } from "@lib/instrumentation"
 
 
 export default async function main(req: Request) {
+
     const url = new URL(req.url);
 
     // Send the page view event to either Amplitude or Vercel Web Analytics.
