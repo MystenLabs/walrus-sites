@@ -10,6 +10,7 @@ import { standardUrlFetcher, premiumUrlFetcher } from "src/url_fetcher_factory"
 import { sendToWebAnalytics } from "src/web_analytics"
 import { sendToAmplitude } from "src/amplitude"
 import { Base36toHex } from "@lib/objectId_operations"
+import { instrumentationFacade } from "@lib/instrumentation"
 
 
 export default async function main(req: Request) {
@@ -29,6 +30,7 @@ export default async function main(req: Request) {
 
     if (parsedUrl) {
         if (blocklistChecker && await blocklistChecker.isBlocked(parsedUrl.subdomain)) {
+            instrumentationFacade.bumpBlockedRequests()
             return siteNotFound();
         }
 

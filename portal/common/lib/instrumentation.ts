@@ -14,6 +14,11 @@ export class InstrumentationFacade {
 
     private num_requests_made_counter: Counter;
     private num_generic_errors_counter: Counter;
+    private num_site_not_found_counter: Counter;
+    private num_blocked_requests_counter: Counter;
+    private num_resource_not_found_counter: Counter;
+    private num_full_node_fail_counter: Counter;
+    private num_hash_mismatch_counter: Counter;
 
     private routingHistogram: Histogram<Attributes>;
     private fetchRoutesDynamicFieldObjectHistogram: Histogram<Attributes>;
@@ -63,6 +68,26 @@ export class InstrumentationFacade {
             description: "Time spent in resolve domain and fetch Url",
             unit: "ms",
         });
+
+        this.num_site_not_found_counter = this.meter.createCounter("ws_num_site_not_found_counter", {
+            description: "Number of site not found requests",
+        });
+
+        this.num_blocked_requests_counter = this.meter.createCounter("ws_num_blocked_requests_counter", {
+            description: "Number of blocked requests",
+        });
+
+        this.num_resource_not_found_counter = this.meter.createCounter("ws_num_resource_not_found_counter", {
+            description: "Number of resource not found requests",
+        });
+
+        this.num_full_node_fail_counter = this.meter.createCounter("ws_num_full_node_fail_counter", {
+            description: "Number of full node fail requests",
+        });
+
+        this.num_hash_mismatch_counter = this.meter.createCounter("ws_num_hash_mismatch_counter", {
+            description: "Number of hash mismatch requests",
+        });
     }
 
     public increaseRequestsMade(total: number, _requestId: string) {
@@ -71,6 +96,14 @@ export class InstrumentationFacade {
 
     public bumpGenericErrors() {
         this.num_generic_errors_counter.add(1);
+    }
+
+    public bumpSiteNotFoundRequests() {
+        this.num_site_not_found_counter.add(1);
+    }
+
+    public bumpBlockedRequests() {
+        this.num_blocked_requests_counter.add(1);
     }
 
     public recordRoutingTime(time: number, siteObjectId: string) {
@@ -89,6 +122,17 @@ export class InstrumentationFacade {
         this.resolveDomainAndFetchUrlHistogram.record(time, { resolvedObjectId });
     }
 
+    public recordResourceNotFoundRequests() {
+        this.num_resource_not_found_counter.add(1);
+    }
+
+    public recordFullNodeFailRequests() {
+        this.num_full_node_fail_counter.add(1);
+    }
+
+    public recordHashMismatchRequests() {
+        this.num_hash_mismatch_counter.add(1);
+    }
 }
 
 const port = parseInt(process.env.PROMETHEUS_EXPORTER_PORT!) || 9184;

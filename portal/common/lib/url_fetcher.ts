@@ -65,6 +65,7 @@ export class UrlFetcher {
         logger.debug({ message: "Resolved object id", resolvedObjectId: resolvedObjectId });
         logger.debug({ message: "Base36 version of the object id", base36OfObjectId: HEXtoBase36(resolvedObjectId) });
         if (blocklistChecker && await blocklistChecker.isBlocked(resolvedObjectId)) {
+            instrumentationFacade.bumpBlockedRequests();
             return siteNotFound();
         }
 
@@ -103,7 +104,7 @@ export class UrlFetcher {
                 const routeResponse = await this.fetchUrl(resolvedObjectId, matchingRoute);
                 if (routeResponse.status !== HttpStatusCodes.NOT_FOUND) {
                     const routeResponseDuration = Date.now() - reqStartTime;
-                    instrumentationFacade.resolveDomainAndFetchUrlResponseTime(routeResponseDuration, resolvedObjectId);
+                    instrumentationFacade.recordResolveDomainAndFetchUrlResponseTime(routeResponseDuration, resolvedObjectId);
                     return routeResponse;
                 }
             } else {
@@ -122,6 +123,7 @@ export class UrlFetcher {
             }
         }
 
+        instrumentationFacade.bumpSiteNotFoundRequests();
         return siteNotFound();
     }
 
@@ -152,12 +154,14 @@ export class UrlFetcher {
                 message: "Could not resolve SuiNs domain. Does the domain exist?",
                 subdomain: parsedUrl.subdomain,
             })
+            instrumentationFacade.bumpNoObjectIdFoundRequests();
             return noObjectIdFound();
         } catch {
             logger.error({
                 message: "Failed to contact the full node while resolving suins domain",
                 subdomain: parsedUrl.subdomain
             });
+            instrumentationFacade.bumpFullNodeFailRequests();
             return fullNodeFail();
         }
     }
@@ -192,6 +196,7 @@ export class UrlFetcher {
                     path: result.path,
                     status: contents.status
                 });
+            instrumentationFacade.bumpSiteNotFoundRequests();
             return siteNotFound();
         }
 
