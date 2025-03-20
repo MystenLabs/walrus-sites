@@ -35,7 +35,7 @@ export default async function main(req: Request) {
 	const portalDomain = getDomain(url, Number(portalDomainNameLength));
 	const requestDomain = getDomain(url, Number(portalDomainNameLength));
 
-	if (parsedUrl) {
+	if (parsedUrl && !config.bringYourOwnDomain) {
 		if (blocklistChecker && await blocklistChecker.isBlocked(parsedUrl.subdomain)) {
 			return siteNotFound();
 		}

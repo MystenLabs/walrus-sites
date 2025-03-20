@@ -29,7 +29,8 @@ const configurationSchema =
 		amplitudeApiKey: env.AMPLITUDE_API_KEY,
 		aggregatorUrl: env.AGGREGATOR_URL,
 		sitePackage: env.SITE_PACKAGE,
-		b36DomainResolutionSupport: env.B36_DOMAIN_RESOLUTION_SUPPORT
+		b36DomainResolutionSupport: env.B36_DOMAIN_RESOLUTION_SUPPORT,
+		bringYourOwnDomain: env.BRING_YOUR_OWN_DOMAIN,
 	}),
 	z.object({
 		edgeConfig: z.string().optional(),
@@ -80,7 +81,8 @@ const configurationSchema =
 		amplitudeApiKey: z.string().optional(),
 		aggregatorUrl: z.string().url({message: "AGGREGATOR_URL is not a valid URL!"}),
 		sitePackage: z.string().refine((val) => val.length === 66 && /^0x[0-9a-fA-F]+$/.test(val)),
-		b36DomainResolutionSupport: stringBoolean
+		b36DomainResolutionSupport: stringBoolean,
+		bringYourOwnDomain: stringBoolean.optional(),
 	})
   	.refine(
    	(data) => {
