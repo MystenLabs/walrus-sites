@@ -33,7 +33,7 @@ export class InstrumentationFacade {
 
         // Initialize the Meter provider
         const meterProvider = new MeterProvider({ readers: [exporter] });
-        this.meter = meterProvider.getMeter("my-meter");
+        this.meter = meterProvider.getMeter("walrus-sites-meter");
 
         this.num_requests_made_counter = this.meter.createCounter(
             "ws_num_requests_made_counter",
