@@ -5,11 +5,11 @@ import {
     DomainDetails,
     isResource,
     optionalRangeToHeaders as optionalRangeToRequestHeaders,
-	Routes,
+    Routes,
 } from "./types/index";
-import { subdomainToObjectId, HEXtoBase36 } from "./objectId_operations";
-import { SuiNSResolver } from "./suins";
-import { ResourceFetcher } from "./resource";
+import { subdomainToObjectId, HEXtoBase36 } from "./objectId_operations"
+import { SuiNSResolver } from "./suins"
+import { ResourceFetcher } from "./resource"
 import {
     siteNotFound,
     noObjectIdFound,
@@ -17,25 +17,26 @@ import {
     generateHashErrorResponse,
     resourceNotFound,
 } from "./http/http_error_responses";
-import { aggregatorEndpoint } from "./aggregator";
-import { toBase64 } from "@mysten/bcs";
-import { sha256 } from "./crypto";
-import { WalrusSitesRouter } from "./routing";
-import { HttpStatusCodes } from "./http/http_status_codes";
-import logger from "./logger";
-import BlocklistChecker from "./blocklist_checker";
+import { aggregatorEndpoint } from "./aggregator"
+import { toBase64 } from "@mysten/bcs"
+import { sha256 } from "./crypto"
+import { WalrusSitesRouter } from "./routing"
+import { HttpStatusCodes } from "./http/http_status_codes"
+import logger from "./logger"
+import BlocklistChecker from "./blocklist_checker"
+import { instrumentationFacade } from "./instrumentation"
 
 /**
 * Includes all the logic for fetching the URL contents of a walrus site.
 */
 export class UrlFetcher {
-    constructor(
+    constructor (
         private resourceFetcher: ResourceFetcher,
         private suinsResolver: SuiNSResolver,
         private wsRouter: WalrusSitesRouter,
         private aggregatorUrl: string,
         private b36DomainResolutionSupport: boolean
-    ){}
+    ) { }
 
     /**
      * Resolves the subdomain to an object ID, and gets the corresponding resources.
@@ -48,6 +49,9 @@ export class UrlFetcher {
         resolvedObjectId: string | null,
         blocklistChecker?: BlocklistChecker
     ): Promise<Response> {
+
+        const reqStartTime = Date.now();
+
         logger.debug({ message: "parsed-url", subdomain: parsedUrl.subdomain, path: parsedUrl.path });
         if (!resolvedObjectId) {
             const resolveObjectResult = await this.resolveObjectId(parsedUrl);
@@ -98,6 +102,8 @@ export class UrlFetcher {
                 // If the route is found, fetch the redirected path.
                 const routeResponse = await this.fetchUrl(resolvedObjectId, matchingRoute);
                 if (routeResponse.status !== HttpStatusCodes.NOT_FOUND) {
+                    const routeResponseDuration = Date.now() - reqStartTime;
+                    instrumentationFacade.resolveDomainAndFetchUrlResponseTime(routeResponseDuration, resolvedObjectId);
                     return routeResponse;
                 }
             } else {
@@ -122,20 +128,20 @@ export class UrlFetcher {
     async resolveObjectId(
         parsedUrl: DomainDetails,
     ): Promise<string | Response> {
-    	// Resolve to an objectId using a hard-coded subdomain.
-    	const hardCodedObjectId = this.suinsResolver.hardcodedSubdomains(parsedUrl.subdomain);
-		if (hardCodedObjectId) return hardCodedObjectId;
+        // Resolve to an objectId using a hard-coded subdomain.
+        const hardCodedObjectId = this.suinsResolver.hardcodedSubdomains(parsedUrl.subdomain);
+        if (hardCodedObjectId) return hardCodedObjectId;
 
         // If b36 subdomains are supported, resolve them by converting them to a hex object id.
-		const isSuiNSDomain = parsedUrl.subdomain.includes(".");
-		const isb36Domain = !isSuiNSDomain;
+        const isSuiNSDomain = parsedUrl.subdomain.includes(".");
+        const isb36Domain = !isSuiNSDomain;
         if (this.b36DomainResolutionSupport && isb36Domain) {
             // Try to convert the subdomain to an object ID NOTE: This effectively _disables_ any SuiNs
             // name that is the base36 encoding of an object ID (i.e., a 32-byte string). This is
             // desirable, prevents people from getting suins names that are the base36 encoding the
             // object ID of a target site (with the goal of hijacking non-suins queries).
-			const resolvedB36toHex = subdomainToObjectId(parsedUrl.subdomain);
-			if (resolvedB36toHex) return resolvedB36toHex;
+            const resolvedB36toHex = subdomainToObjectId(parsedUrl.subdomain);
+            if (resolvedB36toHex) return resolvedB36toHex;
         }
 
         // Resolve the SuiNS domain to an object id.
@@ -165,7 +171,7 @@ export class UrlFetcher {
         objectId: string,
         path: string,
     ): Promise<Response> {
-        logger.info({message: 'Fetching URL', objectId: objectId, path: path});
+        logger.info({ message: 'Fetching URL', objectId: objectId, path: path });
         const result = await this.resourceFetcher.fetchResource(objectId, path, new Set<string>());
         if (!isResource(result) || !result.blob_id) {
             return resourceNotFound();
@@ -174,7 +180,7 @@ export class UrlFetcher {
         logger.info({ message: "Successfully fetched resource!", fetchedResourceResult: JSON.stringify(result) });
 
         // We have a resource, get the range header.
-        logger.info({ message: "Add the range headers of the resource", range: JSON.stringify(result.range)});
+        logger.info({ message: "Add the range headers of the resource", range: JSON.stringify(result.range) });
         let range_header = optionalRangeToRequestHeaders(result.range);
         const contents = await this.fetchWithRetry(
             aggregatorEndpoint(result.blob_id, this.aggregatorUrl), { headers: range_header }
@@ -196,7 +202,7 @@ export class UrlFetcher {
         if (result.blob_hash != h10b) {
             logger.error({
                 message: "Checksum mismatch! The hash of the fetched resource does not " +
-                "match the hash of the aggregator response.",
+                    "match the hash of the aggregator response.",
                 path: result.path,
                 blobHash: result.blob_hash,
                 aggrHash: h10b
@@ -258,7 +264,7 @@ export class UrlFetcher {
                     totalAttempts: retries + 1,
                     error: error instanceof Error ? error.message : error,
                 });
-				lastError = error;
+                lastError = error;
             }
 
             // Wait before retrying

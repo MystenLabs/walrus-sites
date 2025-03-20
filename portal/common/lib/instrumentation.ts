@@ -17,6 +17,8 @@ export class InstrumentationFacade {
 
     private routingHistogram: Histogram<Attributes>;
     private fetchRoutesDynamicFieldObjectHistogram: Histogram<Attributes>;
+    private resolveSuiNsAddressHistogram: Histogram<Attributes>;
+    private resolveDomainAndFetchUrlHistogram: Histogram<Attributes>;
 
     constructor (port: number) {
         // Create the Prometheus exporter
@@ -29,26 +31,36 @@ export class InstrumentationFacade {
         this.meter = meterProvider.getMeter("my-meter");
 
         this.num_requests_made_counter = this.meter.createCounter(
-            "rbr_num_requests_made_counter",
+            "ws_num_requests_made_counter",
             {
                 description: "Number of requests made",
             }
         );
 
         this.num_generic_errors_counter = this.meter.createCounter(
-            "rbr_num_generic_errors_counter",
+            "ws_num_generic_errors_counter",
             {
                 description: "Total number of generic errors",
             }
         );
 
-        this.routingHistogram = this.meter.createHistogram("rbr_routing_time", {
+        this.routingHistogram = this.meter.createHistogram("ws_routing_time", {
             description: "Time spent in Routing",
             unit: "ms",
         });
 
-        this.fetchRoutesDynamicFieldObjectHistogram = this.meter.createHistogram("rbr_fetch_routes_dynamic_field_object_time", {
+        this.fetchRoutesDynamicFieldObjectHistogram = this.meter.createHistogram("ws_fetch_routes_dynamic_field_object_time", {
             description: "Time spent in Fetching Routes Dynamic Field Object",
+            unit: "ms",
+        });
+
+        this.resolveSuiNsAddressHistogram = this.meter.createHistogram("ws_resolve_sui_ns_address_time", {
+            description: "Time spent in Resolving SuiNS Address",
+            unit: "ms",
+        });
+
+        this.resolveDomainAndFetchUrlHistogram = this.meter.createHistogram("ws_resolve_domain_and_fetch_url_time", {
+            description: "Time spent in resolve domain and fetch Url",
             unit: "ms",
         });
     }
@@ -67,6 +79,14 @@ export class InstrumentationFacade {
 
     public recordFetchRoutesDynamicFieldObjectTime(time: number, siteObjectId: string) {
         this.fetchRoutesDynamicFieldObjectHistogram.record(time, { siteObjectId });
+    }
+
+    public recordResolveSuiNsAddressTime(time: number, subdomain: string) {
+        this.resolveSuiNsAddressHistogram.record(time, { subdomain });
+    }
+
+    public recordResolveDomainAndFetchUrlResponseTime(time: number, resolvedObjectId: string) {
+        this.resolveDomainAndFetchUrlHistogram.record(time, { resolvedObjectId });
     }
 
 }
