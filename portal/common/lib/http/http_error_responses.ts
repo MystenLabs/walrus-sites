@@ -17,7 +17,7 @@ export function siteNotFound(): Response {
 export function noObjectIdFound(): Response {
     return Response404(
         mainNotFoundErrorMessage,
-        "Invalid URL: No object ID could be found."
+        "Invalid URL: Walrus Site not found!"
     );
 }
 
@@ -48,6 +48,13 @@ function Response404(message: String, secondaryMessage?: String): Response {
             "Content-Type": "text/html",
         },
     });
+}
+
+export function bringYourOwnDomainDoesNotSupportSubdomainsYet(attemptedSite: String): Response {
+	return Response404(
+		`This portal does not serve any other Walrus Sites!`,
+		`Please try browsing https://${attemptedSite}.wal.app`
+	)
 }
 
 /**
