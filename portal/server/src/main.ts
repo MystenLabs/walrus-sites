@@ -17,8 +17,8 @@ import { Base36toHex } from "@lib/objectId_operations";
 import { instrumentationFacade } from "@lib/instrumentation";
 
 if (config.enableSentry) {
-	// Only integrate Sentry on production.
-	integrateLoggerWithSentry();
+    // Only integrate Sentry on production.
+    integrateLoggerWithSentry();
 }
 
 export default async function main(req: Request) {
