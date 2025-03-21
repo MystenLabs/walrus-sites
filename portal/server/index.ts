@@ -19,12 +19,7 @@ serve({
 				return await blocklist_healthcheck()
 			}
 			new Response("Not found!", {status: 404, statusText: "This special wal path does not exist."})
- 		},
-		"/walrus-sites-sw.js": new Response(await Bun.file("./public/walrus-sites-sw.js").bytes(), {
-			headers: {
-				"Content-Type": "application/javascript",
-			},
-		}),
+ 		}
 	},
 	// The main flow of all other requests is here.
 	async fetch(request: Request) {
