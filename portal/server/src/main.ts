@@ -1,20 +1,20 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
-import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
-import { getBlobIdLink, getObjectIdLink } from "@lib/links";
+import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing"
+import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects"
+import { getBlobIdLink, getObjectIdLink } from "@lib/links"
 
-import allowlistChecker from "src/allowlist_checker";
-import { siteNotFound } from "@lib/http/http_error_responses";
-import integrateLoggerWithSentry from "src/sentry_logger";
-import blocklistChecker from "src/blocklist_checker";
-import { config } from "src/configuration_loader";
-import { standardUrlFetcher, premiumUrlFetcher } from "src/url_fetcher_factory";
-import { sendToWebAnalytics } from "src/web_analytics";
-import { sendToAmplitude } from "src/amplitude";
-import { Base36toHex } from "@lib/objectId_operations";
-
+import allowlistChecker from "src/allowlist_checker"
+import { siteNotFound } from "@lib/http/http_error_responses"
+import integrateLoggerWithSentry from "src/sentry_logger"
+import blocklistChecker from "src/blocklist_checker"
+import { config } from "src/configuration_loader"
+import { standardUrlFetcher, premiumUrlFetcher } from "src/url_fetcher_factory"
+import { sendToWebAnalytics } from "src/web_analytics"
+import { sendToAmplitude } from "src/amplitude"
+import { Base36toHex } from "@lib/objectId_operations"
+import { instrumentationFacade } from "@lib/instrumentation"
 if (config.enableSentry) {
     // Only integrate Sentry on production.
     integrateLoggerWithSentry();
