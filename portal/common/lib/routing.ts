@@ -112,7 +112,7 @@ export class WalrusSitesRouter {
         }
 
         const filteredRoutes = Array.from(routes.routes_list.entries())
-                        .filter(([pattern, _]) => new RegExp(`^${pattern.replace(/\*/g, ".*")}$`).test(path));
+                .filter(([pattern, _]) => new RegExp(`^${pattern.replace(/\*/g, ".*")}$`).test(path));
 
         if (filteredRoutes.length === 0) {
             logger.warn({ message: "No matching routes found.", path });
