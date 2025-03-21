@@ -2,12 +2,8 @@
 module walrus_site::site;
 
 use std::string::String;
-use sui::display::{Self, Display};
-use sui::dynamic_field as df;
-use sui::package::{Self, Publisher};
-use sui::vec_map;
-use walrus_site::events::{emit_site_created, emit_site_burned};
-use walrus_site::metadata::Metadata;
+use sui::{display::{Self, Display}, dynamic_field as df, package::{Self, Publisher}, vec_map};
+use walrus_site::{events::{emit_site_created, emit_site_burned}, metadata::Metadata};
 
 /// The name of the dynamic field containing the routes.
 const ROUTES_FIELD: vector<u8> = b"routes";
