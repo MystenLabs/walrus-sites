@@ -8,6 +8,7 @@ import { bcs, fromBase64 } from "@mysten/bcs";
 import logger from "./logger";
 import { RPCSelector } from "./rpc_selector";
 import { deriveDynamicFieldID } from "@mysten/sui/utils";
+import { instrumentationFacade } from "./instrumentation";
 
 /**
  * The WalrusSiteRouter class is responsible for handling the routing logic for published
@@ -25,17 +26,22 @@ export class WalrusSitesRouter {
      * @returns The routes list.
      */
     public async getRoutes(siteObjectId: string): Promise<Routes | undefined> {
+        const reqStartTime = Date.now();
+        instrumentationFacade.increaseRequestsMade(1, siteObjectId);
+
         logger.info({ message: "Fetching routes dynamic field.", siteObjectId });
         const routesObj = await this.fetchRoutesDynamicFieldObject(siteObjectId);
         const objectData = routesObj.data;
         if (objectData && objectData.bcs && objectData.bcs.dataType === "moveObject") {
+            const routingDuration = Date.now() - reqStartTime;
+            instrumentationFacade.recordRoutingTime(routingDuration, siteObjectId);
             return this.parseRoutesData(objectData.bcs.bcsBytes);
         }
         if (!objectData) {
             logger.warn({
                 message: "Routes dynamic field does not contain a `data` field.",
             });
-            return
+            return;
         } else if (!objectData.bcs) {
             logger.warn({
                 message: "Routes dynamic field does not contain a `bcs` field.",
@@ -99,8 +105,9 @@ export class WalrusSitesRouter {
             return undefined;
         }
 
-        const filteredRoutes = Array.from(routes.routes_list.entries())
-                .filter(([pattern, _]) => new RegExp(`^${pattern.replace(/\*/g, ".*")}$`).test(path));
+        const filteredRoutes = Array.from(routes.routes_list.entries()).filter(([pattern, _]) =>
+            new RegExp(`^${pattern.replace(/\*/g, ".*")}$`).test(path),
+        );
 
         if (filteredRoutes.length === 0) {
             logger.warn({ message: "No matching routes found.", path });
