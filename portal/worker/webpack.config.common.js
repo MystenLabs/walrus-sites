@@ -54,6 +54,9 @@ module.exports = {
             'process.env.SITE_PACKAGE': JSON.stringify(
                 process.env.SITE_PACKAGE || undefined
             ),
+            'process.env.PROMETHEUS_EXPORTER_PORT': JSON.stringify(
+                process.env.PROMETHEUS_EXPORTER_PORT || undefined
+            ),
         }),
         new CopyPlugin({
             patterns: [
