@@ -24,7 +24,6 @@ const configurationSchema = z.preprocess(
 		aggregatorUrl: env.AGGREGATOR_URL,
 		sitePackage: env.SITE_PACKAGE,
 		b36DomainResolutionSupport: env.B36_DOMAIN_RESOLUTION_SUPPORT,
-		prometheusExporterPort: env.PROMETHEUS_EXPORTER_PORT
 	}),
 	z
 		.object({
@@ -81,7 +80,6 @@ const configurationSchema = z.preprocess(
 				.string()
 				.refine((val) => val.length === 66 && /^0x[0-9a-fA-F]+$/.test(val)),
 			b36DomainResolutionSupport: stringBoolean,
-			prometheusExporterPort: z.number().min(1).max(65535),
 		})
 		.refine(
 			(data) => {
