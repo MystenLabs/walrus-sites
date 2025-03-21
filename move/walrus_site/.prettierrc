@@ -2,6 +2,6 @@
     "printWidth": 100,
     "wrapComments": false,
     "useModuleLabel": true,
-    "autoGroupImports": "module",
+    "autoGroupImports": "package",
     "tabWidth": 4
 }
