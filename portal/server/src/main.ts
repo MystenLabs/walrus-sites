@@ -39,6 +39,7 @@ export default async function main(req: Request) {
 
 	if (parsedUrl && !config.bringYourOwnDomain) {
 		if (blocklistChecker && await blocklistChecker.isBlocked(parsedUrl.subdomain)) {
+			instrumentationFacade.bumpBlockedRequests();
 			return siteNotFound();
 		}
 
