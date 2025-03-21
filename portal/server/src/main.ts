@@ -1,20 +1,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing"
-import allowlistChecker from "src/allowlist_checker"
-import { siteNotFound } from "@lib/http/http_error_responses"
-import blocklistChecker from "src/blocklist_checker"
-import { config } from "src/configuration_loader"
-import { standardUrlFetcher, premiumUrlFetcher } from "src/url_fetcher_factory"
-import { sendToWebAnalytics } from "src/web_analytics"
-import { sendToAmplitude } from "src/amplitude"
-import { Base36toHex } from "@lib/objectId_operations"
-import { instrumentationFacade } from "@lib/instrumentation"
-
+import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
+import allowlistChecker from "src/allowlist_checker";
+import { siteNotFound } from "@lib/http/http_error_responses";
+import blocklistChecker from "src/blocklist_checker";
+import { config } from "src/configuration_loader";
+import { standardUrlFetcher, premiumUrlFetcher } from "src/url_fetcher_factory";
+import { sendToWebAnalytics } from "src/web_analytics";
+import { sendToAmplitude } from "src/amplitude";
+import { Base36toHex } from "@lib/objectId_operations";
+import { instrumentationFacade } from "@lib/instrumentation";
 
 export default async function main(req: Request) {
-
     const url = new URL(req.url);
 
     // Send the page view event to either Amplitude or Vercel Web Analytics.
@@ -30,14 +28,14 @@ export default async function main(req: Request) {
     const requestDomain = getDomain(url, Number(portalDomainNameLength));
 
     if (parsedUrl) {
-        if (blocklistChecker && await blocklistChecker.isBlocked(parsedUrl.subdomain)) {
-            instrumentationFacade.bumpBlockedRequests()
+        if (blocklistChecker && (await blocklistChecker.isBlocked(parsedUrl.subdomain))) {
+            instrumentationFacade.bumpBlockedRequests();
             return siteNotFound();
         }
 
-        const urlFetcher = await allowlistChecker?.isAllowed(
-            parsedUrl.subdomain ?? ''
-        ) ? premiumUrlFetcher : standardUrlFetcher;
+        const urlFetcher = (await allowlistChecker?.isAllowed(parsedUrl.subdomain ?? ""))
+            ? premiumUrlFetcher
+            : standardUrlFetcher;
 
         if (requestDomain == portalDomain && parsedUrl.subdomain) {
             return await urlFetcher.resolveDomainAndFetchUrl(parsedUrl, null, blocklistChecker);
@@ -57,7 +55,7 @@ export default async function main(req: Request) {
                 path: parsedUrl?.path ?? "/index.html",
             },
             Base36toHex(config.landingPageOidB36),
-            blocklistChecker
+            blocklistChecker,
         );
         return response;
     }

@@ -7,9 +7,9 @@ import {
     optionalRangeToHeaders as optionalRangeToRequestHeaders,
     Routes,
 } from "./types/index";
-import { subdomainToObjectId, HEXtoBase36 } from "./objectId_operations"
-import { SuiNSResolver } from "./suins"
-import { ResourceFetcher } from "./resource"
+import { subdomainToObjectId, HEXtoBase36 } from "./objectId_operations";
+import { SuiNSResolver } from "./suins";
+import { ResourceFetcher } from "./resource";
 import {
     siteNotFound,
     noObjectIdFound,
@@ -17,26 +17,26 @@ import {
     generateHashErrorResponse,
     resourceNotFound,
 } from "./http/http_error_responses";
-import { aggregatorEndpoint } from "./aggregator"
-import { toBase64 } from "@mysten/bcs"
-import { sha256 } from "./crypto"
-import { WalrusSitesRouter } from "./routing"
-import { HttpStatusCodes } from "./http/http_status_codes"
-import logger from "./logger"
-import BlocklistChecker from "./blocklist_checker"
-import { instrumentationFacade } from "./instrumentation"
+import { aggregatorEndpoint } from "./aggregator";
+import { toBase64 } from "@mysten/bcs";
+import { sha256 } from "./crypto";
+import { WalrusSitesRouter } from "./routing";
+import { HttpStatusCodes } from "./http/http_status_codes";
+import logger from "./logger";
+import BlocklistChecker from "./blocklist_checker";
+import { instrumentationFacade } from "./instrumentation";
 
 /**
-* Includes all the logic for fetching the URL contents of a walrus site.
-*/
+ * Includes all the logic for fetching the URL contents of a walrus site.
+ */
 export class UrlFetcher {
-    constructor (
+    constructor(
         private resourceFetcher: ResourceFetcher,
         private suinsResolver: SuiNSResolver,
         private wsRouter: WalrusSitesRouter,
         private aggregatorUrl: string,
-        private b36DomainResolutionSupport: boolean
-    ) { }
+        private b36DomainResolutionSupport: boolean,
+    ) {}
 
     /**
      * Resolves the subdomain to an object ID, and gets the corresponding resources.
@@ -47,12 +47,15 @@ export class UrlFetcher {
     public async resolveDomainAndFetchUrl(
         parsedUrl: DomainDetails,
         resolvedObjectId: string | null,
-        blocklistChecker?: BlocklistChecker
+        blocklistChecker?: BlocklistChecker,
     ): Promise<Response> {
-
         const reqStartTime = Date.now();
 
-        logger.debug({ message: "parsed-url", subdomain: parsedUrl.subdomain, path: parsedUrl.path });
+        logger.debug({
+            message: "parsed-url",
+            subdomain: parsedUrl.subdomain,
+            path: parsedUrl.path,
+        });
         if (!resolvedObjectId) {
             const resolveObjectResult = await this.resolveObjectId(parsedUrl);
             const isObjectId = typeof resolveObjectResult == "string";
@@ -63,8 +66,11 @@ export class UrlFetcher {
         }
 
         logger.debug({ message: "Resolved object id", resolvedObjectId: resolvedObjectId });
-        logger.debug({ message: "Base36 version of the object id", base36OfObjectId: HEXtoBase36(resolvedObjectId) });
-        if (blocklistChecker && await blocklistChecker.isBlocked(resolvedObjectId)) {
+        logger.debug({
+            message: "Base36 version of the object id",
+            base36OfObjectId: HEXtoBase36(resolvedObjectId),
+        });
+        if (blocklistChecker && (await blocklistChecker.isBlocked(resolvedObjectId))) {
             instrumentationFacade.bumpBlockedRequests();
             return siteNotFound();
         }
@@ -91,7 +97,7 @@ export class UrlFetcher {
         if (!routes) {
             logger.warn({
                 message: "No routes found for the object ID",
-                resolvedObjectIdNoRoutes: resolvedObjectId
+                resolvedObjectIdNoRoutes: resolvedObjectId,
             });
             // Fall through to 404.html check
         }
@@ -104,13 +110,16 @@ export class UrlFetcher {
                 const routeResponse = await this.fetchUrl(resolvedObjectId, matchingRoute);
                 if (routeResponse.status !== HttpStatusCodes.NOT_FOUND) {
                     const routeResponseDuration = Date.now() - reqStartTime;
-                    instrumentationFacade.recordResolveDomainAndFetchUrlResponseTime(routeResponseDuration, resolvedObjectId);
+                    instrumentationFacade.recordResolveDomainAndFetchUrlResponseTime(
+                        routeResponseDuration,
+                        resolvedObjectId,
+                    );
                     return routeResponse;
                 }
             } else {
                 logger.warn({
                     message: `No matching route found for ${parsedUrl.path}`,
-                    resolvedObjectIdNoMatchingRoute: resolvedObjectId
+                    resolvedObjectIdNoMatchingRoute: resolvedObjectId,
                 });
             }
         }
@@ -127,9 +136,7 @@ export class UrlFetcher {
         return siteNotFound();
     }
 
-    async resolveObjectId(
-        parsedUrl: DomainDetails,
-    ): Promise<string | Response> {
+    async resolveObjectId(parsedUrl: DomainDetails): Promise<string | Response> {
         // Resolve to an objectId using a hard-coded subdomain.
         const hardCodedObjectId = this.suinsResolver.hardcodedSubdomains(parsedUrl.subdomain);
         if (hardCodedObjectId) return hardCodedObjectId;
@@ -153,13 +160,13 @@ export class UrlFetcher {
             logger.warn({
                 message: "Could not resolve SuiNs domain. Does the domain exist?",
                 subdomain: parsedUrl.subdomain,
-            })
+            });
             instrumentationFacade.bumpNoObjectIdFoundRequests();
             return noObjectIdFound();
         } catch {
             logger.error({
                 message: "Failed to contact the full node while resolving suins domain",
-                subdomain: parsedUrl.subdomain
+                subdomain: parsedUrl.subdomain,
             });
             instrumentationFacade.bumpFullNodeFailRequests();
             return fullNodeFail();
@@ -171,31 +178,34 @@ export class UrlFetcher {
      * @param objectId - The object ID of the site object.
      * @param path - The path of the site resource to fetch. e.g. /index.html
      */
-    public async fetchUrl(
-        objectId: string,
-        path: string,
-    ): Promise<Response> {
-        logger.info({ message: 'Fetching URL', objectId: objectId, path: path });
+    public async fetchUrl(objectId: string, path: string): Promise<Response> {
+        logger.info({ message: "Fetching URL", objectId: objectId, path: path });
         const result = await this.resourceFetcher.fetchResource(objectId, path, new Set<string>());
         if (!isResource(result) || !result.blob_id) {
             return resourceNotFound();
         }
 
-        logger.info({ message: "Successfully fetched resource!", fetchedResourceResult: JSON.stringify(result) });
+        logger.info({
+            message: "Successfully fetched resource!",
+            fetchedResourceResult: JSON.stringify(result),
+        });
 
         // We have a resource, get the range header.
-        logger.info({ message: "Add the range headers of the resource", range: JSON.stringify(result.range) });
+        logger.info({
+            message: "Add the range headers of the resource",
+            range: JSON.stringify(result.range),
+        });
         let range_header = optionalRangeToRequestHeaders(result.range);
         const contents = await this.fetchWithRetry(
-            aggregatorEndpoint(result.blob_id, this.aggregatorUrl), { headers: range_header }
+            aggregatorEndpoint(result.blob_id, this.aggregatorUrl),
+            { headers: range_header },
         );
         if (!contents.ok) {
-            logger.error(
-                {
-                    message: "Failed to fetch resource! Response from aggregator endpoint not ok.",
-                    path: result.path,
-                    status: contents.status
-                });
+            logger.error({
+                message: "Failed to fetch resource! Response from aggregator endpoint not ok.",
+                path: result.path,
+                status: contents.status,
+            });
             instrumentationFacade.bumpSiteNotFoundRequests();
             return siteNotFound();
         }
@@ -206,11 +216,12 @@ export class UrlFetcher {
         const h10b = toBase64(await sha256(body));
         if (result.blob_hash != h10b) {
             logger.error({
-                message: "Checksum mismatch! The hash of the fetched resource does not " +
+                message:
+                    "Checksum mismatch! The hash of the fetched resource does not " +
                     "match the hash of the aggregator response.",
                 path: result.path,
                 blobHash: result.blob_hash,
-                aggrHash: h10b
+                aggrHash: h10b,
             });
             return generateHashErrorResponse();
         }
@@ -241,13 +252,13 @@ export class UrlFetcher {
         input: string | URL | globalThis.Request,
         init?: RequestInit,
         retries: number = 2,
-        delayMs: number = 1000
+        delayMs: number = 1000,
     ): Promise<Response> {
         let lastError: unknown;
 
         if (retries < 0) {
             logger.warn({
-                message: `Invalid retries value (${retries}). Falling back to a single fetch call.`
+                message: `Invalid retries value (${retries}). Falling back to a single fetch call.`,
             });
             return fetch(input, init);
         }
@@ -274,10 +285,12 @@ export class UrlFetcher {
 
             // Wait before retrying
             if (attempt < retries) {
-                await new Promise(resolve => setTimeout(resolve, delayMs));
+                await new Promise((resolve) => setTimeout(resolve, delayMs));
             }
         }
         // All retry attempts failed; throw the last encountered error.
-        throw lastError instanceof Error ? lastError : new Error('Unknown error occurred in fetchWithRetry');
+        throw lastError instanceof Error
+            ? lastError
+            : new Error("Unknown error occurred in fetchWithRetry");
     }
 }
