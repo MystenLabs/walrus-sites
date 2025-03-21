@@ -14,6 +14,7 @@ import { standardUrlFetcher, premiumUrlFetcher } from "src/url_fetcher_factory";
 import { sendToWebAnalytics } from "src/web_analytics";
 import { sendToAmplitude } from "src/amplitude";
 import { Base36toHex } from "@lib/objectId_operations";
+import { bringYourOwnDomainDoesNotSupportSubdomainsYet } from "@lib/http/http_error_responses";
 
 if (config.enableSentry) {
     // Only integrate Sentry on production.
@@ -65,6 +66,10 @@ export default async function main(req: Request) {
 			blocklistChecker
 		);
 		return response;
+	}
+
+	if (config.bringYourOwnDomain) {
+		return bringYourOwnDomainDoesNotSupportSubdomainsYet(parsedUrl?.subdomain!)
 	}
 
 	return new Response(`Resource at ${url} not found!`, { status: 404 });
