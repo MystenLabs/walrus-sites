@@ -6,7 +6,7 @@ use sui::display::{Self, Display};
 use sui::dynamic_field as df;
 use sui::package::{Self, Publisher};
 use sui::vec_map;
-use walrus_site::events::{emit_site_created, emit_site_burned, emit_site_update_name};
+use walrus_site::events::{emit_site_created, emit_site_burned};
 use walrus_site::metadata::Metadata;
 
 /// The name of the dynamic field containing the routes.
@@ -86,8 +86,6 @@ public fun new_site(name: String, metadata: Metadata, ctx: &mut TxContext): Site
     };
     emit_site_created(
         object::id(&site),
-        name,
-        &metadata,
     );
     site
 }
@@ -151,11 +149,6 @@ fun new_path(path: String): ResourcePath {
 
 /// Updates the name of a site.
 public fun update_name(site: &mut Site, new_name: String) {
-    emit_site_update_name(
-        object::id(site),
-        site.name,
-        new_name,
-    );
     site.name = new_name
 }
 
