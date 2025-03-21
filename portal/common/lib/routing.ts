@@ -61,6 +61,7 @@ export class WalrusSitesRouter {
      * @returns The routes object.
      */
     private async fetchRoutesDynamicFieldObject(siteObjectId: string): Promise<SuiObjectResponse> {
+        const reqStartTime = Date.now();
         const routesMoveType = "vector<u8>";
         const dynamicFieldId = deriveDynamicFieldID(
             siteObjectId,
@@ -71,6 +72,11 @@ export class WalrusSitesRouter {
             id: dynamicFieldId,
             options: { showBcs: true },
         });
+        const fetchRoutesDynamicFieldObjectDuration = Date.now() - reqStartTime;
+		instrumentationFacade.recordFetchRoutesDynamicFieldObjectTime(
+			fetchRoutesDynamicFieldObjectDuration,
+			siteObjectId,
+		);
         return dfObjectResponse;
     }
 
