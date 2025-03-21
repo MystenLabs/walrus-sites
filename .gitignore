@@ -1,6 +1,7 @@
 node_modules/
 build/
 .vercel
+.zed
 .DS_Store
 dist/
 __pycache__

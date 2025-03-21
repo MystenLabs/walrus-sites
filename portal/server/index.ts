@@ -6,6 +6,7 @@ import blocklist_healthcheck from "src/blocklist_healthcheck";
 import CookieMonster from "src/cookie_monster";
 import { genericError } from "@lib/http/http_error_responses";
 import main from "src/main";
+import { instrumentationFacade } from "@lib/instrumentation";
 
 const PORT = 3000;
 console.log("Running Bun server at port", PORT, "...")
@@ -33,6 +34,7 @@ serve({
 			CookieMonster.eatCookies(request, response)
 			return response
 		} catch (e) {
+			instrumentationFacade.bumpGenericErrors();
 			return genericError()
 		}
 	}
