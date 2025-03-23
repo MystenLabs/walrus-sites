@@ -36,6 +36,11 @@ module.exports = {
             "@static": path.resolve(__dirname, "./static"),
         },
         extensions: [".ts", ".js", ".html"],
+        fallback: {
+            "http": require.resolve("stream-http"),
+            "https": require.resolve("https-browserify"),
+            "stream": require.resolve("stream-browserify"),
+        }
     },
     plugins: [
         new webpack.DefinePlugin({
