@@ -1,0 +1,20 @@
+groups:
+  - name: walrus-sites-alerts
+    rules:
+      - alert: HighErrorRate
+        expr: rate(ws_num_generic_errors_counter[5m]) > 10
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: High error rate detected
+          description: Generic error count exceeded threshold
+
+      - alert: HighSiteNotFoundRate
+        expr: rate(ws_num_site_not_found_counter[5m]) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High rate of site not found errors
+          description: Site not found errors exceeded threshold
