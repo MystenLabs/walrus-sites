@@ -133,9 +133,10 @@ impl SiteEditor {
     }
 
     pub async fn destroy(&self, site_id: ObjectID) -> Result<()> {
-        // Delete blobs on Walrus
+        // Delete blobs on Walrus.
         let wallet_walrus = load_wallet_context(&self.config.general.wallet)?;
-        let all_dynamic_fields = RemoteSiteFactory::new(
+
+        let site = RemoteSiteFactory::new(
             // TODO(giac): make the backoff configurable.
             &RetriableSuiClient::new_from_wallet(
                 &wallet_walrus,
@@ -145,16 +146,19 @@ impl SiteEditor {
             self.config.package,
         )
         .await?
-        .get_existing_resources(site_id)
+        .get_from_chain(site_id)
         .await?;
 
-        tracing::debug!(
-            "Retrieved blobs and deleting them: {:?}",
-            &all_dynamic_fields,
-        );
+        let all_blobs = site
+            .resources()
+            .into_iter()
+            .map(|resource| (resource.info.blob_id))
+            .collect::<Vec<_>>();
 
-        // Add warning if no deletable blobs found
-        if all_dynamic_fields.is_empty() {
+        tracing::debug!(?all_blobs, "retrieved the site for deletion");
+
+        // Add warning if no deletable blobs found.
+        if all_blobs.is_empty() {
             println!("Warning: No deletable resources found. This may be because the site was created with permanent=true");
         } else {
             let mut site_manager = SiteManager::new(
@@ -168,7 +172,7 @@ impl SiteEditor {
             )
             .await?;
 
-            site_manager.delete_from_walrus(all_dynamic_fields).await?;
+            site_manager.delete_from_walrus(&all_blobs).await?;
         }
 
         // Delete objects on SUI blockchain
