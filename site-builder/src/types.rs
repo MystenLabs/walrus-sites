@@ -141,3 +141,24 @@ pub struct Range {
     pub start: Option<u64>,
     pub end: Option<u64>,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Metadata {
+    pub link: Option<String>,
+    pub image_url: Option<String>,
+    pub description: Option<String>,
+    pub project_url: Option<String>,
+    pub creator: Option<String>,
+}
+
+impl Default for Metadata {
+    fn default() -> Self {
+        Self {
+            link: None,
+            image_url: Some("https://www.walrus.xyz/walrus-site".to_string()),
+            description: Some("A walrus site created using Walrus and Sui!".to_string()),
+            project_url: None,
+            creator: None,
+        }
+    }
+}
