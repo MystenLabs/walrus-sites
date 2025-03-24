@@ -13,7 +13,7 @@
     "/path/*": "/file.svg"
   },
   "metadata": {
-	   "link": "https://subdomain.walrus.site",
+	   "link": "https://docs.walrus.site",
 	   "image_url": "https://www.walrus.xyz/walrus-site",
 	   "description": "This is a walrus site.",
 	   "project_url": "https://github.com/MystenLabs/walrus-sites/",
