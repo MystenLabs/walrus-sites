@@ -52,7 +52,7 @@ export class CookieMonster {
 
 	/**
 	* Gets the parent domain if it's not a public suffix.
-	* For example: walrusadventures.walrus.site -> walrus.site
+	* For example: walrusadventures.wal.app -> wal.app
 	*/
 	private static getParentDomain(host: string): string | null {
 		const parts = host.split('.');

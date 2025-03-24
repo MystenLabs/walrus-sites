@@ -59,8 +59,8 @@ mod tests {
 
     const METADATA: &str = r#"
         "metadata": {
-            "link": "https://subdomain.walrus.site",
-            "image_url": "https://subdomain.walrus.site/image.png",
+            "link": "https://subdomain.wal.app",
+            "image_url": "https://subdomain.wal.app/image.png",
             "description": "This is walrus site.",
             "project_url": "https://github.com/MystenLabs/walrus-sites/",
             "creator": "MystenLabs"

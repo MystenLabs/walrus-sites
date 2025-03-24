@@ -70,8 +70,8 @@ fun test_site_flow_with_resources_and_routes() {
     // Create a site.
     {
         let metadata = walrus_site::metadata::new_metadata(
-            option::some(b"https://<b36>.walrus.site".to_string()),
-            option::some(b"https://<b36>.walrus.site/image.png".to_string()),
+            option::some(b"https://<b36>.wal.app".to_string()),
+            option::some(b"https://<b36>.wal.app/image.png".to_string()),
             option::some(b"This is a test site.".to_string()),
             option::none(),
             option::none(),
@@ -83,9 +83,9 @@ fun test_site_flow_with_resources_and_routes() {
         );
 
         assert!(get_site_name(&site) == b"Example".to_string());
-        assert!(get_site_link(&site).borrow() == b"https://<b36>.walrus.site".to_string());
+        assert!(get_site_link(&site).borrow() == b"https://<b36>.wal.app".to_string());
         assert!(
-            get_site_image_url(&site).borrow() == b"https://<b36>.walrus.site/image.png".to_string(),
+            get_site_image_url(&site).borrow() == b"https://<b36>.wal.app/image.png".to_string(),
         );
         assert!(get_site_description(&site).borrow() == b"This is a test site.".to_string());
         assert!(get_site_project_url(&site).is_none());
@@ -185,8 +185,8 @@ fun test_update_metadata() {
     // Create a site.
     {
         let metadata = walrus_site::metadata::new_metadata(
-            option::some(b"https://<b36>.walrus.site".to_string()),
-            option::some(b"https://<b36>.walrus.site/image.png".to_string()),
+            option::some(b"https://<b36>.wal.app".to_string()),
+            option::some(b"https://<b36>.wal.app/image.png".to_string()),
             option::some(b"This is a test site.".to_string()),
             option::none(),
             option::none(),
@@ -198,7 +198,7 @@ fun test_update_metadata() {
         );
 
         assert!(get_site_name(&site) == b"Example".to_string());
-        assert!(get_site_link(&site).borrow() == b"https://<b36>.walrus.site".to_string());
+        assert!(get_site_link(&site).borrow() == b"https://<b36>.wal.app".to_string());
 
         transfer::public_transfer(site, owner)
     };
@@ -209,8 +209,8 @@ fun test_update_metadata() {
         let mut site = scenario.take_from_sender<Site>();
         // Update the site metadata.
         let metadata = walrus_site::metadata::new_metadata(
-            option::some(b"https://<b36>.walrus.site".to_string()),
-            option::some(b"https://<b36>.walrus.site/image.png".to_string()),
+            option::some(b"https://<b36>.wal.app".to_string()),
+            option::some(b"https://<b36>.wal.app/image.png".to_string()),
             option::some(b"I am just updating the site metadata.".to_string()),
             option::none(),
             option::none(),

@@ -1,5 +1,5 @@
 # module: site
-# portal: walrus.site
+# portal: wal.app
 package: 0x9d055e60cc8012d43c396194395e8f80c54afd083d908bdfbc3c37906f59146e
 # general:
 #   rpc_url: https://fullnode.testnet.sui.io:443

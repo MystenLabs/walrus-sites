@@ -5,7 +5,7 @@ It is a collection of software architecture diagrams that show how components in
 
 Use it as a reference to understand the architecture of the Walrus Sites codebase.
 
-Combine it while reading the [docs](https://docs.walrus.site/walrus-sites/intro.html)
+Combine it while reading the [docs](https://docs.wal.app/walrus-sites/intro.html)
 to get the best out of it.
 
 ## How to access the GUI

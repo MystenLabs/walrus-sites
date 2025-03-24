@@ -14,9 +14,9 @@ const redirectToPortalURLTestCases: [string, DomainDetails, string][] = [
         "https://subname.example.com/index.html",
     ],
     [
-        "https://walrus.site",
+        "https://wal.app",
         { subdomain: "name", path: "/index.html" },
-        "https://name.walrus.site/index.html",
+        "https://name.wal.app/index.html",
     ],
     [
         "http://localhost:8080",
@@ -48,7 +48,7 @@ const redirectToAggregatorUrlTestCases: [string, string, string][] = [
         "https://aggregator.walrus-testnet.walrus.space/v1/blobs/12345",
     ],
     [
-        "https://walrus.site",
+        "https://wal.app",
         "blob-id",
         "https://aggregator.walrus-testnet.walrus.space/v1/blobs/blob-id",
     ],

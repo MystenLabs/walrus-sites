@@ -11,9 +11,9 @@ const getDomainTestCases: [string, string][] = [
     ['https://example.com', 'example.com'],
     ['https://suinsname.localhost:8080', 'localhost'],
     ['https://subname.suinsname.localhost:8080', 'localhost'],
-    ['https://flatland.walrus.site/', 'walrus.site'],
-    ['https://4snh0c0o7quicfzokqpsmuchtgitnukme1q680o1s1nfn325sr.walrus.site/',
-        'walrus.site'],
+    ['https://flatland.wal.app/', 'wal.app'],
+    ['https://4snh0c0o7quicfzokqpsmuchtgitnukme1q680o1s1nfn325sr.wal.app/',
+        'wal.app'],
     ['https://4snh0c0o7quicfzokqpsmuchtgitnukme1q680o1s1nfn325sr.portalname.co.uk/',
         'portalname.co.uk'],
     ['https://subname.suinsname.portalname.co.uk/', 'portalname.co.uk'],
@@ -45,8 +45,8 @@ describe('getDomain with portal name length', () => {
 })
 
 const getSubdomainAndPathTestCases: [string, DomainDetails][] = [
-    ['https://subname.name.walrus.site/', {subdomain: 'subname.name', path: '/index.html' }],
-    ['https://name.walrus.site/', { subdomain: 'name', path: '/index.html' }],
+    ['https://subname.name.wal.app/', {subdomain: 'subname.name', path: '/index.html' }],
+    ['https://name.wal.app/', { subdomain: 'name', path: '/index.html' }],
     ['http://name.localhost:8080/', { subdomain: 'name', path: '/index.html' }],
     ['http://flatland.localhost:8080/', { subdomain: 'flatland', path: '/index.html' }],
     ['http://subname.suinsname.localhost:8080/',
