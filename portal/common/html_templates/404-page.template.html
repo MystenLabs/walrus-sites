@@ -142,7 +142,8 @@
                     function goToRootDomain() {
                         const hostname = window.location.hostname
                         const rootDomain = hostname.split('.').slice(-2).join('.')
-                        window.location.href = `${window.location.protocol}//${rootDomain}`
+                        const port = window.location.port ? `:${window.location.port}` : ''
+                        window.location.href = `${window.location.protocol}//${rootDomain}${port}`
                     }
                 </script>
             </div>
