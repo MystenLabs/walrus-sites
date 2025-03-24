@@ -114,7 +114,7 @@ module walrus_site::site {
 
     /// Creates a new resource path.
     fun new_path(path: String): ResourcePath {
-        ResourcePath { path }
+        ResourcePath { path.replace('\\', '/') }
     }
 
     /// Updates the name of a site.
