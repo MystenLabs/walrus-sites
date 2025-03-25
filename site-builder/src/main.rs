@@ -51,6 +51,10 @@ struct Args {
     /// The path to the configuration file for the site builder.
     #[clap(short, long)]
     config: Option<PathBuf>,
+    /// The context with which to load the configuration.
+    ///
+    /// If specified, the context will be taken from the config file. Otherwise, the default
+    /// context, which is also specified in the config file, will be used.
     #[clap(long)]
     context: Option<String>,
     #[clap(flatten)]
