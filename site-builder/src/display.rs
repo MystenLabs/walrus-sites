@@ -49,3 +49,13 @@ pub fn done() {
         .unwrap();
     }
 }
+
+pub fn warn<S: Display>(message: S) {
+    if cfg!(not(test)) {
+        crossterm::execute!(
+            stdout(),
+            Print(format!("\n{} {message}\n", "Warning:".yellow())),
+        )
+        .unwrap();
+    }
+}
