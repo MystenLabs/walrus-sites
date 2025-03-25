@@ -364,7 +364,7 @@ mod default {
     }
 
     pub(crate) fn default_portal() -> String {
-        "walrus.site".to_owned()
+        "wal.app".to_owned()
     }
 }
 

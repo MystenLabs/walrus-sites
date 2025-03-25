@@ -15,7 +15,7 @@ export function getDomain(url: URL, portalNameLength?: Number): string | null {
 
 /**
 * Given a URL, returns the subdomain and path.
-* @param url e.g. "https://subname.name.walrus.site/"
+* @param url e.g. "https://subname.name.wal.app/"
 * @returns domain details e.g. { subdomain: "subname", path: "/index.html"}
 */
 export function getSubdomainAndPath(url: URL, portalNameLength?: Number): DomainDetails | null {
@@ -24,9 +24,9 @@ export function getSubdomainAndPath(url: URL, portalNameLength?: Number): Domain
 
 /**
 * Given a URL, returns the extracted parts of it.
-* @param url e.g. "https://subname.name.walrus.site/"
+* @param url e.g. "https://subname.name.wal.app/"
 * @returns extracted details of a url e.g.
-    {domain: name.walrus.site,
+    {domain: name.wal.app,
     { subdomain: "subname", path: "/index.html"}}
 */
 function splitUrl(url: URL, portalNameLength?: Number): UrlExtract {
