@@ -8,7 +8,6 @@ use std::{num::NonZeroU16, path::PathBuf};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
-use sui_types::base_types::ObjectID;
 
 use super::types::BlobId;
 use crate::EpochCountOrMax;
@@ -76,22 +75,14 @@ pub enum Command {
     },
     /// Deletes a blob from Walrus.
     Delete {
-        /// The filename(s), or the blob ID(s), or the object ID(s) of the blob(s) to delete.
-        #[serde(flatten)]
-        target: BlobIdentifiers,
-        /// Proceed to delete the blob without confirmation.
-        #[serde(default)]
-        yes: bool,
+        /// The the blob ID(s) of the blob(s) to delete.
+        #[serde_as(as = "Vec<DisplayFromStr>")]
+        blob_ids: Vec<BlobId>,
         /// Disable checking the status of the blob after deletion.
         ///
         /// Checking the status adds delay and requires additional requests.
         #[serde(default)]
         no_status_check: bool,
-        /// The encoding type to use for computing the blob ID.
-        ///
-        /// This is only used when running the command with the `--file` target.
-        #[serde(default)]
-        encoding_type: Option<EncodingType>,
     },
     BlobId {
         file: PathBuf,
@@ -122,39 +113,6 @@ pub struct RpcArg {
     /// The RPC URL of a Sui full node.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rpc_url: Option<String>,
-}
-
-/// Supported Walrus encoding types.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash, Serialize, Deserialize)]
-#[repr(u8)]
-pub enum EncodingType {
-    /// Original RedStuff encoding using the RaptorQ erasure code.
-    RedStuffRaptorQ = 0,
-    /// RedStuff using the Reed-Solomon erasure code.
-    RS2 = 1,
-}
-
-#[serde_as]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct BlobIdentifiers {
-    /// The file containing the blob to be deleted.
-    ///
-    /// This is equivalent to calling `blob-id` on the file, and then deleting with `--blob-id`.
-    #[serde(default)]
-    pub(crate) files: Vec<PathBuf>,
-    /// The blob ID to be deleted.
-    ///
-    /// This command deletes _all_ owned blob objects matching the provided blob ID.
-    #[serde_as(as = "Vec<DisplayFromStr>")]
-    #[serde(default)]
-    pub(crate) blob_ids: Vec<BlobId>,
-    /// The object ID of the blob object to be deleted.
-    ///
-    /// This command deletes only the blob object with the given object ID.
-    #[serde_as(as = "Vec<DisplayFromStr>")]
-    #[serde(default)]
-    pub(crate) object_ids: Vec<ObjectID>,
 }
 
 /// Subcommands for the `info` command.
@@ -241,14 +199,8 @@ impl WalrusCmdBuilder {
     /// Adds a [`Command::Delete`] command to the builder.
     pub fn delete(self, blob_ids: &[BlobId]) -> WalrusCmdBuilder<Command> {
         let command = Command::Delete {
-            target: BlobIdentifiers {
-                files: vec![],
-                blob_ids: blob_ids.to_vec(),
-                object_ids: vec![],
-            },
-            yes: false,
+            blob_ids: blob_ids.to_vec(),
             no_status_check: false,
-            encoding_type: None,
         };
         self.with_command(command)
     }
