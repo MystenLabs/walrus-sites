@@ -37,7 +37,7 @@ jobs:
 
       - name: Download Sui
         run: |
-          VERSION=$(curl -s https://api.github.com/repos/MystenLabs/sui/releases/latest | jq -r '.tag_name')
+          VERSION=testnet-v1.45.0
           curl -L "https://github.com/MystenLabs/sui/releases/download/$VERSION/sui-$VERSION-ubuntu-x86_64.tgz" -o sui.tgz
           sudo tar -xvzf sui.tgz -C /usr/local/bin
 

@@ -1,11 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{
-    collections::{BTreeSet, HashMap},
-    str::FromStr,
-    time::Duration,
-};
+use std::{collections::BTreeSet, str::FromStr, time::Duration};
 
 use anyhow::{anyhow, Result};
 use sui_keys::keystore::AccountKeystore;
@@ -30,8 +26,9 @@ use crate::{
     publish::WhenWalrusUpload,
     retry_client::RetriableSuiClient,
     summary::SiteDataDiffSummary,
+    types::Metadata,
     util::{get_site_id_from_response, sign_and_send_ptb},
-    walrus::Walrus,
+    walrus::{types::BlobId, Walrus},
     Config,
     EpochCountOrMax,
 };
@@ -59,6 +56,7 @@ pub struct SiteManager {
     pub backoff_config: ExponentialBackoffConfig,
     pub permanent: bool,
     pub dry_run: bool,
+    pub metadata: Option<Metadata>,
 }
 
 impl SiteManager {
@@ -70,6 +68,7 @@ impl SiteManager {
         when_upload: WhenWalrusUpload,
         permanent: bool,
         dry_run: bool,
+        metadata: Option<Metadata>,
     ) -> Result<Self> {
         Ok(SiteManager {
             walrus: config.walrus_client(),
@@ -81,6 +80,7 @@ impl SiteManager {
             backoff_config: ExponentialBackoffConfig::default(),
             permanent,
             dry_run,
+            metadata,
         })
     }
 
@@ -243,21 +243,28 @@ impl SiteManager {
     }
 
     /// Deletes the resources from Walrus.
-    pub async fn delete_from_walrus<'b>(&mut self, blobs: HashMap<String, ObjectID>) -> Result<()> {
-        for (name, blob_id) in blobs.iter() {
-            tracing::debug!(name, "deleting blob from Walrus");
-            display::action(format!("Deleting resource from Walrus: {}", blob_id,));
-            let output = self.walrus.delete(blob_id.to_string()).await?;
+    pub async fn delete_from_walrus<'b>(&mut self, blob_ids: &[BlobId]) -> Result<()> {
+        tracing::debug!(?blob_ids, "deleting blob from Walrus");
+        display::action("Running the delete commands on Walrus");
+        let output = self.walrus.delete(blob_ids).await?;
+        display::done();
 
-            // Check if the blob was actually deleted
-            if output.objectId != *blob_id.to_string() {
-                display::error(format!(
-                    "Could not delete blob {}, may be already deleted or may be a permanent blob",
-                    blob_id
-                ));
+        for blob_output in output {
+            if let Some(blob_id) = blob_output.blob_identity.blob_id {
+                if blob_ids.contains(&blob_id) {
+                    tracing::debug!(%blob_id, "blob deleted successfully");
+                } else {
+                    display::error(
+                        format!(
+                            "Could not delete blob {}, may be already deleted or may be a permanent blob",
+                            blob_id
+                        ));
+                }
+            } else {
+                tracing::error!(?blob_output.blob_identity, "the blob ID is missing from the identity");
             }
-            display::done();
         }
+
         Ok(())
     }
 
@@ -280,7 +287,9 @@ impl SiteManager {
             SiteIdentifier::ExistingSite(site_id) => {
                 ptb.with_call_arg(&self.wallet.get_object_ref(*site_id).await?.into())?
             }
-            SiteIdentifier::NewSite(site_name) => ptb.with_create_site(site_name)?,
+            SiteIdentifier::NewSite(site_name) => {
+                ptb.with_create_site(site_name, self.metadata.clone())?
+            }
         };
 
         // Publish the first MAX_RESOURCES_PER_PTB resources, or all resources if there are fewer

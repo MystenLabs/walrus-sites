@@ -75,8 +75,14 @@ pub enum Command {
     },
     /// Deletes a blob from Walrus.
     Delete {
-        /// The objectID of the blob to be deleted.
-        object_id: String,
+        /// The the blob ID(s) of the blob(s) to delete.
+        #[serde_as(as = "Vec<DisplayFromStr>")]
+        blob_ids: Vec<BlobId>,
+        /// Disable checking the status of the blob after deletion.
+        ///
+        /// Checking the status adds delay and requires additional requests.
+        #[serde(default)]
+        no_status_check: bool,
     },
     BlobId {
         file: PathBuf,
@@ -191,8 +197,11 @@ impl WalrusCmdBuilder {
     }
 
     /// Adds a [`Command::Delete`] command to the builder.
-    pub fn delete(self, object_id: String) -> WalrusCmdBuilder<Command> {
-        let command = Command::Delete { object_id };
+    pub fn delete(self, blob_ids: &[BlobId]) -> WalrusCmdBuilder<Command> {
+        let command = Command::Delete {
+            blob_ids: blob_ids.to_vec(),
+            no_status_check: false,
+        };
         self.with_command(command)
     }
 

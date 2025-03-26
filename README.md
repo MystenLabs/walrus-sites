@@ -21,25 +21,25 @@ Portals are centralized services that provide a way to gather the site resources
 > Anyone can host their own portal and access Walrus Sites freely!
 
 To browse walrus sites, you can either host your own local portal or access a third-party deployment
-on the internet like https://walrus.site.
+on the internet like https://wal.app.
 
-Domain resolution of Walrus Sites is done with a combination of traditional wildcard domains (e.g. `*.walrus.site`)
+Domain resolution of Walrus Sites is done with a combination of traditional wildcard domains (e.g. `*.wal.app`)
 and the use of subdomains that correspond to [SuiNS domains][suisns].
 
-For example, let's analyze the following site: https://stake.walrus.site
+For example, let's analyze the following site: https://stake.wal.app
 
-1. We are provided with a third-party portal: https://walrus.site.
-2. The site SuiNS domain is `stake`, so we need to use it as a subdomain of walrus.site: `stake.walrus.site`.
-3. Therefore, we can access the site with standard HTTPS at `https://stake.walrus.site`.
+1. We are provided with a third-party portal: https://wal.app.
+2. The site SuiNS domain is `stake`, so we need to use it as a subdomain of wal.app: `stake.wal.app`.
+3. Therefore, we can access the site with standard HTTPS at `https://stake.wal.app`.
 
-Documentation of Walrus and Walrus Sites is available at [docs.walrus.site][walrus-sites-docs].
+Documentation of Walrus and Walrus Sites is available at [docs.wal.app][walrus-sites-docs].
 
 > Fun fact: the documentation is itself a Walrus Site!
 
 ## Quick Start
 
 Walrus Sites undergo a lot of changes, so the best way to avoid confusion with deprecated features
-please start by following the guide [here](https://docs.walrus.site/walrus-sites/intro.html).
+please start by following the guide [here](https://docs.wal.app/walrus-sites/intro.html).
 
 ## File structure
 
@@ -64,7 +64,7 @@ Walrus Sites is open source! Here is a graph showing the star history over time.
 
 [walrus-link]: https://www.walrus.xyz/
 [sui-link]: https://docs.sui.io/
-[use-cases]: https://docs.walrus.site/design/objectives_use_cases.html#use-cases
-[walrus-sites-docs]: https://docs.walrus.site/walrus-sites/intro.html
+[use-cases]: https://docs.wal.app/design/objectives_use_cases.html#use-cases
+[walrus-sites-docs]: https://docs.wal.app/walrus-sites/intro.html
 [service-worker]: https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API
 [suins]: https://suins.io/

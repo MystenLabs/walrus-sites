@@ -11,5 +11,12 @@
   },
   "routes": {
     "/path/*": "/file.svg"
-  }
+  },
+  "metadata": {
+	   "link": "https://docs.wal.app",
+	   "image_url": "https://www.walrus.xyz/walrus-site",
+	   "description": "This is a walrus site.",
+	   "project_url": "https://github.com/MystenLabs/walrus-sites/",
+	   "creator": "MystenLabs"
+	}
 }

@@ -16,7 +16,10 @@ use super::{
     resource::{Resource, ResourceOp},
     RouteOps,
 };
-use crate::{site::contracts, types::Range};
+use crate::{
+    site::contracts,
+    types::{Metadata, Range},
+};
 
 pub struct SitePtb<T = ()> {
     pt_builder: ProgrammableTransactionBuilder,
@@ -57,8 +60,12 @@ impl SitePtb {
     }
 
     /// Makes the call to create a new site and keeps the resulting argument.
-    pub fn with_create_site(mut self, site_name: &str) -> Result<SitePtb<Argument>> {
-        let argument = self.create_site(site_name)?;
+    pub fn with_create_site(
+        mut self,
+        site_name: &str,
+        metadata: Option<Metadata>,
+    ) -> Result<SitePtb<Argument>> {
+        let argument = self.create_site(site_name, metadata)?;
         self.with_arg(argument)
     }
 }
@@ -70,14 +77,40 @@ impl<T> SitePtb<T> {
     }
 
     /// Move call to create a new Walrus site.
-    pub fn create_site(&mut self, site_name: &str) -> Result<Argument> {
+    pub fn create_site(&mut self, site_name: &str, metadata: Option<Metadata>) -> Result<Argument> {
         tracing::debug!(site=%site_name, "new Move call: creating site");
         let name_arg = self.pt_builder.input(pure_call_arg(&site_name)?)?;
+        let metadata_arg = match metadata {
+            Some(metadata) => self.new_metadata(metadata),
+            None => self.new_metadata(Metadata::default()),
+        };
         Ok(self.add_programmable_move_call(
             contracts::site::new_site.identifier(),
             vec![],
-            vec![name_arg],
+            vec![name_arg, metadata_arg],
         ))
+    }
+
+    fn new_metadata(&mut self, metadata: Metadata) -> Argument {
+        let defaults = Metadata::default();
+        let args = [
+            metadata.link.or(defaults.link),
+            metadata.image_url.or(defaults.image_url),
+            metadata.description.or(defaults.description),
+            metadata.project_url.or(defaults.project_url),
+            metadata.creator.or(defaults.creator),
+        ]
+        .into_iter()
+        .map(|val| self.pt_builder.pure(val).unwrap())
+        .collect::<Vec<_>>();
+
+        self.pt_builder.programmable_move_call(
+            self.package,
+            Identifier::new("metadata").unwrap(),
+            Identifier::new("new_metadata").unwrap(),
+            vec![],
+            args,
+        )
     }
 
     pub fn add_programmable_move_call(

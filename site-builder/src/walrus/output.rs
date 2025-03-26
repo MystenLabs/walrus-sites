@@ -218,15 +218,76 @@ pub struct BlobIdOutput {
     pub unencoded_length: u64,
 }
 
-/// The output of the `destroy` command.
-#[derive(Debug, Clone, Deserialize)]
 #[allow(unused)]
-#[allow(non_snake_case)]
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DestroyOutput {
-    /// The objectId deleted.
-    pub objectId: String,
-    /// The blobs deleted.
-    pub deletedBlobs: Vec<String>,
+    pub blob_identity: BlobIdentity,
+    pub deleted_blobs: Vec<Blob>,
+    pub post_deletion_status: Option<BlobStatus>,
+    pub no_blob_found: bool,
+    pub error: Option<String>,
+    pub aborted: bool,
+}
+
+/// Represents a blob.
+#[serde_as]
+#[derive(Debug, Clone, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct BlobIdentity {
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub blob_id: Option<BlobId>,
+    pub file: Option<PathBuf>,
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub object_id: Option<ObjectID>,
+}
+
+/// Contains the certification status of a blob.
+///
+/// If the a permanent blob exists, it also contains its end epoch and the ID of the Sui event
+/// from which the latest status (registered or certified) resulted.
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone, Copy, Default, Hash)]
+#[serde(rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub enum BlobStatus {
+    /// The blob does not exist (anymore) within Walrus.
+    #[default]
+    Nonexistent,
+    /// The blob ID has been marked as invalid.
+    Invalid {
+        /// The ID of the Sui event in which the blob was marked as invalid.
+        event: EventID,
+    },
+    /// The blob exists within Walrus in a permanent state.
+    Permanent {
+        /// The latest epoch at which the blob expires (non-inclusive).
+        end_epoch: Epoch,
+        /// Whether the blob is certified (true) or only registered (false).
+        is_certified: bool,
+        /// The ID of the Sui event that caused the status with the given `end_epoch`.
+        status_event: EventID,
+        /// Counts of deletable `Blob` objects.
+        deletable_counts: DeletableCounts,
+        /// If the blob is certified, contains the epoch where it was initially certified.
+        initial_certified_epoch: Option<Epoch>,
+    },
+    /// The blob exists within Walrus; but there is no related permanent object, so it may be
+    /// deleted at any time.
+    Deletable {
+        /// If the blob is certified, contains the epoch where it was initially certified.
+        // INV: certified_epoch.is_some() == count_deletable_certified > 0
+        initial_certified_epoch: Option<Epoch>,
+        /// Counts of deletable `Blob` objects.
+        deletable_counts: DeletableCounts,
+    },
+}
+
+/// Contains counts of all and certified deletable `Blob` objects.
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone, Copy, Default, Hash)]
+pub struct DeletableCounts {
+    /// Total number of active deletable `Blob` objects for the given blob ID.
+    pub count_deletable_total: u32,
+    /// Number of certified deletable `Blob` objects for the given blob ID.
+    pub count_deletable_certified: u32,
 }
 
 /// The number of shards, which can be deserialized from the output of the `info` command.

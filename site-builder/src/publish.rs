@@ -133,9 +133,10 @@ impl SiteEditor {
     }
 
     pub async fn destroy(&self, site_id: ObjectID) -> Result<()> {
-        // Delete blobs on Walrus
+        // Delete blobs on Walrus.
         let wallet_walrus = load_wallet_context(&self.config.general.wallet)?;
-        let all_dynamic_fields = RemoteSiteFactory::new(
+
+        let site = RemoteSiteFactory::new(
             // TODO(giac): make the backoff configurable.
             &RetriableSuiClient::new_from_wallet(
                 &wallet_walrus,
@@ -145,16 +146,19 @@ impl SiteEditor {
             self.config.package,
         )
         .await?
-        .get_existing_resources(site_id)
+        .get_from_chain(site_id)
         .await?;
 
-        tracing::debug!(
-            "Retrieved blobs and deleting them: {:?}",
-            &all_dynamic_fields,
-        );
+        let all_blobs = site
+            .resources()
+            .into_iter()
+            .map(|resource| (resource.info.blob_id))
+            .collect::<Vec<_>>();
 
-        // Add warning if no deletable blobs found
-        if all_dynamic_fields.is_empty() {
+        tracing::debug!(?all_blobs, "retrieved the site for deletion");
+
+        // Add warning if no deletable blobs found.
+        if all_blobs.is_empty() {
             println!("Warning: No deletable resources found. This may be because the site was created with permanent=true");
         } else {
             let mut site_manager = SiteManager::new(
@@ -164,10 +168,11 @@ impl SiteEditor {
                 WhenWalrusUpload::Always,
                 false,
                 false,
+                None,
             )
             .await?;
 
-            site_manager.delete_from_walrus(all_dynamic_fields).await?;
+            site_manager.delete_from_walrus(&all_blobs).await?;
         }
 
         // Delete objects on SUI blockchain
@@ -241,7 +246,7 @@ impl SiteEditor<EditOptions> {
 
         let mut resource_manager = ResourceManager::new(
             self.config.walrus_client(),
-            ws_resources,
+            ws_resources.clone(),
             ws_resources_path,
             self.edit_options.publish_options.max_concurrent,
         )
@@ -254,6 +259,11 @@ impl SiteEditor<EditOptions> {
         display::done();
         tracing::debug!(?local_site_data, "resources loaded from directory");
 
+        let site_metadata = match ws_resources {
+            Some(value) => value.metadata,
+            None => None,
+        };
+
         let mut site_manager = SiteManager::new(
             self.config.clone(),
             self.edit_options.site_id.clone(),
@@ -261,6 +271,7 @@ impl SiteEditor<EditOptions> {
             self.edit_options.when_upload.clone(),
             self.edit_options.publish_options.permanent,
             self.edit_options.publish_options.dry_run,
+            site_metadata,
         )
         .await?;
         let (response, summary) = site_manager.update_site(&local_site_data).await?;
@@ -340,8 +351,8 @@ fn print_summary(
     println!(
         r#"To browse the site, you have the following options:
         1. Run a local portal, and browse the site through it: e.g. http://{base36_id}.localhost:3000
-           (more info: https://docs.walrus.site/walrus-sites/portal.html#running-the-portal-locally)
-        2. Use a third-party portal (e.g. walrus.site), which will require a SuiNS name.
+           (more info: https://docs.wal.app/walrus-sites/portal.html#running-the-portal-locally)
+        2. Use a third-party portal (e.g. wal.app), which will require a SuiNS name.
            First, buy a SuiNS name at suins.io (e.g. example-domain), then point it to the site object ID.
            Finally, browse it with: https://example-domain.{portal}
            "#,

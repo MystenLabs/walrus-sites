@@ -42,7 +42,7 @@ body:
     attributes:
       label: Deviation steps
       description: If you have deviated from the
-        [setup instructions steps](https://docs.walrus.site/walrus-sites/tutorial-install.html)
+        [setup instructions steps](https://docs.wal.app/walrus-sites/tutorial-install.html)
         please describe how.
     validations:
       required: false
