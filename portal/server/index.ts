@@ -15,7 +15,6 @@ serve({
 	// Special Walrus Sites routes.
 	routes: {
 		"/__wal__/*": async (req: Request) => {
-			console.log("debug", req.url)
 			if (req.url.endsWith("/healthz")) {
 				return await blocklist_healthcheck()
 			}
