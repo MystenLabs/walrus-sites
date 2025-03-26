@@ -12,8 +12,9 @@ mod types;
 mod util;
 mod walrus;
 use std::{
+    collections::HashMap,
     num::{NonZeroU32, NonZeroUsize},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use anyhow::{anyhow, ensure, Result};
@@ -50,6 +51,12 @@ struct Args {
     /// The path to the configuration file for the site builder.
     #[clap(short, long)]
     config: Option<PathBuf>,
+    /// The context with which to load the configuration.
+    ///
+    /// If specified, the context will be taken from the config file. Otherwise, the default
+    /// context, which is also specified in the config file, will be used.
+    #[clap(long)]
+    context: Option<String>,
     #[clap(flatten)]
     general: GeneralArgs,
     #[command(subcommand)]
@@ -259,6 +266,13 @@ pub struct PublishOptions {
     dry_run: bool,
 }
 
+/// Configuration for the site builder, complete with separate context for networks.
+#[derive(Deserialize, Debug, Clone)]
+pub(crate) struct MultiConfig {
+    pub contexts: HashMap<String, Config>,
+    pub default_context: String,
+}
+
 /// The configuration for the site builder.
 #[derive(Deserialize, Debug, Clone)]
 pub(crate) struct Config {
@@ -270,6 +284,29 @@ pub(crate) struct Config {
 }
 
 impl Config {
+    pub fn load_multi_config(path: impl AsRef<Path>, context: Option<&str>) -> Result<Self> {
+        let mut multi_config =
+            serde_yaml::from_str::<MultiConfig>(&std::fs::read_to_string(path)?)?;
+
+        let context = context.unwrap_or_else(|| &multi_config.default_context);
+        tracing::info!(?context, "loading the configuration");
+
+        let config = multi_config
+            .contexts
+            .remove(context)
+            .ok_or_else(|| anyhow!("could not find the context: {}", context))?;
+
+        if context != multi_config.default_context {
+            display::warn(format!(
+                "using a non-default context ({}); the default context is: {}\n\
+                Please ensure that this matches your wallet and Walrus CLI context\n",
+                context, multi_config.default_context,
+            ));
+        }
+
+        Ok(config)
+    }
+
     /// Merges the other [`GeneralArgs`] (taken from the CLI) with the `general` in the struct.
     ///
     /// The values in `other_general` take precedence.
@@ -400,7 +437,7 @@ async fn run() -> Result<()> {
             consider using  the --config flag to specify the config"
         ))?;
     tracing::info!(?config_path, "loading sites configuration");
-    let mut config = serde_yaml::from_str::<Config>(&std::fs::read_to_string(config_path)?)?;
+    let mut config = Config::load_multi_config(config_path, args.context.as_deref())?;
 
     // Merge the configs and the CLI args. Serde default ensures that the `walrus_binary` and
     // `gas_budget` exist.
