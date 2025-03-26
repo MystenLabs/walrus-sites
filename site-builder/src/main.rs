@@ -289,7 +289,7 @@ impl Config {
             serde_yaml::from_str::<MultiConfig>(&std::fs::read_to_string(path)?)?;
 
         let context = context.unwrap_or_else(|| &multi_config.default_context);
-        tracing::info!(?context, "using context");
+        tracing::info!(?context, "loading the configuration");
 
         let config = multi_config
             .contexts
