@@ -92,7 +92,6 @@ pub(crate) struct GeneralArgs {
     /// The gas budget for the operations on Sui.
     ///
     /// Can be specified as a CLI argument or in the config.
-    #[arg(long)]
     #[arg(short, long)]
     #[serde(default = "default::gas_budget")]
     gas_budget: Option<u64>,
