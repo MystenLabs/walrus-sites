@@ -48,6 +48,31 @@ use crate::{
 
 const DEFAULT_WS_RESOURCES_FILE: &str = "ws-resources.json";
 
+#[derive(Parser, Debug, Clone)]
+pub struct PublishOptions {
+    /// The directory containing the site sources.
+    pub directory: PathBuf,
+    /// The path to the Walrus sites resources file.
+    ///
+    /// This JSON configuration file defined HTTP resource headers and other utilities for your
+    /// files. By default, the file is expected to be named `ws-resources.json` and located in the
+    /// root of the site directory.
+    ///
+    /// The configuration file _will not_ be uploaded to Walrus.
+    #[arg(long)]
+    ws_resources: Option<PathBuf>,
+    /// The number of epochs for which to save the resources on Walrus.
+    #[arg(long, default_value_t = 1)]
+    pub epochs: u64,
+    /// Preprocess the directory before publishing.
+    /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
+    #[arg(long)]
+    pub list_directory: bool,
+    /// The maximum number of concurrent calls to the Walrus CLI for the computation of blob IDs.
+    #[arg(long)]
+    max_concurrent: Option<NonZeroUsize>,
+}
+
 /// The continuous editing options.
 #[derive(Debug, Clone)]
 pub(crate) enum ContinuousEditing {
