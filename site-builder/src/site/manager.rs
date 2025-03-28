@@ -1,9 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::BTreeSet, str::FromStr, time::Duration};
+use std::{collections::BTreeSet, num::NonZeroUsize, str::FromStr, time::Duration};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Error, Result};
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{rpc_types::SuiTransactionBlockResponse, wallet_context::WalletContext};
 use sui_types::{
@@ -21,7 +21,9 @@ use super::{
     SITE_MODULE,
 };
 use crate::{
+    args::WalrusStoreOptions,
     backoff::ExponentialBackoffConfig,
+    config::ConfigWithContext,
     display,
     publish::WhenWalrusUpload,
     retry_client::RetriableSuiClient,
@@ -29,8 +31,6 @@ use crate::{
     types::Metadata,
     util::{get_site_id_from_response, sign_and_send_ptb},
     walrus::{types::BlobId, Walrus},
-    Config,
-    EpochCountOrMax,
 };
 
 const MAX_RESOURCES_PER_PTB: usize = 200;
@@ -47,40 +47,37 @@ pub enum SiteIdentifier {
 }
 
 pub struct SiteManager {
-    pub config: Config,
+    pub config: ConfigWithContext,
     pub walrus: Walrus,
     pub wallet: WalletContext,
     pub site_id: SiteIdentifier,
-    pub epochs: EpochCountOrMax,
     pub when_upload: WhenWalrusUpload,
     pub backoff_config: ExponentialBackoffConfig,
-    pub permanent: bool,
-    pub dry_run: bool,
     pub metadata: Option<Metadata>,
+    pub walrus_options: WalrusStoreOptions,
+    pub max_parallel_stores: NonZeroUsize,
 }
 
 impl SiteManager {
     /// Creates a new site manager.
     pub async fn new(
-        config: Config,
+        config: ConfigWithContext,
         site_id: SiteIdentifier,
-        epochs: EpochCountOrMax,
         when_upload: WhenWalrusUpload,
-        permanent: bool,
-        dry_run: bool,
+        walrus_options: WalrusStoreOptions,
         metadata: Option<Metadata>,
+        max_parallel_stores: NonZeroUsize,
     ) -> Result<Self> {
         Ok(SiteManager {
             walrus: config.walrus_client(),
-            wallet: config.wallet()?,
+            wallet: config.load_wallet()?,
             config,
             site_id,
-            epochs,
             when_upload,
             backoff_config: ExponentialBackoffConfig::default(),
-            permanent,
-            dry_run,
             metadata,
+            walrus_options,
+            max_parallel_stores,
         })
     }
 
@@ -99,8 +96,8 @@ impl SiteManager {
                 .walrus
                 .dry_run_store(
                     resource.full_path.clone(),
-                    self.epochs.clone(),
-                    !self.permanent,
+                    self.walrus_options.epochs.clone(),
+                    !self.walrus_options.permanent,
                     false,
                 )
                 .await?;
@@ -143,7 +140,7 @@ impl SiteManager {
         let walrus_updates = site_updates.get_walrus_updates(&self.when_upload);
 
         if !walrus_updates.is_empty() {
-            if self.dry_run {
+            if self.walrus_options.dry_run {
                 let total_storage_cost = self.dry_run_walrus_store(&walrus_updates).await?;
                 // Before doing the actual execution, perform a dry run
                 display::action(format!(
@@ -179,62 +176,64 @@ impl SiteManager {
 
     /// Publishes the resources to Walrus.
     async fn publish_to_walrus<'b>(&mut self, updates: &[&ResourceOp<'b>]) -> Result<()> {
-        let deletable = !self.permanent;
-
-        for update in updates.iter() {
-            let resource = update.inner();
-            tracing::debug!(
-                resource=?resource.full_path,
-                blob_id=%resource.info.blob_id,
-                unencoded_size=%resource.unencoded_size,
-                "storing new blob on Walrus"
-            );
+        for (idx, update_set) in updates.chunks(self.max_parallel_stores.get()).enumerate() {
             display::action(format!(
-                "Storing resource on Walrus: {}",
-                &resource.info.path
+                "Storing resources on Walrus: batch {} of {}",
+                idx + 1,
+                updates.len().div_ceil(self.max_parallel_stores.get()),
             ));
+            self.store_multiple_to_walrus_with_retry(update_set).await?;
+            display::done();
+        }
+        Ok(())
+    }
 
-            // Retry if the store operation fails with an os error.
-            // NOTE(giac): This can be improved when the rust sdk for the client is open sourced.
-            let mut retry_num = 0;
-            loop {
-                anyhow::ensure!(
-                    retry_num < MAX_RETRIES,
-                    "maximum number of retries exceeded"
-                );
-                tracing::debug!(retry_num, "attempting to store resource");
-                retry_num += 1;
-                let result = self
-                    .walrus
-                    .store(
-                        resource.full_path.clone(),
-                        self.epochs.clone(),
-                        false,
-                        deletable,
-                    )
-                    .await;
+    async fn store_multiple_to_walrus_with_retry<'b>(
+        &mut self,
+        update_batch: &[&ResourceOp<'b>],
+    ) -> Result<()> {
+        let deletable = !self.walrus_options.permanent;
+        let resource_paths = update_batch
+            .iter()
+            .map(|update| update.inner().full_path.clone())
+            .collect::<Vec<_>>();
 
-                match result {
-                    Ok(_) => {
-                        display::done();
-                        break;
-                    }
-                    Err(err) => {
-                        tracing::warn!(?err, "store operation failed");
-                        if !err.to_string().contains("os error 54") || retry_num >= MAX_RETRIES {
-                            return Err(err);
-                        } else if retry_num >= MAX_RETRIES {
-                            anyhow::bail!(
-                                "a network error occurred when calling the Walrus CLI, \
-                                and the maximum number of retries was exceeded"
-                            );
-                        } else {
-                            tracing::warn!(
-                                delay = ?OS_ERROR_DELAY,
-                                "calling the Walrus CLI encountered an OS network error, retrying"
-                            );
-                            tokio::time::sleep(OS_ERROR_DELAY).await;
-                        }
+        tracing::debug!(?resource_paths, "storing resource batch on Walrus",);
+
+        // Retry if the store operation fails with an os error.
+        // NOTE(giac): This can be improved when the rust sdk for the client is open sourced.
+        let mut retry_num = 0;
+        loop {
+            anyhow::ensure!(
+                retry_num < MAX_RETRIES,
+                "maximum number of retries exceeded"
+            );
+            tracing::debug!(retry_num, "attempting to store resource");
+            retry_num += 1;
+            let result = self
+                .walrus
+                .store(
+                    resource_paths.clone(),
+                    self.walrus_options.epochs.clone(),
+                    false,
+                    deletable,
+                )
+                .await;
+
+            match result {
+                Ok(_) => {
+                    break;
+                }
+                Err(error) => {
+                    if !is_retriable_error(&error) || retry_num >= MAX_RETRIES {
+                        return Err(error);
+                    } else {
+                        tracing::warn!(
+                            ?error,
+                            delay = ?OS_ERROR_DELAY,
+                            "calling the Walrus CLI encountered a retriable error, retrying"
+                        );
+                        tokio::time::sleep(OS_ERROR_DELAY).await;
                     }
                 }
             }
@@ -371,7 +370,7 @@ impl SiteManager {
             .collect::<Vec<_>>();
 
         //Perform dry run
-        if self.dry_run {
+        if self.walrus_options.dry_run {
             let total_storage_cost = self.dry_run_walrus_store(&walrus_ops).await?;
             // Before doing the actual execution, perform a dry run
             display::action(format!(
@@ -456,5 +455,18 @@ impl SiteManager {
     /// A new site needs to be transferred to the active address.
     fn needs_transfer(&self) -> bool {
         matches!(self.site_id, SiteIdentifier::NewSite(_))
+    }
+}
+
+fn is_retriable_error(error: &Error) -> bool {
+    let error_message = error.to_string();
+    if error_message.contains("os error 54") {
+        // The connection was reset by the peer -- a common RPC error under load.
+        true
+    } else if error_message.contains("response does not contain object data") {
+        // The RPC may be slow, and does not have the correct object version.
+        true
+    } else {
+        false
     }
 }

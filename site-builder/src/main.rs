@@ -1,7 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+mod args;
 mod backoff;
+mod config;
 mod display;
 mod preprocessor;
 mod publish;
@@ -11,89 +13,80 @@ mod summary;
 mod types;
 mod util;
 mod walrus;
-use std::{
-    collections::HashMap,
-    num::{NonZeroU32, NonZeroUsize},
-    path::{Path, PathBuf},
-};
+use std::{num::NonZeroUsize, path::PathBuf};
 
-use anyhow::{anyhow, ensure, Result};
+use anyhow::{anyhow, Result};
+use args::{Commands, GeneralArgs};
 use backoff::ExponentialBackoffConfig;
-use clap::{Parser, Subcommand};
+use clap::Parser;
+use config::Config;
 use futures::TryFutureExt;
 use publish::{ContinuousEditing, SiteEditor, WhenWalrusUpload};
 use retry_client::RetriableSuiClient;
-use serde::{Deserialize, Serialize};
 use site::{
     config::WSResources,
     manager::{SiteIdentifier, SiteManager},
     resource::ResourceManager,
     RemoteSiteFactory,
 };
-use sui_sdk::wallet_context::WalletContext;
-use sui_types::base_types::ObjectID;
 use util::path_or_defaults_if_exist;
-use walrus::{output::EpochCount, Walrus};
 
-use crate::{
-    preprocessor::Preprocessor,
-    util::{id_to_base36, load_wallet_context},
-};
+use crate::{preprocessor::Preprocessor, util::id_to_base36};
+
+/// The default path to the configuration file for the site builder.
+const SITES_CONFIG_NAME: &str = "./sites-config.yaml";
 
 // Define the `GIT_REVISION` and `VERSION` consts.
 bin_version::bin_version!();
 
-const SITES_CONFIG_NAME: &str = "./sites-config.yaml";
-
 #[derive(Parser, Debug)]
-#[clap(rename_all = "kebab-case", version = VERSION, propagate_version = true)]
+#[command(rename_all = "kebab-case", version = VERSION, propagate_version = true)]
 struct Args {
     /// The path to the configuration file for the site builder.
-    #[clap(short, long)]
+    #[arg(short, long)]
     config: Option<PathBuf>,
     /// The context with which to load the configuration.
     ///
     /// If specified, the context will be taken from the config file. Otherwise, the default
     /// context, which is also specified in the config file, will be used.
-    #[clap(long)]
+    #[arg(long)]
     context: Option<String>,
-    #[clap(flatten)]
+    #[command(flatten)]
     general: GeneralArgs,
     #[command(subcommand)]
     command: Commands,
 }
 
 #[derive(Parser, Clone, Debug, Deserialize)]
-#[clap(rename_all = "kebab-case")]
+#[command(rename_all = "kebab-case")]
 pub(crate) struct GeneralArgs {
     /// The URL or the RPC endpoint to connect the client to.
     ///
     /// Can be specified as a CLI argument or in the config.
-    #[clap(long)]
+    #[arg(long)]
     rpc_url: Option<String>,
     /// The path to the Sui Wallet config.
     ///
     /// Can be specified as a CLI argument or in the config.
-    #[clap(long)]
+    #[arg(long)]
     wallet: Option<PathBuf>,
     /// The path or name of the walrus binary.
     ///
     /// The Walrus binary will then be called with this configuration to perform actions on Walrus.
     /// Can be specified as a CLI argument or in the config.
-    #[clap(long)]
+    #[arg(long)]
     #[serde(default = "default::walrus_binary")]
     walrus_binary: Option<String>,
     /// The path to the configuration for the Walrus client.
     ///
     /// This will be passed to the calls to the Walrus binary.
     /// Can be specified as a CLI argument or in the config.
-    #[clap(long)]
+    #[arg(long)]
     walrus_config: Option<PathBuf>,
     /// The gas budget for the operations on Sui.
     ///
     /// Can be specified as a CLI argument or in the config.
-    #[clap(long)]
-    #[clap(short, long)]
+    #[arg(short, long)]
     #[serde(default = "default::gas_budget")]
     gas_budget: Option<u64>,
 }
@@ -144,29 +137,29 @@ impl GeneralArgs {
 }
 
 #[derive(Subcommand, Debug)]
-#[clap(rename_all = "kebab-case")]
+#[command(rename_all = "kebab-case")]
 enum Commands {
     /// Publish a new site on Sui.
     Publish {
-        #[clap(flatten)]
+        #[command(flatten)]
         publish_options: PublishOptions,
         /// The name of the site.
-        #[clap(short, long, default_value = "test site")]
+        #[arg(short, long, default_value = "test site")]
         site_name: String,
     },
     /// Update an existing site.
     Update {
-        #[clap(flatten)]
+        #[command(flatten)]
         publish_options: PublishOptions,
         /// The object ID of a partially published site to be completed.
         object_id: ObjectID,
-        #[clap(short, long, action)]
+        #[arg(short, long)]
         watch: bool,
         /// Publish all resources to Sui and Walrus, even if they may be already present.
         ///
         /// This can be useful in case the Walrus devnet is reset, but the resources are still
         /// available on Sui.
-        #[clap(long, action)]
+        #[arg(long)]
         force: bool,
     },
     /// Convert an object ID in hex format to the equivalent Base36 format.
@@ -431,11 +424,13 @@ async fn run() -> Result<()> {
     tracing::info!("initializing site builder");
 
     let args = Args::parse();
-    let config_path = path_or_defaults_if_exist(&args.config, &sites_config_default_paths())
-        .ok_or(anyhow!(
-            "could not find a valid sites configuration file; \
+    let config_path =
+        path_or_defaults_if_exist(args.config.as_deref(), &sites_config_default_paths()).ok_or(
+            anyhow!(
+                "could not find a valid sites configuration file; \
             consider using  the --config flag to specify the config"
-        ))?;
+            ),
+        )?;
     tracing::info!(?config_path, "loading sites configuration");
     let mut config = Config::load_multi_config(config_path, args.context.as_deref())?;
 
@@ -449,7 +444,7 @@ async fn run() -> Result<()> {
             publish_options,
             site_name,
         } => {
-            SiteEditor::new(config)
+            SiteEditor::new(args.context, config)
                 .with_edit_options(
                     publish_options,
                     SiteIdentifier::NewSite(site_name),
@@ -465,7 +460,7 @@ async fn run() -> Result<()> {
             watch,
             force,
         } => {
-            SiteEditor::new(config)
+            SiteEditor::new(args.context, config)
                 .with_edit_options(
                     publish_options,
                     SiteIdentifier::ExistingSite(object_id),
@@ -481,7 +476,7 @@ async fn run() -> Result<()> {
             let all_dynamic_fields = RemoteSiteFactory::new(
                 // TODO(giac): make the backoff configurable.
                 &RetriableSuiClient::new_from_wallet(
-                    &config.wallet()?,
+                    &config.load_wallet()?,
                     ExponentialBackoffConfig::default(),
                 )
                 .await?,
@@ -500,25 +495,28 @@ async fn run() -> Result<()> {
             Preprocessor::preprocess(path.as_path())?;
         }
         Commands::Destroy { object } => {
-            let site_editor = SiteEditor::new(config);
+            let site_editor = SiteEditor::new(args.context, config);
             site_editor.destroy(object).await?;
         }
         Commands::UpdateResource {
             resource,
             path,
             site_object,
-            ws_resources,
-            epochs,
-            permanent,
-            dry_run,
+            common,
         } => {
-            let ws_res = ws_resources
+            let ws_res = common
+                .ws_resources
                 .clone()
                 .as_ref()
                 .map(WSResources::read)
                 .transpose()?;
-            let resource_manager =
-                ResourceManager::new(config.walrus_client(), ws_res, ws_resources, None).await?;
+            let resource_manager = ResourceManager::new(
+                config.walrus_client(),
+                ws_res,
+                common.ws_resources.clone(),
+                None,
+            )
+            .await?;
             let resource = resource_manager
                 .read_resource(&resource, path)
                 .await?
@@ -530,11 +528,10 @@ async fn run() -> Result<()> {
             let mut site_manager = SiteManager::new(
                 config,
                 SiteIdentifier::ExistingSite(site_object),
-                epochs,
                 WhenWalrusUpload::Always,
-                permanent,
-                dry_run,
+                common,
                 None, // TODO: update the site metadata.
+                NonZeroUsize::new(1).expect("non-zero"),
             )
             .await?;
             site_manager.update_single_resource(resource).await?;

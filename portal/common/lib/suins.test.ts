@@ -29,18 +29,6 @@ describe('resolveSuiNsAddress', () => {
                 contentHash: "dummyContentHash",
                 walrusSiteId: "0x57414C525553"
             }],
-            // Deprecated case where the walrusSiteId is not set, but the targetAddress is used
-            //  instead:
-            ["docs", {
-              name: 'docs.sui',
-              nftId: '0xcc8ee266bc1f07b3218696912c7e5244aeb0e32c8c9befec059e3527558e4063',
-              targetAddress: '0x57414C525553',
-              expirationTimestampMs: '1749826519160',
-              data: {},
-              avatar: undefined,
-              contentHash: undefined,
-              walrusSiteId: undefined
-            }]
         ];
 
         for (const [input, expected] of cases) {

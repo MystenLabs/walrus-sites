@@ -3,6 +3,7 @@
 
 use std::{
     collections::BTreeSet,
+    num::NonZeroUsize,
     path::{Path, PathBuf},
     sync::mpsc::channel,
 };
@@ -20,30 +21,25 @@ use sui_types::{
 };
 
 use crate::{
+    args::{PublishOptions, WalrusStoreOptions},
     backoff::ExponentialBackoffConfig,
+    config::ConfigWithContext,
     display,
     preprocessor::Preprocessor,
     retry_client::RetriableSuiClient,
     site::{
         builder::SitePtb,
         config::WSResources,
-        manager::{SiteIdentifier, SiteIdentifier::ExistingSite, SiteManager},
+        manager::{
+            SiteIdentifier::{self, ExistingSite},
+            SiteManager,
+        },
         resource::ResourceManager,
         RemoteSiteFactory,
         SITE_MODULE,
     },
     summary::{SiteDataDiffSummary, Summarizable},
-    util::{
-        get_site_id_from_response,
-        id_to_base36,
-        load_wallet_context,
-        path_or_defaults_if_exist,
-        sign_and_send_ptb,
-    },
-    Config,
-    EpochCountOrMax,
-    NonZeroU32,
-    PublishOptions,
+    util::{get_site_id_from_response, id_to_base36, path_or_defaults_if_exist, sign_and_send_ptb},
 };
 
 const DEFAULT_WS_RESOURCES_FILE: &str = "ws-resources.json";
@@ -102,13 +98,15 @@ pub(crate) struct EditOptions {
 }
 
 pub(crate) struct SiteEditor<E = ()> {
-    config: Config,
+    context: Option<String>,
+    config: ConfigWithContext,
     edit_options: E,
 }
 
 impl SiteEditor {
-    pub fn new(config: Config) -> Self {
+    pub fn new(context: Option<String>, config: ConfigWithContext) -> Self {
         SiteEditor {
+            context,
             config,
             edit_options: (),
         }
@@ -122,6 +120,7 @@ impl SiteEditor {
         when_upload: WhenWalrusUpload,
     ) -> SiteEditor<EditOptions> {
         SiteEditor {
+            context: self.context,
             config: self.config,
             edit_options: EditOptions {
                 publish_options,
@@ -134,7 +133,7 @@ impl SiteEditor {
 
     pub async fn destroy(&self, site_id: ObjectID) -> Result<()> {
         // Delete blobs on Walrus.
-        let wallet_walrus = load_wallet_context(&self.config.general.wallet)?;
+        let wallet_walrus = self.config.load_wallet()?;
 
         let site = RemoteSiteFactory::new(
             // TODO(giac): make the backoff configurable.
@@ -161,14 +160,14 @@ impl SiteEditor {
         if all_blobs.is_empty() {
             println!("Warning: No deletable resources found. This may be because the site was created with permanent=true");
         } else {
+            // TODO: Change the site manager not to the unnecessary info.
             let mut site_manager = SiteManager::new(
                 self.config.clone(),
                 ExistingSite(site_id),
-                EpochCountOrMax::Epochs(NonZeroU32::new(1).unwrap()),
                 WhenWalrusUpload::Always,
-                false,
-                false,
+                WalrusStoreOptions::default(),
                 None,
+                NonZeroUsize::new(1).expect("non-zero"),
             )
             .await?;
 
@@ -176,7 +175,7 @@ impl SiteEditor {
         }
 
         // Delete objects on SUI blockchain
-        let mut wallet = self.config.wallet()?;
+        let mut wallet = self.config.load_wallet()?;
         let ptb = SitePtb::new(self.config.package, Identifier::new(SITE_MODULE)?)?;
         let mut ptb = ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
         let site = RemoteSiteFactory::new(
@@ -234,7 +233,11 @@ impl SiteEditor<EditOptions> {
         }
 
         let (ws_resources, ws_resources_path) = load_ws_resources(
-            &self.edit_options.publish_options.ws_resources,
+            self.edit_options
+                .publish_options
+                .walrus_options
+                .ws_resources
+                .as_deref(),
             self.directory(),
         )?;
         if let Some(path) = ws_resources_path.as_ref() {
@@ -267,11 +270,10 @@ impl SiteEditor<EditOptions> {
         let mut site_manager = SiteManager::new(
             self.config.clone(),
             self.edit_options.site_id.clone(),
-            self.edit_options.publish_options.epochs.clone(),
             self.edit_options.when_upload.clone(),
-            self.edit_options.publish_options.permanent,
-            self.edit_options.publish_options.dry_run,
+            self.edit_options.publish_options.walrus_options.clone(),
             site_metadata,
+            self.edit_options.publish_options.max_parallel_stores,
         )
         .await?;
         let (response, summary) = site_manager.update_site(&local_site_data).await?;
@@ -313,7 +315,7 @@ impl SiteEditor<EditOptions> {
 }
 
 fn print_summary(
-    config: &Config,
+    config: &ConfigWithContext,
     address: &SuiAddress,
     site_id: &SiteIdentifier,
     response: &SuiTransactionBlockResponse,
@@ -364,7 +366,7 @@ fn print_summary(
 
 /// Gets the configuration from the provided file, or looks in the default directory.
 pub(crate) fn load_ws_resources(
-    path: &Option<PathBuf>,
+    path: Option<&Path>,
     site_dir: &Path,
 ) -> Result<(Option<WSResources>, Option<PathBuf>)> {
     let default_paths = vec![site_dir.join(DEFAULT_WS_RESOURCES_FILE)];

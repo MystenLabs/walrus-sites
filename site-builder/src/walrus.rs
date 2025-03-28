@@ -19,8 +19,8 @@ use tokio::process::Command as CliCommand;
 
 use self::types::BlobId;
 use crate::{
+    args::EpochCountOrMax,
     walrus::{command::WalrusCmdBuilder, output::DestroyOutput},
-    EpochCountOrMax,
 };
 pub mod command;
 pub mod output;
@@ -37,6 +37,8 @@ pub struct Walrus {
     rpc_url: Option<String>,
     /// The path to the Walrus cli Config.
     config: Option<PathBuf>,
+    /// The context to use for the Walrus CLI.
+    context: Option<String>,
     /// The path to the Sui Wallet config.
     wallet: Option<PathBuf>,
 }
@@ -68,6 +70,7 @@ impl Walrus {
         gas_budget: u64,
         rpc_url: Option<String>,
         config: Option<PathBuf>,
+        context: Option<String>,
         wallet: Option<PathBuf>,
     ) -> Self {
         Self {
@@ -75,6 +78,7 @@ impl Walrus {
             gas_budget,
             rpc_url,
             config,
+            context,
             wallet,
         }
     }
@@ -84,12 +88,12 @@ impl Walrus {
     // time. The issue is that the inner wallet may lock coins if called in parallel.
     pub async fn store(
         &mut self,
-        file: PathBuf,
+        files: Vec<PathBuf>,
         epochs: EpochCountOrMax,
         force: bool,
         deletable: bool,
     ) -> Result<StoreOutput> {
-        create_command!(self, store, vec![file], epochs, force, deletable, false)
+        create_command!(self, store, files, epochs, force, deletable, false)
     }
 
     /// Issues a `delete` JSON command to the Walrus CLI, returning the parsed output.
@@ -114,7 +118,6 @@ impl Walrus {
         create_command!(self, read, blob_id, out, self.rpc_arg())
     }
 
-    // TODO(giac): maybe preconfigure the `n_shards` to avid repeating `None`.
     /// Issues a `blob_id` JSON command to the Walrus CLI, returning the parsed output.
     pub async fn blob_id(
         &self,
@@ -138,7 +141,12 @@ impl Walrus {
     }
 
     fn builder(&self) -> WalrusCmdBuilder {
-        WalrusCmdBuilder::new(self.config.clone(), self.wallet.clone(), self.gas_budget)
+        WalrusCmdBuilder::new(
+            self.config.clone(),
+            self.context.clone(),
+            self.wallet.clone(),
+            self.gas_budget,
+        )
     }
 
     fn rpc_arg(&self) -> RpcArg {
