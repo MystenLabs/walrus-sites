@@ -118,7 +118,6 @@ impl Walrus {
         create_command!(self, read, blob_id, out, self.rpc_arg())
     }
 
-    // TODO(giac): maybe preconfigure the `n_shards` to avid repeating `None`.
     /// Issues a `blob_id` JSON command to the Walrus CLI, returning the parsed output.
     pub async fn blob_id(
         &self,
