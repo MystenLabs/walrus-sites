@@ -88,12 +88,12 @@ impl Walrus {
     // time. The issue is that the inner wallet may lock coins if called in parallel.
     pub async fn store(
         &mut self,
-        file: PathBuf,
+        files: Vec<PathBuf>,
         epochs: EpochCountOrMax,
         force: bool,
         deletable: bool,
     ) -> Result<StoreOutput> {
-        create_command!(self, store, vec![file], epochs, force, deletable, false)
+        create_command!(self, store, files, epochs, force, deletable, false)
     }
 
     /// Issues a `delete` JSON command to the Walrus CLI, returning the parsed output.

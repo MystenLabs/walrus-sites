@@ -3,6 +3,7 @@
 
 use std::{
     collections::BTreeSet,
+    num::NonZeroUsize,
     path::{Path, PathBuf},
     sync::mpsc::channel,
 };
@@ -20,7 +21,7 @@ use sui_types::{
 };
 
 use crate::{
-    args::{EpochCountOrMax, PublishOptions},
+    args::{PublishOptions, WalrusStoreOptions},
     backoff::ExponentialBackoffConfig,
     config::ConfigWithContext,
     display,
@@ -39,7 +40,6 @@ use crate::{
     },
     summary::{SiteDataDiffSummary, Summarizable},
     util::{get_site_id_from_response, id_to_base36, path_or_defaults_if_exist, sign_and_send_ptb},
-    NonZeroU32,
 };
 
 const DEFAULT_WS_RESOURCES_FILE: &str = "ws-resources.json";
@@ -160,14 +160,14 @@ impl SiteEditor {
         if all_blobs.is_empty() {
             println!("Warning: No deletable resources found. This may be because the site was created with permanent=true");
         } else {
+            // TODO: Change the site manager not to the unnecessary info.
             let mut site_manager = SiteManager::new(
                 self.config.clone(),
                 ExistingSite(site_id),
-                EpochCountOrMax::Epochs(NonZeroU32::new(1).unwrap()),
                 WhenWalrusUpload::Always,
-                false,
-                false,
+                WalrusStoreOptions::default(),
                 None,
+                NonZeroUsize::new(1).expect("non-zero"),
             )
             .await?;
 
@@ -270,15 +270,10 @@ impl SiteEditor<EditOptions> {
         let mut site_manager = SiteManager::new(
             self.config.clone(),
             self.edit_options.site_id.clone(),
-            self.edit_options
-                .publish_options
-                .walrus_options
-                .epochs
-                .clone(),
             self.edit_options.when_upload.clone(),
-            self.edit_options.publish_options.walrus_options.permanent,
-            self.edit_options.publish_options.walrus_options.dry_run,
+            self.edit_options.publish_options.walrus_options.clone(),
             site_metadata,
+            self.edit_options.publish_options.max_parallel_stores,
         )
         .await?;
         let (response, summary) = site_manager.update_site(&local_site_data).await?;

@@ -13,7 +13,7 @@ mod summary;
 mod types;
 mod util;
 mod walrus;
-use std::{num::NonZeroU32, path::PathBuf};
+use std::{num::NonZeroUsize, path::PathBuf};
 
 use anyhow::{anyhow, Result};
 use args::{Commands, GeneralArgs};
@@ -169,9 +169,13 @@ async fn run() -> Result<()> {
                 .as_ref()
                 .map(WSResources::read)
                 .transpose()?;
-            let resource_manager =
-                ResourceManager::new(config.walrus_client(), ws_res, common.ws_resources, None)
-                    .await?;
+            let resource_manager = ResourceManager::new(
+                config.walrus_client(),
+                ws_res,
+                common.ws_resources.clone(),
+                None,
+            )
+            .await?;
             let resource = resource_manager
                 .read_resource(&resource, path)
                 .await?
@@ -183,11 +187,10 @@ async fn run() -> Result<()> {
             let mut site_manager = SiteManager::new(
                 config,
                 SiteIdentifier::ExistingSite(site_object),
-                common.epochs,
                 WhenWalrusUpload::Always,
-                common.permanent,
-                common.dry_run,
+                common,
                 None, // TODO: update the site metadata.
+                NonZeroUsize::new(1).expect("non-zero"),
             )
             .await?;
             site_manager.update_single_resource(resource).await?;

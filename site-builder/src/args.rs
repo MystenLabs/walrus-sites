@@ -190,12 +190,17 @@ pub(crate) struct PublishOptions {
     /// The maximum number of concurrent calls to the Walrus CLI for the computation of blob IDs.
     #[clap(long)]
     pub(crate) max_concurrent: Option<NonZeroUsize>,
+    /// The maximum number of blobs that can be stored concurrently.
+    ///
+    /// More blobs can be stored concurrently, but this will increase memory usage.
+    #[clap(long, default_value_t = default::max_parallel_stores())]
+    pub(crate) max_parallel_stores: NonZeroUsize,
     /// Common configurations.
     #[clap(flatten)]
     pub(crate) walrus_options: WalrusStoreOptions,
 }
 
-#[derive(Parser, Debug, Clone)]
+#[derive(Parser, Debug, Clone, Default)]
 /// Common configurations across publish, update, and update-resource commands.
 pub(crate) struct WalrusStoreOptions {
     /// The path to the Walrus sites resources file.
@@ -240,6 +245,12 @@ pub(crate) enum EpochCountOrMax {
     Epochs(NonZeroU32),
 }
 
+impl Default for EpochCountOrMax {
+    fn default() -> Self {
+        Self::Epochs(NonZeroU32::new(1).unwrap())
+    }
+}
+
 impl EpochCountOrMax {
     fn parse_epoch_count(input: &str) -> Result<Self> {
         if input == "max" {
@@ -275,10 +286,15 @@ impl EpochCountOrMax {
 }
 
 mod default {
+    use std::num::NonZeroUsize;
+
     pub(crate) fn walrus_binary() -> Option<String> {
         Some("walrus".to_owned())
     }
     pub(crate) fn gas_budget() -> Option<u64> {
         Some(500_000_000)
+    }
+    pub(crate) fn max_parallel_stores() -> NonZeroUsize {
+        NonZeroUsize::new(50).unwrap()
     }
 }
