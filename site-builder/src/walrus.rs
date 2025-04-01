@@ -19,8 +19,8 @@ use tokio::process::Command as CliCommand;
 
 use self::types::BlobId;
 use crate::{
+    args::EpochCountOrMax,
     walrus::{command::WalrusCmdBuilder, output::DestroyOutput},
-    EpochCountOrMax,
 };
 pub mod command;
 pub mod output;
@@ -37,6 +37,8 @@ pub struct Walrus {
     rpc_url: Option<String>,
     /// The path to the Walrus cli Config.
     config: Option<PathBuf>,
+    /// The context to use for the Walrus CLI.
+    context: Option<String>,
     /// The path to the Sui Wallet config.
     wallet: Option<PathBuf>,
 }
@@ -68,6 +70,7 @@ impl Walrus {
         gas_budget: u64,
         rpc_url: Option<String>,
         config: Option<PathBuf>,
+        context: Option<String>,
         wallet: Option<PathBuf>,
     ) -> Self {
         Self {
@@ -75,6 +78,7 @@ impl Walrus {
             gas_budget,
             rpc_url,
             config,
+            context,
             wallet,
         }
     }
@@ -138,7 +142,12 @@ impl Walrus {
     }
 
     fn builder(&self) -> WalrusCmdBuilder {
-        WalrusCmdBuilder::new(self.config.clone(), self.wallet.clone(), self.gas_budget)
+        WalrusCmdBuilder::new(
+            self.config.clone(),
+            self.context.clone(),
+            self.wallet.clone(),
+            self.gas_budget,
+        )
     }
 
     fn rpc_arg(&self) -> RpcArg {

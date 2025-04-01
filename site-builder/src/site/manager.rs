@@ -21,7 +21,9 @@ use super::{
     SITE_MODULE,
 };
 use crate::{
+    args::EpochCountOrMax,
     backoff::ExponentialBackoffConfig,
+    config::ConfigWithContext,
     display,
     publish::WhenWalrusUpload,
     retry_client::RetriableSuiClient,
@@ -29,8 +31,6 @@ use crate::{
     types::Metadata,
     util::{get_site_id_from_response, sign_and_send_ptb},
     walrus::{types::BlobId, Walrus},
-    Config,
-    EpochCountOrMax,
 };
 
 const MAX_RESOURCES_PER_PTB: usize = 200;
@@ -47,7 +47,7 @@ pub enum SiteIdentifier {
 }
 
 pub struct SiteManager {
-    pub config: Config,
+    pub config: ConfigWithContext,
     pub walrus: Walrus,
     pub wallet: WalletContext,
     pub site_id: SiteIdentifier,
@@ -62,7 +62,7 @@ pub struct SiteManager {
 impl SiteManager {
     /// Creates a new site manager.
     pub async fn new(
-        config: Config,
+        config: ConfigWithContext,
         site_id: SiteIdentifier,
         epochs: EpochCountOrMax,
         when_upload: WhenWalrusUpload,
@@ -72,7 +72,7 @@ impl SiteManager {
     ) -> Result<Self> {
         Ok(SiteManager {
             walrus: config.walrus_client(),
-            wallet: config.wallet()?,
+            wallet: config.load_wallet()?,
             config,
             site_id,
             epochs,
