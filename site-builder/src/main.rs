@@ -161,18 +161,17 @@ async fn run() -> Result<()> {
             resource,
             path,
             site_object,
-            ws_resources,
-            epochs,
-            permanent,
-            dry_run,
+            common,
         } => {
-            let ws_res = ws_resources
+            let ws_res = common
+                .ws_resources
                 .clone()
                 .as_ref()
                 .map(WSResources::read)
                 .transpose()?;
             let resource_manager =
-                ResourceManager::new(config.walrus_client(), ws_res, ws_resources, None).await?;
+                ResourceManager::new(config.walrus_client(), ws_res, common.ws_resources, None)
+                    .await?;
             let resource = resource_manager
                 .read_resource(&resource, path)
                 .await?
@@ -184,10 +183,10 @@ async fn run() -> Result<()> {
             let mut site_manager = SiteManager::new(
                 config,
                 SiteIdentifier::ExistingSite(site_object),
-                epochs,
+                common.epochs,
                 WhenWalrusUpload::Always,
-                permanent,
-                dry_run,
+                common.permanent,
+                common.dry_run,
                 None, // TODO: update the site metadata.
             )
             .await?;

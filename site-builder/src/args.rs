@@ -173,30 +173,9 @@ pub(crate) enum Commands {
         /// The object ID of the Site object on Sui, to which the resource will be added.
         #[clap(long)]
         site_object: ObjectID,
-        /// The path to the Walrus sites resources file.
-        ///
-        /// This JSON configuration file defined HTTP resource headers and other utilities for your
-        /// files. By default, the file is expected to be named `ws-resources.json` and located in the
-        /// root of the site directory.
-        ///
-        /// The configuration file _will not_ be uploaded to Walrus.
-        #[clap(long)]
-        // TODO: deduplicate with the `publish_options` in the `Publish` and `Update` commands.
-        ws_resources: Option<PathBuf>,
-        /// The number of epochs for which to save the resources on Walrus.
-        ///
-        /// If set to `max`, the resources are stored for the maximum number of epochs allowed on
-        /// Walrus. Otherwise, the resources are stored for the specified number of epochs. The
-        /// number of epochs must be greater than 0.
-        #[clap(long, value_parser = EpochCountOrMax::parse_epoch_count)]
-        epochs: EpochCountOrMax,
-        /// By default, sites are deletable with site-builder delete command. By passing --permanent, the site is deleted only after `epochs` expiration.
-        /// Make resources permanent (non-deletable)
-        #[clap(long, action = clap::ArgAction::SetTrue)]
-        permanent: bool,
-        /// Perform a dry run (you'll be asked for confirmation before committing changes).
-        #[clap(long)]
-        dry_run: bool,
+        /// Common configurations.
+        #[clap(flatten)]
+        common: WalrusStoreOptions,
     },
 }
 
@@ -204,6 +183,21 @@ pub(crate) enum Commands {
 pub(crate) struct PublishOptions {
     /// The directory containing the site sources.
     pub(crate) directory: PathBuf,
+    /// Preprocess the directory before publishing.
+    /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
+    #[clap(long, action)]
+    pub(crate) list_directory: bool,
+    /// The maximum number of concurrent calls to the Walrus CLI for the computation of blob IDs.
+    #[clap(long)]
+    pub(crate) max_concurrent: Option<NonZeroUsize>,
+    /// Common configurations.
+    #[clap(flatten)]
+    pub(crate) walrus_options: WalrusStoreOptions,
+}
+
+#[derive(Parser, Debug, Clone)]
+/// Common configurations across publish, update, and update-resource commands.
+pub(crate) struct WalrusStoreOptions {
     /// The path to the Walrus sites resources file.
     ///
     /// This JSON configuration file defined HTTP resource headers and other utilities for your
@@ -220,15 +214,11 @@ pub(crate) struct PublishOptions {
     /// number of epochs must be greater than 0.
     #[clap(long, value_parser = EpochCountOrMax::parse_epoch_count)]
     pub(crate) epochs: EpochCountOrMax,
-    /// Preprocess the directory before publishing.
-    /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
-    #[clap(long, action)]
-    pub(crate) list_directory: bool,
-    /// The maximum number of concurrent calls to the Walrus CLI for the computation of blob IDs.
-    #[clap(long)]
-    pub(crate) max_concurrent: Option<NonZeroUsize>,
-    /// By default, sites are deletable with site-builder delete command. By passing --permanent, the site is deleted only after `epochs` expiration.
-    /// Make resources permanent (non-deletable)
+    /// Make the stored resources permanent.
+    ///
+    /// By default, sites are deletable with site-builder delete command. By passing --permanent,
+    /// the site is deleted only after `epochs` expiration. Make resources permanent
+    /// (non-deletable)
     #[clap(long, action = clap::ArgAction::SetTrue)]
     pub(crate) permanent: bool,
     /// Perform a dry run (you'll be asked for confirmation before committing changes).

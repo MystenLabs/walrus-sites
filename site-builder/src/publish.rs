@@ -233,7 +233,11 @@ impl SiteEditor<EditOptions> {
         }
 
         let (ws_resources, ws_resources_path) = load_ws_resources(
-            self.edit_options.publish_options.ws_resources.as_deref(),
+            self.edit_options
+                .publish_options
+                .walrus_options
+                .ws_resources
+                .as_deref(),
             self.directory(),
         )?;
         if let Some(path) = ws_resources_path.as_ref() {
@@ -266,10 +270,14 @@ impl SiteEditor<EditOptions> {
         let mut site_manager = SiteManager::new(
             self.config.clone(),
             self.edit_options.site_id.clone(),
-            self.edit_options.publish_options.epochs.clone(),
+            self.edit_options
+                .publish_options
+                .walrus_options
+                .epochs
+                .clone(),
             self.edit_options.when_upload.clone(),
-            self.edit_options.publish_options.permanent,
-            self.edit_options.publish_options.dry_run,
+            self.edit_options.publish_options.walrus_options.permanent,
+            self.edit_options.publish_options.walrus_options.dry_run,
             site_metadata,
         )
         .await?;
