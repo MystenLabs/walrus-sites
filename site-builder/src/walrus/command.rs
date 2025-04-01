@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
 use super::types::BlobId;
-use crate::EpochCountOrMax;
+use crate::args::EpochCountOrMax;
 
 /// Represents a call to the JSON mode of the Walrus CLI.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -20,6 +20,9 @@ pub struct WalrusJsonCmd {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub config: Option<PathBuf>,
+    /// The configuration context to use for the client, if omitted the default_context is used.
+    #[serde(default)]
+    pub context: Option<String>,
     /// The path for the wallet to use with Walrus.
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -145,6 +148,7 @@ mod default {
 #[derive(Debug, Clone)]
 pub struct WalrusCmdBuilder<T = ()> {
     config: Option<PathBuf>,
+    context: Option<String>,
     wallet: Option<PathBuf>,
     gas_budget: u64,
     command: T,
@@ -152,9 +156,15 @@ pub struct WalrusCmdBuilder<T = ()> {
 
 impl WalrusCmdBuilder {
     /// Creates a new builder.
-    pub fn new(config: Option<PathBuf>, wallet: Option<PathBuf>, gas_budget: u64) -> Self {
+    pub fn new(
+        config: Option<PathBuf>,
+        context: Option<String>,
+        wallet: Option<PathBuf>,
+        gas_budget: u64,
+    ) -> Self {
         Self {
             config,
+            context,
             wallet,
             gas_budget,
             command: (),
@@ -165,12 +175,14 @@ impl WalrusCmdBuilder {
     pub fn with_command(self, command: Command) -> WalrusCmdBuilder<Command> {
         let Self {
             config,
+            context,
             wallet,
             gas_budget,
             ..
         } = self;
         WalrusCmdBuilder {
             config,
+            context,
             wallet,
             gas_budget,
             command,
@@ -255,12 +267,14 @@ impl WalrusCmdBuilder<Command> {
     pub fn build(self) -> WalrusJsonCmd {
         let WalrusCmdBuilder {
             config,
+            context,
             wallet,
             gas_budget,
             command,
         } = self;
         WalrusJsonCmd {
             config,
+            context,
             wallet,
             gas_budget,
             command,
