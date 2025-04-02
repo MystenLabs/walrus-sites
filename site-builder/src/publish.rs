@@ -134,14 +134,15 @@ impl SiteEditor {
     pub async fn destroy(&self, site_id: ObjectID) -> Result<()> {
         // Delete blobs on Walrus.
         let wallet_walrus = self.config.load_wallet()?;
+        let retriable_client = RetriableSuiClient::new_from_wallet(
+            &wallet_walrus,
+            ExponentialBackoffConfig::default(),
+        )
+        .await?;
 
         let site = RemoteSiteFactory::new(
             // TODO(giac): make the backoff configurable.
-            &RetriableSuiClient::new_from_wallet(
-                &wallet_walrus,
-                ExponentialBackoffConfig::default(),
-            )
-            .await?,
+            &retriable_client,
             self.config.package,
         )
         .await?
@@ -178,14 +179,10 @@ impl SiteEditor {
         let mut wallet = self.config.load_wallet()?;
         let ptb = SitePtb::new(self.config.package, Identifier::new(SITE_MODULE)?)?;
         let mut ptb = ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
-        let site = RemoteSiteFactory::new(
-            &RetriableSuiClient::new_from_wallet(&wallet, ExponentialBackoffConfig::default())
-                .await?,
-            self.config.package,
-        )
-        .await?
-        .get_from_chain(site_id)
-        .await?;
+        let site = RemoteSiteFactory::new(&retriable_client, self.config.package)
+            .await?
+            .get_from_chain(site_id)
+            .await?;
 
         ptb.destroy(site.resources())?;
         let active_address = wallet.active_address()?;
@@ -198,6 +195,7 @@ impl SiteEditor {
         sign_and_send_ptb(
             active_address,
             &wallet,
+            &retriable_client,
             ptb.finish(),
             gas_coin,
             self.config.gas_budget(),
