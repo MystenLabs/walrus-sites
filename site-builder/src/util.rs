@@ -28,6 +28,7 @@ use crate::{retry_client::RetriableSuiClient, site::contracts::TypeOriginMap};
 pub async fn sign_and_send_ptb(
     active_address: SuiAddress,
     wallet: &WalletContext,
+    retry_client: &RetriableSuiClient,
     programmable_transaction: ProgrammableTransaction,
     gas_coin: ObjectRef,
     gas_budget: u64,
@@ -41,7 +42,7 @@ pub async fn sign_and_send_ptb(
         gas_price,
     );
     let transaction = wallet.sign_transaction(&transaction);
-    wallet.execute_transaction_may_fail(transaction).await
+    retry_client.execute_transaction(transaction).await
 }
 
 pub async fn handle_pagination<F, T, C, Fut>(

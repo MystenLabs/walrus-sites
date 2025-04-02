@@ -119,9 +119,10 @@ impl SiteManager {
         local_site_data: &SiteData,
     ) -> Result<(SuiTransactionBlockResponse, SiteDataDiffSummary)> {
         tracing::debug!(?self.site_id, "creating or updating site");
+        let retriable_client = self.sui_client().await?;
         let existing_site = match &self.site_id {
             SiteIdentifier::ExistingSite(site_id) => {
-                RemoteSiteFactory::new(&self.sui_client().await?, self.config.package)
+                RemoteSiteFactory::new(&retriable_client, self.config.package)
                     .await?
                     .get_from_chain(*site_id)
                     .await?
@@ -307,8 +308,9 @@ impl SiteManager {
             ptb.transfer_site(self.active_address()?);
         }
 
+        let retry_client = self.sui_client().await?;
         let result = self
-            .sign_and_send_ptb(ptb.finish(), self.gas_coin_ref().await?)
+            .sign_and_send_ptb(ptb.finish(), self.gas_coin_ref().await?, &retry_client)
             .await?;
 
         let site_object_id = match &self.site_id {
@@ -337,7 +339,7 @@ impl SiteManager {
             ptb.add_resource_operations(&updates.resource_ops[start..end])?;
 
             let _result = self
-                .sign_and_send_ptb(ptb.finish(), self.gas_coin_ref().await?)
+                .sign_and_send_ptb(ptb.finish(), self.gas_coin_ref().await?, &retry_client)
                 .await?;
         }
 
@@ -393,8 +395,12 @@ impl SiteManager {
         // Create the PTB
         tracing::debug!("modifying the site object on chain");
         ptb.add_resource_operations(&operations)?;
-        self.sign_and_send_ptb(ptb.finish(), self.gas_coin_ref().await?)
-            .await?;
+        self.sign_and_send_ptb(
+            ptb.finish(),
+            self.gas_coin_ref().await?,
+            &self.sui_client().await?,
+        )
+        .await?;
         Ok(())
     }
 
@@ -402,10 +408,12 @@ impl SiteManager {
         &self,
         programmable_transaction: ProgrammableTransaction,
         gas_coin: ObjectRef,
+        retry_client: &RetriableSuiClient,
     ) -> Result<SuiTransactionBlockResponse> {
         sign_and_send_ptb(
             self.active_address()?,
             &self.wallet,
+            retry_client,
             programmable_transaction,
             gas_coin,
             self.config.gas_budget(),
