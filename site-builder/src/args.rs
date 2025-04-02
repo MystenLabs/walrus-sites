@@ -120,9 +120,6 @@ pub(crate) enum Commands {
     Publish {
         #[clap(flatten)]
         publish_options: PublishOptions,
-        /// The name of the site.
-        #[clap(short, long, default_value = "test site")]
-        site_name: String,
     },
     /// Update an existing site.
     Update {

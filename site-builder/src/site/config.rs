@@ -21,12 +21,16 @@ pub struct WSResources {
     /// The attributes used inside the Display object.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Metadata>,
+    /// The name of the site.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
 }
 
 impl WSResources {
     /// Reads and parses the `ws-resources.json` file into a `WSResources` struct.
     pub fn read<P: AsRef<Path>>(path: P) -> Result<WSResources> {
         // Load the JSON contents to a string.
+        tracing::info!("Reading Walrus site resources: {}", path.as_ref().display());
         let file_contents =
             std::fs::read_to_string(path).context("Failed to read ws_config.json")?;
         // Read the JSON contents of the file as an instance of `WSResources`.

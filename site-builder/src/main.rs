@@ -99,10 +99,22 @@ async fn run() -> Result<()> {
     tracing::info!(?config, "configuration loaded");
 
     match args.command {
-        Commands::Publish {
-            publish_options,
-            site_name,
-        } => {
+        Commands::Publish { publish_options } => {
+            let ws_res_path = publish_options
+                .clone()
+                .walrus_options
+                .ws_resources
+                .unwrap_or_else(|| {
+                    std::path::PathBuf::from(format!(
+                        "{}/ws-resources.json",
+                        publish_options.clone().directory.to_str().unwrap_or("")
+                    ))
+                });
+            let ws_resources = WSResources::read(ws_res_path);
+            let site_name = ws_resources.map_or_else(
+                |_| "test site".to_string(),
+                |res| res.name.unwrap_or_else(|| "test site".to_string()),
+            );
             SiteEditor::new(args.context, config)
                 .with_edit_options(
                     publish_options,
