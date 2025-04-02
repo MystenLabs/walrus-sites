@@ -17,43 +17,43 @@ use sui_types::base_types::ObjectID;
 use crate::{util::load_wallet_context, walrus::output::EpochCount};
 
 #[derive(Parser, Clone, Debug, Deserialize)]
-#[clap(rename_all = "kebab-case")]
+#[command(rename_all = "kebab-case")]
 pub(crate) struct GeneralArgs {
     /// The URL or the RPC endpoint to connect the client to.
     ///
     /// Can be specified as a CLI argument or in the config.
-    #[clap(long)]
+    #[arg(long)]
     pub(crate) rpc_url: Option<String>,
     /// The path to the Sui Wallet config.
     ///
     /// Can be specified as a CLI argument or in the config.
-    #[clap(long)]
+    #[arg(long)]
     pub(crate) wallet: Option<PathBuf>,
     /// The env to be used for the Sui wallet.
     ///
     /// If not specified, the env specified in the sites-config (under `wallet_env`) will be used.
     /// If the wallet env is also not specified in the config, the env configured in the Sui client
     /// will be used.
-    #[clap(long)]
+    #[arg(long)]
     pub(crate) wallet_env: Option<String>,
     /// The path or name of the walrus binary.
     ///
     /// The Walrus binary will then be called with this configuration to perform actions on Walrus.
     /// Can be specified as a CLI argument or in the config.
-    #[clap(long)]
+    #[arg(long)]
     #[serde(default = "default::walrus_binary")]
     pub(crate) walrus_binary: Option<String>,
     /// The path to the configuration for the Walrus client.
     ///
     /// This will be passed to the calls to the Walrus binary.
     /// Can be specified as a CLI argument or in the config.
-    #[clap(long)]
+    #[arg(long)]
     pub(crate) walrus_config: Option<PathBuf>,
     /// The gas budget for the operations on Sui.
     ///
     /// Can be specified as a CLI argument or in the config.
-    #[clap(long)]
-    #[clap(short, long)]
+    #[arg(long)]
+    #[arg(short, long)]
     #[serde(default = "default::gas_budget")]
     pub(crate) gas_budget: Option<u64>,
 }
@@ -114,29 +114,29 @@ impl GeneralArgs {
 }
 
 #[derive(Subcommand, Debug)]
-#[clap(rename_all = "kebab-case")]
+#[command(rename_all = "kebab-case")]
 pub(crate) enum Commands {
     /// Publish a new site on Sui.
     Publish {
-        #[clap(flatten)]
+        #[command(flatten)]
         publish_options: PublishOptions,
         /// The name of the site.
-        #[clap(short, long, default_value = "test site")]
+        #[arg(short, long, default_value = "test site")]
         site_name: String,
     },
     /// Update an existing site.
     Update {
-        #[clap(flatten)]
+        #[command(flatten)]
         publish_options: PublishOptions,
         /// The object ID of a partially published site to be completed.
         object_id: ObjectID,
-        #[clap(short, long, action)]
+        #[arg(short, long)]
         watch: bool,
         /// Publish all resources to Sui and Walrus, even if they may be already present.
         ///
         /// This can be useful in case the Walrus devnet is reset, but the resources are still
         /// available on Sui.
-        #[clap(long, action)]
+        #[arg(long)]
         force: bool,
     },
     /// Convert an object ID in hex format to the equivalent Base36 format.
@@ -163,18 +163,18 @@ pub(crate) enum Commands {
     /// The ws_resource file will still be used to determine the resource's headers.
     UpdateResource {
         /// The path to the resource to be added.
-        #[clap(long)]
+        #[arg(long)]
         resource: PathBuf,
         /// The path the resource should have in the site.
         ///
         /// Should be in the form `/path/to/resource.html`, with a leading `/`.
-        #[clap(long)]
+        #[arg(long)]
         path: String,
         /// The object ID of the Site object on Sui, to which the resource will be added.
-        #[clap(long)]
+        #[arg(long)]
         site_object: ObjectID,
         /// Common configurations.
-        #[clap(flatten)]
+        #[command(flatten)]
         common: WalrusStoreOptions,
     },
 }
@@ -185,18 +185,18 @@ pub(crate) struct PublishOptions {
     pub(crate) directory: PathBuf,
     /// Preprocess the directory before publishing.
     /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
-    #[clap(long, action)]
+    #[arg(long)]
     pub(crate) list_directory: bool,
     /// The maximum number of concurrent calls to the Walrus CLI for the computation of blob IDs.
-    #[clap(long)]
+    #[arg(long)]
     pub(crate) max_concurrent: Option<NonZeroUsize>,
     /// The maximum number of blobs that can be stored concurrently.
     ///
     /// More blobs can be stored concurrently, but this will increase memory usage.
-    #[clap(long, default_value_t = default::max_parallel_stores())]
+    #[arg(long, default_value_t = default::max_parallel_stores())]
     pub(crate) max_parallel_stores: NonZeroUsize,
     /// Common configurations.
-    #[clap(flatten)]
+    #[command(flatten)]
     pub(crate) walrus_options: WalrusStoreOptions,
 }
 
@@ -210,24 +210,24 @@ pub(crate) struct WalrusStoreOptions {
     /// root of the site directory.
     ///
     /// The configuration file _will not_ be uploaded to Walrus.
-    #[clap(long)]
+    #[arg(long)]
     pub(crate) ws_resources: Option<PathBuf>,
     /// The number of epochs for which to save the resources on Walrus.
     ///
     /// If set to `max`, the resources are stored for the maximum number of epochs allowed on
     /// Walrus. Otherwise, the resources are stored for the specified number of epochs. The
     /// number of epochs must be greater than 0.
-    #[clap(long, value_parser = EpochCountOrMax::parse_epoch_count)]
+    #[arg(long, value_parser = EpochCountOrMax::parse_epoch_count)]
     pub(crate) epochs: EpochCountOrMax,
     /// Make the stored resources permanent.
     ///
     /// By default, sites are deletable with site-builder delete command. By passing --permanent,
     /// the site is deleted only after `epochs` expiration. Make resources permanent
     /// (non-deletable)
-    #[clap(long, action = clap::ArgAction::SetTrue)]
+    #[arg(long, action = clap::ArgAction::SetTrue)]
     pub(crate) permanent: bool,
     /// Perform a dry run (you'll be asked for confirmation before committing changes).
-    #[clap(long)]
+    #[arg(long)]
     pub(crate) dry_run: bool,
 }
 

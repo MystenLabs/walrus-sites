@@ -40,18 +40,18 @@ const SITES_CONFIG_NAME: &str = "./sites-config.yaml";
 bin_version::bin_version!();
 
 #[derive(Parser, Debug)]
-#[clap(rename_all = "kebab-case", version = VERSION, propagate_version = true)]
+#[command(rename_all = "kebab-case", version = VERSION, propagate_version = true)]
 struct Args {
     /// The path to the configuration file for the site builder.
-    #[clap(short, long)]
+    #[arg(short, long)]
     config: Option<PathBuf>,
     /// The context with which to load the configuration.
     ///
     /// If specified, the context will be taken from the config file. Otherwise, the default
     /// context, which is also specified in the config file, will be used.
-    #[clap(long)]
+    #[arg(long)]
     context: Option<String>,
-    #[clap(flatten)]
+    #[command(flatten)]
     general: GeneralArgs,
     #[command(subcommand)]
     command: Commands,
