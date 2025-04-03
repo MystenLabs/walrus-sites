@@ -113,7 +113,7 @@ async fn run() -> Result<()> {
             let ws_resources = WSResources::read(ws_res_path);
             let site_name = ws_resources.map_or_else(
                 |_| "test site".to_string(),
-                |res| res.name.unwrap_or_else(|| "test site".to_string()),
+                |res| res.site_name.unwrap_or_else(|| "test site".to_string()),
             );
             SiteEditor::new(args.context, config)
                 .with_edit_options(

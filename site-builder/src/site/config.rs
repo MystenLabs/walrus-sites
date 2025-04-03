@@ -22,8 +22,8 @@ pub struct WSResources {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Metadata>,
     /// The name of the site.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
+    #[serde(rename = "site-name", skip_serializing_if = "Option::is_none")]
+    pub site_name: Option<String>,
 }
 
 impl WSResources {

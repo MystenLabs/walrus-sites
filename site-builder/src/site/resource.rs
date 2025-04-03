@@ -625,7 +625,7 @@ mod tests {
             headers: Some(headers),
             routes: None,
             metadata: None,
-            name: None,
+            site_name: None,
         })
     }
 }
