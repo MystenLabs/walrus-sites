@@ -99,7 +99,10 @@ async fn run() -> Result<()> {
     tracing::info!(?config, "configuration loaded");
 
     match args.command {
-        Commands::Publish { publish_options } => {
+        Commands::Publish {
+            publish_options,
+            site_name,
+        } => {
             let ws_res_path = publish_options
                 .clone()
                 .walrus_options
@@ -111,14 +114,19 @@ async fn run() -> Result<()> {
                     ))
                 });
             let ws_resources = WSResources::read(ws_res_path);
-            let site_name = ws_resources.map_or_else(
-                |_| "test site".to_string(),
-                |res| res.site_name.unwrap_or_else(|| "test site".to_string()),
-            );
+            // If site_name is passed as CLI argument, use it,
+            // otherwise use the site name from ws-resources.json,
+            // else, use the default "test site".
+            let final_site_name = site_name.unwrap_or_else(|| {
+                ws_resources.map_or_else(
+                    |_| "test site".to_string(),
+                    |res| res.site_name.unwrap_or_else(|| "test site".to_string()),
+                )
+            });
             SiteEditor::new(args.context, config)
                 .with_edit_options(
                     publish_options,
-                    SiteIdentifier::NewSite(site_name),
+                    SiteIdentifier::NewSite(final_site_name),
                     ContinuousEditing::Once,
                     WhenWalrusUpload::Modified,
                 )
