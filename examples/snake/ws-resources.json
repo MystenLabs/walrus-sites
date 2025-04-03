@@ -18,5 +18,6 @@
 	   "description": "This is a walrus site.",
 	   "project_url": "https://github.com/MystenLabs/walrus-sites/",
 	   "creator": "MystenLabs"
-	}
+	},
+  "site-name": "Walrus Snake Game"
 }

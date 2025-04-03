@@ -103,10 +103,31 @@ async fn run() -> Result<()> {
             publish_options,
             site_name,
         } => {
+            let ws_res_path = publish_options
+                .clone()
+                .walrus_options
+                .ws_resources
+                .unwrap_or_else(|| {
+                    std::path::PathBuf::from(format!(
+                        "{}/ws-resources.json",
+                        publish_options.clone().directory.to_str().unwrap_or("")
+                    ))
+                });
+            let ws_resources = WSResources::read(ws_res_path);
+            // If site_name is passed as CLI argument, use it,
+            // otherwise use the site name from ws-resources.json,
+            // else, use the default "test site".
+            let default_site_name = "Test Site".to_string();
+            let final_site_name = site_name.unwrap_or_else(|| {
+                ws_resources
+                    .ok()
+                    .and_then(|res| res.site_name)
+                    .unwrap_or(default_site_name)
+            });
             SiteEditor::new(args.context, config)
                 .with_edit_options(
                     publish_options,
-                    SiteIdentifier::NewSite(site_name),
+                    SiteIdentifier::NewSite(final_site_name),
                     ContinuousEditing::Once,
                     WhenWalrusUpload::Modified,
                 )
