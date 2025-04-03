@@ -1,6 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use std::{path::PathBuf, str};
+use std::{
+    path::{Path, PathBuf},
+    str,
+};
 
 use anyhow::{anyhow, bail, Result};
 use futures::Future;
@@ -25,6 +28,7 @@ use crate::{retry_client::RetriableSuiClient, site::contracts::TypeOriginMap};
 pub async fn sign_and_send_ptb(
     active_address: SuiAddress,
     wallet: &WalletContext,
+    retry_client: &RetriableSuiClient,
     programmable_transaction: ProgrammableTransaction,
     gas_coin: ObjectRef,
     gas_budget: u64,
@@ -38,7 +42,7 @@ pub async fn sign_and_send_ptb(
         gas_price,
     );
     let transaction = wallet.sign_transaction(&transaction);
-    wallet.execute_transaction_may_fail(transaction).await
+    retry_client.execute_transaction(transaction).await
 }
 
 pub async fn handle_pagination<F, T, C, Fut>(
@@ -128,8 +132,8 @@ pub fn get_site_id_from_response(
 }
 
 /// Returns the path if it is `Some` or any of the default paths if they exist (attempt in order).
-pub fn path_or_defaults_if_exist(path: &Option<PathBuf>, defaults: &[PathBuf]) -> Option<PathBuf> {
-    let mut path = path.clone();
+pub fn path_or_defaults_if_exist(path: Option<&Path>, defaults: &[PathBuf]) -> Option<PathBuf> {
+    let mut path = path.map(|p| p.to_path_buf());
     for default in defaults {
         if path.is_some() {
             break;
@@ -162,22 +166,43 @@ pub(crate) async fn type_origin_map_for_package(
         .collect())
 }
 
-/// Loads the wallet context from the given path.
+/// Loads the wallet context from the given optional wallet config (optional path and optional
+/// Sui env).
 ///
-/// If no path is provided, tries to load the configuration first from the local folder, and then
-/// from the standard Sui configuration directory.
+/// If no path is provided, tries to load the configuration first from the local folder, and
+/// then from the standard Sui configuration directory.
 // NB: When making changes to the logic, make sure to update the argument docs in
 // `crates/walrus-service/bin/client.rs`.
-#[allow(dead_code)]
-pub fn load_wallet_context(path: &Option<PathBuf>) -> Result<WalletContext> {
+pub fn load_wallet_context(path: Option<&Path>, wallet_env: Option<&str>) -> Result<WalletContext> {
     let mut default_paths = vec!["./client.yaml".into(), "./sui_config.yaml".into()];
     if let Some(home_dir) = home::home_dir() {
         default_paths.push(home_dir.join(".sui").join("sui_config").join("client.yaml"))
     }
+
     let path = path_or_defaults_if_exist(path, &default_paths)
-        .ok_or(anyhow!("Could not find a valid wallet config file."))?;
-    tracing::info!("Using wallet configuration from {}", path.display());
-    WalletContext::new(&path, None, None)
+        .ok_or(anyhow!("could not find a valid wallet config file"))?;
+    tracing::info!(conf_path = %path.display(), "using Sui wallet configuration");
+    let mut wallet_context: WalletContext = WalletContext::new(&path, None, None)?;
+    if let Some(target_env) = wallet_env {
+        if !wallet_context
+            .config
+            .envs
+            .iter()
+            .any(|env| env.alias == target_env)
+        {
+            return Err(anyhow!(
+                "Env '{}' not found in wallet config file '{}'.",
+                target_env,
+                path.display()
+            ));
+        }
+        wallet_context.config.active_env = Some(target_env.to_string());
+        tracing::info!(?target_env, "set the wallet env");
+    } else {
+        tracing::info!("no wallet env provided, using the default one");
+    }
+
+    Ok(wallet_context)
 }
 
 #[cfg(test)]

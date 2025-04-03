@@ -26,11 +26,11 @@ on the internet like https://wal.app.
 Domain resolution of Walrus Sites is done with a combination of traditional wildcard domains (e.g. `*.wal.app`)
 and the use of subdomains that correspond to [SuiNS domains][suisns].
 
-For example, let's analyze the following site: https://stake.wal.app
+For example, let's analyze the following site: https://stake-wal.wal.app
 
 1. We are provided with a third-party portal: https://wal.app.
-2. The site SuiNS domain is `stake`, so we need to use it as a subdomain of wal.app: `stake.wal.app`.
-3. Therefore, we can access the site with standard HTTPS at `https://stake.wal.app`.
+2. The site SuiNS domain is `stake`, so we need to use it as a subdomain of wal.app: `stake-wal.wal.app`.
+3. Therefore, we can access the site with standard HTTPS at `https://stake-wal.wal.app`.
 
 Documentation of Walrus and Walrus Sites is available at [docs.wal.app][walrus-sites-docs].
 

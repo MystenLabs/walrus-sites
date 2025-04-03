@@ -25,6 +25,8 @@ use sui_sdk::{
         SuiObjectResponse,
         SuiObjectResponseQuery,
         SuiRawData,
+        SuiTransactionBlockResponse,
+        SuiTransactionBlockResponseOptions,
     },
     wallet_context::WalletContext,
     SuiClient,
@@ -33,6 +35,8 @@ use sui_sdk::{
 use sui_types::{
     base_types::{ObjectID, SuiAddress},
     dynamic_field::{derive_dynamic_field_id, DynamicFieldInfo},
+    quorum_driver_types::ExecuteTransactionRequestType::WaitForLocalExecution,
+    transaction::Transaction,
     TypeTag,
 };
 use tracing::Level;
@@ -358,5 +362,31 @@ impl RetriableSuiClient {
     /// Gets a backoff strategy, seeded from the internal RNG.
     fn get_strategy(&self) -> ExponentialBackoff<StdRng> {
         self.backoff_config.get_strategy(ThreadRng::default().gen())
+    }
+
+    /// Executes a transaction.
+    #[tracing::instrument(err, skip(self))]
+    pub(crate) async fn execute_transaction(
+        &self,
+        transaction: Transaction,
+    ) -> anyhow::Result<SuiTransactionBlockResponse> {
+        // Retry here must use the exact same transaction to avoid locked objects.
+        retry_rpc_errors(self.get_strategy(), || async {
+            Ok(self
+                .sui_client
+                .quorum_driver_api()
+                .execute_transaction_block(
+                    transaction.clone(),
+                    SuiTransactionBlockResponseOptions::new()
+                        .with_effects()
+                        .with_input()
+                        .with_events()
+                        .with_object_changes()
+                        .with_balance_changes(),
+                    Some(WaitForLocalExecution),
+                )
+                .await?)
+        })
+        .await
     }
 }

@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
-import { redirectToAggregatorUrlResponse, redirectToPortalURLResponse } from "@lib/redirects";
-import { getBlobIdLink, getObjectIdLink } from "@lib/links";
 
 import allowlistChecker from "src/allowlist_checker";
 import { siteNotFound } from "@lib/http/http_error_responses";
@@ -25,10 +23,6 @@ if (config.enableSentry) {
 export default async function main(req: Request) {
 	const url = new URL(req.url);
 
-	// Send the page view event to either Amplitude or Vercel Web Analytics.
-	if (config.amplitudeApiKey) {
-		await sendToAmplitude(req, url);
-	}
 	if (config.enableVercelWebAnalytics) {
 		await sendToWebAnalytics(req);
 	}
@@ -48,7 +42,11 @@ export default async function main(req: Request) {
 		) ? premiumUrlFetcher : standardUrlFetcher;
 
 		if (requestDomain == portalDomain && parsedUrl.subdomain) {
-			return await urlFetcher.resolveDomainAndFetchUrl(parsedUrl, null, blocklistChecker);
+			const res = await urlFetcher.resolveDomainAndFetchUrl(parsedUrl, null, blocklistChecker);
+			if (config.amplitudeApiKey && res.status >= 200 && res.status < 400) {
+				await sendToAmplitude(req, url);
+			}
+			return res
 		}
 	}
 
@@ -67,6 +65,9 @@ export default async function main(req: Request) {
 			Base36toHex(config.landingPageOidB36),
 			blocklistChecker
 		);
+		if (config.amplitudeApiKey && response.status >= 200 && response.status < 400) {
+			await sendToAmplitude(req, url);
+		}
 		return response;
 	}
 
