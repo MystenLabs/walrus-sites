@@ -117,11 +117,12 @@ async fn run() -> Result<()> {
             // If site_name is passed as CLI argument, use it,
             // otherwise use the site name from ws-resources.json,
             // else, use the default "test site".
+            let default_site_name = "Test Site".to_string();
             let final_site_name = site_name.unwrap_or_else(|| {
-                ws_resources.map_or_else(
-                    |_| "test site".to_string(),
-                    |res| res.site_name.unwrap_or_else(|| "test site".to_string()),
-                )
+                ws_resources
+                    .ok()
+                    .and_then(|res| res.site_name)
+                    .unwrap_or(default_site_name)
             });
             SiteEditor::new(args.context, config)
                 .with_edit_options(
