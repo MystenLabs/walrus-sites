@@ -83,7 +83,7 @@ async fn run() -> Result<()> {
     tracing::info!("initializing site builder");
 
     let args = Args::parse();
-    tracing::info!(?args, "command line arguments");
+    tracing::debug!(?args, "command line arguments");
     let config_path =
         path_or_defaults_if_exist(args.config.as_deref(), &sites_config_default_paths()).ok_or(
             anyhow!(
@@ -147,7 +147,7 @@ async fn run() -> Result<()> {
         // Add a path to be watched. All files and directories at that path and
         // below will be monitored for changes.
         Commands::Sitemap { object } => {
-            let all_dynamic_fields = RemoteSiteFactory::new(
+            let site_data = RemoteSiteFactory::new(
                 // TODO(giac): make the backoff configurable.
                 &RetriableSuiClient::new_from_wallet(
                     &config.load_wallet()?,
@@ -157,12 +157,30 @@ async fn run() -> Result<()> {
                 config.package,
             )
             .await?
-            .get_existing_resources(object)
+            .get_from_chain(object)
             .await?;
+
             println!("Pages in site at object id: {}", object);
-            for (name, id) in all_dynamic_fields {
-                println!("  - {:<40} {:?}", name, id);
+
+            let blob_ids = site_data
+                .resources()
+                .into_iter()
+                .map(|res| res.info.blob_id)
+                .collect::<Vec<_>>();
+
+            for blob in blob_ids {
+                println!("{}", blob);
             }
+
+            // list the blobs owed by the current wallet
+
+            //for resoruce in site_data.resources() {
+            //    println!("  - {:<40} {}", resoruce.info.path, resoruce.info.blob_id);
+            //}
+
+            //for (name, id) in all_dynamic_fields {
+            //    println!("  - {:<40} {:?}", name, id);
+            //}
         }
         Commands::Convert { object_id } => println!("{}", id_to_base36(&object_id)?),
         Commands::ListDirectory { path } => {

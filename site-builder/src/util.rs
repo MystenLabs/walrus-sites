@@ -205,7 +205,10 @@ pub fn load_wallet_context(
         wallet_context.config.active_env = Some(target_env.to_string());
         tracing::info!(?target_env, "set the wallet env");
     } else {
-        tracing::info!("no wallet env provided, using the default one");
+        tracing::info!(
+            active_env=?wallet_context.config.active_env,
+            "no wallet env provided, using the default one"
+        );
     }
 
     if let Some(target_address) = wallet_address {
@@ -225,7 +228,10 @@ pub fn load_wallet_context(
         wallet_context.config.active_address = Some(*target_address);
         tracing::info!(?target_address, "set the wallet address");
     } else {
-        tracing::info!("no wallet address provided, using the default one");
+        tracing::info!(
+            active_address=?wallet_context.config.active_address,
+            "no wallet address provided, using the default one"
+        );
     }
 
     Ok(wallet_context)
