@@ -91,7 +91,7 @@ async fn run() -> Result<()> {
             ),
         )?;
     tracing::info!(?config_path, "loading sites configuration");
-    let mut config = Config::load_multi_config(config_path, args.context.as_deref())?;
+    let mut config = Config::load_from_multi_config(config_path, args.context.as_deref())?;
 
     // Merge the configs and the CLI args. Serde default ensures that the `walrus_binary` and
     // `gas_budget` exist.
