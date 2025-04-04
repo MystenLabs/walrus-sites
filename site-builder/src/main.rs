@@ -147,7 +147,7 @@ async fn run() -> Result<()> {
         // Add a path to be watched. All files and directories at that path and
         // below will be monitored for changes.
         Commands::Sitemap { object } => {
-            let site_data = RemoteSiteFactory::new(
+            let all_dynamic_fields = RemoteSiteFactory::new(
                 // TODO(giac): make the backoff configurable.
                 &RetriableSuiClient::new_from_wallet(
                     &config.load_wallet()?,
@@ -157,30 +157,12 @@ async fn run() -> Result<()> {
                 config.package,
             )
             .await?
-            .get_from_chain(object)
+            .get_existing_resources(object)
             .await?;
-
             println!("Pages in site at object id: {}", object);
-
-            let blob_ids = site_data
-                .resources()
-                .into_iter()
-                .map(|res| res.info.blob_id)
-                .collect::<Vec<_>>();
-
-            for blob in blob_ids {
-                println!("{}", blob);
+            for (name, id) in all_dynamic_fields {
+                println!("  - {:<40} {:?}", name, id);
             }
-
-            // list the blobs owed by the current wallet
-
-            //for resoruce in site_data.resources() {
-            //    println!("  - {:<40} {}", resoruce.info.path, resoruce.info.blob_id);
-            //}
-
-            //for (name, id) in all_dynamic_fields {
-            //    println!("  - {:<40} {:?}", name, id);
-            //}
         }
         Commands::Convert { object_id } => println!("{}", id_to_base36(&object_id)?),
         Commands::ListDirectory { path } => {
