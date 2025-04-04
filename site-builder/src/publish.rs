@@ -23,7 +23,7 @@ use sui_types::{
 use crate::{
     args::{PublishOptions, WalrusStoreOptions},
     backoff::ExponentialBackoffConfig,
-    config::ConfigWithContext,
+    config::Config,
     display,
     preprocessor::Preprocessor,
     retry_client::RetriableSuiClient,
@@ -99,12 +99,12 @@ pub(crate) struct EditOptions {
 
 pub(crate) struct SiteEditor<E = ()> {
     context: Option<String>,
-    config: ConfigWithContext,
+    config: Config,
     edit_options: E,
 }
 
 impl SiteEditor {
-    pub fn new(context: Option<String>, config: ConfigWithContext) -> Self {
+    pub fn new(context: Option<String>, config: Config) -> Self {
         SiteEditor {
             context,
             config,
@@ -313,7 +313,7 @@ impl SiteEditor<EditOptions> {
 }
 
 fn print_summary(
-    config: &ConfigWithContext,
+    config: &Config,
     address: &SuiAddress,
     site_id: &SiteIdentifier,
     response: &SuiTransactionBlockResponse,

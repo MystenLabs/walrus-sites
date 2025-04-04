@@ -83,6 +83,7 @@ async fn run() -> Result<()> {
     tracing::info!("initializing site builder");
 
     let args = Args::parse();
+    tracing::info!(?args, "command line arguments");
     let config_path =
         path_or_defaults_if_exist(args.config.as_deref(), &sites_config_default_paths()).ok_or(
             anyhow!(
@@ -90,8 +91,10 @@ async fn run() -> Result<()> {
             consider using  the --config flag to specify the config"
             ),
         )?;
+
     tracing::info!(?config_path, "loading sites configuration");
     let mut config = Config::load_from_multi_config(config_path, args.context.as_deref())?;
+    tracing::debug!(?config, "configuration before merging");
 
     // Merge the configs and the CLI args. Serde default ensures that the `walrus_binary` and
     // `gas_budget` exist.
@@ -103,7 +106,7 @@ async fn run() -> Result<()> {
             publish_options,
             site_name,
         } => {
-            // Use the passed, name, or load the ws-resources file, if it exsists, to take the site
+            // Use the passed, name, or load the ws-resources file, if it exists, to take the site
             // name from it or use the default one.
             let (ws_resources, _) = load_ws_resources(
                 publish_options.walrus_options.ws_resources.as_deref(),

@@ -7,6 +7,7 @@ use std::{
 
 use anyhow::{anyhow, bail, Result};
 use futures::Future;
+use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{
     rpc_types::{
         Page,
@@ -173,7 +174,11 @@ pub(crate) async fn type_origin_map_for_package(
 /// then from the standard Sui configuration directory.
 // NB: When making changes to the logic, make sure to update the argument docs in
 // `crates/walrus-service/bin/client.rs`.
-pub fn load_wallet_context(path: Option<&Path>, wallet_env: Option<&str>) -> Result<WalletContext> {
+pub fn load_wallet_context(
+    path: Option<&Path>,
+    wallet_env: Option<&str>,
+    wallet_address: Option<&SuiAddress>,
+) -> Result<WalletContext> {
     let mut default_paths = vec!["./client.yaml".into(), "./sui_config.yaml".into()];
     if let Some(home_dir) = home::home_dir() {
         default_paths.push(home_dir.join(".sui").join("sui_config").join("client.yaml"))
@@ -183,6 +188,7 @@ pub fn load_wallet_context(path: Option<&Path>, wallet_env: Option<&str>) -> Res
         .ok_or(anyhow!("could not find a valid wallet config file"))?;
     tracing::info!(conf_path = %path.display(), "using Sui wallet configuration");
     let mut wallet_context: WalletContext = WalletContext::new(&path, None, None)?;
+
     if let Some(target_env) = wallet_env {
         if !wallet_context
             .config
@@ -200,6 +206,26 @@ pub fn load_wallet_context(path: Option<&Path>, wallet_env: Option<&str>) -> Res
         tracing::info!(?target_env, "set the wallet env");
     } else {
         tracing::info!("no wallet env provided, using the default one");
+    }
+
+    if let Some(target_address) = wallet_address {
+        if !wallet_context
+            .config
+            .keystore
+            .addresses()
+            .iter()
+            .any(|address| address == target_address)
+        {
+            return Err(anyhow!(
+                "Address '{}' not found in wallet config file '{}'.",
+                target_address,
+                path.display()
+            ));
+        }
+        wallet_context.config.active_address = Some(*target_address);
+        tracing::info!(?target_address, "set the wallet address");
+    } else {
+        tracing::info!("no wallet address provided, using the default one");
     }
 
     Ok(wallet_context)

@@ -23,7 +23,7 @@ use super::{
 use crate::{
     args::WalrusStoreOptions,
     backoff::ExponentialBackoffConfig,
-    config::ConfigWithContext,
+    config::Config,
     display,
     publish::WhenWalrusUpload,
     retry_client::RetriableSuiClient,
@@ -47,7 +47,7 @@ pub enum SiteIdentifier {
 }
 
 pub struct SiteManager {
-    pub config: ConfigWithContext,
+    pub config: Config,
     pub walrus: Walrus,
     pub wallet: WalletContext,
     pub site_id: SiteIdentifier,
@@ -61,7 +61,7 @@ pub struct SiteManager {
 impl SiteManager {
     /// Creates a new site manager.
     pub async fn new(
-        config: ConfigWithContext,
+        config: Config,
         site_id: SiteIdentifier,
         when_upload: WhenWalrusUpload,
         walrus_options: WalrusStoreOptions,

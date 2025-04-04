@@ -24,16 +24,12 @@ pub(crate) enum MultiConfig {
     },
 }
 
-pub(crate) type ConfigWithContext = Config<Option<String>>;
-
 /// The configuration for the site builder.
 #[derive(Deserialize, Debug, Clone)]
-pub(crate) struct Config<C = ()> {
+pub(crate) struct Config {
     #[serde(default = "default_portal")]
     pub portal: String,
     pub package: ObjectID,
-    #[serde(skip_deserializing)]
-    pub context: C,
     #[serde(default)]
     pub general: GeneralArgs,
 }
@@ -42,7 +38,7 @@ pub(crate) fn default_portal() -> String {
     "wal.app".to_owned()
 }
 
-impl<C> Config<C> {
+impl Config {
     /// Merges the other [`GeneralArgs`] (taken from the CLI) with the `general` in the struct.
     ///
     /// The values in `other_general` take precedence.
@@ -69,24 +65,6 @@ impl<C> Config<C> {
         self.general.load_wallet()
     }
 
-    /// Adds the context to the configuration.
-    pub fn with_context(self, context: Option<String>) -> ConfigWithContext {
-        let Config {
-            portal,
-            package,
-            general,
-            ..
-        } = self;
-        Config {
-            portal,
-            package,
-            general,
-            context,
-        }
-    }
-}
-
-impl ConfigWithContext {
     pub fn load_from_multi_config(path: impl AsRef<Path>, context: Option<&str>) -> Result<Self> {
         let multi_config =
             serde_yaml::from_str::<MultiConfig>(&std::fs::read_to_string(path.as_ref())?)?;
@@ -95,24 +73,23 @@ impl ConfigWithContext {
             MultiConfig::SingletonConfig(config) => {
                 if let Some(context) = context {
                     bail!(
-                        "cannot specify contex when using a single config file \
+                        "cannot specify context when using a singleton config file \
                         (config_filename={}, context={})",
                         path.as_ref().display(),
                         context
                     );
                 }
-                Ok(config.with_context(None))
+                Ok(config)
             }
             MultiConfig::MultiConfig {
                 mut contexts,
                 default_context,
             } => {
                 let context = context.unwrap_or(&default_context);
-                tracing::info!(?context, "loading the configuration");
-                let config = contexts
+                tracing::info!(?context, "loading the multi config");
+                Ok(contexts
                     .remove(context)
-                    .ok_or_else(|| anyhow!("could not find the context: {}", context))?;
-                Ok(config.with_context(Some(context.to_owned())))
+                    .ok_or_else(|| anyhow!("could not find the context: {}", context))?)
             }
         }
     }
@@ -124,7 +101,7 @@ impl ConfigWithContext {
             self.gas_budget(),
             self.general.rpc_url.clone(),
             self.general.walrus_config.clone(),
-            self.context.clone(),
+            self.general.walrus_context.clone(),
             self.general.wallet.clone(),
         )
     }

@@ -12,7 +12,7 @@ use anyhow::{anyhow, ensure, Result};
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use sui_sdk::wallet_context::WalletContext;
-use sui_types::base_types::ObjectID;
+use sui_types::base_types::{ObjectID, SuiAddress};
 
 use crate::{util::load_wallet_context, walrus::output::EpochCount};
 
@@ -36,6 +36,19 @@ pub(crate) struct GeneralArgs {
     /// will be used.
     #[clap(long)]
     pub(crate) wallet_env: Option<String>,
+    /// The address to be used for the Sui wallet.
+    ///
+    /// If not specified, the address specified in the sites-config (under `wallet_address`) will be
+    /// used. If the wallet address is also not specified in the config, the address configured in
+    /// the Sui client will be used.
+    #[clap(long)]
+    pub(crate) wallet_address: Option<SuiAddress>,
+    /// The context that will be passed to the Walrus binary.
+    ///
+    /// If not specified, the Walrus context specified in the sites-config will be
+    /// used. If it is also not specified in the config, no context will be passed.
+    #[clap(long)]
+    pub(crate) walrus_context: Option<String>,
     /// The path or name of the walrus binary.
     ///
     /// The Walrus binary will then be called with this configuration to perform actions on Walrus.
@@ -53,7 +66,6 @@ pub(crate) struct GeneralArgs {
     ///
     /// Can be specified as a CLI argument or in the config.
     #[clap(long)]
-    #[clap(short, long)]
     #[serde(default = "default::gas_budget")]
     pub(crate) gas_budget: Option<u64>,
 }
@@ -64,6 +76,8 @@ impl Default for GeneralArgs {
             rpc_url: None,
             wallet: None,
             wallet_env: None,
+            wallet_address: None,
+            walrus_context: None,
             walrus_binary: default::walrus_binary(),
             walrus_config: None,
             gas_budget: default::gas_budget(),
@@ -76,14 +90,25 @@ impl GeneralArgs {
     ///
     /// If no wallet is specified, the default wallet will be used.
     pub fn load_wallet(&self) -> Result<WalletContext> {
-        load_wallet_context(self.wallet.as_deref(), self.wallet_env.as_deref())
+        load_wallet_context(
+            self.wallet.as_deref(),
+            self.wallet_env.as_deref(),
+            self.wallet_address.as_ref(),
+        )
     }
 }
 
 macro_rules! merge {
     ($self:ident, $other:ident, $field:ident) => {
+        let self_value = $self.$field.as_ref();
+        let other_value = $other.$field.as_ref();
+        let field = stringify!($field);
+
         if $other.$field.is_some() {
+            tracing::debug!(?self_value, ?other_value, field, "merging field",);
             $self.$field = $other.$field.clone();
+        } else {
+            tracing::debug!(?self_value, ?other_value, field, "not merging field");
         }
     };
 }
@@ -106,6 +131,9 @@ impl GeneralArgs {
             other,
             rpc_url,
             wallet,
+            wallet_env,
+            wallet_address,
+            walrus_context,
             walrus_binary,
             walrus_config,
             gas_budget,
