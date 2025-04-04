@@ -5,7 +5,7 @@
 
 use std::{collections::HashMap, path::Path};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use serde::Deserialize;
 use sui_sdk::wallet_context::WalletContext;
 use sui_types::base_types::ObjectID;
@@ -14,21 +14,22 @@ pub(crate) use crate::{args::GeneralArgs, walrus::Walrus};
 
 /// Configuration for the site builder, complete with separate context for networks.
 #[derive(Deserialize, Debug, Clone)]
-pub(crate) struct MultiConfig {
-    pub contexts: HashMap<String, Config>,
-    pub default_context: String,
+#[serde(untagged)]
+#[allow(clippy::large_enum_variant)]
+pub(crate) enum MultiConfig {
+    SingletonConfig(Config),
+    MultiConfig {
+        contexts: HashMap<String, Config>,
+        default_context: String,
+    },
 }
-
-pub(crate) type ConfigWithContext = Config<String>;
 
 /// The configuration for the site builder.
 #[derive(Deserialize, Debug, Clone)]
-pub(crate) struct Config<C = ()> {
+pub(crate) struct Config {
     #[serde(default = "default_portal")]
     pub portal: String,
     pub package: ObjectID,
-    #[serde(skip_deserializing)]
-    pub context: C,
     #[serde(default)]
     pub general: GeneralArgs,
 }
@@ -37,7 +38,7 @@ pub(crate) fn default_portal() -> String {
     "wal.app".to_owned()
 }
 
-impl<C> Config<C> {
+impl Config {
     /// Merges the other [`GeneralArgs`] (taken from the CLI) with the `general` in the struct.
     ///
     /// The values in `other_general` take precedence.
@@ -64,38 +65,33 @@ impl<C> Config<C> {
         self.general.load_wallet()
     }
 
-    /// Adds the context to the configuration.
-    pub fn with_context(self, context: String) -> Config<String> {
-        let Config {
-            portal,
-            package,
-            general,
-            ..
-        } = self;
-        Config {
-            portal,
-            package,
-            general,
-            context,
+    pub fn load_from_multi_config(path: impl AsRef<Path>, context: Option<&str>) -> Result<Self> {
+        let multi_config =
+            serde_yaml::from_str::<MultiConfig>(&std::fs::read_to_string(path.as_ref())?)?;
+
+        match multi_config {
+            MultiConfig::SingletonConfig(config) => {
+                if let Some(context) = context {
+                    bail!(
+                        "cannot specify context when using a singleton config file \
+                        (config_filename={}, context={})",
+                        path.as_ref().display(),
+                        context
+                    );
+                }
+                Ok(config)
+            }
+            MultiConfig::MultiConfig {
+                mut contexts,
+                default_context,
+            } => {
+                let context = context.unwrap_or(&default_context);
+                tracing::info!(?context, "loading the multi config");
+                Ok(contexts
+                    .remove(context)
+                    .ok_or_else(|| anyhow!("could not find the context: {}", context))?)
+            }
         }
-    }
-}
-
-impl Config<String> {
-    pub fn load_multi_config(path: impl AsRef<Path>, context: Option<&str>) -> Result<Self> {
-        let mut multi_config =
-            serde_yaml::from_str::<MultiConfig>(&std::fs::read_to_string(path)?)?;
-
-        let context = context.unwrap_or_else(|| &multi_config.default_context);
-        tracing::info!(?context, "loading the configuration");
-
-        let config = multi_config
-            .contexts
-            .remove(context)
-            .ok_or_else(|| anyhow!("could not find the context: {}", context))?;
-
-        let config = config.with_context(context.to_owned());
-        Ok(config)
     }
 
     /// Creates a Walrus client with the configuration from `self`.
@@ -105,8 +101,7 @@ impl Config<String> {
             self.gas_budget(),
             self.general.rpc_url.clone(),
             self.general.walrus_config.clone(),
-            // TODO: should we ever pass None?
-            Some(self.context.clone()),
+            self.general.walrus_context.clone(),
             self.general.wallet.clone(),
         )
     }
