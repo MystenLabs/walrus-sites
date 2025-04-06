@@ -1,0 +1,14 @@
+# This is an example singleton config for testnet.
+
+# module: site
+# portal: wal.app
+package: 0x26eb7ee8688da02c5f671679524e379f0b837a12f1d1d799f255b7eea260ad27
+general:
+   wallet_env: mainnet
+   walrus_context: mainnet # Assumes a Walrus CLI setup with a multi-config containing the "mainnet" context.
+   # wallet_address: 0x1234...
+   # rpc_url: https://fullnode.mainnet.sui.io:443
+   # wallet: /path/to/.sui/sui_config/client.yaml
+   # walrus_binary: /path/to/walrus
+   # walrus_config: /path/to/mainnet/client_config.yaml
+   # gas_budget: 500000000

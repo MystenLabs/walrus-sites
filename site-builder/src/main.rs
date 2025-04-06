@@ -21,7 +21,7 @@ use backoff::ExponentialBackoffConfig;
 use clap::Parser;
 use config::Config;
 use futures::TryFutureExt;
-use publish::{ContinuousEditing, SiteEditor, WhenWalrusUpload};
+use publish::{load_ws_resources, ContinuousEditing, SiteEditor, WhenWalrusUpload};
 use retry_client::RetriableSuiClient;
 use site::{
     config::WSResources,
@@ -83,6 +83,7 @@ async fn run() -> Result<()> {
     tracing::info!("initializing site builder");
 
     let args = Args::parse();
+    tracing::debug!(?args, "command line arguments");
     let config_path =
         path_or_defaults_if_exist(args.config.as_deref(), &sites_config_default_paths()).ok_or(
             anyhow!(
@@ -90,8 +91,10 @@ async fn run() -> Result<()> {
             consider using  the --config flag to specify the config"
             ),
         )?;
+
     tracing::info!(?config_path, "loading sites configuration");
-    let mut config = Config::load_multi_config(config_path, args.context.as_deref())?;
+    let mut config = Config::load_from_multi_config(config_path, args.context.as_deref())?;
+    tracing::debug!(?config, "configuration before merging");
 
     // Merge the configs and the CLI args. Serde default ensures that the `walrus_binary` and
     // `gas_budget` exist.
@@ -103,31 +106,22 @@ async fn run() -> Result<()> {
             publish_options,
             site_name,
         } => {
-            let ws_res_path = publish_options
-                .clone()
-                .walrus_options
-                .ws_resources
-                .unwrap_or_else(|| {
-                    std::path::PathBuf::from(format!(
-                        "{}/ws-resources.json",
-                        publish_options.clone().directory.to_str().unwrap_or("")
-                    ))
-                });
-            let ws_resources = WSResources::read(ws_res_path);
-            // If site_name is passed as CLI argument, use it,
-            // otherwise use the site name from ws-resources.json,
-            // else, use the default "test site".
-            let default_site_name = "Test Site".to_string();
-            let final_site_name = site_name.unwrap_or_else(|| {
+            // Use the passed, name, or load the ws-resources file, if it exists, to take the site
+            // name from it or use the default one.
+            let (ws_resources, _) = load_ws_resources(
+                publish_options.walrus_options.ws_resources.as_deref(),
+                publish_options.directory.as_path(),
+            )?;
+            let site_name = site_name.unwrap_or_else(|| {
                 ws_resources
-                    .ok()
                     .and_then(|res| res.site_name)
-                    .unwrap_or(default_site_name)
+                    .unwrap_or_else(|| "Test Site".to_string())
             });
+
             SiteEditor::new(args.context, config)
                 .with_edit_options(
                     publish_options,
-                    SiteIdentifier::NewSite(final_site_name),
+                    SiteIdentifier::NewSite(site_name),
                     ContinuousEditing::Once,
                     WhenWalrusUpload::Modified,
                 )
