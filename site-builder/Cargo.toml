@@ -30,7 +30,7 @@ sui-keys = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.39.0" 
 sui-sdk = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.39.0" }
 sui-types = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.39.0" }
 thiserror = "1.0.61"
-tokio = { version = "1.38.1", features = ["rt", "rt-multi-thread", "macros", "process"] }
+tokio = { version = "1.43.1", features = ["rt", "rt-multi-thread", "macros", "process"] }
 toml = "0.8.14"
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
