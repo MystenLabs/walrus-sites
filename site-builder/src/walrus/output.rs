@@ -11,8 +11,9 @@ use serde_with::{base64::Base64, serde_as, DisplayFromStr};
 use sui_types::{base_types::ObjectID, event::EventID};
 
 use super::types::BlobId;
+use crate::site::contracts::{self, AssociatedContractStruct, StructTag};
 
-pub type Epoch = u64;
+pub type Epoch = u32;
 pub type EpochCount = u32;
 
 /// Either an event ID or an object ID.
@@ -146,6 +147,10 @@ pub struct StorageResource {
 }
 
 /// Sui object for a blob.
+///
+/// This struct is used to deserialize the blob from B64 format.
+// NOTE: Need two struct definitions for the blob to deserialize both from B64 and BCS. Will be
+// TODO: Remove once the Walrus SDK is available.
 #[serde_as]
 #[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -159,7 +164,7 @@ pub struct Blob {
     pub blob_id: BlobId,
     /// The (unencoded) size of the blob.
     pub size: u64,
-    /// The erasure coding type used for the blob.
+    /// The encoding coding type used for the blob.
     pub encoding_type: EncodingType,
     /// The epoch in which the blob was first certified, `None` if the blob is uncertified.
     pub certified_epoch: Option<Epoch>,
@@ -167,6 +172,35 @@ pub struct Blob {
     pub storage: StorageResource,
     /// Marks the blob as deletable.
     pub deletable: bool,
+}
+
+/// Sui object for a blob.
+///
+/// This struct is used to deserialize the blob from BCS format.
+// NOTE: Need two struct definitions for the blob to deserialize both from B64 and BCS.
+#[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SuiBlob {
+    /// Object ID of the Sui object.
+    pub id: ObjectID,
+    /// The epoch in which the blob has been registered.
+    pub registered_epoch: Epoch,
+    /// The blob ID.
+    pub blob_id: BlobId,
+    /// The (unencoded) size of the blob.
+    pub size: u64,
+    /// The encoding coding type used for the blob.
+    pub encoding_type: EncodingType,
+    /// The epoch in which the blob was first certified, `None` if the blob is uncertified.
+    pub certified_epoch: Option<Epoch>,
+    /// The [`StorageResource`] used to store the blob.
+    pub storage: StorageResource,
+    /// Marks the blob as deletable.
+    pub deletable: bool,
+}
+
+impl AssociatedContractStruct for SuiBlob {
+    const CONTRACT_STRUCT: StructTag<'static> = contracts::walrus::Blob;
 }
 
 /// The output of the `store` command.

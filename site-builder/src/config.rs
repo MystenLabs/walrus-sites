@@ -65,7 +65,12 @@ impl Config {
         self.general.load_wallet()
     }
 
-    pub fn load_from_multi_config(path: impl AsRef<Path>, context: Option<&str>) -> Result<Self> {
+    /// Returns the configuration for the given context or the default context if no context is
+    /// provided and the config is a multi config.
+    pub fn load_from_multi_config(
+        path: impl AsRef<Path>,
+        context: Option<&str>,
+    ) -> Result<(Self, Option<String>)> {
         let multi_config =
             serde_yaml::from_str::<MultiConfig>(&std::fs::read_to_string(path.as_ref())?)?;
 
@@ -79,7 +84,7 @@ impl Config {
                         context
                     );
                 }
-                Ok(config)
+                Ok((config, context.map(|s| s.to_owned())))
             }
             MultiConfig::MultiConfig {
                 mut contexts,
@@ -87,9 +92,12 @@ impl Config {
             } => {
                 let context = context.unwrap_or(&default_context);
                 tracing::info!(?context, "loading the multi config");
-                Ok(contexts
-                    .remove(context)
-                    .ok_or_else(|| anyhow!("could not find the context: {}", context))?)
+                Ok((
+                    contexts
+                        .remove(context)
+                        .ok_or_else(|| anyhow!("could not find the context: {}", context))?,
+                    Some(context.to_owned()),
+                ))
             }
         }
     }

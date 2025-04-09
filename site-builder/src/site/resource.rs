@@ -4,7 +4,7 @@
 //! Functionality to read and check the files in of a website.
 
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeSet,
     fmt::{self, Display},
     fs,
     io::Write,
@@ -23,7 +23,7 @@ use super::SiteData;
 use crate::{
     publish::WhenWalrusUpload,
     site::{config::WSResources, content::ContentType},
-    types::{HttpHeaders, SuiResource},
+    types::{HttpHeaders, SuiResource, VecMap},
     walrus::{types::BlobId, Walrus},
 };
 
@@ -266,6 +266,18 @@ impl ResourceSet {
     {
         self.inner.extend(resources.into_iter().map(Into::into));
     }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    pub(crate) fn iter(&self) -> std::collections::btree_set::Iter<'_, Resource> {
+        self.inner.iter()
+    }
 }
 
 impl<'a> IntoIterator for &'a ResourceSet {
@@ -367,7 +379,7 @@ impl ResourceManager {
             }
         }
 
-        let mut http_headers: BTreeMap<String, String> =
+        let mut http_headers: VecMap<String, String> =
             ResourceManager::derive_http_headers(&self.ws_resources, &resource_path);
         let extension = full_path
             .extension()
@@ -432,7 +444,7 @@ impl ResourceManager {
     pub fn derive_http_headers(
         ws_resources: &Option<WSResources>,
         resource_path: &str,
-    ) -> BTreeMap<String, String> {
+    ) -> VecMap<String, String> {
         ws_resources
             .as_ref()
             .and_then(|config| config.headers.as_ref())

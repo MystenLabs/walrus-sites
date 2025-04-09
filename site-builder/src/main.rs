@@ -9,6 +9,8 @@ mod preprocessor;
 mod publish;
 mod retry_client;
 mod site;
+mod sitemap;
+mod suins;
 mod summary;
 mod types;
 mod util;
@@ -17,18 +19,16 @@ use std::{num::NonZeroUsize, path::PathBuf};
 
 use anyhow::{anyhow, Result};
 use args::{Commands, GeneralArgs};
-use backoff::ExponentialBackoffConfig;
 use clap::Parser;
 use config::Config;
 use futures::TryFutureExt;
 use publish::{load_ws_resources, ContinuousEditing, SiteEditor, WhenWalrusUpload};
-use retry_client::RetriableSuiClient;
 use site::{
     config::WSResources,
     manager::{SiteIdentifier, SiteManager},
     resource::ResourceManager,
-    RemoteSiteFactory,
 };
+use sitemap::display_sitemap;
 use util::path_or_defaults_if_exist;
 
 use crate::{preprocessor::Preprocessor, util::id_to_base36};
@@ -93,7 +93,8 @@ async fn run() -> Result<()> {
         )?;
 
     tracing::info!(?config_path, "loading sites configuration");
-    let mut config = Config::load_from_multi_config(config_path, args.context.as_deref())?;
+    let (mut config, selected_context) =
+        Config::load_from_multi_config(config_path, args.context.as_deref())?;
     tracing::debug!(?config, "configuration before merging");
 
     // Merge the configs and the CLI args. Serde default ensures that the `walrus_binary` and
@@ -146,23 +147,8 @@ async fn run() -> Result<()> {
         }
         // Add a path to be watched. All files and directories at that path and
         // below will be monitored for changes.
-        Commands::Sitemap { object } => {
-            let all_dynamic_fields = RemoteSiteFactory::new(
-                // TODO(giac): make the backoff configurable.
-                &RetriableSuiClient::new_from_wallet(
-                    &config.load_wallet()?,
-                    ExponentialBackoffConfig::default(),
-                )
-                .await?,
-                config.package,
-            )
-            .await?
-            .get_existing_resources(object)
-            .await?;
-            println!("Pages in site at object id: {}", object);
-            for (name, id) in all_dynamic_fields {
-                println!("  - {:<40} {:?}", name, id);
-            }
+        Commands::Sitemap { site_to_map } => {
+            display_sitemap(site_to_map, selected_context, config).await?;
         }
         Commands::Convert { object_id } => println!("{}", id_to_base36(&object_id)?),
         Commands::ListDirectory { path } => {

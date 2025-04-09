@@ -3,11 +3,15 @@
 
 //! Collection of types to mirror the Sui move structs.
 
-use std::collections::BTreeMap;
+use std::{
+    borrow::Borrow,
+    collections::{btree_map, BTreeMap},
+    str::FromStr,
+};
 
 use move_core_types::u256::U256;
-use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer};
-use sui_types::base_types::ObjectID;
+use serde::{de::DeserializeOwned, Deserialize, Serialize, Serializer};
+use sui_types::base_types::{ObjectID, SuiAddress};
 
 use crate::{
     site::contracts::{self, AssociatedContractStruct, StructTag},
@@ -47,7 +51,6 @@ pub(crate) struct SuiResource {
     /// The relative path the resource will have on Sui.
     pub path: String,
     /// Response, Representation and Payload headers.
-    #[serde(deserialize_with = "deserialize_http_headers")]
     pub headers: HttpHeaders,
     /// The blob ID of the resource.
     #[serde(serialize_with = "serialize_blob_id")]
@@ -56,14 +59,6 @@ pub(crate) struct SuiResource {
     pub blob_hash: U256,
     /// Byte ranges for the resource.
     pub range: Option<Range>,
-}
-
-fn deserialize_http_headers<'de, D>(deserializer: D) -> Result<HttpHeaders, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let headers: Vec<(String, String)> = Deserialize::deserialize(deserializer)?;
-    Ok(HttpHeaders(headers.into_iter().collect()))
 }
 
 /// Serialize as string to make sure that the json output uses the base64 encoding.
@@ -78,31 +73,111 @@ impl AssociatedContractStruct for SuiResource {
     const CONTRACT_STRUCT: StructTag<'static> = contracts::site::Resource;
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct HttpHeaders(pub BTreeMap<String, String>);
+/// The representation of a move VecMap.
+#[derive(Serialize, Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Default)]
+pub struct VecMap<K, V>(pub BTreeMap<K, V>);
 
-/// The routes of a site.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct Routes(pub BTreeMap<String, String>);
+impl<K, V> VecMap<K, V>
+where
+    K: Ord,
+{
+    pub fn new() -> Self {
+        VecMap(BTreeMap::new())
+    }
 
-impl<'de> Deserialize<'de> for Routes {
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn entry(&mut self, key: K) -> btree_map::Entry<K, V> {
+        self.0.entry(key)
+    }
+
+    #[allow(unused)]
+    pub fn insert(&mut self, key: K, value: V) -> Option<V> {
+        self.0.insert(key, value)
+    }
+
+    #[allow(unused)]
+    pub fn or_insert(&mut self, key: K, value: V) -> &mut V {
+        self.0.entry(key).or_insert(value)
+    }
+
+    #[allow(unused)]
+    pub fn contains_key<Q>(&self, key: &Q) -> bool
+    where
+        K: Borrow<Q> + Ord,
+        Q: ?Sized + Ord,
+    {
+        self.0.contains_key(key)
+    }
+
+    #[allow(unused)]
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn iter(&self) -> btree_map::Iter<K, V> {
+        self.0.iter()
+    }
+
+    pub fn get<Q>(&self, key: &Q) -> Option<&V>
+    where
+        K: Borrow<Q> + Ord,
+        Q: ?Sized + Ord,
+    {
+        self.0.get(key)
+    }
+}
+
+impl<K, V> IntoIterator for VecMap<K, V> {
+    type Item = (K, V);
+    type IntoIter = <BTreeMap<K, V> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'de, K, V> Deserialize<'de> for VecMap<K, V>
+where
+    K: Deserialize<'de> + Ord,
+    V: Deserialize<'de>,
+{
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         if deserializer.is_human_readable() {
-            let routes: BTreeMap<String, String> = Deserialize::deserialize(deserializer)?;
+            let routes: BTreeMap<K, V> = Deserialize::deserialize(deserializer)?;
             Ok(Self(routes))
         } else {
-            let routes: Vec<(String, String)> = Deserialize::deserialize(deserializer)?;
+            let routes: Vec<(K, V)> = Deserialize::deserialize(deserializer)?;
             Ok(Self(routes.into_iter().collect()))
         }
     }
 }
 
+impl<K, V> FromIterator<(K, V)> for VecMap<K, V>
+where
+    K: Ord,
+{
+    fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
+        VecMap(iter.into_iter().collect())
+    }
+}
+
+/// The representation of the HTTP headers.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct HttpHeaders(pub VecMap<String, String>);
+
+/// The routes of a site.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Routes(pub VecMap<String, String>);
+
 impl Routes {
     pub fn empty() -> Self {
-        Routes(BTreeMap::new())
+        Routes(VecMap::new())
     }
 
     pub fn is_empty(&self) -> bool {
@@ -161,4 +236,64 @@ impl Default for Metadata {
             creator: None,
         }
     }
+}
+
+// SuiNS definitions
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NameRecord {
+    pub nft_id: ObjectID,
+    /// Timestamp in milliseconds when the record expires.
+    pub expiration_timestamp_ms: u64,
+    /// The target address that this domain points to
+    pub target_address: Option<SuiAddress>,
+    /// Additional data which may be stored in a record
+    pub data: VecMap<String, String>,
+}
+
+impl NameRecord {
+    /// Returns the `walrus_site_id` for the record, if it exists.
+    ///
+    /// If it does not exist, it returns the ID of the wallet pointed to the by the record.
+    pub(crate) fn walrus_site_id(&self) -> Option<ObjectID> {
+        self.data
+            .get("walrus_site_id")
+            .and_then(|s| ObjectID::from_str(s).ok())
+            .or_else(|| {
+                tracing::info!("no walrus_site_id found in the record");
+                self.target_address.map(|address| address.into())
+            })
+    }
+}
+
+/// The `Domain` type for keying the record table.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Domain {
+    pub labels: Vec<String>,
+}
+
+impl Domain {
+    /// Returns the normalized SuiNS name, if valid.
+    pub(crate) fn from_name(name: &str) -> Option<Self> {
+        let name = name.trim();
+        if name.is_empty() {
+            return None;
+        }
+
+        // TODO: Check if the name is specified as `@<name>`
+        if !name.ends_with(".sui") {
+            return None;
+        }
+
+        let labels = name
+            .split('.')
+            .rev()
+            .map(|s| s.to_owned())
+            .collect::<Vec<_>>();
+        Some(Domain { labels })
+    }
+}
+
+impl AssociatedContractStruct for NameRecord {
+    const CONTRACT_STRUCT: StructTag<'static> = contracts::suins::NameRecord;
 }

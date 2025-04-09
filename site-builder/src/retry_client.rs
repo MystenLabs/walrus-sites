@@ -5,9 +5,9 @@
 //!
 //! Wraps the [`SuiClient`] to introduce retries.
 
-use std::{fmt::Debug, future::Future, str::FromStr};
+use std::{fmt::Debug, future::Future};
 
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use rand::{
     rngs::{StdRng, ThreadRng},
     Rng as _,
@@ -19,8 +19,11 @@ use sui_sdk::{
     rpc_types::{
         Balance,
         Coin,
+        DynamicFieldInfo,
         ObjectsPage,
         Page,
+        SuiObjectData,
+        SuiObjectDataFilter,
         SuiObjectDataOptions,
         SuiObjectResponse,
         SuiObjectResponseQuery,
@@ -34,7 +37,7 @@ use sui_sdk::{
 };
 use sui_types::{
     base_types::{ObjectID, SuiAddress},
-    dynamic_field::{derive_dynamic_field_id, DynamicFieldInfo},
+    dynamic_field::derive_dynamic_field_id,
     quorum_driver_types::ExecuteTransactionRequestType::WaitForLocalExecution,
     transaction::Transaction,
     TypeTag,
@@ -44,11 +47,13 @@ use tracing::Level;
 use crate::{
     backoff::{BackoffStrategy, ExponentialBackoff, ExponentialBackoffConfig},
     site::contracts::{
+        self,
         get_sui_object_from_object_response,
         AssociatedContractStruct,
         TypeOriginMap,
     },
     types::SuiDynamicField,
+    util::handle_pagination,
 };
 
 /// The list of HTTP status codes that are retriable.
@@ -229,6 +234,29 @@ impl RetriableSuiClient {
         .await
     }
 
+    /// Gets a single dynamic field by key.
+    pub(crate) async fn get_dynamic_field<K, V>(
+        &self,
+        parent: ObjectID,
+        key_type: TypeTag,
+        key: K,
+    ) -> Result<V>
+    where
+        K: DeserializeOwned + Serialize,
+        V: DeserializeOwned + Serialize,
+    {
+        let object_id = derive_dynamic_field_id(
+            parent,
+            &key_type,
+            &bcs::to_bytes(&key).expect("key should be serializable"),
+        )?;
+
+        tracing::debug!(?object_id, "getting single dynamic field");
+
+        let field: SuiDynamicField<K, V> = self.get_sui_object(object_id).await?;
+        Ok(field.value)
+    }
+
     /// Return a paginated response with the objects owned by the given address.
     ///
     /// Calls [`sui_sdk::apis::ReadApi::get_owned_objects`] internally.
@@ -313,29 +341,6 @@ impl RetriableSuiClient {
         .await
     }
 
-    pub(crate) async fn get_dynamic_field_object<K, V>(
-        &self,
-        parent: ObjectID,
-        key_type: TypeTag,
-        key: K,
-    ) -> Result<V>
-    where
-        V: AssociatedContractStruct,
-        K: DeserializeOwned + Serialize,
-    {
-        let key_tag = key_type.to_canonical_string(true);
-        let object_id = derive_dynamic_field_id(
-            parent,
-            &TypeTag::from_str(&format!("0x2::dynamic_object_field::Wrapper<{}>", key_tag))
-                .expect("valid type tag"),
-            &bcs::to_bytes(&key).expect("key should be serializable"),
-        )?;
-
-        let field: SuiDynamicField<K, ObjectID> = self.get_sui_object(object_id).await?;
-        let inner = self.get_sui_object(field.value).await?;
-        Ok(inner)
-    }
-
     /// Gets the type origin map for a given package.
     pub(crate) async fn type_origin_map_for_package(
         &self,
@@ -388,5 +393,70 @@ impl RetriableSuiClient {
                 .await?)
         })
         .await
+    }
+
+    /// Get all the owned objects of the specified type for the specified owner.
+    ///
+    /// If some of the returned objects cannot be converted to the expected type, they are ignored.
+    pub(crate) async fn get_owned_objects_of_type<'a, U>(
+        &'a self,
+        owner: SuiAddress,
+        type_origin_map: &'a TypeOriginMap,
+        type_args: &'a [TypeTag],
+    ) -> Result<impl Iterator<Item = U> + 'a>
+    where
+        U: AssociatedContractStruct,
+    {
+        let results = self
+            .get_owned_object_data(owner, type_origin_map, type_args, U::CONTRACT_STRUCT)
+            .await?;
+
+        Ok(results.filter_map(|object_data| {
+            object_data.map_or_else(
+                |error| {
+                    tracing::warn!(?error, "failed to convert to local type");
+                    None
+                },
+                |object_data| match U::try_from_object_data(&object_data) {
+                    Result::Ok(value) => Some(value),
+                    Result::Err(error) => {
+                        tracing::warn!(?error, "failed to convert to local type");
+                        None
+                    }
+                },
+            )
+        }))
+    }
+
+    /// Get all the [`SuiObjectData`] objects of the specified type for the specified owner.
+    async fn get_owned_object_data<'a>(
+        &'a self,
+        owner: SuiAddress,
+        type_origin_map: &'a TypeOriginMap,
+        type_args: &'a [TypeTag],
+        object_type: contracts::StructTag<'a>,
+    ) -> Result<impl Iterator<Item = Result<SuiObjectData>> + 'a> {
+        let struct_tag =
+            object_type.to_move_struct_tag_with_type_map(type_origin_map, type_args)?;
+        Ok(handle_pagination(move |cursor| {
+            self.get_owned_objects(
+                owner,
+                Some(SuiObjectResponseQuery {
+                    filter: Some(SuiObjectDataFilter::StructType(struct_tag.clone())),
+                    options: Some(SuiObjectDataOptions::new().with_bcs().with_type()),
+                }),
+                cursor,
+                None,
+            )
+        })
+        .await?
+        .map(|resp| {
+            resp.data.ok_or_else(|| {
+                anyhow!(
+                    "response does not contain object data [err={:?}]",
+                    resp.error
+                )
+            })
+        }))
     }
 }
