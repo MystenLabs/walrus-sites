@@ -5,17 +5,16 @@
 version = 2
 ignore = [
     "RUSTSEC-2023-0071",
-    # difference 2.0.0 is unmaintained
-    "RUSTSEC-2020-0095",
     # rust-yaml is not maintained, but is a dependency in many of our packages.
     "RUSTSEC-2024-0320",
-    # We have a vulnerable version of `rustls` in our dependency tree through the old version of
-    # jsonrpsee used by sui.
-    "RUSTSEC-2024-0336",
     # proc-macro-error is not maintained, but is a dependency in many of our packages.
     "RUSTSEC-2024-0370",
     # `derivative` is unmaintained.
     "RUSTSEC-2024-0388",
+    # Crash due to uncontrolled recursion in `protobuf` crate.
+    "RUSTSEC-2024-0437",
+    # `paste` is unmaintained.
+    "RUSTSEC-2024-0436",
 ]
 
 # This section is considered when running `cargo deny check licenses`
@@ -64,6 +63,11 @@ ignore = true
 # Lint level for when multiple versions of the same crate are detected
 multiple-versions = "deny"
 skip = [
+  { name = "funty", version = "1.1.0" }, # Sui depends on both 1.1.0 and 2.0.0.
+  { name = "itertools", version = "<=12.1" },
+  { name = "radium", version = "0.6.2" }, # Sui depends on both 0.6.2 and 0.7.0.
+  { name = "synstructure", version = "0.12.6" },
+  { name = "hermit-abi", version = "0.3.9" }, # Prettytable conflicts with sui.
 ]
 skip-tree = [
     # Mysten's libraries pull in several conflicting repo versions.
@@ -72,6 +76,8 @@ skip-tree = [
     { name = "sui-sdk", depth = 6},
     # several crates depend on an older version of windows-sys
     { name = "windows-sys", depth = 3, version = "0.48" },
+    # Several crates depend on older windows versions
+    { name = "windows-targets", depth = 3, version = "0.42.2" },
 ]
 
 # This section is considered when running `cargo deny check sources`.

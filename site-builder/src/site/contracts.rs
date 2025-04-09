@@ -30,8 +30,9 @@ pub trait AssociatedContractStruct: DeserializeOwned {
     #[instrument(err, skip_all)]
     fn try_from_object_data(sui_object_data: &SuiObjectData) -> Result<Self> {
         tracing::debug!(
-            "converting move object to rust struct {:?}",
-            Self::CONTRACT_STRUCT,
+            contract_struct = ?Self::CONTRACT_STRUCT,
+            object_id = ?sui_object_data.object_id,
+            "converting move object to rust struct",
         );
         let raw = sui_object_data
             .bcs
@@ -228,8 +229,21 @@ pub mod site {
     contract_ident!(fn site::new_range_option, 1);
 }
 
+pub mod walrus {
+    use super::*;
+
+    contract_ident!(struct blob::Blob);
+}
+
 pub mod dynamic_field {
     use super::*;
 
     contract_ident!(struct dynamic_field::Field);
+}
+
+pub mod suins {
+    use super::*;
+
+    contract_ident!(struct name_record::NameRecord);
+    contract_ident!(struct domain::Domain);
 }

@@ -237,6 +237,8 @@ pub fn load_wallet_context(
     Ok(wallet_context)
 }
 
+// Resolution
+
 #[cfg(test)]
 mod test_util {
     use sui_types::base_types::ObjectID;

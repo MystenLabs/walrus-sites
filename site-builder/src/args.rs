@@ -6,6 +6,7 @@
 use std::{
     num::{NonZeroU32, NonZeroUsize},
     path::PathBuf,
+    str::FromStr,
 };
 
 use anyhow::{anyhow, ensure, Result};
@@ -14,7 +15,12 @@ use serde::{Deserialize, Serialize};
 use sui_sdk::wallet_context::WalletContext;
 use sui_types::base_types::{ObjectID, SuiAddress};
 
-use crate::{util::load_wallet_context, walrus::output::EpochCount};
+use crate::{
+    retry_client::RetriableSuiClient,
+    suins::SuiNsClient,
+    util::load_wallet_context,
+    walrus::output::EpochCount,
+};
 
 #[derive(Parser, Clone, Debug, Deserialize)]
 #[clap(rename_all = "kebab-case")]
@@ -62,6 +68,11 @@ pub(crate) struct GeneralArgs {
     /// Can be specified as a CLI argument or in the config.
     #[clap(long)]
     pub(crate) walrus_config: Option<PathBuf>,
+    /// The package ID of the Walrus package on the selected network.
+    ///
+    /// This is currently only used for the `sitemap` command.
+    #[clap(long)]
+    pub(crate) walrus_package: Option<ObjectID>,
     /// The gas budget for the operations on Sui.
     ///
     /// Can be specified as a CLI argument or in the config.
@@ -80,6 +91,7 @@ impl Default for GeneralArgs {
             walrus_context: None,
             walrus_binary: default::walrus_binary(),
             walrus_config: None,
+            walrus_package: None,
             gas_budget: default::gas_budget(),
         }
     }
@@ -141,6 +153,62 @@ impl GeneralArgs {
     }
 }
 
+#[derive(Debug, Clone)]
+pub(crate) enum ObjectIdOrName {
+    /// The object ID of the site.
+    ObjectId(ObjectID),
+    /// The name of the site.
+    Name(String),
+}
+
+impl ObjectIdOrName {
+    fn parse_sitemap_target(input: &str) -> Result<Self> {
+        if let Ok(object_id) = ObjectID::from_str(input) {
+            Ok(Self::ObjectId(object_id))
+        } else {
+            Ok(Self::Name(Self::normalize_name(input)))
+        }
+    }
+
+    /// Returns the object ID of the site, resolving it from SuiNS if necessary.
+    pub(crate) async fn resolve_object_id(
+        &self,
+        client: RetriableSuiClient,
+        context: &str,
+    ) -> Result<ObjectID> {
+        match self {
+            ObjectIdOrName::ObjectId(object) => Ok(*object),
+            ObjectIdOrName::Name(domain) => {
+                let suins = SuiNsClient::from_context(client, context).await?;
+                let record = suins.resolve_name_record(domain).await?;
+                let object_id = record.walrus_site_id();
+
+                if let Some(object_id) = object_id {
+                    println!(
+                        "The SuiNS name {} points to the Walrus Site object: {} (on {})",
+                        domain, object_id, context
+                    );
+                    Ok(object_id)
+                } else {
+                    Err(anyhow!(
+                        "the SuiNS name ({}) provided does not point to any object",
+                        domain
+                    ))
+                }
+            }
+        }
+    }
+
+    /// Normalizes the suins name, changing it to the format `<name>.sui`.
+    pub(crate) fn normalize_name(name: &str) -> String {
+        if let Some(stripped) = name.strip_prefix('@') {
+            format!("{}.sui", stripped)
+        } else {
+            name.to_owned()
+        }
+    }
+}
+
 #[derive(Subcommand, Debug)]
 #[clap(rename_all = "kebab-case")]
 pub(crate) enum Commands {
@@ -174,8 +242,18 @@ pub(crate) enum Commands {
         /// The object id (in hex format) to convert
         object_id: ObjectID,
     },
-    /// Show the pages composing the site at the given object ID.
-    Sitemap { object: ObjectID },
+    /// Show the pages composing the site at the given object ID or the given SuiNS name.
+    ///
+    /// Running this command requires the `walrus_package` to be specified either in the config or
+    /// through the `--walrus-package` flag.
+    Sitemap {
+        #[clap(value_parser = ObjectIdOrName::parse_sitemap_target)]
+        /// The site to be mapped.
+        ///
+        /// The site can be specified as object ID (in hex form) or as SuiNS name.
+        /// The SuiNS name can be specified either as `<name>.sui`, or as `@<name>`,
+        site_to_map: ObjectIdOrName,
+    },
     /// Preprocess the directory, creating and linking index files.
     /// This command allows to publish directories as sites. Warning: Rewrites all `index.html`
     /// files.

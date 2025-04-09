@@ -14,7 +14,8 @@ use anyhow::Result;
 use contracts::TypeOriginMap;
 use futures::future::try_join_all;
 use resource::{ResourceOp, ResourceSet};
-use sui_types::{base_types::ObjectID, dynamic_field::DynamicFieldInfo, TypeTag};
+use sui_sdk::rpc_types::DynamicFieldInfo;
+use sui_types::{base_types::ObjectID, TypeTag};
 
 use crate::{
     publish::WhenWalrusUpload,
@@ -197,6 +198,7 @@ impl RemoteSiteFactory<'_> {
     }
 
     /// Gets all the resources and their object ids from chain.
+    #[allow(unused)]
     pub async fn get_existing_resources(
         &self,
         object_id: ObjectID,
@@ -214,6 +216,7 @@ impl RemoteSiteFactory<'_> {
     }
 
     /// Filters the dynamic fields to get the resource object IDs.
+    #[allow(unused)]
     fn resources_from_dynamic_fields(
         &self,
         dynamic_fields: &[DynamicFieldInfo],
@@ -229,6 +232,7 @@ impl RemoteSiteFactory<'_> {
     }
 
     /// Gets the path of the resource from the dynamic field.
+    #[allow(unused)]
     fn get_path_from_info(&self, field: &DynamicFieldInfo, name_tag: &TypeTag) -> Option<String> {
         if field.name.type_ != *name_tag {
             return None;
