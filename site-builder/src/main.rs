@@ -22,7 +22,7 @@ use args::{Commands, GeneralArgs};
 use clap::Parser;
 use config::Config;
 use futures::TryFutureExt;
-use publish::{load_ws_resources, ContinuousEditing, SiteEditor, WhenWalrusUpload};
+use publish::{load_ws_resources, BlobManagementOptions, ContinuousEditing, SiteEditor};
 use site::{
     config::WSResources,
     manager::{SiteIdentifier, SiteManager},
@@ -124,23 +124,36 @@ async fn run() -> Result<()> {
                     publish_options,
                     SiteIdentifier::NewSite(site_name),
                     ContinuousEditing::Once,
-                    WhenWalrusUpload::Modified,
+                    BlobManagementOptions::no_status_check(),
                 )
                 .run()
                 .await?
         }
+        #[allow(deprecated)]
         Commands::Update {
             publish_options,
             object_id,
             watch,
             force,
+            check_extend,
         } => {
+            if force {
+                display::warning(
+                    "Warning: The --force flag is deprecated and will be removed in a future \
+                    version. Please use --check-extend instead.",
+                )
+            }
             SiteEditor::new(args.context, config)
                 .with_edit_options(
                     publish_options,
                     SiteIdentifier::ExistingSite(object_id),
                     ContinuousEditing::from_watch_flag(watch),
-                    WhenWalrusUpload::from_force_flag(force),
+                    // Check the extension if either `check_extend` is true or `force` is true.
+                    // This is for backwards compatibility.
+                    // TODO: Remove once the `force` flag is deprecated.
+                    BlobManagementOptions {
+                        check_extend: check_extend || force,
+                    },
                 )
                 .run()
                 .await?
@@ -188,7 +201,7 @@ async fn run() -> Result<()> {
             let mut site_manager = SiteManager::new(
                 config,
                 SiteIdentifier::ExistingSite(site_object),
-                WhenWalrusUpload::Always,
+                BlobManagementOptions::no_status_check(),
                 common,
                 None, // TODO: update the site metadata.
                 NonZeroUsize::new(1).expect("non-zero"),

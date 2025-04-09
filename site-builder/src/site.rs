@@ -18,7 +18,7 @@ use sui_sdk::rpc_types::DynamicFieldInfo;
 use sui_types::{base_types::ObjectID, TypeTag};
 
 use crate::{
-    publish::WhenWalrusUpload,
+    publish::BlobManagementOptions,
     retry_client::RetriableSuiClient,
     summary::SiteDataDiffSummary,
     types::{ResourceDynamicField, RouteOps, Routes, SuiDynamicField},
@@ -33,7 +33,7 @@ const DF_REQ_BATCH_SIZE: usize = 10;
 const DF_REQ_DELAY_MS: u64 = 100;
 
 /// The diff between two site data.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SiteDataDiff<'a> {
     /// The operations to perform on the resources.
     pub resource_ops: Vec<ResourceOp<'a>>,
@@ -47,16 +47,16 @@ impl SiteDataDiff<'_> {
     }
 
     /// Returns the resources that need to be updated on Walrus.
-    pub fn get_walrus_updates(&self, when_upload: &WhenWalrusUpload) -> Vec<&ResourceOp> {
+    pub fn get_walrus_updates(&self, blob_options: &BlobManagementOptions) -> Vec<&ResourceOp> {
         self.resource_ops
             .iter()
-            .filter(|u| u.is_walrus_update(when_upload))
+            .filter(|u| u.is_walrus_update(blob_options))
             .collect::<Vec<_>>()
     }
 
     /// Returns the summary of the operations in the diff.
-    pub fn summary(&self, when_upload: &WhenWalrusUpload) -> SiteDataDiffSummary {
-        if when_upload.is_always() {
+    pub fn summary(&self, blob_options: &BlobManagementOptions) -> SiteDataDiffSummary {
+        if blob_options.is_check_extend() {
             return SiteDataDiffSummary::from(self);
         }
         SiteDataDiffSummary {

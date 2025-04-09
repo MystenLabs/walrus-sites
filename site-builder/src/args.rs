@@ -228,12 +228,26 @@ pub(crate) enum Commands {
         object_id: ObjectID,
         #[clap(short, long, action)]
         watch: bool,
-        /// Publish all resources to Sui and Walrus, even if they may be already present.
+        /// This flag is deprecated and will be removed in the future. Use --check-extend.
         ///
+        /// Publish all resources to Sui and Walrus, even if they may be already present.
         /// This can be useful in case the Walrus devnet is reset, but the resources are still
         /// available on Sui.
         #[clap(long, action)]
+        #[deprecated(note = "This flag is being removed; please use --check-extend")]
         force: bool,
+        /// Checks and extends all blobs in the site.
+        ///
+        /// With this flag, the site-builder will force a check of the status of all the Walrus
+        /// blobs composing the site, and will extend the ones that expire before `--epochs` epochs.
+        /// This is useful to ensure all the resources in the site are available for the given
+        /// amount of epochs.
+        ///
+        /// Further, when this flag is set, _missing_ blobs will also be reuploaded (e.g., in case
+        /// they were deleted, or are all expired and were not owned, or, in case of testnet, the
+        /// network was wiped).
+        #[clap(long, action)]
+        check_extend: bool,
     },
     /// Convert an object ID in hex format to the equivalent Base36 format.
     ///

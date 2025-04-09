@@ -21,7 +21,7 @@ use regex::Regex;
 
 use super::SiteData;
 use crate::{
-    publish::WhenWalrusUpload,
+    publish::BlobManagementOptions,
     site::{config::WSResources, content::ContentType},
     types::{HttpHeaders, SuiResource, VecMap},
     walrus::{types::BlobId, Walrus},
@@ -104,6 +104,7 @@ impl Display for Resource {
 /// Updates to resources are implemented as deleting the outdated
 /// resource and adding a new one. Two [`Resources`][Resource] are
 /// different if their respective [`SuiResource`] differ.
+#[derive(Clone)]
 pub enum ResourceOp<'a> {
     Deleted(&'a Resource),
     Created(&'a Resource),
@@ -135,9 +136,9 @@ impl<'a> ResourceOp<'a> {
     }
 
     /// Returns if the operation needs to be uploaded to Walrus.
-    pub fn is_walrus_update(&self, when_upload: &WhenWalrusUpload) -> bool {
+    pub fn is_walrus_update(&self, blob_options: &BlobManagementOptions) -> bool {
         matches!(self, ResourceOp::Created(_))
-            || (when_upload.is_always() && matches!(self, ResourceOp::Unchanged(_)))
+            || (blob_options.is_check_extend() && matches!(self, ResourceOp::Unchanged(_)))
     }
 
     /// Returns true if the operation modifies a resource.

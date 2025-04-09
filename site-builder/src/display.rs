@@ -32,6 +32,16 @@ pub fn error<S: Display>(message: S) {
     }
 }
 
+pub fn warning<S: Display>(message: S) {
+    if cfg!(not(test)) {
+        crossterm::execute!(
+            stdout(),
+            PrintStyledContent(format!("\n{message}\n").yellow().bold()),
+        )
+        .unwrap();
+    }
+}
+
 pub fn action<S: Display>(message: S) {
     if cfg!(not(test)) {
         crossterm::execute!(stdout(), Print(format!("{message} ... ")), SavePosition).unwrap();
