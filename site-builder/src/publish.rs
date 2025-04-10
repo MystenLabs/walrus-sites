@@ -64,28 +64,23 @@ impl ContinuousEditing {
     }
 }
 
-/// Force the update of walrus blobs.
+/// Options for the management of Walrus blobs.
 #[derive(Debug, Clone)]
-pub(crate) enum WhenWalrusUpload {
-    /// Force the update of walrus blobs.
-    Always,
-    /// Only update modified
-    Modified,
+pub(crate) struct BlobManagementOptions {
+    /// Forces a check of the expiration of all blobs, and extension if necessary.
+    pub(crate) check_extend: bool,
 }
 
-impl WhenWalrusUpload {
-    pub fn is_always(&self) -> bool {
-        matches!(self, WhenWalrusUpload::Always)
+impl BlobManagementOptions {
+    /// Returns true if the expiration of all blobs should be checked.
+    pub fn is_check_extend(&self) -> bool {
+        self.check_extend
     }
-}
 
-/// When to upload the resources to Walrus.
-impl WhenWalrusUpload {
-    pub fn from_force_flag(force: bool) -> Self {
-        if force {
-            WhenWalrusUpload::Always
-        } else {
-            WhenWalrusUpload::Modified
+    /// Returns an instance of `Self` with the expiration check disabled.
+    pub fn no_status_check() -> Self {
+        BlobManagementOptions {
+            check_extend: false,
         }
     }
 }
@@ -94,7 +89,7 @@ pub(crate) struct EditOptions {
     pub publish_options: PublishOptions,
     pub site_id: SiteIdentifier,
     pub continuous_editing: ContinuousEditing,
-    pub when_upload: WhenWalrusUpload,
+    pub blob_options: BlobManagementOptions,
 }
 
 pub(crate) struct SiteEditor<E = ()> {
@@ -117,7 +112,7 @@ impl SiteEditor {
         publish_options: PublishOptions,
         site_id: SiteIdentifier,
         continuous_editing: ContinuousEditing,
-        when_upload: WhenWalrusUpload,
+        blob_options: BlobManagementOptions,
     ) -> SiteEditor<EditOptions> {
         SiteEditor {
             context: self.context,
@@ -126,7 +121,7 @@ impl SiteEditor {
                 publish_options,
                 site_id,
                 continuous_editing,
-                when_upload,
+                blob_options,
             },
         }
     }
@@ -161,11 +156,11 @@ impl SiteEditor {
         if all_blobs.is_empty() {
             println!("Warning: No deletable resources found. This may be because the site was created with permanent=true");
         } else {
-            // TODO: Change the site manager not to the unnecessary info.
+            // TODO: Change the site manager not to require the unnecessary info.
             let mut site_manager = SiteManager::new(
                 self.config.clone(),
                 ExistingSite(site_id),
-                WhenWalrusUpload::Always,
+                BlobManagementOptions::no_status_check(),
                 WalrusStoreOptions::default(),
                 None,
                 NonZeroUsize::new(1).expect("non-zero"),
@@ -268,7 +263,7 @@ impl SiteEditor<EditOptions> {
         let mut site_manager = SiteManager::new(
             self.config.clone(),
             self.edit_options.site_id.clone(),
-            self.edit_options.when_upload.clone(),
+            self.edit_options.blob_options.clone(),
             self.edit_options.publish_options.walrus_options.clone(),
             site_metadata,
             self.edit_options.publish_options.max_parallel_stores,

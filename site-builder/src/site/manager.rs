@@ -25,7 +25,7 @@ use crate::{
     backoff::ExponentialBackoffConfig,
     config::Config,
     display,
-    publish::WhenWalrusUpload,
+    publish::BlobManagementOptions,
     retry_client::RetriableSuiClient,
     summary::SiteDataDiffSummary,
     types::Metadata,
@@ -51,7 +51,7 @@ pub struct SiteManager {
     pub walrus: Walrus,
     pub wallet: WalletContext,
     pub site_id: SiteIdentifier,
-    pub when_upload: WhenWalrusUpload,
+    pub blob_options: BlobManagementOptions,
     pub backoff_config: ExponentialBackoffConfig,
     pub metadata: Option<Metadata>,
     pub walrus_options: WalrusStoreOptions,
@@ -63,7 +63,7 @@ impl SiteManager {
     pub async fn new(
         config: Config,
         site_id: SiteIdentifier,
-        when_upload: WhenWalrusUpload,
+        blob_options: BlobManagementOptions,
         walrus_options: WalrusStoreOptions,
         metadata: Option<Metadata>,
         max_parallel_stores: NonZeroUsize,
@@ -73,7 +73,7 @@ impl SiteManager {
             wallet: config.load_wallet()?,
             config,
             site_id,
-            when_upload,
+            blob_options,
             backoff_config: ExponentialBackoffConfig::default(),
             metadata,
             walrus_options,
@@ -131,14 +131,38 @@ impl SiteManager {
         };
         tracing::debug!(?existing_site, "checked existing site");
 
-        let site_updates = if self.when_upload.is_always() {
+        let site_updates = local_site_data.diff(&existing_site);
+
+        let walrus_candidate_set = if self.blob_options.is_check_extend() {
+            // We need to check the status of all blobs: Return the full list of existing and added
+            // blobs as possible updates.
             existing_site.replace_all(local_site_data)
         } else {
-            local_site_data.diff(&existing_site)
+            // We only need to upload the new blobs.
+            site_updates.clone()
         };
-        tracing::debug!(operations=?site_updates, "list of operations computed");
+        // IMPORTANT: Perform the store operations on Walrus first, to ensure zero "downtime".
+        self.select_and_store_to_walrus(&walrus_candidate_set)
+            .await?;
 
-        let walrus_updates = site_updates.get_walrus_updates(&self.when_upload);
+        // Check if there are any updates to the site on-chain.
+        let result = if site_updates.has_updates() {
+            display::action("Applying the Walrus Site object updates on Sui");
+            let result = self.execute_sui_updates(&site_updates).await?;
+            display::done();
+            result
+        } else {
+            SuiTransactionBlockResponse::default()
+        };
+        Ok((result, site_updates.summary(&self.blob_options)))
+    }
+
+    /// Selects the necessary walrus store operations and executes them.
+    async fn select_and_store_to_walrus(
+        &mut self,
+        walrus_candidate_set: &SiteDataDiff<'_>,
+    ) -> Result<()> {
+        let walrus_updates = walrus_candidate_set.get_walrus_updates(&self.blob_options);
 
         if !walrus_updates.is_empty() {
             if self.walrus_options.dry_run {
@@ -160,28 +184,23 @@ impl SiteManager {
                     return Err(anyhow!("Update cancelled by user"));
                 }
             }
-            self.publish_to_walrus(&walrus_updates).await?;
+            self.store_to_walrus(&walrus_updates).await?;
         }
-
-        // Check if there are any updates to the site on-chain.
-        let result = if site_updates.has_updates() {
-            display::action("Applying the Walrus Site object updates on Sui");
-            let result = self.execute_sui_updates(&site_updates).await?;
-            display::done();
-            result
-        } else {
-            SuiTransactionBlockResponse::default()
-        };
-        Ok((result, site_updates.summary(&self.when_upload)))
+        Ok(())
     }
 
     /// Publishes the resources to Walrus.
-    async fn publish_to_walrus<'b>(&mut self, updates: &[&ResourceOp<'b>]) -> Result<()> {
-        for (idx, update_set) in updates.chunks(self.max_parallel_stores.get()).enumerate() {
+    async fn store_to_walrus<'b>(&mut self, walrus_updates: &[&ResourceOp<'b>]) -> Result<()> {
+        for (idx, update_set) in walrus_updates
+            .chunks(self.max_parallel_stores.get())
+            .enumerate()
+        {
             display::action(format!(
                 "Storing resources on Walrus: batch {} of {}",
                 idx + 1,
-                updates.len().div_ceil(self.max_parallel_stores.get()),
+                walrus_updates
+                    .len()
+                    .div_ceil(self.max_parallel_stores.get()),
             ));
             self.store_multiple_to_walrus_with_retry(update_set).await?;
             display::done();
@@ -275,6 +294,7 @@ impl SiteManager {
     ) -> Result<SuiTransactionBlockResponse> {
         tracing::debug!(
             address=?self.active_address()?,
+            ?updates,
             "starting to update site resources on chain",
         );
         let ptb = SitePtb::new(
@@ -368,7 +388,7 @@ impl SiteManager {
         tracing::debug!("uploading the resource to Walrus");
         let walrus_ops = operations
             .iter()
-            .filter(|u| u.is_walrus_update(&self.when_upload))
+            .filter(|u| u.is_walrus_update(&self.blob_options))
             .collect::<Vec<_>>();
 
         //Perform dry run
@@ -390,7 +410,7 @@ impl SiteManager {
                 return Err(anyhow!("Update cancelled by user"));
             }
         }
-        self.publish_to_walrus(&walrus_ops).await?;
+        self.store_to_walrus(&walrus_ops).await?;
 
         // Create the PTB
         tracing::debug!("modifying the site object on chain");
