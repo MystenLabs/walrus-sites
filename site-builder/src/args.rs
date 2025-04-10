@@ -236,16 +236,21 @@ pub(crate) enum Commands {
         #[clap(long, action)]
         #[deprecated(note = "This flag is being removed; please use --check-extend")]
         force: bool,
-        /// Checks and extends all blobs in the site.
+        /// Checks and extends all blobs in the site during the update.
         ///
         /// With this flag, the site-builder will force a check of the status of all the Walrus
         /// blobs composing the site, and will extend the ones that expire before `--epochs` epochs.
-        /// This is useful to ensure all the resources in the site are available for the given
+        /// This is useful to ensure all the resources in the site are available for the same
         /// amount of epochs.
         ///
         /// Further, when this flag is set, _missing_ blobs will also be reuploaded (e.g., in case
         /// they were deleted, or are all expired and were not owned, or, in case of testnet, the
         /// network was wiped).
+        ///
+        /// Without this flag, the `update` command will only create new blobs for the resources
+        /// that have been added or modified (compared to the object on Sui). This implies that
+        /// successive updates (without --check-extend) may result in the site having resources
+        /// with different expiration times (and possibly some that are expired).
         #[clap(long, action)]
         check_extend: bool,
     },
