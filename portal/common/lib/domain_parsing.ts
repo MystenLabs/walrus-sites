@@ -23,10 +23,15 @@ export function getSubdomainAndPath(url: URL, portalNameLength?: Number): Domain
     if (!splitResult.details) {
         return null;
     }
-    return {
-        subdomain: splitResult.details.subdomain,
-        path: splitResult.details.path.replace(/%20/g, " "),
-    };
+    try {
+        return {
+            subdomain: splitResult.details.subdomain,
+            path: decodeURIComponent(splitResult.details.path),
+        };
+    } catch (e) {
+        console.error("Error decoding URL component:", e);
+        return null;
+    }
 }
 
 /**
