@@ -24,6 +24,10 @@ pub struct WSResources {
     /// The name of the site.
     #[serde(rename = "site-name", skip_serializing_if = "Option::is_none")]
     pub site_name: Option<String>,
+    /// The paths to ignore when publishing/updating.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ignore: Option<Vec<String>>,
+    
 }
 
 impl WSResources {
@@ -71,6 +75,14 @@ mod tests {
         }
     "#;
 
+    const IGNORE_DATA: &str = r#"
+    "ignore": [
+        "/foo/*",
+        "/baz/bar/*"
+    ]
+    "#;
+
+
     #[test]
     fn test_read_ws_resources() {
         let header_data = format!("{{{}}}", HEADER_DATA);
@@ -81,5 +93,11 @@ mod tests {
         serde_json::from_str::<WSResources>(&route_header_data).expect("parsing should succeed");
         let all_fields_included = format!("{{{},{},{}}}", HEADER_DATA, ROUTE_DATA, METADATA);
         serde_json::from_str::<WSResources>(&all_fields_included).expect("parsing should succeed");
+        // Test for ignore field
+        let ignore_data = format!("{{{}}}", IGNORE_DATA);
+        let parsed: WSResources = serde_json::from_str(&ignore_data).expect("parsing should succeed");
+        assert!(parsed.ignore.is_some());
+        assert_eq!(parsed.ignore.unwrap(), vec!["/foo/*", "/baz/bar/*"]);
+
     }
 }

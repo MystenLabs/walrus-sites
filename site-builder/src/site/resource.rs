@@ -380,6 +380,12 @@ impl ResourceManager {
             }
         }
 
+        // Skip if resource matches ignore patterns/
+        if self.is_ignored(&resource_path) {
+            tracing::debug!(?resource_path, "ignoring resource due to ignore pattern");
+            return Ok(None);
+        }
+
         let mut http_headers: VecMap<String, String> =
             ResourceManager::derive_http_headers(&self.ws_resources, &resource_path);
         let extension = full_path
@@ -469,6 +475,20 @@ impl ResourceManager {
             .map(|re| re.is_match(resource_path))
             .unwrap_or(false)
     }
+
+    /// Returns true if the resource_path matches any of the ignore patterns.
+    fn is_ignored(&self, resource_path: &str) -> bool {
+        if let Some(ws_resources) = &self.ws_resources {
+            if let Some(ignore_patterns) = &ws_resources.ignore {
+                // Find the longest matching pattern
+                return ignore_patterns
+                    .iter()
+                    .any(|pattern| Self::is_pattern_match(pattern, resource_path));
+            }
+        }
+        false
+    }
+
 
     /// Recursively iterate a directory and load all [`Resources`][Resource] within.
     pub async fn read_dir(&mut self, root: &Path) -> Result<SiteData> {
@@ -639,6 +659,7 @@ mod tests {
             routes: None,
             metadata: None,
             site_name: None,
+            ignore: None,
         })
     }
 }
