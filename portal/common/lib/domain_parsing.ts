@@ -19,7 +19,19 @@ export function getDomain(url: URL, portalNameLength?: Number): string | null {
 * @returns domain details e.g. { subdomain: "subname", path: "/index.html"}
 */
 export function getSubdomainAndPath(url: URL, portalNameLength?: Number): DomainDetails | null {
-    return splitUrl(url, portalNameLength).details;
+    const splitResult = splitUrl(url, portalNameLength);
+    if (!splitResult.details) {
+        return null;
+    }
+    try {
+        return {
+            subdomain: splitResult.details.subdomain,
+            path: decodeURIComponent(splitResult.details.path),
+        };
+    } catch (e) {
+        console.error("Error decoding URL component:", e);
+        return null;
+    }
 }
 
 /**

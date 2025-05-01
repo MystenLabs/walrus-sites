@@ -55,7 +55,13 @@ const getSubdomainAndPathTestCases: [string, DomainDetails][] = [
         { subdomain: 'subsubname.subname.suinsname', path: '/index.html' }],
     ['http://docs.localhost/css/print.css', { subdomain: 'docs', path: '/css/print.css' }],
     ['http://docs.localhost/assets/index-a242f32b.js',
-        { subdomain: 'docs', path: '/assets/index-a242f32b.js'}]
+        { subdomain: 'docs', path: '/assets/index-a242f32b.js'}],
+    ['https://mystenlabs-logos.wal.app/02_Horizontal%20Logo/index.html',
+        { subdomain: 'mystenlabs-logos', path: '/02_Horizontal Logo/index.html' }],
+    ['http://my-site.localhost/files/report%2D2024.pdf',
+        { subdomain: 'my-site', path: '/files/report-2024.pdf' }],
+    ['http://my-site.localhost/files/report-2024.pdf',
+        { subdomain: 'my-site', path: '/files/report-2024.pdf' }]
 ]
 
 describe('getSubdomainAndPath', () => {
