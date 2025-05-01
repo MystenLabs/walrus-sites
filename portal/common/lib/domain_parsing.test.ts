@@ -59,6 +59,8 @@ const getSubdomainAndPathTestCases: [string, DomainDetails][] = [
     ['https://mystenlabs-logos.wal.app/02_Horizontal%20Logo/index.html',
         { subdomain: 'mystenlabs-logos', path: '/02_Horizontal Logo/index.html' }],
     ['http://my-site.localhost/files/report%2D2024.pdf',
+        { subdomain: 'my-site', path: '/files/report-2024.pdf' }],
+    ['http://my-site.localhost/files/report-2024.pdf',
         { subdomain: 'my-site', path: '/files/report-2024.pdf' }]
 ]
 
