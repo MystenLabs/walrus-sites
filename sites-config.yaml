@@ -6,7 +6,7 @@ contexts:
     general:
        wallet_env: testnet
        walrus_context: testnet # Assumes a Walrus CLI setup with a multi-config containing the "testnet" context.
-       # walrus_package: 0xd84704c17fc870b8764832c535aa6b11f21a95cd6f5bb38a9b07d2cf42220c66
+       walrus_package: 0xd84704c17fc870b8764832c535aa6b11f21a95cd6f5bb38a9b07d2cf42220c66
        # wallet_address: 0x1234...
        # rpc_url: https://fullnode.testnet.sui.io:443
        # wallet: /path/to/.sui/sui_config/client.yaml
