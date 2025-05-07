@@ -489,7 +489,6 @@ impl ResourceManager {
         false
     }
 
-
     /// Recursively iterate a directory and load all [`Resources`][Resource] within.
     pub async fn read_dir(&mut self, root: &Path) -> Result<SiteData> {
         let resource_paths = Self::iter_dir(root, root)?;
