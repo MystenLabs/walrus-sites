@@ -19,5 +19,6 @@
 	   "project_url": "https://github.com/MystenLabs/walrus-sites/",
 	   "creator": "MystenLabs"
 	},
-  "site-name": "Walrus Snake Game"
+  "site-name": "Walrus Snake Game",
+  "ignore": ["/private/*", "/secret.txt"]
 }
