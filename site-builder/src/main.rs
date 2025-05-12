@@ -145,6 +145,7 @@ async fn run() -> Result<()> {
                 )
                 .run()
                 .await?
+        }
         Commands::Publish {
             publish_options,
             site_name,
