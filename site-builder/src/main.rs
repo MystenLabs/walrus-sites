@@ -103,6 +103,58 @@ async fn run() -> Result<()> {
     tracing::info!(?config, "configuration loaded");
 
     match args.command {
+        Commands::Deploy {
+            publish_options,
+            site_name,
+            watch,
+            check_extend,
+        } => {
+            // TODO: Refactoring opportunity --> extract the update/publish internal functions
+            // to avoid code duplication.
+            // (For now I am following the rule of 3 before extracting a new function)
+
+            // Load the ws-resources file, to check for the site-object-id.
+            // If it exists, it means the site is already deployed, in which case we should
+            // do the same as the update command.
+            // If it doesn't exist, we can deploy the site, by doing the same as the publish command.
+            let (ws_resources, _) = load_ws_resources(
+                publish_options.walrus_options.ws_resources.as_deref(),
+                publish_options.directory.as_path(),
+            )?;
+            let site_object_id = ws_resources.as_ref().and_then(|res| res.site_object_id);
+
+            match site_object_id {
+                Some(object_id) => {
+                    SiteEditor::new(args.context, config)
+                        .with_edit_options(
+                            publish_options,
+                            SiteIdentifier::ExistingSite(object_id),
+                            ContinuousEditing::from_watch_flag(watch),
+                            // Check the extension if `check_extend` is true.
+                            BlobManagementOptions { check_extend },
+                        )
+                        .run()
+                        .await?
+                }
+                None => {
+                    let site_name = site_name.unwrap_or_else(|| {
+                        ws_resources
+                            .and_then(|res| res.site_name)
+                            .unwrap_or_else(|| "Test Site".to_string())
+                    });
+
+                    SiteEditor::new(args.context, config)
+                        .with_edit_options(
+                            publish_options,
+                            SiteIdentifier::NewSite(site_name),
+                            ContinuousEditing::Once,
+                            BlobManagementOptions::no_status_check(),
+                        )
+                        .run()
+                        .await?
+                }
+            }
+        }
         Commands::Publish {
             publish_options,
             site_name,

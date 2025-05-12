@@ -243,7 +243,7 @@ impl SiteEditor<EditOptions> {
         let mut resource_manager = ResourceManager::new(
             self.config.walrus_client(),
             ws_resources.clone(),
-            ws_resources_path,
+            ws_resources_path.clone(),
             self.edit_options.publish_options.max_concurrent,
         )
         .await?;
@@ -255,7 +255,7 @@ impl SiteEditor<EditOptions> {
         display::done();
         tracing::debug!(?local_site_data, "resources loaded from directory");
 
-        let site_metadata = match ws_resources {
+        let site_metadata = match ws_resources.clone() {
             Some(value) => value.metadata,
             None => None,
         };
@@ -270,6 +270,48 @@ impl SiteEditor<EditOptions> {
         )
         .await?;
         let (response, summary) = site_manager.update_site(&local_site_data).await?;
+
+        // Save the site_object_id to the ws-resources file.
+
+        let new_site_object_id = match get_site_id_from_response(
+            site_manager.active_address()?,
+            response
+                .effects
+                .as_ref()
+                .ok_or_else(|| anyhow!("Transaction effects not found"))?, // Use ok_or_else for better error
+        ) {
+            Ok(id) => id,
+            Err(e) => {
+                // If we can't get the ID, we can't save it.
+                display::error(format!(
+                    "Could not get site object ID from transaction response: {}",
+                    e
+                ));
+                // Maybe return early here ?? :
+                // return Err(e.context("Failed to extract site object ID for saving"));
+                return Ok((site_manager.active_address()?, response, summary)); // Exit OK without saving
+            }
+        };
+        match ws_resources {
+            Some(mut ws_resources) => {
+                ws_resources.site_object_id = Some(new_site_object_id);
+                ws_resources.save(ws_resources_path.unwrap())?;
+            }
+            None => {
+                // TODO: Maybe implement the `Default` trait for `WSResources` ?
+                // If the ws_resources file does not exist, create it with the new site object ID.
+                let ws_resources = WSResources {
+                    headers: None,
+                    routes: None,
+                    metadata: None,
+                    site_name: None,
+                    site_object_id: Some(new_site_object_id),
+                    ignore: None,
+                };
+                ws_resources.save(ws_resources_path.unwrap())?;
+            }
+        }
+
         Ok((site_manager.active_address()?, response, summary))
     }
 
