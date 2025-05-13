@@ -271,7 +271,15 @@ impl SiteEditor<EditOptions> {
         .await?;
         let (response, summary) = site_manager.update_site(&local_site_data).await?;
 
-        // Save the site_object_id to the ws-resources file.
+        // -- Save the site_object_id to the ws-resources file.
+
+        if let Some(ws_resources) = ws_resources.as_ref() {
+            // Check if the site object ID is already set in the ws-resources file.
+            if ws_resources.site_object_id.is_some() {
+                display::action("Site object ID already set in the ws-resources file");
+                return Ok((site_manager.active_address()?, response, summary));
+            }
+        };
 
         let new_site_object_id = match get_site_id_from_response(
             site_manager.active_address()?,
@@ -281,6 +289,7 @@ impl SiteEditor<EditOptions> {
                 .ok_or_else(|| anyhow!("Transaction effects not found"))?, // Use ok_or_else for better error
         ) {
             Ok(id) => id,
+            // TODO: This arm is unreachable, because get_site_id_from_response uses `expect`, which panics
             Err(e) => {
                 // If we can't get the ID, we can't save it.
                 display::error(format!(
