@@ -355,8 +355,8 @@ mod tests {
         ];
 
         for (this_routes, other_routes, has_updates) in cases {
-            let this = SiteData::new(ResourceSet::empty(), this_routes);
-            let other = SiteData::new(ResourceSet::empty(), other_routes);
+            let this = SiteData::new(ResourceSet::empty(), this_routes, None);
+            let other = SiteData::new(ResourceSet::empty(), other_routes, None);
             let diff = this.diff(&other);
             assert_eq!(diff.has_updates(), has_updates);
         }
