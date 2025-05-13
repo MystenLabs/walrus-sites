@@ -21,7 +21,15 @@ use crate::{
     publish::BlobManagementOptions,
     retry_client::RetriableSuiClient,
     summary::SiteDataDiffSummary,
-    types::{Metadata, ResourceDynamicField, RouteOps, Routes, SiteObjFields, SuiDynamicField},
+    types::{
+        Metadata,
+        MetadataOp,
+        ResourceDynamicField,
+        RouteOps,
+        Routes,
+        SiteObjFields,
+        SuiDynamicField,
+    },
     util::{handle_pagination, type_origin_map_for_package},
 };
 
@@ -38,7 +46,7 @@ pub struct SiteDataDiff<'a> {
     /// The operations to perform on the resources.
     pub resource_ops: Vec<ResourceOp<'a>>,
     pub route_ops: RouteOps,
-    pub metadata_ops: Option<Metadata>,
+    pub metadata_op: MetadataOp,
 }
 
 impl SiteDataDiff<'_> {
@@ -46,7 +54,7 @@ impl SiteDataDiff<'_> {
     pub fn has_updates(&self) -> bool {
         self.resource_ops.iter().any(|op| op.is_change())
             || !self.route_ops.is_unchanged()
-            || self.metadata_ops.is_some()
+            || !self.metadata_op.is_noop()
     }
 
     /// Returns the resources that need to be updated on Walrus.
@@ -70,7 +78,7 @@ impl SiteDataDiff<'_> {
                 .map(|op| op.into())
                 .collect(),
             route_ops: self.route_ops.clone(),
-            metadata: self.metadata_ops.is_some(),
+            metadata_updated: !self.metadata_op.is_noop(),
         }
     }
 }
@@ -107,7 +115,7 @@ impl SiteData {
         SiteDataDiff {
             resource_ops: self.resources.diff(&start.resources),
             route_ops: self.routes_diff(start),
-            metadata_ops: self.metadata_diff(start),
+            metadata_op: self.metadata_diff(start),
         }
     }
 
@@ -116,7 +124,7 @@ impl SiteData {
         SiteDataDiff {
             resource_ops: self.resources.replace_all(&other.resources),
             route_ops: self.routes_diff(other),
-            metadata_ops: self.metadata_diff(other),
+            metadata_op: self.metadata_diff(other),
         }
     }
 
@@ -129,11 +137,11 @@ impl SiteData {
         }
     }
 
-    fn metadata_diff(&self, start: &Self) -> Option<Metadata> {
+    fn metadata_diff(&self, start: &Self) -> MetadataOp {
         if self.metadata != start.metadata {
-            Some(self.metadata.clone())
+            MetadataOp::Update
         } else {
-            None
+            MetadataOp::Noop
         }
     }
 

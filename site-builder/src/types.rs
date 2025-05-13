@@ -261,6 +261,18 @@ impl From<SiteObjFields> for Metadata {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum MetadataOp {
+    Update,
+    Noop,
+}
+
+impl MetadataOp {
+    pub fn is_noop(&self) -> bool {
+        matches!(self, Self::Noop)
+    }
+}
+
 #[derive(Deserialize, Clone, Debug)]
 pub struct SiteObjFields {
     #[allow(dead_code)]
