@@ -241,9 +241,9 @@ impl Default for Metadata {
     }
 }
 
-impl From<SiteObjFields> for Metadata {
-    fn from(value: SiteObjFields) -> Self {
-        let SiteObjFields {
+impl From<SiteFields> for Metadata {
+    fn from(value: SiteFields) -> Self {
+        let SiteFields {
             link,
             image_url,
             description,
@@ -274,7 +274,7 @@ impl MetadataOp {
 }
 
 #[derive(Deserialize, Clone, Debug)]
-pub struct SiteObjFields {
+pub struct SiteFields {
     #[allow(dead_code)]
     pub id: UID,
     #[allow(dead_code)]
@@ -284,6 +284,10 @@ pub struct SiteObjFields {
     pub description: Option<String>,
     pub project_url: Option<String>,
     pub creator: Option<String>,
+}
+
+impl AssociatedContractStruct for SiteFields {
+    const CONTRACT_STRUCT: StructTag<'static> = contracts::site::Site;
 }
 
 // SuiNS definitions

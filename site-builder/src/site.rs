@@ -14,7 +14,7 @@ use anyhow::Result;
 use contracts::TypeOriginMap;
 use futures::future::try_join_all;
 use resource::{ResourceOp, ResourceSet};
-use sui_sdk::rpc_types::{DynamicFieldInfo, SuiObjectDataOptions};
+use sui_sdk::rpc_types::DynamicFieldInfo;
 use sui_types::{base_types::ObjectID, TypeTag};
 
 use crate::{
@@ -27,7 +27,7 @@ use crate::{
         ResourceDynamicField,
         RouteOps,
         Routes,
-        SiteObjFields,
+        SiteFields,
         SuiDynamicField,
     },
     util::{handle_pagination, type_origin_map_for_package},
@@ -171,7 +171,7 @@ impl RemoteSiteFactory<'_> {
 
     /// Gets the remote site representation stored on chain
     pub async fn get_from_chain(&self, site_id: ObjectID) -> Result<SiteData> {
-        let metadata = self.get_site_metadata(site_id).await?;
+        let metadata = self.get_site_fields(site_id).await?.into();
         let dynamic_fields = self.get_all_dynamic_fields(site_id).await?;
         let resource_path_tag = self.resource_path_tag()?;
 
@@ -249,18 +249,8 @@ impl RemoteSiteFactory<'_> {
         Ok(iter)
     }
 
-    async fn get_site_metadata(&self, object_id: ObjectID) -> anyhow::Result<Metadata> {
-        let obj_resp = self
-            .sui_client
-            .get_object_with_options(object_id, SuiObjectDataOptions::new().with_content())
-            .await?;
-        let sui_sdk::rpc_types::SuiParsedData::MoveObject(parsed_move_obj) =
-            obj_resp.data.unwrap().content.unwrap()
-        else {
-            todo!("Fail gracefully");
-        };
-        let fields: SiteObjFields = serde_json::from_value(parsed_move_obj.fields.to_json_value())?;
-        Ok(fields.into())
+    async fn get_site_fields(&self, site_id: ObjectID) -> anyhow::Result<SiteFields> {
+        self.sui_client.get_sui_object(site_id).await
     }
 
     /// Filters the dynamic fields to get the resource object IDs.
