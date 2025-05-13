@@ -212,6 +212,19 @@ impl ObjectIdOrName {
 #[derive(Subcommand, Debug)]
 #[clap(rename_all = "kebab-case")]
 pub(crate) enum Commands {
+    /// Deploy a new site on Sui.
+    /// Combines the `publish` and `update` commands.
+    Deploy {
+        #[clap(flatten)]
+        publish_options: PublishOptions,
+        /// The name of the site.
+        #[clap(short, long)]
+        site_name: Option<String>,
+        #[clap(short, long, action)]
+        watch: bool,
+        #[clap(long, action)]
+        check_extend: bool,
+    },
     /// Publish a new site on Sui.
     Publish {
         #[clap(flatten)]

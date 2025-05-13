@@ -658,6 +658,7 @@ mod tests {
             routes: None,
             metadata: None,
             site_name: None,
+            site_object_id: None,
             ignore: None,
         })
     }
