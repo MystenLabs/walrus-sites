@@ -14,14 +14,15 @@ use anyhow::Result;
 use contracts::TypeOriginMap;
 use futures::future::try_join_all;
 use resource::{ResourceOp, ResourceSet};
-use sui_sdk::rpc_types::DynamicFieldInfo;
-use sui_types::{base_types::ObjectID, TypeTag};
+use serde::Deserialize;
+use sui_sdk::rpc_types::{DynamicFieldInfo, SuiObjectDataOptions};
+use sui_types::{base_types::ObjectID, id::UID, TypeTag};
 
 use crate::{
     publish::BlobManagementOptions,
     retry_client::RetriableSuiClient,
     summary::SiteDataDiffSummary,
-    types::{ResourceDynamicField, RouteOps, Routes, SuiDynamicField},
+    types::{Metadata, ResourceDynamicField, RouteOps, Routes, SuiDynamicField},
     util::{handle_pagination, type_origin_map_for_package},
 };
 
@@ -38,12 +39,15 @@ pub struct SiteDataDiff<'a> {
     /// The operations to perform on the resources.
     pub resource_ops: Vec<ResourceOp<'a>>,
     pub route_ops: RouteOps,
+    pub metadata_ops: Option<Metadata>,
 }
 
 impl SiteDataDiff<'_> {
     /// Returns `true` if there are updates to be made.
     pub fn has_updates(&self) -> bool {
-        self.resource_ops.iter().any(|op| op.is_change()) || !self.route_ops.is_unchanged()
+        self.resource_ops.iter().any(|op| op.is_change())
+            || !self.route_ops.is_unchanged()
+            || self.metadata_ops.is_some()
     }
 
     /// Returns the resources that need to be updated on Walrus.
@@ -76,17 +80,24 @@ impl SiteDataDiff<'_> {
 pub struct SiteData {
     resources: ResourceSet,
     routes: Option<Routes>,
+    metadata: Metadata,
 }
 
 impl SiteData {
-    pub fn new(resources: ResourceSet, routes: Option<Routes>) -> Self {
-        Self { resources, routes }
+    pub fn new(resources: ResourceSet, routes: Option<Routes>, metadata: Option<Metadata>) -> Self {
+        let metadata = metadata.unwrap_or_default();
+        Self {
+            resources,
+            routes,
+            metadata,
+        }
     }
 
     pub fn empty() -> Self {
         Self {
             resources: ResourceSet::empty(),
             routes: None,
+            metadata: Metadata::default(),
         }
     }
 
@@ -96,6 +107,7 @@ impl SiteData {
         SiteDataDiff {
             resource_ops: self.resources.diff(&start.resources),
             route_ops: self.routes_diff(start),
+            metadata_ops: self.metadata_diff(start),
         }
     }
 
@@ -104,6 +116,7 @@ impl SiteData {
         SiteDataDiff {
             resource_ops: self.resources.replace_all(&other.resources),
             route_ops: self.routes_diff(other),
+            metadata_ops: self.metadata_diff(other),
         }
     }
 
@@ -116,8 +129,49 @@ impl SiteData {
         }
     }
 
+    fn metadata_diff(&self, start: &Self) -> Option<Metadata> {
+        if self.metadata != start.metadata {
+            Some(self.metadata.clone())
+        } else {
+            None
+        }
+    }
+
     pub fn resources(&self) -> &ResourceSet {
         &self.resources
+    }
+}
+
+#[derive(Deserialize, Clone, Debug)]
+pub struct SiteObjFields {
+    #[allow(dead_code)]
+    pub id: UID,
+    #[allow(dead_code)]
+    pub name: String,
+    pub link: Option<String>,
+    pub image_url: Option<String>,
+    pub description: Option<String>,
+    pub project_url: Option<String>,
+    pub creator: Option<String>,
+}
+
+impl Into<Metadata> for SiteObjFields {
+    fn into(self) -> Metadata {
+        let Self {
+            link,
+            image_url,
+            description,
+            project_url,
+            creator,
+            ..
+        } = self;
+        Metadata {
+            link,
+            image_url,
+            description,
+            project_url,
+            creator,
+        }
     }
 }
 
@@ -142,6 +196,7 @@ impl RemoteSiteFactory<'_> {
 
     /// Gets the remote site representation stored on chain
     pub async fn get_from_chain(&self, site_id: ObjectID) -> Result<SiteData> {
+        let metadata = self.get_site_metadata(site_id).await?;
         let dynamic_fields = self.get_all_dynamic_fields(site_id).await?;
         let resource_path_tag = self.resource_path_tag()?;
 
@@ -178,7 +233,11 @@ impl RemoteSiteFactory<'_> {
 
         tracing::debug!("fetching the routes from the dynamic fields");
         let routes = self.get_routes(&dynamic_fields).await?;
-        Ok(SiteData { resources, routes })
+        Ok(SiteData {
+            resources,
+            routes,
+            metadata,
+        })
     }
 
     async fn get_routes(&self, dynamic_fields: &[DynamicFieldInfo]) -> Result<Option<Routes>> {
@@ -213,6 +272,20 @@ impl RemoteSiteFactory<'_> {
                 .await?
                 .collect();
         Ok(iter)
+    }
+
+    async fn get_site_metadata(&self, object_id: ObjectID) -> anyhow::Result<Metadata> {
+        let obj_resp = self
+            .sui_client
+            .get_object_with_options(object_id, SuiObjectDataOptions::new().with_content())
+            .await?;
+        let sui_sdk::rpc_types::SuiParsedData::MoveObject(parsed_move_obj) =
+            obj_resp.data.unwrap().content.unwrap()
+        else {
+            todo!("Fail gracefully");
+        };
+        let fields: SiteObjFields = serde_json::from_value(parsed_move_obj.fields.to_json_value())?;
+        Ok(fields.into())
     }
 
     /// Filters the dynamic fields to get the resource object IDs.

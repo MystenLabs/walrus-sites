@@ -225,6 +225,7 @@ impl SiteEditor<EditOptions> {
             display::done();
         }
 
+        // Note: `load_ws_resources` again. We already loaded them when parsing the name.
         let (ws_resources, ws_resources_path) = load_ws_resources(
             self.edit_options
                 .publish_options

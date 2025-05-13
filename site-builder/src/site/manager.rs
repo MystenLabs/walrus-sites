@@ -305,7 +305,13 @@ impl SiteManager {
         // Add the call arg if we are updating a site, or add the command to create a new site.
         let mut ptb = match &self.site_id {
             SiteIdentifier::ExistingSite(site_id) => {
-                ptb.with_call_arg(&self.wallet.get_object_ref(*site_id).await?.into())?
+                let ptb = ptb.with_call_arg(&self.wallet.get_object_ref(*site_id).await?.into())?;
+                // Also update metadata if there is a diff
+                if let Some(ref metadata) = self.metadata {
+                    ptb.with_update_metadata(metadata.clone())?
+                } else {
+                    ptb
+                }
             }
             SiteIdentifier::NewSite(site_name) => {
                 ptb.with_create_site(site_name, self.metadata.clone())?

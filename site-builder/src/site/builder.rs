@@ -1,14 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::str::FromStr;
+
 use anyhow::Result;
 use serde::Serialize;
 use sui_types::{
     base_types::{ObjectID, SuiAddress},
     programmable_transaction_builder::ProgrammableTransactionBuilder,
     transaction::{Argument, CallArg, ProgrammableTransaction},
-    Identifier,
-    TypeTag,
+    Identifier, TypeTag,
 };
 
 use super::{
@@ -161,6 +162,16 @@ impl SitePtb<Argument> {
             }
         }
         Ok(())
+    }
+
+    pub fn with_update_metadata(mut self, metadata: Metadata) -> Result<SitePtb<Argument>> {
+        let metadata = self.new_metadata(metadata);
+        self.add_programmable_move_call(
+            Identifier::from_str("update_metadata")?,
+            vec![],
+            vec![self.site_argument, metadata],
+        );
+        Ok(self)
     }
 
     pub fn transfer_site(&mut self, recipient: SuiAddress) {
