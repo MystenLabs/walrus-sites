@@ -156,26 +156,6 @@ pub struct SiteObjFields {
     pub creator: Option<String>,
 }
 
-impl Into<Metadata> for SiteObjFields {
-    fn into(self) -> Metadata {
-        let Self {
-            link,
-            image_url,
-            description,
-            project_url,
-            creator,
-            ..
-        } = self;
-        Metadata {
-            link,
-            image_url,
-            description,
-            project_url,
-            creator,
-        }
-    }
-}
-
 /// Fetches remote sites.
 pub struct RemoteSiteFactory<'a> {
     sui_client: &'a RetriableSuiClient,

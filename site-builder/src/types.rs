@@ -14,7 +14,10 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize, Serializer};
 use sui_types::base_types::{ObjectID, SuiAddress};
 
 use crate::{
-    site::contracts::{self, AssociatedContractStruct, StructTag},
+    site::{
+        contracts::{self, AssociatedContractStruct, StructTag},
+        SiteObjFields,
+    },
     walrus::types::BlobId,
 };
 
@@ -234,6 +237,26 @@ impl Default for Metadata {
             description: Some("A walrus site created using Walrus and Sui!".to_string()),
             project_url: None,
             creator: None,
+        }
+    }
+}
+
+impl From<SiteObjFields> for Metadata {
+    fn from(value: SiteObjFields) -> Self {
+        let SiteObjFields {
+            link,
+            image_url,
+            description,
+            project_url,
+            creator,
+            ..
+        } = value;
+        Metadata {
+            link,
+            image_url,
+            description,
+            project_url,
+            creator,
         }
     }
 }
