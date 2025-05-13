@@ -71,6 +71,7 @@ impl SiteDataDiff<'_> {
                 .map(|op| op.into())
                 .collect(),
             route_ops: self.route_ops.clone(),
+            metadata: self.metadata_ops.is_some(),
         }
     }
 }
