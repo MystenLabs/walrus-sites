@@ -11,13 +11,13 @@ use std::{
 
 use move_core_types::u256::U256;
 use serde::{de::DeserializeOwned, Deserialize, Serialize, Serializer};
-use sui_types::base_types::{ObjectID, SuiAddress};
+use sui_types::{
+    base_types::{ObjectID, SuiAddress},
+    id::UID,
+};
 
 use crate::{
-    site::{
-        contracts::{self, AssociatedContractStruct, StructTag},
-        SiteObjFields,
-    },
+    site::contracts::{self, AssociatedContractStruct, StructTag},
     walrus::types::BlobId,
 };
 
@@ -259,6 +259,19 @@ impl From<SiteObjFields> for Metadata {
             creator,
         }
     }
+}
+
+#[derive(Deserialize, Clone, Debug)]
+pub struct SiteObjFields {
+    #[allow(dead_code)]
+    pub id: UID,
+    #[allow(dead_code)]
+    pub name: String,
+    pub link: Option<String>,
+    pub image_url: Option<String>,
+    pub description: Option<String>,
+    pub project_url: Option<String>,
+    pub creator: Option<String>,
 }
 
 // SuiNS definitions

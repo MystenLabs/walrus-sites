@@ -1,8 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::str::FromStr;
-
 use anyhow::Result;
 use serde::Serialize;
 use sui_types::{
@@ -168,7 +166,7 @@ impl SitePtb<Argument> {
     pub fn with_update_metadata(mut self, metadata: Metadata) -> Result<SitePtb<Argument>> {
         let metadata = self.new_metadata(metadata);
         self.add_programmable_move_call(
-            Identifier::from_str("update_metadata")?,
+            contracts::site::update_metadata.identifier(),
             vec![],
             vec![self.site_argument, metadata],
         );

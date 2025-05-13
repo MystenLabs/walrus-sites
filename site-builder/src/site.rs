@@ -14,15 +14,14 @@ use anyhow::Result;
 use contracts::TypeOriginMap;
 use futures::future::try_join_all;
 use resource::{ResourceOp, ResourceSet};
-use serde::Deserialize;
 use sui_sdk::rpc_types::{DynamicFieldInfo, SuiObjectDataOptions};
-use sui_types::{base_types::ObjectID, id::UID, TypeTag};
+use sui_types::{base_types::ObjectID, TypeTag};
 
 use crate::{
     publish::BlobManagementOptions,
     retry_client::RetriableSuiClient,
     summary::SiteDataDiffSummary,
-    types::{Metadata, ResourceDynamicField, RouteOps, Routes, SuiDynamicField},
+    types::{Metadata, ResourceDynamicField, RouteOps, Routes, SiteObjFields, SuiDynamicField},
     util::{handle_pagination, type_origin_map_for_package},
 };
 
@@ -141,19 +140,6 @@ impl SiteData {
     pub fn resources(&self) -> &ResourceSet {
         &self.resources
     }
-}
-
-#[derive(Deserialize, Clone, Debug)]
-pub struct SiteObjFields {
-    #[allow(dead_code)]
-    pub id: UID,
-    #[allow(dead_code)]
-    pub name: String,
-    pub link: Option<String>,
-    pub image_url: Option<String>,
-    pub description: Option<String>,
-    pub project_url: Option<String>,
-    pub creator: Option<String>,
 }
 
 /// Fetches remote sites.
