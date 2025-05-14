@@ -299,7 +299,10 @@ impl RemoteSiteFactory<'_> {
 #[cfg(test)]
 mod tests {
     use super::SiteData;
-    use crate::{site::resource::ResourceSet, types::Routes};
+    use crate::{
+        site::resource::ResourceSet,
+        types::{Metadata, Routes},
+    };
 
     fn routes_from_pair(key: &str, value: &str) -> Option<Routes> {
         Some(Routes(
@@ -328,6 +331,44 @@ mod tests {
             let other = SiteData::new(ResourceSet::empty(), other_routes, None);
             let diff = this.diff(&other);
             assert_eq!(diff.has_updates(), has_updates);
+        }
+    }
+
+    #[test]
+    fn test_metadata_diff() {
+        let metadata_empty = Metadata {
+            link: None,
+            image_url: None,
+            description: None,
+            project_url: None,
+            creator: None,
+        };
+
+        let metadata_with_link = |link: &str| -> Metadata {
+            Metadata {
+                link: Some(link.to_string()),
+                image_url: None,
+                description: None,
+                project_url: None,
+                creator: None,
+            }
+        };
+        let cases = vec![
+            (Some(Metadata::default()), Some(Metadata::default()), false),
+            (Some(Metadata::default()), None, false),
+            (None, Some(Metadata::default()), false),
+            (Some(metadata_empty), Some(Metadata::default()), true),
+            (
+                Some(metadata_with_link("https://alink.invalid.org")),
+                Some(metadata_with_link("https://blink.invalid.org")),
+                true,
+            ),
+        ];
+
+        for (this_metadata, other_metadata, has_updates) in cases {
+            let this = SiteData::new(ResourceSet::empty(), None, this_metadata);
+            let other = SiteData::new(ResourceSet::empty(), None, other_metadata);
+            assert_eq!(this.diff(&other).has_updates(), has_updates);
         }
     }
 }
