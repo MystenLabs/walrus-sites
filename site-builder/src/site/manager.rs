@@ -28,7 +28,7 @@ use crate::{
     publish::BlobManagementOptions,
     retry_client::RetriableSuiClient,
     summary::SiteDataDiffSummary,
-    types::Metadata,
+    types::{Metadata, MetadataOp},
     util::{get_site_id_from_response, sign_and_send_ptb},
     walrus::{types::BlobId, Walrus},
 };
@@ -307,10 +307,13 @@ impl SiteManager {
             SiteIdentifier::ExistingSite(site_id) => {
                 let ptb = ptb.with_call_arg(&self.wallet.get_object_ref(*site_id).await?.into())?;
                 // Also update metadata if there is a diff
-                if let Some(ref metadata) = self.metadata {
-                    ptb.with_update_metadata(metadata.clone())?
-                } else {
-                    ptb
+                match updates.metadata_op {
+                    MetadataOp::Update => {
+                        // REVIEW: If metadata inside ws-resources, is None (Metadata::default())
+                        // and different from the site published, should we still update?
+                        ptb.with_update_metadata(self.metadata.clone().unwrap_or_default())?
+                    }
+                    MetadataOp::Noop => ptb,
                 }
             }
             SiteIdentifier::NewSite(site_name) => {

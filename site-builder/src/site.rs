@@ -92,6 +92,8 @@ pub struct SiteData {
 }
 
 impl SiteData {
+    /// SiteData constructor.
+    /// Note that given None metadata, it will fill it with Metadata::default()
     pub fn new(resources: ResourceSet, routes: Option<Routes>, metadata: Option<Metadata>) -> Self {
         let metadata = metadata.unwrap_or_default();
         Self {
@@ -101,6 +103,8 @@ impl SiteData {
         }
     }
 
+    /// Empty SiteData constructor.
+    /// Note metadata is filled with Metadata::default()
     pub fn empty() -> Self {
         Self {
             resources: ResourceSet::empty(),
