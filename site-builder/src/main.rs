@@ -116,7 +116,7 @@ async fn run() -> Result<()> {
             let site_name = site_name.unwrap_or_else(|| {
                 ws_resources
                     .and_then(|res| res.site_name)
-                    .unwrap_or_else(|| "Test Site".to_string())
+                    .unwrap_or_else(|| "My Walrus Site".to_string())
             });
 
             SiteEditor::new(args.context, config)
