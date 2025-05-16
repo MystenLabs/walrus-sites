@@ -6,6 +6,7 @@
 use std::collections::HashMap;
 
 use anyhow::{anyhow, bail, Context, Result};
+use chrono::{Duration, NaiveDate};
 use prettytable::{
     format::{self, FormatBuilder},
     row,
@@ -57,7 +58,7 @@ pub(crate) async fn display_sitemap(
         return Ok(());
     }
 
-    let table = MapTable::new(&site_data, &owned_blobs);
+    let table = MapTable::new(&site_data, &owned_blobs, &context);
     table.printstd();
 
     Ok(())
@@ -93,15 +94,27 @@ async fn get_site_resources_and_blobs(
     Ok((site, owned_blobs))
 }
 
-struct MapTable(Vec<(String, BlobId, Option<ObjectID>)>);
+struct MapTable(Vec<(String, BlobId, Option<ObjectID>, Option<String>)>);
 
 impl MapTable {
-    fn new(site_data: &SiteData, owned_blobs: &HashMap<BlobId, SuiBlob>) -> Self {
+    fn new(site_data: &SiteData, owned_blobs: &HashMap<BlobId, SuiBlob>, context: &str) -> Self {
         let mut data = Vec::with_capacity(site_data.resources().len());
         site_data.resources().iter().for_each(|resource| {
             let info = &resource.info;
             let blob_object_id = owned_blobs.get(&info.blob_id).map(|blob| blob.id);
-            data.push((info.path.clone(), info.blob_id, blob_object_id));
+            let epoch_days = match context {
+                "testnet" => 2,
+                "mainnet" => 14,
+                _ => 14, // default fallback
+            };
+            let expiration = owned_blobs.get(&info.blob_id).map(|blob| {
+                let end_epoch = blob.storage.end_epoch;
+                let days_since_epoch_1 = (end_epoch.saturating_sub(1)) * epoch_days;
+                let epoch_1 = NaiveDate::from_ymd_opt(2025, 3, 27).unwrap();
+                let expiration_date = epoch_1 + Duration::days(days_since_epoch_1.into());
+                expiration_date.format("%Y-%m-%d").to_string()
+            });
+            data.push((info.path.clone(), info.blob_id, blob_object_id, expiration));
         });
         Self(data)
     }
@@ -129,14 +142,22 @@ impl MapTable {
         let has_blob_id = self
             .0
             .iter()
-            .any(|(_, _, owned_blob_id)| owned_blob_id.is_some());
+            .any(|(_, _, owned_blob_id, _)| owned_blob_id.is_some());
+        let has_expiration = self
+            .0
+            .iter()
+            .any(|(_, _, _, expiration)| expiration.is_some());
 
         if has_blob_id {
             titles.add_cell(Cell::new("Owned blob object ID (if any)").style_spec("b"));
         }
+        if has_expiration {
+            titles.add_cell(Cell::new("Expiration Date").style_spec("b"));
+        }
+
         table.set_titles(titles);
 
-        for (owned_blob_id, blob_id, object_id) in &self.0 {
+        for (owned_blob_id, blob_id, object_id, expiration_opt) in &self.0 {
             let mut row = row![Cell::new(owned_blob_id), Cell::new(&blob_id.to_string())];
 
             if has_blob_id {
@@ -144,6 +165,10 @@ impl MapTable {
                     &object_id.map_or_else(|| "".to_owned(), |id| id.to_string()),
                 ));
             }
+            if has_expiration {
+                row.add_cell(Cell::new(expiration_opt.as_deref().unwrap_or("-")));
+            }
+
             table.add_row(row);
         }
 

@@ -5996,6 +5996,7 @@ dependencies = [
  "base64 0.22.1",
  "bcs",
  "bin-version",
+ "chrono",
  "clap",
  "crossterm",
  "dialoguer",
