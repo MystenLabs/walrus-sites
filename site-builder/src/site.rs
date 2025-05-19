@@ -355,7 +355,7 @@ mod tests {
         };
         let cases = vec![
             (Some(Metadata::default()), Some(Metadata::default()), false),
-            (Some(Metadata::default()), None, false),
+            (Some(Metadata::default()), None, true),
             (None, Some(Metadata::default()), false),
             (Some(metadata_empty), Some(Metadata::default()), true),
             (
