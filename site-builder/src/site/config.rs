@@ -11,6 +11,7 @@ use crate::types::{HttpHeaders, Metadata};
 
 /// Deserialized object of the file's `ws-resource.json` contents.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct WSResources {
     /// The HTTP headers to be set for the resources.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -22,7 +23,7 @@ pub struct WSResources {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Metadata>,
     /// The name of the site.
-    #[serde(rename = "site-name", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub site_name: Option<String>,
     /// The paths to ignore when publishing/updating.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -37,7 +38,13 @@ impl WSResources {
         let file_contents =
             std::fs::read_to_string(path).context("Failed to read ws_config.json")?;
         // Read the JSON contents of the file as an instance of `WSResources`.
-        let ws_config: WSResources = serde_json::from_str(&file_contents)?;
+        // let ws_config: WSResources = serde_json::from_str(&file_contents)?;
+        let ws_config: WSResources = serde_json::from_str(&file_contents)
+            .with_context(|| format!(
+                "Failed to parse ws_resources.json: {}\n\nCheck for typos or unknown fields (e.g. 'site-name' with a dash for the site name field; use 'site_name' instead).",
+                file_contents
+            ))?;
+
         tracing::info!(?ws_config, "ws resources configuration loaded");
         Ok(ws_config)
     }
@@ -74,6 +81,14 @@ mod tests {
         }
     "#;
 
+    const SITE_NAME_INVALID_FIELD: &str = r#"
+    "site-name": "A Walrus Site Name"
+    "#;
+
+    const SITE_NAME_DATA: &str = r#"
+    "site_name": "A Walrus Site Name"
+    "#;
+
     const IGNORE_DATA: &str = r#"
     "ignore": [
         "/foo/*",
@@ -97,5 +112,16 @@ mod tests {
             serde_json::from_str(&ignore_data).expect("parsing should succeed");
         assert!(parsed.ignore.is_some());
         assert_eq!(parsed.ignore.unwrap(), vec!["/foo/*", "/baz/bar/*"]);
+        // Test for invalid site name field
+        let invalid_site_name_data = format!("{{{}}}", SITE_NAME_INVALID_FIELD);
+        // Parsing should fail
+        let result = serde_json::from_str::<WSResources>(&invalid_site_name_data);
+        assert!(result.is_err());
+        // Test for valid site_name field
+        let valid_site_name_data = format!("{{{}}}", SITE_NAME_DATA);
+        let parsed: WSResources =
+            serde_json::from_str(&valid_site_name_data).expect("parsing should succeed");
+        assert!(parsed.site_name.is_some());
+        assert_eq!(parsed.site_name.unwrap(), "A Walrus Site Name".to_string());
     }
 }
