@@ -88,14 +88,12 @@ impl SiteDataDiff<'_> {
 pub struct SiteData {
     resources: ResourceSet,
     routes: Option<Routes>,
-    metadata: Metadata,
+    metadata: Option<Metadata>,
 }
 
 impl SiteData {
     /// SiteData constructor.
-    /// Note that given None metadata, it will fill it with Metadata::default()
     pub fn new(resources: ResourceSet, routes: Option<Routes>, metadata: Option<Metadata>) -> Self {
-        let metadata = metadata.unwrap_or_default();
         Self {
             resources,
             routes,
@@ -104,12 +102,11 @@ impl SiteData {
     }
 
     /// Empty SiteData constructor.
-    /// Note metadata is filled with Metadata::default()
     pub fn empty() -> Self {
         Self {
             resources: ResourceSet::empty(),
             routes: None,
-            metadata: Metadata::default(),
+            metadata: None,
         }
     }
 
@@ -141,8 +138,11 @@ impl SiteData {
         }
     }
 
+    /// Current logic is to return MetadataOp::Update only when metadata read
+    /// from ws-resources is some, and different than the metadata found
+    /// on-chain.
     fn metadata_diff(&self, start: &Self) -> MetadataOp {
-        if self.metadata != start.metadata {
+        if self.metadata != start.metadata && self.metadata.is_some() {
             MetadataOp::Update
         } else {
             MetadataOp::Noop
@@ -175,7 +175,7 @@ impl RemoteSiteFactory<'_> {
 
     /// Gets the remote site representation stored on chain
     pub async fn get_from_chain(&self, site_id: ObjectID) -> Result<SiteData> {
-        let metadata = self.get_site_fields(site_id).await?.into();
+        let metadata = Some(self.get_site_fields(site_id).await?.into());
         let dynamic_fields = self.get_all_dynamic_fields(site_id).await?;
         let resource_path_tag = self.resource_path_tag()?;
 

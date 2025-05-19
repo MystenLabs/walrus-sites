@@ -47,8 +47,8 @@ impl Summarizable for ResourceOpSummary {
 impl Summarizable for RouteOps {
     fn to_summary(&self) -> String {
         match self {
-            RouteOps::Unchanged => "The site routes were left unchanged".to_owned(),
-            RouteOps::Replace(_) => "The site routes were modified".to_owned(),
+            RouteOps::Unchanged => "The site routes were left unchanged.".to_owned(),
+            RouteOps::Replace(_) => "The site routes were modified.".to_owned(),
         }
     }
 }
@@ -88,7 +88,7 @@ impl From<SiteDataDiff<'_>> for SiteDataDiffSummary {
 impl Summarizable for SiteDataDiffSummary {
     fn to_summary(&self) -> String {
         if self.resource_ops.is_empty() && self.route_ops.is_unchanged() && !self.metadata_updated {
-            return "No operation needs to be performed".to_owned();
+            return "No operation needs to be performed.".to_owned();
         }
 
         let resource_str = if !self.resource_ops.is_empty() {
@@ -103,7 +103,7 @@ impl Summarizable for SiteDataDiffSummary {
         let metadata_str = if self.metadata_updated {
             "Metadata updated."
         } else {
-            ""
+            "No Metadata updated."
         };
 
         format!("{}\n{}\n{}", resource_str, route_str, metadata_str)
