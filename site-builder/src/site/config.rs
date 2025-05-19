@@ -26,8 +26,14 @@ pub struct WSResources {
     /// The name of the site.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub site_name: Option<String>,
-    /// The object ID of the published site. (Used by the deploy command)
-    #[serde(rename = "site_object_id", skip_serializing_if = "Option::is_none")]
+    /// The object ID of the published site.
+    ///
+    /// This parameter is automatically set by the `deploy` command to store
+    /// the information about the Site object being used, so there is no need
+    /// to manually keep track of it.
+    /// On subsequent calls to the `deploy` command, this parameter is used
+    /// to update the site.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub site_object_id: Option<ObjectID>,
     /// The paths to ignore when publishing/updating.
     #[serde(skip_serializing_if = "Option::is_none")]

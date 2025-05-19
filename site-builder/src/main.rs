@@ -78,6 +78,7 @@ pub fn sites_config_default_paths() -> Vec<PathBuf> {
     default_paths
 }
 
+#[allow(deprecated)]
 async fn run() -> Result<()> {
     tracing_subscriber::fmt::init();
     tracing::info!("initializing site builder");
@@ -129,7 +130,7 @@ async fn run() -> Result<()> {
                     SiteIdentifier::NewSite(site_name.unwrap_or_else(|| {
                         ws_resources
                             .and_then(|res| res.site_name)
-                            .unwrap_or_else(|| "Test Site".to_string())
+                            .unwrap_or_else(|| "My Walrus Site".to_string())
                     })),
                     ContinuousEditing::Once,
                     BlobManagementOptions::no_status_check(),

@@ -213,7 +213,11 @@ impl ObjectIdOrName {
 #[clap(rename_all = "kebab-case")]
 pub(crate) enum Commands {
     /// Deploy a new site on Sui.
-    /// Combines the `publish` and `update` commands.
+    ///
+    /// If the site has not been published before, this command publishes it and stores
+    /// the object ID of the Site in the ws-resources.json file.
+    /// If the site has been published before, this command updates the site(indicaded
+    /// by the site_object_id field in the ws-resources.json file).
     Deploy {
         #[clap(flatten)]
         publish_options: PublishOptions,
@@ -226,6 +230,7 @@ pub(crate) enum Commands {
         check_extend: bool,
     },
     /// Publish a new site on Sui.
+    #[deprecated(note = "This command is soon to be deprecated; please use `deploy` instead")]
     Publish {
         #[clap(flatten)]
         publish_options: PublishOptions,
@@ -234,6 +239,7 @@ pub(crate) enum Commands {
         site_name: Option<String>,
     },
     /// Update an existing site.
+    #[deprecated(note = "This command is soon to be deprecated; please use `deploy` instead")]
     Update {
         #[clap(flatten)]
         publish_options: PublishOptions,
