@@ -28,7 +28,7 @@ use crate::{
     publish::BlobManagementOptions,
     retry_client::RetriableSuiClient,
     summary::SiteDataDiffSummary,
-    types::Metadata,
+    types::{Metadata, MetadataOp},
     util::{get_site_id_from_response, sign_and_send_ptb},
     walrus::{types::BlobId, Walrus},
 };
@@ -305,7 +305,14 @@ impl SiteManager {
         // Add the call arg if we are updating a site, or add the command to create a new site.
         let mut ptb = match &self.site_id {
             SiteIdentifier::ExistingSite(site_id) => {
-                ptb.with_call_arg(&self.wallet.get_object_ref(*site_id).await?.into())?
+                let ptb = ptb.with_call_arg(&self.wallet.get_object_ref(*site_id).await?.into())?;
+                // Also update metadata if there is a diff
+                match updates.metadata_op {
+                    MetadataOp::Update => {
+                        ptb.with_update_metadata(self.metadata.clone().unwrap_or_default())?
+                    }
+                    MetadataOp::Noop => ptb,
+                }
             }
             SiteIdentifier::NewSite(site_name) => {
                 ptb.with_create_site(site_name, self.metadata.clone())?

@@ -211,8 +211,10 @@ macro_rules! contract_ident {
 pub mod site {
     use super::*;
 
+    contract_ident!(struct site::Site);
     contract_ident!(fn site::new_site, 1);
     contract_ident!(fn site::burn);
+    contract_ident!(fn site::update_metadata);
     // Resource functions
     contract_ident!(struct site::Resource);
     contract_ident!(struct site::ResourcePath);
