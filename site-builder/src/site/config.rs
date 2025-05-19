@@ -11,7 +11,7 @@ use super::Routes;
 use crate::types::{HttpHeaders, Metadata};
 
 /// Deserialized object of the file's `ws-resource.json` contents.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct WSResources {
     /// The HTTP headers to be set for the resources.

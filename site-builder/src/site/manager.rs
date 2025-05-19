@@ -340,7 +340,7 @@ impl SiteManager {
                     .effects
                     .as_ref()
                     .ok_or(anyhow!("the result did not have effects"))?;
-                get_site_id_from_response(self.active_address()?, resp)?
+                get_site_id_from_response(self.active_address()?, resp)
             }
         };
 

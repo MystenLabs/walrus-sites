@@ -85,6 +85,14 @@ impl BlobManagementOptions {
     }
 }
 
+/// Outcome of attempting to save the site object ID.
+enum SiteIdSaveResult {
+    /// The site object ID was already present in ws-resources; no action taken.
+    AlreadySet,
+    /// The site object ID was successfully obtained and saved.
+    SuccessfullySaved,
+}
+
 pub(crate) struct EditOptions {
     pub publish_options: PublishOptions,
     pub site_id: SiteIdentifier,
@@ -271,53 +279,34 @@ impl SiteEditor<EditOptions> {
         .await?;
         let (response, summary) = site_manager.update_site(&local_site_data).await?;
 
-        // -- Save the site_object_id to the ws-resources file.
+        // Save the site_object_id to the ws-resources file.
+        let path_for_saving =
+            ws_resources_path.unwrap_or_else(|| self.directory().join(DEFAULT_WS_RESOURCES_FILE));
 
-        if let Some(ws_resources) = ws_resources.as_ref() {
-            // Check if the site object ID is already set in the ws-resources file.
-            if ws_resources.site_object_id.is_some() {
+        let active_address = site_manager.active_address()?;
+        let tx_effects = response
+            .effects
+            .as_ref()
+            .ok_or_else(|| anyhow!("Transaction effects not found for saving site ID"))?;
+
+        let (save_id_result, _updated_ws_resources) = handle_site_id_saving(
+            ws_resources,
+            path_for_saving.as_ref(),
+            active_address,
+            tx_effects,
+        )
+        .await?;
+
+        match save_id_result {
+            SiteIdSaveResult::AlreadySet => {
                 display::action("Site object ID already set in the ws-resources file");
                 return Ok((site_manager.active_address()?, response, summary));
             }
-        };
-
-        let new_site_object_id = match get_site_id_from_response(
-            site_manager.active_address()?,
-            response
-                .effects
-                .as_ref()
-                .ok_or_else(|| anyhow!("Transaction effects not found"))?, // Use ok_or_else for better error
-        ) {
-            Ok(id) => id,
-            // TODO: This arm is unreachable, because get_site_id_from_response uses `expect`, which panics
-            Err(e) => {
-                // If we can't get the ID, we can't save it.
-                display::error(format!(
-                    "Could not get site object ID from transaction response: {}",
-                    e
+            SiteIdSaveResult::SuccessfullySaved => {
+                display::action(format!(
+                    "Site object ID saved to the ws-resources file: {}",
+                    path_for_saving.display()
                 ));
-                // Maybe return early here ?? :
-                // return Err(e.context("Failed to extract site object ID for saving"));
-                return Ok((site_manager.active_address()?, response, summary)); // Exit OK without saving
-            }
-        };
-        match ws_resources {
-            Some(mut ws_resources) => {
-                ws_resources.site_object_id = Some(new_site_object_id);
-                ws_resources.save(ws_resources_path.unwrap())?;
-            }
-            None => {
-                // TODO: Maybe implement the `Default` trait for `WSResources` ?
-                // If the ws_resources file does not exist, create it with the new site object ID.
-                let ws_resources = WSResources {
-                    headers: None,
-                    routes: None,
-                    metadata: None,
-                    site_name: None,
-                    site_object_id: Some(new_site_object_id),
-                    ignore: None,
-                };
-                ws_resources.save(ws_resources_path.unwrap())?;
             }
         }
 
@@ -388,7 +377,7 @@ fn print_summary(
                     .effects
                     .as_ref()
                     .ok_or(anyhow::anyhow!("response did not contain effects"))?,
-            )?;
+            );
             println!("Created new site: {}\nNew site object ID: {}", name, id);
             id
         }
@@ -406,6 +395,58 @@ fn print_summary(
         portal = config.portal
     );
     Ok(())
+}
+
+/// Handles the logic for checking, obtaining, and saving the site object ID to the ws-resources file.
+///
+/// Consumes the `current_ws_resources` to check if the site object ID is already set.
+/// Returns a tuple containing the result of the save operation and the updated `WSResources`.
+async fn handle_site_id_saving(
+    current_ws_resources: Option<WSResources>, // Take ownership
+    ws_resources_path: &Path,
+    active_address: SuiAddress,
+    tx_effects: &SuiTransactionBlockEffects,
+) -> Result<(SiteIdSaveResult, Option<WSResources>), anyhow::Error> {
+    // Check if site_object_id is already set in the ws-resources file.
+    if let Some(ws_resources) = current_ws_resources.as_ref() {
+        if ws_resources.site_object_id.is_some() {
+            return Ok((SiteIdSaveResult::AlreadySet, current_ws_resources));
+        }
+    }
+
+    // If not already set, try to get the site object ID from the transaction effects.
+    display::action("Getting the site object ID from the transaction effects");
+
+    // potentially panics if the site object ID is not found.
+    let new_site_object_id = get_site_id_from_response(active_address, tx_effects);
+    // If we reach here, get_site_id_from_response succeeded.
+
+    // Update the existing ws_resources or create a new one, then save.
+    match current_ws_resources {
+        Some(mut ws_res) => {
+            ws_res.site_object_id = Some(new_site_object_id);
+            display::action(format!(
+                "Updating ws-resources file with new site object ID: {}",
+                ws_resources_path.display()
+            ));
+            ws_res.save(ws_resources_path)?;
+            display::done();
+            Ok((SiteIdSaveResult::SuccessfullySaved, Some(ws_res)))
+        }
+        None => {
+            display::action(format!(
+                "Creating ws-resources file with new site object ID: {}",
+                ws_resources_path.display()
+            ));
+            let new_ws_res = WSResources {
+                site_object_id: Some(new_site_object_id),
+                ..Default::default() // Set other fields to their defaults
+            };
+            new_ws_res.save(ws_resources_path)?;
+            display::done();
+            Ok((SiteIdSaveResult::SuccessfullySaved, Some(new_ws_res)))
+        }
+    }
 }
 
 /// Gets the configuration from the provided file, or looks in the default directory.
