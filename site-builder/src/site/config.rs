@@ -48,9 +48,8 @@ impl WSResources {
         let file_contents =
             std::fs::read_to_string(path).context("Failed to read ws_config.json")?;
         // Read the JSON contents of the file as an instance of `WSResources`.
-        // let ws_config: WSResources = serde_json::from_str(&file_contents)?;
         let ws_config: WSResources = serde_json::from_str(&file_contents)
-            .with_context(|| format!(
+            .context(format!(
                 "Failed to parse ws_resources.json: {}\n\nCheck for typos or unknown fields (e.g. 'site-name' with a dash for the site name field; use 'site_name' instead).",
                 file_contents
             ))?;
@@ -62,11 +61,16 @@ impl WSResources {
     /// Saves the `WSResources` struct to a json file, pretty-printed.
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         tracing::info!(file=%path.as_ref().display(), "saving Walrus site resources");
-        let file = std::fs::File::create(path.as_ref())
-            .with_context(|| format!("Failed to create file: {}", path.as_ref().display()))?;
+        let file = std::fs::File::create(path.as_ref()).context(format!(
+            "Failed to create file: {}",
+            path.as_ref().display()
+        ))?;
+
         let writer = std::io::BufWriter::new(file);
-        serde_json::to_writer_pretty(writer, self)
-            .with_context(|| format!("Failed to write to file: {}", path.as_ref().display()))?;
+        serde_json::to_writer_pretty(writer, self).context(format!(
+            "Failed to write to file: {}",
+            path.as_ref().display()
+        ))?;
         Ok(())
     }
 }
