@@ -5,6 +5,7 @@ use std::{collections::BTreeMap, path::Path};
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+use sui_types::base_types::ObjectID;
 
 use super::Routes;
 use crate::types::{HttpHeaders, Metadata};
@@ -25,6 +26,15 @@ pub struct WSResources {
     /// The name of the site.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub site_name: Option<String>,
+    /// The object ID of the published site.
+    ///
+    /// This parameter is automatically set by the `deploy` command to store
+    /// the information about the Site object being used, so there is no need
+    /// to manually keep track of it.
+    /// On subsequent calls to the `deploy` command, this parameter is used
+    /// to update the site.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub site_object_id: Option<ObjectID>,
     /// The paths to ignore when publishing/updating.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ignore: Option<Vec<String>>,
@@ -47,6 +57,17 @@ impl WSResources {
 
         tracing::info!(?ws_config, "ws resources configuration loaded");
         Ok(ws_config)
+    }
+
+    /// Saves the `WSResources` struct to a json file, pretty-printed.
+    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        tracing::info!(file=%path.as_ref().display(), "saving Walrus site resources");
+        let file = std::fs::File::create(path.as_ref())
+            .with_context(|| format!("Failed to create file: {}", path.as_ref().display()))?;
+        let writer = std::io::BufWriter::new(file);
+        serde_json::to_writer_pretty(writer, self)
+            .with_context(|| format!("Failed to write to file: {}", path.as_ref().display()))?;
+        Ok(())
     }
 }
 

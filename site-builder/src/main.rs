@@ -78,6 +78,7 @@ pub fn sites_config_default_paths() -> Vec<PathBuf> {
     default_paths
 }
 
+#[allow(deprecated)]
 async fn run() -> Result<()> {
     tracing_subscriber::fmt::init();
     tracing::info!("initializing site builder");
@@ -103,6 +104,49 @@ async fn run() -> Result<()> {
     tracing::info!(?config, "configuration loaded");
 
     match args.command {
+        Commands::Deploy {
+            publish_options,
+            site_name,
+            watch,
+            check_extend,
+        } => {
+            // Load the ws-resources file, to check for the site-object-id. If it exists, it means
+            // the site is already deployed, in which case we should do the same as the update
+            // command. If it doesn't exist, we can deploy the site, by doing the same as the
+            // publish command.
+            let (ws_resources, _) = load_ws_resources(
+                publish_options.walrus_options.ws_resources.as_deref(),
+                publish_options.directory.as_path(),
+            )?;
+            let site_object_id = ws_resources.as_ref().and_then(|res| res.site_object_id);
+
+            let (identifier, continuous_editing, blob_management) = match site_object_id {
+                Some(object_id) => (
+                    SiteIdentifier::ExistingSite(object_id),
+                    ContinuousEditing::from_watch_flag(watch),
+                    BlobManagementOptions { check_extend },
+                ),
+                None => (
+                    SiteIdentifier::NewSite(site_name.unwrap_or_else(|| {
+                        ws_resources
+                            .and_then(|res| res.site_name)
+                            .unwrap_or_else(|| "My Walrus Site".to_string())
+                    })),
+                    ContinuousEditing::Once,
+                    BlobManagementOptions::no_status_check(),
+                ),
+            };
+
+            SiteEditor::new(args.context, config)
+                .with_edit_options(
+                    publish_options,
+                    identifier,
+                    continuous_editing,
+                    blob_management,
+                )
+                .run()
+                .await?
+        }
         Commands::Publish {
             publish_options,
             site_name,
