@@ -309,8 +309,6 @@ impl SiteManager {
                 // Also update metadata if there is a diff
                 match updates.metadata_op {
                     MetadataOp::Update => {
-                        // REVIEW: If metadata inside ws-resources, is None (Metadata::default())
-                        // and different from the site published, should we still update?
                         ptb.with_update_metadata(self.metadata.clone().unwrap_or_default())?
                     }
                     MetadataOp::Noop => ptb,
