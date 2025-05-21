@@ -7,10 +7,11 @@ use std::{
     num::{NonZeroU32, NonZeroUsize},
     path::PathBuf,
     str::FromStr,
+    time::SystemTime,
 };
 
 use anyhow::{anyhow, ensure, Result};
-use clap::{Parser, Subcommand};
+use clap::{ArgGroup, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use sui_sdk::wallet_context::WalletContext;
 use sui_types::base_types::{ObjectID, SuiAddress};
@@ -388,8 +389,9 @@ pub(crate) struct WalrusStoreOptions {
     /// If set to `max`, the resources are stored for the maximum number of epochs allowed on
     /// Walrus. Otherwise, the resources are stored for the specified number of epochs. The
     /// number of epochs must be greater than 0.
-    #[clap(long, value_parser = EpochCountOrMax::parse_epoch_count)]
-    pub(crate) epochs: EpochCountOrMax,
+    #[command(flatten)]
+    pub(crate) target_range: EpochArg,
+    // pub(crate) epochs: EpochCountOrMax,
     /// Make the stored resources permanent.
     ///
     /// By default, sites are deletable with site-builder delete command. By passing --permanent,
@@ -400,6 +402,30 @@ pub(crate) struct WalrusStoreOptions {
     /// Perform a dry run (you'll be asked for confirmation before committing changes).
     #[clap(long)]
     pub(crate) dry_run: bool,
+}
+
+#[derive(Parser, Debug, Clone, Default, Serialize, Deserialize)]
+#[clap(group(
+    ArgGroup::new("target_range")
+        .args(&["epochs", "earliest_expiry_time", "end_epoch"])
+        .required(true)
+))]
+#[serde(rename_all = "camelCase")]
+pub struct EpochArg {
+    /// Set number of epochs
+    #[arg(long, value_parser = EpochCountOrMax::parse_epoch_count)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub epochs: Option<EpochCountOrMax>,
+
+    /// Set earliest expiry time
+    #[arg(long, value_parser = humantime::parse_rfc3339_weak)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub earliest_expiry_time: Option<SystemTime>,
+
+    /// Set end epoch
+    #[clap(long = "end-epoch")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_epoch: Option<NonZeroU32>,
 }
 
 /// The number of epochs to store the blobs for.
