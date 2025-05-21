@@ -52,7 +52,7 @@ pub enum Command {
         files: Vec<PathBuf>,
         /// The number of epochs for which to store the file.
         #[serde(flatten)]
-        target_range: EpochArg,
+        epoch_arg: EpochArg,
         /// Do not check for the blob status before storing it.
         ///
         /// This will create a new blob even if the blob is already certified for a sufficient
@@ -194,14 +194,14 @@ impl WalrusCmdBuilder {
     pub fn store(
         self,
         files: Vec<PathBuf>,
-        target_range: EpochArg,
+        epoch_arg: EpochArg,
         force: bool,
         deletable: bool,
         dry_run: bool,
     ) -> WalrusCmdBuilder<Command> {
         let command = Command::Store {
             files,
-            target_range,
+            epoch_arg,
             force,
             deletable,
             dry_run,

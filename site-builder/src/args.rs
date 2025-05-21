@@ -344,7 +344,7 @@ pub(crate) struct WalrusStoreOptions {
     /// Walrus. Otherwise, the resources are stored for the specified number of epochs. The
     /// number of epochs must be greater than 0.
     #[command(flatten)]
-    pub(crate) target_range: EpochArg,
+    pub(crate) epoch_arg: EpochArg,
     // pub(crate) epochs: EpochCountOrMax,
     /// Make the stored resources permanent.
     ///
@@ -360,7 +360,7 @@ pub(crate) struct WalrusStoreOptions {
 
 #[derive(Parser, Debug, Clone, Default, Serialize, Deserialize)]
 #[clap(group(
-    ArgGroup::new("target_range")
+    ArgGroup::new("epoch_arg")
         .args(&["epochs", "earliest_expiry_time", "end_epoch"])
         .required(true)
 ))]
