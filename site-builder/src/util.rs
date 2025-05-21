@@ -129,7 +129,7 @@ pub fn get_site_id_from_response(
         ?effects,
         "getting the object ID of the created Walrus site."
     );
-    effects // The Ok() wrapper is removed
+    effects
         .created()
         .iter()
         .find(|c| {
