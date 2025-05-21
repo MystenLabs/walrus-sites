@@ -119,8 +119,7 @@ pub fn id_to_base36(id: &ObjectID) -> Result<String> {
 /// Panics if the created site object ID cannot be found in the transaction effects.
 /// This can happen if, for example, no object owned by the provided `address` was created
 /// in the transaction, or if the transaction did not result in the expected object creation
-/// structure that this function relies on (via `.created().iter().find(...).expect(...)`).
-// #[allow(dead_code)] // Removed as per suggestion
+/// structure that this function relies on.
 pub fn get_site_id_from_response(
     address: SuiAddress,
     effects: &SuiTransactionBlockEffects,
@@ -139,7 +138,7 @@ pub fn get_site_id_from_response(
                 .map(|owner_address| owner_address == address)
                 .unwrap_or(false)
         })
-        .expect("could not find the object ID for the created Walrus site.") // This .expect() will panic on None
+        .expect("could not find the object ID for the created Walrus site.")
         .reference
         .object_id
 }

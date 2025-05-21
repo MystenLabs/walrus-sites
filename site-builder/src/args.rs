@@ -236,7 +236,6 @@ pub(crate) enum Commands {
         check_extend: bool,
     },
     /// Publish a new site on Sui.
-    #[deprecated(note = "This command is soon to be deprecated; please use `deploy` instead")]
     Publish {
         #[clap(flatten)]
         publish_options: PublishOptions,
@@ -245,7 +244,6 @@ pub(crate) enum Commands {
         site_name: Option<String>,
     },
     /// Update an existing site.
-    #[deprecated(note = "This command is soon to be deprecated; please use `deploy` instead")]
     Update {
         #[clap(flatten)]
         publish_options: PublishOptions,
