@@ -224,6 +224,12 @@ pub(crate) enum Commands {
         /// The name of the site.
         #[clap(short, long)]
         site_name: Option<String>,
+        /// The object ID of a partially published site to be completed.
+        ///
+        /// This is the object ID of the site that was published before, and is now being updated.
+        /// If this is provided, it will override the object ID in the ws-resources.json file.
+        #[clap(short, long)]
+        object_id: Option<ObjectID>,
         #[clap(short, long, action)]
         watch: bool,
         #[clap(long, action)]

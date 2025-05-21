@@ -5,7 +5,7 @@ use std::{
     str,
 };
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use futures::Future;
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{
@@ -24,7 +24,11 @@ use sui_types::{
     transaction::{ProgrammableTransaction, TransactionData},
 };
 
-use crate::{retry_client::RetriableSuiClient, site::contracts::TypeOriginMap};
+use crate::{
+    display,
+    retry_client::RetriableSuiClient,
+    site::{config::WSResources, contracts::TypeOriginMap},
+};
 
 pub async fn sign_and_send_ptb(
     active_address: SuiAddress,
@@ -243,6 +247,80 @@ pub fn load_wallet_context(
     }
 
     Ok(wallet_context)
+}
+
+/// Persists the site_object_id and site_name to the ws-resources.json file.
+///
+/// > Note: This function should be called only after a successful deployment operation.
+pub fn persist_site_id_and_name(
+    site_object_id: ObjectID,
+    site_name: Option<String>,
+    initial_ws_resources_opt: Option<WSResources>,
+    ws_resources_path: &Path,
+) -> Result<WSResources, anyhow::Error> {
+    let mut ws_resources_to_save = initial_ws_resources_opt.unwrap_or_default();
+
+    // Update/Set the site_object_id
+    if ws_resources_to_save.site_object_id != Some(site_object_id) {
+        tracing::info!(
+            "Updating site_object_id in ws-resources.json from {:?} to: {}",
+            ws_resources_to_save.site_object_id,
+            site_object_id
+        );
+        ws_resources_to_save.site_object_id = Some(site_object_id);
+    } else {
+        tracing::info!(
+            "Site object ID ({}) to be persisted is already the current ID in ws-resources.json.",
+            site_object_id
+        );
+    }
+
+    // Update/Set the site_name
+    match site_name {
+        Some(ref new_site_name) if ws_resources_to_save.site_name != site_name => {
+            tracing::info!(
+                "Updating site_name in ws-resources.json from {:?} to: {}",
+                ws_resources_to_save.site_name,
+                new_site_name
+            );
+            ws_resources_to_save.site_name = site_name;
+        }
+        Some(ref existing_site_name) => {
+            tracing::info!(
+                "Site Name ({}) to be persisted is already the current Site Name in ws-resources.json.",
+                existing_site_name
+            );
+        }
+        None => {
+            tracing::info!("Persisting the Default Site Name in ws-resources.json.");
+        }
+    }
+
+    // Save the updated WSResources struct
+    let action_message = if ws_resources_path.exists() {
+        "Updating"
+    } else {
+        "Creating"
+    };
+    display::action(format!(
+        "{} ws-resources.json (Site Object ID: {}, Name: {:?}) at: {}",
+        action_message,
+        ws_resources_to_save
+            .site_object_id
+            .expect("ID should be set by now"), // Should be Some
+        ws_resources_to_save.site_name,
+        ws_resources_path.display()
+    ));
+
+    ws_resources_to_save
+        .save(ws_resources_path)
+        .context(format!(
+            "Failed to save ws-resources.json to {}",
+            ws_resources_path.display()
+        ))?;
+
+    display::done();
+    Ok(ws_resources_to_save)
 }
 
 // Resolution

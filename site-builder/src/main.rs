@@ -107,18 +107,21 @@ async fn run() -> Result<()> {
         Commands::Deploy {
             publish_options,
             site_name,
+            object_id,
             watch,
             check_extend,
         } => {
             // Load the ws-resources file, to check for the site-object-id. If it exists, it means
-            // the site is already deployed, in which case we should do the same as the update
-            // command. If it doesn't exist, we can deploy the site, by doing the same as the
-            // publish command.
+            // the site is already deployed, in which case we should do update the site.
+            // If it doesn't exist, we can publish a new site.
             let (ws_resources, _) = load_ws_resources(
                 publish_options.walrus_options.ws_resources.as_deref(),
                 publish_options.directory.as_path(),
             )?;
-            let site_object_id = ws_resources.as_ref().and_then(|res| res.site_object_id);
+
+            // if `object_id` is Some use it, else use the one from the ws-resources file
+            let site_object_id =
+                object_id.or_else(|| ws_resources.as_ref().and_then(|res| res.site_object_id));
 
             let (identifier, continuous_editing, blob_management) = match site_object_id {
                 Some(object_id) => (
