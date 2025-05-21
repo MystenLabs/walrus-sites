@@ -89,11 +89,11 @@ impl Walrus {
     pub async fn store(
         &mut self,
         files: Vec<PathBuf>,
-        target_range: EpochArg,
+        epoch_arg: EpochArg,
         force: bool,
         deletable: bool,
     ) -> Result<StoreOutput> {
-        create_command!(self, store, files, target_range, force, deletable, false)
+        create_command!(self, store, files, epoch_arg, force, deletable, false)
     }
 
     /// Issues a `delete` JSON command to the Walrus CLI, returning the parsed output.
@@ -105,19 +105,11 @@ impl Walrus {
     pub async fn dry_run_store(
         &mut self,
         file: PathBuf,
-        target_range: EpochArg,
+        epoch_arg: EpochArg,
         deletable: bool,
         force: bool,
     ) -> Result<Vec<DryRunOutput>> {
-        create_command!(
-            self,
-            store,
-            vec![file],
-            target_range,
-            force,
-            deletable,
-            true
-        )
+        create_command!(self, store, vec![file], epoch_arg, force, deletable, true)
     }
 
     /// Issues a `read` JSON command to the Walrus CLI, returning the parsed output.
