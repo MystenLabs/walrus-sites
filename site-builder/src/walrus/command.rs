@@ -50,7 +50,9 @@ pub enum Command {
     Store {
         /// The path to the file to be stored.
         files: Vec<PathBuf>,
-        /// The number of epochs for which to store the file.
+        /// The epoch argument to specify either the number of epochs to store the blob, or the
+        /// end epoch, or the earliest expiry time in rfc3339 format.
+        ///
         #[serde(flatten)]
         epoch_arg: EpochArg,
         /// Do not check for the blob status before storing it.
