@@ -16,6 +16,7 @@ import {
     fullNodeFail,
     generateHashErrorResponse,
     resourceNotFound,
+    custom404NotFound,
 } from "./http/http_error_responses";
 import { aggregatorEndpoint } from "./aggregator";
 import { toBase64 } from "@mysten/bcs";
@@ -108,15 +109,18 @@ export class UrlFetcher {
             }
         }
 
-        // Try to fetch 404.html
+        // Try to fetch 404.html from the deployed site
         if (parsedUrl.path !== "/404.html") {
             const notFoundPage = await this.fetchUrl(resolvedObjectId, "/404.html");
             if (notFoundPage.status !== HttpStatusCodes.NOT_FOUND) {
                 return notFoundPage;
             }
+
+            // Site doesn't have its own 404 page — use portal fallback
+            return custom404NotFound();
         }
 
-        return siteNotFound();
+        return custom404NotFound();
     }
 
     async resolveObjectId(
