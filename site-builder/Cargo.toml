@@ -17,6 +17,7 @@ fastcrypto = { git = "https://github.com/MystenLabs/fastcrypto" }
 flate2 = "1.0.30"
 futures = "0.3.30"
 home = "0.5.9"
+humantime = "2.2.0"
 move-core-types = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.46.2" }
 notify = "6.1.1"
 prettytable = "0.10.0"
