@@ -358,7 +358,7 @@ fn print_summary(
         );
     } else {
         println!(
-            r#"To browse the site, run a local portal and visit:
+            r#"To browse the site, run a testnet portal locally and visit:
     http://{base36_id}.localhost:3000
 
     (more info: https://docs.wal.app/walrus-sites/portal.html#running-the-portal-locally)"#,
