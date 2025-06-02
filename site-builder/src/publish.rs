@@ -347,7 +347,7 @@ fn print_summary(
 
     if is_mainnet {
         println!(
-            r#"To browse the site, you have the following options:
+            r#"To browse your mainnet site, you have the following options:
     1. Run a local portal, and browse the site through it: e.g. http://{base36_id}.localhost:3000
        (more info: https://docs.wal.app/walrus-sites/portal.html#running-the-portal-locally)
     2. Use a third-party portal (e.g. wal.app), which will require a SuiNS name.
