@@ -197,7 +197,7 @@ impl SiteManager {
     }
 
     /// Publishes the resources to Walrus.
-    async fn store_to_walrus<'b>(&mut self, walrus_updates: &[&ResourceOp<'b>]) -> Result<()> {
+    async fn store_to_walrus(&mut self, walrus_updates: &[&ResourceOp<'_>]) -> Result<()> {
         for (idx, update_set) in walrus_updates
             .chunks(self.max_parallel_stores.get())
             .enumerate()
@@ -215,9 +215,9 @@ impl SiteManager {
         Ok(())
     }
 
-    async fn store_multiple_to_walrus_with_retry<'b>(
+    async fn store_multiple_to_walrus_with_retry(
         &mut self,
-        update_batch: &[&ResourceOp<'b>],
+        update_batch: &[&ResourceOp<'_>],
     ) -> Result<()> {
         let deletable = !self.walrus_options.permanent;
         let resource_paths = update_batch
@@ -294,9 +294,9 @@ impl SiteManager {
     }
 
     /// Executes the updates on Sui.
-    async fn execute_sui_updates<'b>(
+    async fn execute_sui_updates(
         &self,
-        updates: &SiteDataDiff<'b>,
+        updates: &SiteDataDiff<'_>,
     ) -> Result<SuiTransactionBlockResponse> {
         tracing::debug!(
             address=?self.active_address()?,
