@@ -37,3 +37,7 @@ tokio = { version = "1.38.1", features = ["rt", "rt-multi-thread", "macros", "pr
 toml = "0.8.14"
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
+
+[dev-dependencies]
+walrus-service = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.26.2", features = ["test-utils"] }
+walrus-sui = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.26.2" }
