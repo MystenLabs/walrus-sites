@@ -260,13 +260,13 @@ pub fn persist_site_id_and_name(
     let mut ws_resources_to_save = initial_ws_resources_opt.unwrap_or_default();
 
     // Update/Set the site_object_id
-    if ws_resources_to_save.site_object_id != Some(site_object_id) {
+    if ws_resources_to_save.object_id != Some(site_object_id) {
         tracing::info!(
             "Updating site_object_id in ws-resources.json from {:?} to: {}",
-            ws_resources_to_save.site_object_id,
+            ws_resources_to_save.object_id,
             site_object_id
         );
-        ws_resources_to_save.site_object_id = Some(site_object_id);
+        ws_resources_to_save.object_id = Some(site_object_id);
     } else {
         tracing::info!(
             "Site object ID ({}) to be persisted is already the current ID in ws-resources.json.",
@@ -305,7 +305,7 @@ pub fn persist_site_id_and_name(
         "{} ws-resources.json (Site Object ID: {}, Name: {:?}) at: {}",
         action_message,
         ws_resources_to_save
-            .site_object_id
+            .object_id
             .expect("ID should be set by now"), // Should be Some
         ws_resources_to_save.site_name,
         ws_resources_path.display()

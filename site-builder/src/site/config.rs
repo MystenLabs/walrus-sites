@@ -34,7 +34,7 @@ pub struct WSResources {
     /// On subsequent calls to the `deploy` command, this parameter is used
     /// to update the site.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub site_object_id: Option<ObjectID>,
+    pub object_id: Option<ObjectID>,
     /// The paths to ignore when publishing/updating.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ignore: Option<Vec<String>>,

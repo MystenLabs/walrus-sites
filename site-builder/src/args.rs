@@ -230,8 +230,27 @@ pub(crate) enum Commands {
         /// If this is provided, it will override the object ID in the ws-resources.json file.
         #[clap(short, long)]
         object_id: Option<ObjectID>,
+        /// Watch the site directory for changes and automatically redeploy when files are modified.
+        ///
+        /// When enabled, the command will continuously monitor the site directory and trigger a
+        /// redepoloyment whenever changes are detected, allowing for rapid development iteration.
         #[clap(short, long, action)]
         watch: bool,
+        /// Checks and extends all blobs in an existing site during an update.
+        ///
+        /// With this flag, the site-builder will force a check of the status of all the Walrus
+        /// blobs composing the site, and will extend the ones that expire before `--epochs` epochs.
+        /// This is useful to ensure all the resources in the site are available for the same
+        /// amount of epochs.
+        ///
+        /// Further, when this flag is set, _missing_ blobs will also be reuploaded (e.g., in case
+        /// they were deleted, or are all expired and were not owned, or, in case of testnet, the
+        /// network was wiped).
+        ///
+        /// Without this flag, when updating a site, the `deploy` command will only create new blobs
+        /// for the resources that have been added or modified (compared to the object on Sui).
+        /// This implies that successive updates (without --check-extend) may result in the site
+        /// having resources with different expiration times (and possibly some that are expired).
         #[clap(long, action)]
         check_extend: bool,
     },
@@ -249,6 +268,10 @@ pub(crate) enum Commands {
         publish_options: PublishOptions,
         /// The object ID of a partially published site to be completed.
         object_id: ObjectID,
+        /// Watch the site directory for changes and automatically redeploy when files are modified.
+        ///
+        /// When enabled, the command will continuously monitor the site directory and trigger a
+        /// redepoloyment whenever changes are detected, allowing for rapid development iteration.
         #[clap(short, long, action)]
         watch: bool,
         /// This flag is deprecated and will be removed in the future. Use --check-extend.

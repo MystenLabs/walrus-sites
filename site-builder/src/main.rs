@@ -120,7 +120,7 @@ async fn run() -> Result<()> {
 
             // if `object_id` is Some use it, else use the one from the ws-resources file
             let site_object_id =
-                object_id.or_else(|| ws_resources.as_ref().and_then(|res| res.site_object_id));
+                object_id.or_else(|| ws_resources.as_ref().and_then(|res| res.object_id));
 
             let (identifier, continuous_editing, blob_management) = match site_object_id {
                 Some(object_id) => (
