@@ -103,13 +103,9 @@ jobs:
     runs-on: ubuntu-ghcloud
     steps:
       - uses: actions/checkout@v4
-      #- uses: Swatinem/rust-cache@v2.7.3
-      #  with:
-      #    save-if: ${{ github.ref == 'refs/heads/main' && 'true' || 'false' }}
-      - name: Clean cargo cache
-        run: cargo clean
-      - name: Remove Cargo.lock
-        run: rm -f Cargo.lock
+      - uses: Swatinem/rust-cache@v2.7.3
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' && 'true' || 'false' }}
       - name: Build Rust code
         run: cargo build --verbose
 
@@ -125,10 +121,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2.7.3
         with:
           save-if: ${{ github.ref == 'refs/heads/main' && 'true' || 'false' }}
-      - name: Clean cargo cache
-        run: cargo clean
-      - name: Remove Cargo.lock
-        run: rm -f Cargo.lock
       - name: Run tests
         run: cargo test -- --include-ignored
   check-all:
