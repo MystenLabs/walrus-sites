@@ -78,7 +78,6 @@ pub fn sites_config_default_paths() -> Vec<PathBuf> {
     default_paths
 }
 
-#[allow(deprecated)]
 async fn run() -> Result<()> {
     tracing_subscriber::fmt::init();
     tracing::info!("initializing site builder");
