@@ -261,14 +261,14 @@ pub fn persist_site_id_and_name(
 
     // Update/Set the site_object_id
     if ws_resources_to_save.object_id != Some(site_object_id) {
-        tracing::info!(
+        tracing::debug!(
             "Updating site_object_id in ws-resources.json from {:?} to: {}",
             ws_resources_to_save.object_id,
             site_object_id
         );
         ws_resources_to_save.object_id = Some(site_object_id);
     } else {
-        tracing::info!(
+        tracing::debug!(
             "Site object ID ({}) to be persisted is already the current ID in ws-resources.json.",
             site_object_id
         );
@@ -277,7 +277,7 @@ pub fn persist_site_id_and_name(
     // Update/Set the site_name
     match site_name {
         Some(ref new_site_name) if ws_resources_to_save.site_name != site_name => {
-            tracing::info!(
+            tracing::debug!(
                 "Updating site_name in ws-resources.json from {:?} to: {}",
                 ws_resources_to_save.site_name,
                 new_site_name
@@ -285,13 +285,13 @@ pub fn persist_site_id_and_name(
             ws_resources_to_save.site_name = site_name;
         }
         Some(ref existing_site_name) => {
-            tracing::info!(
+            tracing::debug!(
                 "Site Name ({}) to be persisted is already the current Site Name in ws-resources.json.",
                 existing_site_name
             );
         }
         None => {
-            tracing::info!("Persisting the Default Site Name in ws-resources.json.");
+            tracing::debug!("Persisting the Default Site Name in ws-resources.json.");
         }
     }
 
