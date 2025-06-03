@@ -11,7 +11,10 @@ use std::{
 
 use move_core_types::u256::U256;
 use serde::{de::DeserializeOwned, Deserialize, Serialize, Serializer};
-use sui_types::base_types::{ObjectID, SuiAddress};
+use sui_types::{
+    base_types::{ObjectID, SuiAddress},
+    id::UID,
+};
 
 use crate::{
     site::contracts::{self, AssociatedContractStruct, StructTag},
@@ -236,6 +239,55 @@ impl Default for Metadata {
             creator: None,
         }
     }
+}
+
+impl From<SiteFields> for Metadata {
+    fn from(value: SiteFields) -> Self {
+        let SiteFields {
+            link,
+            image_url,
+            description,
+            project_url,
+            creator,
+            ..
+        } = value;
+        Metadata {
+            link,
+            image_url,
+            description,
+            project_url,
+            creator,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum MetadataOp {
+    Update,
+    Noop,
+}
+
+impl MetadataOp {
+    pub fn is_noop(&self) -> bool {
+        matches!(self, Self::Noop)
+    }
+}
+
+#[derive(Deserialize, Clone, Debug)]
+pub struct SiteFields {
+    #[allow(dead_code)]
+    pub id: UID,
+    #[allow(dead_code)]
+    pub name: String,
+    pub link: Option<String>,
+    pub image_url: Option<String>,
+    pub description: Option<String>,
+    pub project_url: Option<String>,
+    pub creator: Option<String>,
+}
+
+impl AssociatedContractStruct for SiteFields {
+    const CONTRACT_STRUCT: StructTag<'static> = contracts::site::Site;
 }
 
 // SuiNS definitions

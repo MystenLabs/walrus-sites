@@ -231,6 +231,7 @@ impl SiteEditor<EditOptions> {
             display::done();
         }
 
+        // Note: `load_ws_resources` again. We already loaded them when parsing the name.
         let (ws_resources, ws_resources_path) = load_ws_resources(
             self.edit_options
                 .publish_options
@@ -361,18 +362,28 @@ fn print_summary(
             id
         }
     };
+    let is_mainnet = matches!(config.general.walrus_context.as_deref(), Some("mainnet"));
 
-    println!(
-        r#"To browse the site, you have the following options:
-        1. Run a local portal, and browse the site through it: e.g. http://{base36_id}.localhost:3000
-           (more info: https://docs.wal.app/walrus-sites/portal.html#running-the-portal-locally)
-        2. Use a third-party portal (e.g. wal.app), which will require a SuiNS name.
-           First, buy a SuiNS name at suins.io (e.g. example-domain), then point it to the site object ID.
-           Finally, browse it with: https://example-domain.{portal}
-           "#,
-        base36_id = id_to_base36(&object_id)?,
-        portal = config.portal
-    );
+    if is_mainnet {
+        println!(
+            r#"To browse your mainnet site, you have the following options:
+    1. Run a mainnet portal locally, and browse the site through it: e.g. http://{base36_id}.localhost:3000
+       (more info: https://docs.wal.app/walrus-sites/portal.html#running-the-portal-locally)
+    2. Use a third-party portal (e.g. wal.app), which will require a SuiNS name.
+       First, buy a SuiNS name at suins.io (e.g. example-domain), then point it to the site object ID.
+       Finally, browse it with: https://example-domain.{portal}"#,
+            base36_id = id_to_base36(&object_id)?,
+            portal = config.portal
+        );
+    } else {
+        println!(
+            r#"To browse the site, run a testnet portal locally and visit:
+    http://{base36_id}.localhost:3000
+
+    (more info: https://docs.wal.app/walrus-sites/portal.html#running-the-portal-locally)"#,
+            base36_id = id_to_base36(&object_id)?
+        );
+    }
     Ok(())
 }
 

@@ -47,8 +47,8 @@ impl Summarizable for ResourceOpSummary {
 impl Summarizable for RouteOps {
     fn to_summary(&self) -> String {
         match self {
-            RouteOps::Unchanged => "The site routes were left unchanged".to_owned(),
-            RouteOps::Replace(_) => "The site routes were modified".to_owned(),
+            RouteOps::Unchanged => "The site routes were left unchanged.".to_owned(),
+            RouteOps::Replace(_) => "The site routes were modified.".to_owned(),
         }
     }
 }
@@ -66,6 +66,7 @@ impl Summarizable for Vec<ResourceOpSummary> {
 pub struct SiteDataDiffSummary {
     pub resource_ops: Vec<ResourceOpSummary>,
     pub route_ops: RouteOps,
+    pub metadata_updated: bool,
 }
 
 impl From<&SiteDataDiff<'_>> for SiteDataDiffSummary {
@@ -73,6 +74,7 @@ impl From<&SiteDataDiff<'_>> for SiteDataDiffSummary {
         SiteDataDiffSummary {
             resource_ops: value.resource_ops.iter().map(|op| op.into()).collect(),
             route_ops: value.route_ops.clone(),
+            metadata_updated: !value.metadata_op.is_noop(),
         }
     }
 }
@@ -85,20 +87,25 @@ impl From<SiteDataDiff<'_>> for SiteDataDiffSummary {
 
 impl Summarizable for SiteDataDiffSummary {
     fn to_summary(&self) -> String {
-        if self.resource_ops.is_empty() && self.route_ops.is_unchanged() {
-            return "No operation needs to be performed".to_owned();
+        if self.resource_ops.is_empty() && self.route_ops.is_unchanged() && !self.metadata_updated {
+            return "No operation needs to be performed.".to_owned();
         }
 
         let resource_str = if !self.resource_ops.is_empty() {
             format!(
-                "Resource operations performed:\n{}\n",
+                "Resource operations performed:\n{}",
                 self.resource_ops.to_summary()
             )
         } else {
-            "".to_owned()
+            "No resource operations performed.".to_owned()
         };
         let route_str = self.route_ops.to_summary();
+        let metadata_str = if self.metadata_updated {
+            "Metadata updated."
+        } else {
+            "No Metadata updated."
+        };
 
-        format!("{}{}", resource_str, route_str)
+        format!("{}\n{}\n{}", resource_str, route_str, metadata_str)
     }
 }

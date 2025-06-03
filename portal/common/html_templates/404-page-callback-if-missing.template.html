@@ -1,0 +1,152 @@
+<!--
+  Copyright (c) Mysten Labs, Inc.
+  SPDX-License-Identifier: Apache-2.0
+-->
+
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>404 - Page Not Found</title>
+        <style>
+            :root {
+                --bg-light: #f9f9f9;
+                --text-light: #333;
+                --subtext-light: #555;
+                --button-bg-light: #000;
+                --button-text-light: #fff;
+
+                --bg-dark: #121212;
+                --text-dark: #fff;
+                --subtext-dark: #bbb;
+                --button-bg-dark: #fff;
+                --button-text-dark: #000;
+            }
+
+            body {
+                font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                text-align: center;
+                min-height: 100vh;
+                padding: 2rem;
+                margin: 0;
+                background-color: var(--bg-light);
+                color: var(--text-light);
+                transition:
+                    background-color 0.3s,
+                    color 0.3s;
+            }
+
+            .container {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 2rem;
+                max-width: 700px;
+                width: 100%;
+            }
+
+            @media (min-width: 768px) {
+                .container {
+                    flex-direction: row;
+                    text-align: left;
+                }
+            }
+
+            .text {
+                flex: 1;
+                padding: 0 1rem;
+            }
+
+            .icon-light,
+            .icon-dark {
+                width: 200px;
+                max-width: 100%;
+                height: auto;
+                display: none;
+            }
+
+            h1 {
+                font-size: 2.5em;
+                margin: 0 0 1rem 0;
+            }
+
+            .subtext {
+                font-size: 1em;
+                margin-bottom: 2rem;
+                color: var(--subtext-light);
+            }
+
+            .button {
+                padding: 0.75rem 2rem;
+                border: none;
+                border-radius: 12px;
+                font-weight: bold;
+                cursor: pointer;
+                text-decoration: none;
+                display: inline-block;
+                font-size: 1rem;
+                line-height: 1;
+                background-color: var(--button-bg-light);
+                color: var(--button-text-light);
+                transition:
+                    background-color 0.3s,
+                    color 0.3s;
+            }
+
+            .button:hover {
+                opacity: 0.9;
+            }
+
+            @media (prefers-color-scheme: dark) {
+                body {
+                    background-color: var(--bg-dark);
+                    color: var(--text-dark);
+                }
+
+                .subtext {
+                    color: var(--subtext-dark);
+                }
+
+                .icon-dark {
+                    display: block;
+                }
+
+                .button {
+                    background-color: var(--button-bg-dark);
+                    color: var(--button-text-dark);
+                }
+            }
+
+            @media (prefers-color-scheme: light) {
+                .icon-light {
+                    display: block;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="text">
+                <h1>${message}</h1>
+                <p class="subtext">${secondaryMessage}</p>
+                <a href="/" class="button">Return Home</a>
+            </div>
+            <div>
+                <img
+                    class="icon-light"
+                    src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQwIiBoZWlnaHQ9IjI0MCIgdmlld0JveD0iMCAwIDI0MCAyNDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik03MS4yNSA2Mi4xODI2SDUxLjY3QzQ3LjI0ODggNjIuMTgyNiA0My4wMDg4IDYzLjkzODkgMzkuODgyNSA2Ny4wNjUxQzM2Ljc1NjMgNzAuMTkxNCAzNSA3NC40MzE1IDM1IDc4Ljg1MjZWMTkyLjE4M0g4NUM4NSAyMDMuMTgzIDEwMC42NyAyMTIuMTgzIDEyMCAyMTIuMTgzQzEzOS4zMyAyMTIuMTgzIDE1NSAyMDMuMTgzIDE1NSAxOTIuMTgzSDIwNVY4Mi4xODI2QzIwNSA3MS4xMzY5IDE5Ni4wNDYgNjIuMTgyNiAxODUgNjIuMTgyNkgxNzEuMjUiIHN0cm9rZT0iYmxhY2siIHN0cm9rZS13aWR0aD0iMTAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8cGF0aCBkPSJNMTU1IDE5Mi4xODNDMTU1IDIwMy4xODMgMTM5LjMzIDIxMi4xODMgMTIwIDIxMi4xODNDMTAwLjY3IDIxMi4xODMgODUgMjAzLjE4MyA4NSAxOTIuMTgzSDVDNy44NTY2MyAyMDMuNjA4IDE0LjQ1MDEgMjEzLjc1IDIzLjczMjUgMjIwLjk5N0MzMy4wMTQ4IDIyOC4yNDUgNDQuNDUzNCAyMzIuMTgyIDU2LjIzIDIzMi4xODNIMTgzLjc3QzE5NS41NDcgMjMyLjE4MiAyMDYuOTg1IDIyOC4yNDUgMjE2LjI2OCAyMjAuOTk3QzIyNS41NSAyMTMuNzUgMjMyLjE0MyAyMDMuNjA4IDIzNSAxOTIuMTgzSDE1NVoiIHN0cm9rZT0iYmxhY2siIHN0cm9rZS13aWR0aD0iMTAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8cGF0aCBkPSJNMTIxLjAyOSA3Ni44ODIyQzEyMC4xMDQgNzYuODgyMiAxMTkuMzUzIDc2LjEzMTkgMTE5LjM1MyA3NS4yMDYyQzExOS4zNTMgNzQuMjgwNiAxMjAuMTA0IDczLjUzMDMgMTIxLjAyOSA3My41MzAzIiBzdHJva2U9ImJsYWNrIiBzdHJva2Utd2lkdGg9IjEwIi8+CjxwYXRoIGQ9Ik0xMjEuMDMgNDAuMDA5OFY2MC4xMjE0IiBzdHJva2U9ImJsYWNrIiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPHBhdGggZD0iTTE2MC41ODQgODQuMjUzN0MxNjEuOTI1IDg2LjI2NDkgMTYxLjI1NCA4OC4yNzYgMTYwLjU4NCA5MC4yODcyQzE1OS4yNDMgOTIuMjk4MyAxNTcuMjMyIDkyLjk2ODcgMTU1LjIyMSA5Mi45Njg3SDg3LjUxMTNDODUuNTAwMSA5Mi45Njg3IDgzLjQ4ODkgOTEuNjI4IDgyLjE0ODIgOTAuMjg3MkM4MC44MDc0IDg4LjI3NiA4MC44MDc0IDg2LjI2NDkgODIuMTQ4MiA4NC4yNTM3TDExNi4zMzggMTkuODk2NEMxMTcuMDA5IDE4LjU1NTYgMTE3LjY3OSAxNy44ODUyIDExOS4wMiAxNy4yMTQ4QzEyMi4zNzIgMTUuODc0IDEyNS43MjQgMTYuNTQ0NCAxMjcuNzM1IDE5Ljg5NjRMMTYwLjU4NCA4NC4yNTM3WiIgc3Ryb2tlPSJibGFjayIgc3Ryb2tlLXdpZHRoPSIxMCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CjxwYXRoIGQ9Ik0xMjEuMDMgNzYuODgyMkMxMjEuOTU1IDc2Ljg4MjIgMTIyLjcwNiA3Ni4xMzE5IDEyMi43MDYgNzUuMjA2MkMxMjIuNzA2IDc0LjI4MDYgMTIxLjk1NSA3My41MzAzIDEyMS4wMyA3My41MzAzIiBzdHJva2U9ImJsYWNrIiBzdHJva2Utd2lkdGg9IjEwIi8+CjxwYXRoIGQ9Ik0xMDcuNDYzIDEyOC43MDVWMTU2LjQ4NUMxMDcuNDYzIDE2NC4xNTcgMTEzLjY4MiAxNzAuMzc1IDEyMS4zNTMgMTcwLjM3NUMxMjkuMDI1IDE3MC4zNzUgMTM1LjI0MyAxNjQuMTU3IDEzNS4yNDMgMTU2LjQ4NVYxMjguNzA1QzEzNS4yNDMgMTIxLjAzMyAxMjkuMDI1IDExNC44MTQgMTIxLjM1MyAxMTQuODE0QzExMy42ODIgMTE0LjgxNCAxMDcuNDYzIDEyMS4wMzMgMTA3LjQ2MyAxMjguNzA1WiIgc3Ryb2tlPSJibGFjayIgc3Ryb2tlLXdpZHRoPSIxMCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CjxwYXRoIGQ9Ik0xNzUuNzMyIDExNC43NzVMMTQ3LjkzMiAxNTYuNDc1SDE4NC45OTkiIHN0cm9rZT0iYmxhY2siIHN0cm9rZS13aWR0aD0iMTAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8cGF0aCBkPSJNMTc1LjczNSAxMTQuNzc1VjE3MC4zNzUiIHN0cm9rZT0iYmxhY2siIHN0cm9rZS13aWR0aD0iMTAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8cGF0aCBkPSJNODEuNTA4NSAxMTQuNzc1TDUzLjcwODUgMTU2LjQ3NUg5MC43NzUyIiBzdHJva2U9ImJsYWNrIiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPHBhdGggZD0iTTgxLjUwODggMTE0Ljc3NVYxNzAuMzc1IiBzdHJva2U9ImJsYWNrIiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+Cg=="
+                    alt="404 Not Found Icon"
+                />
+                <img
+                    class="icon-dark"
+                    src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQwIiBoZWlnaHQ9IjI0MCIgdmlld0JveD0iMCAwIDI0MCAyNDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik03MS4yNSA2Mi4xODI2SDUxLjY3QzQ3LjI0ODggNjIuMTgyNiA0My4wMDg4IDYzLjkzODkgMzkuODgyNSA2Ny4wNjUxQzM2Ljc1NjMgNzAuMTkxNCAzNSA3NC40MzE1IDM1IDc4Ljg1MjZWMTkyLjE4M0g4NUM4NSAyMDMuMTgzIDEwMC42NyAyMTIuMTgzIDEyMCAyMTIuMTgzQzEzOS4zMyAyMTIuMTgzIDE1NSAyMDMuMTgzIDE1NSAxOTIuMTgzSDIwNVY4Mi4xODI2QzIwNSA3MS4xMzY5IDE5Ni4wNDYgNjIuMTgyNiAxODUgNjIuMTgyNkgxNzEuMjUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMTAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8cGF0aCBkPSJNMTU1IDE5Mi4xODNDMTU1IDIwMy4xODMgMTM5LjMzIDIxMi4xODMgMTIwIDIxMi4xODNDMTAwLjY3IDIxMi4xODMgODUgMjAzLjE4MyA4NSAxOTIuMTgzSDVDNy44NTY2MyAyMDMuNjA4IDE0LjQ1MDEgMjEzLjc1IDIzLjczMjUgMjIwLjk5N0MzMy4wMTQ4IDIyOC4yNDUgNDQuNDUzNCAyMzIuMTgyIDU2LjIzIDIzMi4xODNIMTgzLjc3QzE5NS41NDcgMjMyLjE4MiAyMDYuOTg1IDIyOC4yNDUgMjE2LjI2OCAyMjAuOTk3QzIyNS41NSAyMTMuNzUgMjMyLjE0MyAyMDMuNjA4IDIzNSAxOTIuMTgzSDE1NVoiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMTAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8cGF0aCBkPSJNMTIxLjAyOSA3Ni44ODIyQzEyMC4xMDQgNzYuODgyMiAxMTkuMzUzIDc2LjEzMTkgMTE5LjM1MyA3NS4yMDYyQzExOS4zNTMgNzQuMjgwNiAxMjAuMTA0IDczLjUzMDMgMTIxLjAyOSA3My41MzAzIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjEwIi8+CjxwYXRoIGQ9Ik0xMjEuMDMgNDAuMDA5OFY2MC4xMjE0IiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPHBhdGggZD0iTTE2MC41ODQgODQuMjUzN0MxNjEuOTI1IDg2LjI2NDkgMTYxLjI1NCA4OC4yNzYgMTYwLjU4NCA5MC4yODcyQzE1OS4yNDMgOTIuMjk4MyAxNTcuMjMyIDkyLjk2ODcgMTU1LjIyMSA5Mi45Njg3SDg3LjUxMTNDODUuNTAwMSA5Mi45Njg3IDgzLjQ4ODkgOTEuNjI4IDgyLjE0ODIgOTAuMjg3MkM4MC44MDc0IDg4LjI3NiA4MC44MDc0IDg2LjI2NDkgODIuMTQ4MiA4NC4yNTM3TDExNi4zMzggMTkuODk2NEMxMTcuMDA5IDE4LjU1NTYgMTE3LjY3OSAxNy44ODUyIDExOS4wMiAxNy4yMTQ4QzEyMi4zNzIgMTUuODc0IDEyNS43MjQgMTYuNTQ0NCAxMjcuNzM1IDE5Ljg5NjRMMTYwLjU4NCA4NC4yNTM3WiIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIxMCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CjxwYXRoIGQ9Ik0xMjEuMDMgNzYuODgyMkMxMjEuOTU1IDc2Ljg4MjIgMTIyLjcwNiA3Ni4xMzE5IDEyMi43MDYgNzUuMjA2MkMxMjIuNzA2IDc0LjI4MDYgMTIxLjk1NSA3My41MzAzIDEyMS4wMyA3My41MzAzIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjEwIi8+CjxwYXRoIGQ9Ik0xMDcuNDYzIDEyOC43MDVWMTU2LjQ4NUMxMDcuNDYzIDE2NC4xNTcgMTEzLjY4MiAxNzAuMzc1IDEyMS4zNTMgMTcwLjM3NUMxMjkuMDI1IDE3MC4zNzUgMTM1LjI0MyAxNjQuMTU3IDEzNS4yNDMgMTU2LjQ4NVYxMjguNzA1QzEzNS4yNDMgMTIxLjAzMyAxMjkuMDI1IDExNC44MTQgMTIxLjM1MyAxMTQuODE0QzExMy42ODIgMTE0LjgxNCAxMDcuNDYzIDEyMS4wMzMgMTA3LjQ2MyAxMjguNzA1WiIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIxMCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CjxwYXRoIGQ9Ik0xNzUuNzMyIDExNC43NzVMMTQ3LjkzMiAxNTYuNDc1SDE4NC45OTkiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMTAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8cGF0aCBkPSJNMTc1LjczNSAxMTQuNzc1VjE3MC4zNzUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMTAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8cGF0aCBkPSJNODEuNTA4NSAxMTQuNzc1TDUzLjcwODUgMTU2LjQ3NUg5MC43NzUyIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPHBhdGggZD0iTTgxLjUwODggMTE0Ljc3NVYxNzAuMzc1IiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+Cg=="
+                    alt="404 Not Found Dark"
+                />
+            </div>
+        </div>
+    </body>
+</html>

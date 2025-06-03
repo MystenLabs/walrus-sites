@@ -163,6 +163,16 @@ impl SitePtb<Argument> {
         Ok(())
     }
 
+    pub fn with_update_metadata(mut self, metadata: Metadata) -> Result<SitePtb<Argument>> {
+        let metadata = self.new_metadata(metadata);
+        self.add_programmable_move_call(
+            contracts::site::update_metadata.identifier(),
+            vec![],
+            vec![self.site_argument, metadata],
+        );
+        Ok(self)
+    }
+
     pub fn transfer_site(&mut self, recipient: SuiAddress) {
         self.transfer_arg(recipient, self.site_argument);
     }

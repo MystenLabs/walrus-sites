@@ -21,7 +21,15 @@ use crate::{
     publish::BlobManagementOptions,
     retry_client::RetriableSuiClient,
     summary::SiteDataDiffSummary,
-    types::{ResourceDynamicField, RouteOps, Routes, SuiDynamicField},
+    types::{
+        Metadata,
+        MetadataOp,
+        ResourceDynamicField,
+        RouteOps,
+        Routes,
+        SiteFields,
+        SuiDynamicField,
+    },
     util::{handle_pagination, type_origin_map_for_package},
 };
 
@@ -38,12 +46,15 @@ pub struct SiteDataDiff<'a> {
     /// The operations to perform on the resources.
     pub resource_ops: Vec<ResourceOp<'a>>,
     pub route_ops: RouteOps,
+    pub metadata_op: MetadataOp,
 }
 
 impl SiteDataDiff<'_> {
     /// Returns `true` if there are updates to be made.
     pub fn has_updates(&self) -> bool {
-        self.resource_ops.iter().any(|op| op.is_change()) || !self.route_ops.is_unchanged()
+        self.resource_ops.iter().any(|op| op.is_change())
+            || !self.route_ops.is_unchanged()
+            || !self.metadata_op.is_noop()
     }
 
     /// Returns the resources that need to be updated on Walrus.
@@ -67,6 +78,7 @@ impl SiteDataDiff<'_> {
                 .map(|op| op.into())
                 .collect(),
             route_ops: self.route_ops.clone(),
+            metadata_updated: !self.metadata_op.is_noop(),
         }
     }
 }
@@ -76,17 +88,25 @@ impl SiteDataDiff<'_> {
 pub struct SiteData {
     resources: ResourceSet,
     routes: Option<Routes>,
+    metadata: Option<Metadata>,
 }
 
 impl SiteData {
-    pub fn new(resources: ResourceSet, routes: Option<Routes>) -> Self {
-        Self { resources, routes }
+    /// SiteData constructor.
+    pub fn new(resources: ResourceSet, routes: Option<Routes>, metadata: Option<Metadata>) -> Self {
+        Self {
+            resources,
+            routes,
+            metadata,
+        }
     }
 
+    /// Empty SiteData constructor.
     pub fn empty() -> Self {
         Self {
             resources: ResourceSet::empty(),
             routes: None,
+            metadata: None,
         }
     }
 
@@ -96,6 +116,7 @@ impl SiteData {
         SiteDataDiff {
             resource_ops: self.resources.diff(&start.resources),
             route_ops: self.routes_diff(start),
+            metadata_op: self.metadata_diff(start),
         }
     }
 
@@ -104,6 +125,7 @@ impl SiteData {
         SiteDataDiff {
             resource_ops: self.resources.replace_all(&other.resources),
             route_ops: self.routes_diff(other),
+            metadata_op: self.metadata_diff(other),
         }
     }
 
@@ -113,6 +135,17 @@ impl SiteData {
             (None, Some(_)) => RouteOps::Replace(Routes::empty()),
             (Some(s), None) => RouteOps::Replace(s.clone()),
             _ => RouteOps::Unchanged,
+        }
+    }
+
+    /// Current logic is to return MetadataOp::Update only when metadata read
+    /// from ws-resources is some, and different than the metadata found
+    /// on-chain.
+    fn metadata_diff(&self, start: &Self) -> MetadataOp {
+        if self.metadata != start.metadata && self.metadata.is_some() {
+            MetadataOp::Update
+        } else {
+            MetadataOp::Noop
         }
     }
 
@@ -142,6 +175,7 @@ impl RemoteSiteFactory<'_> {
 
     /// Gets the remote site representation stored on chain
     pub async fn get_from_chain(&self, site_id: ObjectID) -> Result<SiteData> {
+        let metadata = Some(self.get_site_fields(site_id).await?.into());
         let dynamic_fields = self.get_all_dynamic_fields(site_id).await?;
         let resource_path_tag = self.resource_path_tag()?;
 
@@ -178,7 +212,11 @@ impl RemoteSiteFactory<'_> {
 
         tracing::debug!("fetching the routes from the dynamic fields");
         let routes = self.get_routes(&dynamic_fields).await?;
-        Ok(SiteData { resources, routes })
+        Ok(SiteData {
+            resources,
+            routes,
+            metadata,
+        })
     }
 
     async fn get_routes(&self, dynamic_fields: &[DynamicFieldInfo]) -> Result<Option<Routes>> {
@@ -213,6 +251,10 @@ impl RemoteSiteFactory<'_> {
                 .await?
                 .collect();
         Ok(iter)
+    }
+
+    async fn get_site_fields(&self, site_id: ObjectID) -> anyhow::Result<SiteFields> {
+        self.sui_client.get_sui_object(site_id).await
     }
 
     /// Filters the dynamic fields to get the resource object IDs.
@@ -257,7 +299,10 @@ impl RemoteSiteFactory<'_> {
 #[cfg(test)]
 mod tests {
     use super::SiteData;
-    use crate::{site::resource::ResourceSet, types::Routes};
+    use crate::{
+        site::resource::ResourceSet,
+        types::{Metadata, Routes},
+    };
 
     fn routes_from_pair(key: &str, value: &str) -> Option<Routes> {
         Some(Routes(
@@ -282,10 +327,48 @@ mod tests {
         ];
 
         for (this_routes, other_routes, has_updates) in cases {
-            let this = SiteData::new(ResourceSet::empty(), this_routes);
-            let other = SiteData::new(ResourceSet::empty(), other_routes);
+            let this = SiteData::new(ResourceSet::empty(), this_routes, None);
+            let other = SiteData::new(ResourceSet::empty(), other_routes, None);
             let diff = this.diff(&other);
             assert_eq!(diff.has_updates(), has_updates);
+        }
+    }
+
+    #[test]
+    fn test_metadata_diff() {
+        let metadata_empty = Metadata {
+            link: None,
+            image_url: None,
+            description: None,
+            project_url: None,
+            creator: None,
+        };
+
+        let metadata_with_link = |link: &str| -> Metadata {
+            Metadata {
+                link: Some(link.to_string()),
+                image_url: None,
+                description: None,
+                project_url: None,
+                creator: None,
+            }
+        };
+        let cases = vec![
+            (Some(Metadata::default()), Some(Metadata::default()), false),
+            (Some(Metadata::default()), None, true),
+            (None, Some(Metadata::default()), false),
+            (Some(metadata_empty), Some(Metadata::default()), true),
+            (
+                Some(metadata_with_link("https://alink.invalid.org")),
+                Some(metadata_with_link("https://blink.invalid.org")),
+                true,
+            ),
+        ];
+
+        for (this_metadata, other_metadata, has_updates) in cases {
+            let this = SiteData::new(ResourceSet::empty(), None, this_metadata);
+            let other = SiteData::new(ResourceSet::empty(), None, other_metadata);
+            assert_eq!(this.diff(&other).has_updates(), has_updates);
         }
     }
 }
