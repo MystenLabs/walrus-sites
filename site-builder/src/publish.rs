@@ -387,7 +387,6 @@ fn print_summary(
     Ok(())
 }
 
-#[allow(clippy::doc_overindented_list_items)]
 /// Persists the site identifier (ID and optional name) into the `ws-resources.json` file.
 ///
 /// This function handles both cases of `SiteIdentifier`:
