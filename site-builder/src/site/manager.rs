@@ -177,8 +177,7 @@ impl SiteManager {
                 let total_storage_cost = self.dry_run_walrus_store(&walrus_updates).await?;
                 // Before doing the actual execution, perform a dry run
                 display::action(format!(
-                    "Estimated Storage Cost for this publish/update (Gas Cost Excluded): {} FROST",
-                    total_storage_cost
+                    "Estimated Storage Cost for this publish/update (Gas Cost Excluded): {total_storage_cost} FROST"
                 ));
 
                 // Add user confirmation prompt.
@@ -270,7 +269,7 @@ impl SiteManager {
     }
 
     /// Deletes the resources from Walrus.
-    pub async fn delete_from_walrus<'b>(&mut self, blob_ids: &[BlobId]) -> Result<()> {
+    pub async fn delete_from_walrus(&mut self, blob_ids: &[BlobId]) -> Result<()> {
         tracing::debug!(?blob_ids, "deleting blob from Walrus");
         display::action("Running the delete commands on Walrus");
         let output = self.walrus.delete(blob_ids).await?;
@@ -283,8 +282,7 @@ impl SiteManager {
                 } else {
                     display::error(
                         format!(
-                            "Could not delete blob {}, may be already deleted or may be a permanent blob",
-                            blob_id
+                            "Could not delete blob {blob_id}, may be already deleted or may be a permanent blob"
                         ));
                 }
             } else {
@@ -411,8 +409,7 @@ impl SiteManager {
             let total_storage_cost = self.dry_run_walrus_store(&walrus_ops).await?;
             // Before doing the actual execution, perform a dry run
             display::action(format!(
-                "Estimated Storage Cost for this publish/update (Gas Cost Excluded): {} FROST",
-                total_storage_cost
+                "Estimated Storage Cost for this publish/update (Gas Cost Excluded): {total_storage_cost} FROST"
             ));
             // Add user confirmation prompt.
             display::action("Waiting for user confirmation...");
