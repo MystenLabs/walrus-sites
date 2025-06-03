@@ -39,7 +39,13 @@ use crate::{
         SITE_MODULE,
     },
     summary::{SiteDataDiffSummary, Summarizable},
-    util::{get_site_id_from_response, id_to_base36, path_or_defaults_if_exist, sign_and_send_ptb},
+    util::{
+        get_site_id_from_response,
+        id_to_base36,
+        path_or_defaults_if_exist,
+        persist_site_id_and_name,
+        sign_and_send_ptb,
+    },
 };
 
 const DEFAULT_WS_RESOURCES_FILE: &str = "ws-resources.json";
@@ -244,7 +250,7 @@ impl SiteEditor<EditOptions> {
         let mut resource_manager = ResourceManager::new(
             self.config.walrus_client(),
             ws_resources.clone(),
-            ws_resources_path,
+            ws_resources_path.clone(),
             self.edit_options.publish_options.max_concurrent,
         )
         .await?;
@@ -256,7 +262,7 @@ impl SiteEditor<EditOptions> {
         display::done();
         tracing::debug!(?local_site_data, "resources loaded from directory");
 
-        let site_metadata = match ws_resources {
+        let site_metadata = match ws_resources.clone() {
             Some(value) => value.metadata,
             None => None,
         };
@@ -270,7 +276,20 @@ impl SiteEditor<EditOptions> {
             self.edit_options.publish_options.max_parallel_stores,
         )
         .await?;
+
         let (response, summary) = site_manager.update_site(&local_site_data).await?;
+
+        let path_for_saving =
+            ws_resources_path.unwrap_or_else(|| self.directory().join(DEFAULT_WS_RESOURCES_FILE));
+
+        persist_site_identifier(
+            &self.edit_options.site_id,
+            &site_manager,
+            &response,
+            ws_resources,
+            &path_for_saving,
+        )?;
+
         Ok((site_manager.active_address()?, response, summary))
     }
 
@@ -338,7 +357,7 @@ fn print_summary(
                     .effects
                     .as_ref()
                     .ok_or(anyhow::anyhow!("response did not contain effects"))?,
-            )?;
+            );
             println!("Created new site: {}\nNew site object ID: {}", name, id);
             id
         }
@@ -364,6 +383,68 @@ fn print_summary(
     (more info: https://docs.wal.app/walrus-sites/portal.html#running-the-portal-locally)"#,
             base36_id = id_to_base36(&object_id)?
         );
+    }
+    Ok(())
+}
+
+/// Persists the site identifier (ID and optional name) into the `ws-resources.json` file.
+///
+/// This function handles both cases of `SiteIdentifier`:
+/// - For an existing site, it logs the site ID and persists it.
+/// - For a newly published site, it extracts the new site ID from the transaction effects
+///   and persists both the ID and the user-provided name.
+///
+/// # Arguments
+///
+/// * `site_id` - A reference to the `SiteIdentifier` which provides the object id if existing site,
+///     or the site_name if a new site
+/// * `site_manager` - A reference to the `SiteManager` which provides access to the active address.
+/// * `response` - The transaction response containing the effects used to extract the new site ID.
+/// * `ws_resources` - The current workspace resources to be updated and saved.
+/// * `path` - The path to which the `ws-resources.json` should be written.
+///
+/// # Errors
+///
+/// Returns an error if the active address or transaction effects are missing,
+/// or if the persistence operation fails.
+///
+/// # Example
+///
+/// ```rust
+/// persist_site_identifier(&self.edit_options.site_id, &site_manager, &response, ws_resources, &path_for_saving)?;
+/// ```
+fn persist_site_identifier(
+    site_id: &SiteIdentifier,
+    site_manager: &SiteManager,
+    response: &SuiTransactionBlockResponse,
+    ws_resources: Option<WSResources>,
+    path: &Path,
+) -> Result<()> {
+    match site_id {
+        SiteIdentifier::ExistingSite(object_id) => {
+            tracing::info!(
+                "Operation was on an existing site (ID: {}). This ID will be persisted in ws-resources.json.",
+                object_id
+            );
+            persist_site_id_and_name(*object_id, None, ws_resources, path)?;
+        }
+        SiteIdentifier::NewSite(name) => {
+            let active_address = site_manager.active_address()?;
+
+            let tx_effects = response
+                .effects
+                .as_ref()
+                .ok_or_else(|| anyhow!("Transaction effects not found"))?;
+
+            let new_site_object_id = get_site_id_from_response(active_address, tx_effects);
+
+            tracing::info!(
+                "New site published. New ObjectID ({}) will be persisted in ws-resources.json.",
+                new_site_object_id
+            );
+
+            persist_site_id_and_name(new_site_object_id, Some(name.clone()), ws_resources, path)?;
+        }
     }
     Ok(())
 }

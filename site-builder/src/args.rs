@@ -212,6 +212,48 @@ impl ObjectIdOrName {
 #[derive(Subcommand, Debug)]
 #[clap(rename_all = "kebab-case")]
 pub(crate) enum Commands {
+    /// Deploy a new site on Sui.
+    ///
+    /// If the site has not been published before, this command publishes it and stores
+    /// the object ID of the Site in the ws-resources.json file.
+    /// If the site has been published before, this command updates the site(indicaded
+    /// by the site_object_id field in the ws-resources.json file).
+    Deploy {
+        #[clap(flatten)]
+        publish_options: PublishOptions,
+        /// The name of the site.
+        #[clap(short, long)]
+        site_name: Option<String>,
+        /// The object ID of a partially published site to be completed.
+        ///
+        /// This is the object ID of the site that was published before, and is now being updated.
+        /// If this is provided, it will override the object ID in the ws-resources.json file.
+        #[clap(short, long)]
+        object_id: Option<ObjectID>,
+        /// Watch the site directory for changes and automatically redeploy when files are modified.
+        ///
+        /// When enabled, the command will continuously monitor the site directory and trigger a
+        /// redepoloyment whenever changes are detected, allowing for rapid development iteration.
+        #[clap(short, long, action)]
+        watch: bool,
+        /// Checks and extends all blobs in an existing site during an update.
+        ///
+        /// With this flag, the site-builder will force a check of the status of all the Walrus
+        /// blobs composing the site, and will extend the ones that expire before `--epochs` epochs.
+        /// This is useful to ensure all the resources in the site are available for the same
+        /// amount of epochs.
+        ///
+        /// Further, when this flag is set, _missing_ blobs will also be reuploaded (e.g., in case
+        /// they were deleted, or are all expired and were not owned, or, in case of testnet, the
+        /// network was wiped).
+        ///
+        /// Without this flag, when updating a site, the `deploy` command will only create new blobs
+        /// for the resources that have been added or modified (compared to the object on Sui).
+        /// This implies that successive updates (without --check-extend) may result in the site
+        /// having resources with different expiration times (and possibly some that are expired).
+        #[clap(long, action)]
+        check_extend: bool,
+    },
     /// Publish a new site on Sui.
     Publish {
         #[clap(flatten)]
@@ -226,6 +268,10 @@ pub(crate) enum Commands {
         publish_options: PublishOptions,
         /// The object ID of a partially published site to be completed.
         object_id: ObjectID,
+        /// Watch the site directory for changes and automatically redeploy when files are modified.
+        ///
+        /// When enabled, the command will continuously monitor the site directory and trigger a
+        /// redepoloyment whenever changes are detected, allowing for rapid development iteration.
         #[clap(short, long, action)]
         watch: bool,
         /// This flag is deprecated and will be removed in the future. Use --check-extend.
