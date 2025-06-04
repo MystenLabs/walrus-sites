@@ -24,60 +24,60 @@ use crate::{
 };
 
 #[derive(Parser, Clone, Debug, Deserialize)]
-#[clap(rename_all = "kebab-case")]
+#[command(rename_all = "kebab-case")]
 pub(crate) struct GeneralArgs {
     /// The URL or the RPC endpoint to connect the client to.
     ///
     /// Can be specified as a CLI argument or in the config.
-    #[clap(long)]
+    #[arg(long)]
     pub(crate) rpc_url: Option<String>,
     /// The path to the Sui Wallet config.
     ///
     /// Can be specified as a CLI argument or in the config.
-    #[clap(long)]
+    #[arg(long)]
     pub(crate) wallet: Option<PathBuf>,
     /// The env to be used for the Sui wallet.
     ///
     /// If not specified, the env specified in the sites-config (under `wallet_env`) will be used.
     /// If the wallet env is also not specified in the config, the env configured in the Sui client
     /// will be used.
-    #[clap(long)]
+    #[arg(long)]
     pub(crate) wallet_env: Option<String>,
     /// The address to be used for the Sui wallet.
     ///
     /// If not specified, the address specified in the sites-config (under `wallet_address`) will be
     /// used. If the wallet address is also not specified in the config, the address configured in
     /// the Sui client will be used.
-    #[clap(long)]
+    #[arg(long)]
     pub(crate) wallet_address: Option<SuiAddress>,
     /// The context that will be passed to the Walrus binary.
     ///
     /// If not specified, the Walrus context specified in the sites-config will be
     /// used. If it is also not specified in the config, no context will be passed.
-    #[clap(long)]
+    #[arg(long)]
     pub(crate) walrus_context: Option<String>,
     /// The path or name of the walrus binary.
     ///
     /// The Walrus binary will then be called with this configuration to perform actions on Walrus.
     /// Can be specified as a CLI argument or in the config.
-    #[clap(long)]
+    #[arg(long)]
     #[serde(default = "default::walrus_binary")]
     pub(crate) walrus_binary: Option<String>,
     /// The path to the configuration for the Walrus client.
     ///
     /// This will be passed to the calls to the Walrus binary.
     /// Can be specified as a CLI argument or in the config.
-    #[clap(long)]
+    #[arg(long)]
     pub(crate) walrus_config: Option<PathBuf>,
     /// The package ID of the Walrus package on the selected network.
     ///
     /// This is currently only used for the `sitemap` command.
-    #[clap(long)]
+    #[arg(long)]
     pub(crate) walrus_package: Option<ObjectID>,
     /// The gas budget for the operations on Sui.
     ///
     /// Can be specified as a CLI argument or in the config.
-    #[clap(long)]
+    #[arg(long)]
     #[serde(default = "default::gas_budget")]
     pub(crate) gas_budget: Option<u64>,
 }
@@ -210,7 +210,7 @@ impl ObjectIdOrName {
 }
 
 #[derive(Subcommand, Debug)]
-#[clap(rename_all = "kebab-case")]
+#[command(rename_all = "kebab-case")]
 pub(crate) enum Commands {
     /// Deploy a new site on Sui.
     ///
@@ -222,19 +222,19 @@ pub(crate) enum Commands {
         #[clap(flatten)]
         publish_options: PublishOptions,
         /// The name of the site.
-        #[clap(short, long)]
+        #[arg(short, long)]
         site_name: Option<String>,
         /// The object ID of a partially published site to be completed.
         ///
         /// This is the object ID of the site that was published before, and is now being updated.
         /// If this is provided, it will override the object ID in the ws-resources.json file.
-        #[clap(short, long)]
+        #[arg(short, long)]
         object_id: Option<ObjectID>,
         /// Watch the site directory for changes and automatically redeploy when files are modified.
         ///
         /// When enabled, the command will continuously monitor the site directory and trigger a
         /// redepoloyment whenever changes are detected, allowing for rapid development iteration.
-        #[clap(short, long, action)]
+        #[arg(short, long)]
         watch: bool,
         /// Checks and extends all blobs in an existing site during an update.
         ///
@@ -251,7 +251,7 @@ pub(crate) enum Commands {
         /// for the resources that have been added or modified (compared to the object on Sui).
         /// This implies that successive updates (without --check-extend) may result in the site
         /// having resources with different expiration times (and possibly some that are expired).
-        #[clap(long, action)]
+        #[arg(long)]
         check_extend: bool,
     },
     /// Publish a new site on Sui.
@@ -259,7 +259,7 @@ pub(crate) enum Commands {
         #[clap(flatten)]
         publish_options: PublishOptions,
         /// The name of the site.
-        #[clap(short, long)]
+        #[arg(short, long)]
         site_name: Option<String>,
     },
     /// Update an existing site.
@@ -272,14 +272,14 @@ pub(crate) enum Commands {
         ///
         /// When enabled, the command will continuously monitor the site directory and trigger a
         /// redepoloyment whenever changes are detected, allowing for rapid development iteration.
-        #[clap(short, long, action)]
+        #[arg(short, long)]
         watch: bool,
         /// This flag is deprecated and will be removed in the future. Use --check-extend.
         ///
         /// Publish all resources to Sui and Walrus, even if they may be already present.
         /// This can be useful in case the Walrus devnet is reset, but the resources are still
         /// available on Sui.
-        #[clap(long, action)]
+        #[arg(long)]
         #[deprecated(note = "This flag is being removed; please use --check-extend")]
         force: bool,
         /// Checks and extends all blobs in the site during the update.
@@ -297,7 +297,7 @@ pub(crate) enum Commands {
         /// that have been added or modified (compared to the object on Sui). This implies that
         /// successive updates (without --check-extend) may result in the site having resources
         /// with different expiration times (and possibly some that are expired).
-        #[clap(long, action)]
+        #[arg(long)]
         check_extend: bool,
     },
     /// Convert an object ID in hex format to the equivalent Base36 format.
@@ -312,7 +312,7 @@ pub(crate) enum Commands {
     /// Running this command requires the `walrus_package` to be specified either in the config or
     /// through the `--walrus-package` flag.
     Sitemap {
-        #[clap(value_parser = ObjectIdOrName::parse_sitemap_target)]
+        #[arg(value_parser = ObjectIdOrName::parse_sitemap_target)]
         /// The site to be mapped.
         ///
         /// The site can be specified as object ID (in hex form) or as SuiNS name.
@@ -334,15 +334,15 @@ pub(crate) enum Commands {
     /// The ws_resource file will still be used to determine the resource's headers.
     UpdateResource {
         /// The path to the resource to be added.
-        #[clap(long)]
+        #[arg(long)]
         resource: PathBuf,
         /// The path the resource should have in the site.
         ///
         /// Should be in the form `/path/to/resource.html`, with a leading `/`.
-        #[clap(long)]
+        #[arg(long)]
         path: String,
         /// The object ID of the Site object on Sui, to which the resource will be added.
-        #[clap(long)]
+        #[arg(long)]
         site_object: ObjectID,
         /// Common configurations.
         #[clap(flatten)]
@@ -356,15 +356,15 @@ pub(crate) struct PublishOptions {
     pub(crate) directory: PathBuf,
     /// Preprocess the directory before publishing.
     /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
-    #[clap(long, action)]
+    #[arg(long)]
     pub(crate) list_directory: bool,
     /// The maximum number of concurrent calls to the Walrus CLI for the computation of blob IDs.
-    #[clap(long)]
+    #[arg(long)]
     pub(crate) max_concurrent: Option<NonZeroUsize>,
     /// The maximum number of blobs that can be stored concurrently.
     ///
     /// More blobs can be stored concurrently, but this will increase memory usage.
-    #[clap(long, default_value_t = default::max_parallel_stores())]
+    #[arg(long, default_value_t = default::max_parallel_stores())]
     pub(crate) max_parallel_stores: NonZeroUsize,
     /// Common configurations.
     #[clap(flatten)]
@@ -381,29 +381,28 @@ pub(crate) struct WalrusStoreOptions {
     /// root of the site directory.
     ///
     /// The configuration file _will not_ be uploaded to Walrus.
-    #[clap(long)]
+    #[arg(long)]
     pub(crate) ws_resources: Option<PathBuf>,
     /// The epoch argument to specify either the number of epochs to store the blob, or the
     /// end epoch, or the earliest expiry time in rfc3339 format.
     ///
     #[command(flatten)]
     pub(crate) epoch_arg: EpochArg,
-    // pub(crate) epochs: EpochCountOrMax,
     /// Make the stored resources permanent.
     ///
     /// By default, sites are deletable with site-builder delete command. By passing --permanent,
     /// the site is deleted only after `epochs` expiration. Make resources permanent
     /// (non-deletable)
-    #[clap(long, action = clap::ArgAction::SetTrue)]
+    #[arg(long, action = clap::ArgAction::SetTrue)]
     pub(crate) permanent: bool,
     /// Perform a dry run (you'll be asked for confirmation before committing changes).
-    #[clap(long)]
+    #[arg(long)]
     pub(crate) dry_run: bool,
 }
 
 /// The number of epochs to store the blob for.
 #[derive(Parser, Debug, Clone, Default, Serialize, Deserialize)]
-#[clap(group(
+#[command(group(
     ArgGroup::new("epoch_arg")
         .args(&["epochs", "earliest_expiry_time", "end_epoch"])
         .required(true)
@@ -426,7 +425,7 @@ pub struct EpochArg {
     pub earliest_expiry_time: Option<SystemTime>,
 
     /// The end epoch for the blob.
-    #[clap(long = "end-epoch")]
+    #[arg(long = "end-epoch")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub end_epoch: Option<NonZeroU32>,
 }
