@@ -7,6 +7,24 @@ import CookieMonster from "src/cookie_monster";
 import { genericError } from "@lib/http/http_error_responses";
 import main from "src/main";
 import { instrumentationFacade } from "@lib/instrumentation";
+import logger from "@lib/logger";
+import { configure, getConsoleSink, getJsonLinesFormatter } from "@logtape/logtape";
+import { getLogger } from "@logtape/logtape";
+
+await configure({
+	sinks: { console: getConsoleSink({
+		formatter: getJsonLinesFormatter()
+	}) },
+	loggers: [
+		{ category: "server-portal", lowestLevel: "debug", sinks: ["console"] }
+	],
+});
+
+const tapeLogger = getLogger(["server-portal", "my-module"]);
+logger.setInfoPredicate((args) => tapeLogger.info(args));
+logger.setDebugPredicate((args) => tapeLogger.debug(args));
+logger.setWarnPredicate((args) => tapeLogger.warn(args));
+logger.setErrorPredicate((args) => tapeLogger.error(args));
 
 const PORT = 3000;
 console.log("Running Bun server at port", PORT, "...")
@@ -18,8 +36,8 @@ serve({
 			if (req.url.endsWith("/healthz")) {
 				return await blocklist_healthcheck()
 			}
-			new Response("Not found!", {status: 404, statusText: "This special wal path does not exist."})
- 		}
+			new Response("Not found!", { status: 404, statusText: "This special wal path does not exist." })
+		}
 	},
 	// The main flow of all other requests is here.
 	async fetch(request: Request) {

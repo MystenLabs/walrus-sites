@@ -1,9 +1,17 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+type LogInput = {
+	// Unique identifier for tracking purposes, typically used to correlate logs or trace execution flows.
+	id: string;
+	// Description of the message.
+	message: string;
+	// Arbitrary key-values pairs for extra details regarding the log message.
+	[key: string]: any;
+}
 /// Provides a simple logger interface function for
 /// logging messages on different runtimes.
-type LoggingPredicate = (args: any) => void;
+type LoggingPredicate = (args: LogInput) => void;
 
 /**
  * Logger used as an abstraction for logging messages on different runtimes.
@@ -24,10 +32,10 @@ type LoggingPredicate = (args: any) => void;
     /// @param warnPredicate Function for warning messages.
     /// @param errorPredicate Function for error messages.
     constructor(
-		debugPredicate: LoggingPredicate = (value) => console.debug(JSON.stringify(value).replace('\n', '')),
-        logPredicate: LoggingPredicate = (value) => console.log(JSON.stringify(value).replace('\n', '')),
-        warnPredicate: LoggingPredicate = (value) => console.warn(JSON.stringify(value).replace('\n', '')),
-        errorPredicate: LoggingPredicate = (value) => console.error(JSON.stringify(value).replace('\n', ''))
+		debugPredicate: LoggingPredicate = (value) => console.debug(value),
+        logPredicate: LoggingPredicate = (value) => console.log(value),
+        warnPredicate: LoggingPredicate = (value) => console.warn(value),
+        errorPredicate: LoggingPredicate = (value) => console.error(value)
     ) {
         this.debugPredicate = debugPredicate;
         this.infoPredicate = logPredicate;
