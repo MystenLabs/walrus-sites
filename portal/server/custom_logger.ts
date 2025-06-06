@@ -23,8 +23,20 @@ export async function setupTapelog() {
 	const tapeLogger = getLogger(["server-portal", "my-module"]);
 
 	// Integrate Tapelog by connecting the logger predicates to the tapeLogger instance
-	logger.setInfoPredicate((args) => tapeLogger.info(args));
-	logger.setDebugPredicate((args) => tapeLogger.debug(args));
-	logger.setWarnPredicate((args) => tapeLogger.warn(args));
-	logger.setErrorPredicate((args) => tapeLogger.error(args));
+	logger.setInfoPredicate((...args: any[]) =>
+		// If args contains only one element, pass undefined as structured data
+		tapeLogger.info(args[0], args.length > 1 ? args.slice(1) : undefined)
+	);
+	logger.setDebugPredicate((...args: any[]) =>
+		// If args contains only one element, pass undefined as structured data
+		tapeLogger.debug(args[0], args.length > 1 ? args.slice(1) : undefined)
+	);
+	logger.setWarnPredicate((...args: any[]) =>
+		// If args contains only one element, pass undefined as structured data
+		tapeLogger.warn(args[0], args.length > 1 ? args.slice(1) : undefined)
+	);
+	logger.setErrorPredicate((...args: any[]) =>
+		// If args contains only one element, pass undefined as structured data
+		tapeLogger.error(args[0], args.length > 1 ? args.slice(1) : undefined)
+	);
 }
