@@ -7,10 +7,11 @@ use std::{
     num::{NonZeroU32, NonZeroUsize},
     path::PathBuf,
     str::FromStr,
+    time::SystemTime,
 };
 
 use anyhow::{anyhow, ensure, Result};
-use clap::{Parser, Subcommand};
+use clap::{ArgGroup, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use sui_sdk::wallet_context::WalletContext;
 use sui_types::base_types::{ObjectID, SuiAddress};
@@ -383,13 +384,12 @@ pub(crate) struct WalrusStoreOptions {
     /// The configuration file _will not_ be uploaded to Walrus.
     #[clap(long)]
     pub(crate) ws_resources: Option<PathBuf>,
-    /// The number of epochs for which to save the resources on Walrus.
+    /// The epoch argument to specify either the number of epochs to store the blob, or the
+    /// end epoch, or the earliest expiry time in rfc3339 format.
     ///
-    /// If set to `max`, the resources are stored for the maximum number of epochs allowed on
-    /// Walrus. Otherwise, the resources are stored for the specified number of epochs. The
-    /// number of epochs must be greater than 0.
-    #[clap(long, value_parser = EpochCountOrMax::parse_epoch_count)]
-    pub(crate) epochs: EpochCountOrMax,
+    #[command(flatten)]
+    pub(crate) epoch_arg: EpochArg,
+    // pub(crate) epochs: EpochCountOrMax,
     /// Make the stored resources permanent.
     ///
     /// By default, sites are deletable with site-builder delete command. By passing --permanent,
@@ -400,6 +400,36 @@ pub(crate) struct WalrusStoreOptions {
     /// Perform a dry run (you'll be asked for confirmation before committing changes).
     #[clap(long)]
     pub(crate) dry_run: bool,
+}
+
+/// The number of epochs to store the blob for.
+#[derive(Parser, Debug, Clone, Default, Serialize, Deserialize)]
+#[clap(group(
+    ArgGroup::new("epoch_arg")
+        .args(&["epochs", "earliest_expiry_time", "end_epoch"])
+        .required(true)
+))]
+#[serde(rename_all = "camelCase")]
+pub struct EpochArg {
+    /// The number of epochs the blob is stored for.
+    ///
+    /// If set to `max`, the blob is stored for the maximum number of epochs allowed by the
+    /// system object on chain. Otherwise, the blob is stored for the specified number of
+    /// epochs. The number of epochs must be greater than 0.
+    #[arg(long, value_parser = EpochCountOrMax::parse_epoch_count)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub epochs: Option<EpochCountOrMax>,
+
+    /// The earliest time when the blob can expire, in RFC3339 format (e.g., "2024-03-20T15:00:00Z")
+    /// or a more relaxed format (e.g., "2024-03-20 15:00:00").
+    #[arg(long, value_parser = humantime::parse_rfc3339_weak)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub earliest_expiry_time: Option<SystemTime>,
+
+    /// The end epoch for the blob.
+    #[clap(long = "end-epoch")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_epoch: Option<NonZeroU32>,
 }
 
 /// The number of epochs to store the blobs for.

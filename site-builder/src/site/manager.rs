@@ -96,7 +96,7 @@ impl SiteManager {
                 .walrus
                 .dry_run_store(
                     resource.full_path.clone(),
-                    self.walrus_options.epochs.clone(),
+                    self.walrus_options.epoch_arg.clone(),
                     !self.walrus_options.permanent,
                     false,
                 )
@@ -234,7 +234,7 @@ impl SiteManager {
                 .walrus
                 .store(
                     resource_paths.clone(),
-                    self.walrus_options.epochs.clone(),
+                    self.walrus_options.epoch_arg.clone(),
                     false,
                     deletable,
                 )
