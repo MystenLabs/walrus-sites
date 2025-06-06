@@ -50,8 +50,7 @@ impl WSResources {
         // Read the JSON contents of the file as an instance of `WSResources`.
         let ws_config: WSResources = serde_json::from_str(&file_contents)
             .context(format!(
-                "Failed to parse ws_resources.json: {}\n\nCheck for typos or unknown fields (e.g. 'site-name' with a dash for the site name field; use 'site_name' instead).",
-                file_contents
+                "Failed to parse ws_resources.json: {file_contents}\n\nCheck for typos or unknown fields (e.g. 'site-name' with a dash for the site name field; use 'site_name' instead)."
             ))?;
 
         tracing::info!(?ws_config, "ws resources configuration loaded");
@@ -123,27 +122,27 @@ mod tests {
 
     #[test]
     fn test_read_ws_resources() {
-        let header_data = format!("{{{}}}", HEADER_DATA);
+        let header_data = format!("{{{HEADER_DATA}}}");
         serde_json::from_str::<WSResources>(&header_data).expect("parsing should succeed");
-        let route_data = format!("{{{}}}", ROUTE_DATA);
+        let route_data = format!("{{{ROUTE_DATA}}}");
         serde_json::from_str::<WSResources>(&route_data).expect("parsing should succeed");
-        let route_header_data = format!("{{{},{}}}", HEADER_DATA, ROUTE_DATA);
+        let route_header_data = format!("{{{HEADER_DATA},{ROUTE_DATA}}}");
         serde_json::from_str::<WSResources>(&route_header_data).expect("parsing should succeed");
-        let all_fields_included = format!("{{{},{},{}}}", HEADER_DATA, ROUTE_DATA, METADATA);
+        let all_fields_included = format!("{{{HEADER_DATA},{ROUTE_DATA},{METADATA}}}");
         serde_json::from_str::<WSResources>(&all_fields_included).expect("parsing should succeed");
         // Test for ignore field
-        let ignore_data = format!("{{{}}}", IGNORE_DATA);
+        let ignore_data = format!("{{{IGNORE_DATA}}}");
         let parsed: WSResources =
             serde_json::from_str(&ignore_data).expect("parsing should succeed");
         assert!(parsed.ignore.is_some());
         assert_eq!(parsed.ignore.unwrap(), vec!["/foo/*", "/baz/bar/*"]);
         // Test for invalid site name field
-        let invalid_site_name_data = format!("{{{}}}", SITE_NAME_INVALID_FIELD);
+        let invalid_site_name_data = format!("{{{SITE_NAME_INVALID_FIELD}}}");
         // Parsing should fail
         let result = serde_json::from_str::<WSResources>(&invalid_site_name_data);
         assert!(result.is_err());
         // Test for valid site_name field
-        let valid_site_name_data = format!("{{{}}}", SITE_NAME_DATA);
+        let valid_site_name_data = format!("{{{SITE_NAME_DATA}}}");
         let parsed: WSResources =
             serde_json::from_str(&valid_site_name_data).expect("parsing should succeed");
         assert!(parsed.site_name.is_some());
