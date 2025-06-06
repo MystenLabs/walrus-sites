@@ -71,6 +71,7 @@ export function optionalRangeToHeaders(range: Range | null): { [key: string]: st
     	logger.info("Appending range headers", { headers });
         return { range: headers };
     } else {
+        logger.warn("No range headers provided");
         return {};
     }
 }
