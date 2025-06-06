@@ -49,7 +49,7 @@ export class UrlFetcher {
         resolvedObjectId: string | null,
         blocklistChecker?: BlocklistChecker
     ): Promise<Response> {
-        logger.debug("parsed-url", {subdomain: parsedUrl.subdomain, path: parsedUrl.path });
+    	logger.info("Resolving the subdomain to an object ID and retrieving its resources", { subdomain: parsedUrl.subdomain, path: parsedUrl.path });
         if (!resolvedObjectId) {
             const resolveObjectResult = await this.resolveObjectId(parsedUrl);
             const isObjectId = typeof resolveObjectResult == "string";
@@ -59,8 +59,6 @@ export class UrlFetcher {
             resolvedObjectId = resolveObjectResult;
         }
 
-        logger.debug("Resolved object id", { resolvedObjectId: resolvedObjectId });
-        logger.debug("Base36 version of the object id", { base36OfObjectId: HEXtoBase36(resolvedObjectId) });
         if (blocklistChecker && await blocklistChecker.isBlocked(resolvedObjectId)) {
             return siteNotFound();
         }
@@ -86,9 +84,9 @@ export class UrlFetcher {
 
         if (!routes) {
             logger.warn(
-                "No routes found for the object ID",
-                {resolvedObjectIdNoRoutes: resolvedObjectId
-            });
+                "No Routes object found for the object ID",
+                { resolvedObjectIdNoRoutes: resolvedObjectId }
+            );
             // Fall through to 404.html check
         }
 
@@ -126,6 +124,8 @@ export class UrlFetcher {
     async resolveObjectId(
         parsedUrl: DomainDetails,
     ): Promise<string | Response> {
+   		logger.info("Resolving the subdomain to an object ID", { subdomain: parsedUrl.subdomain });
+
     	// Resolve to an objectId using a hard-coded subdomain.
     	const hardCodedObjectId = this.suinsResolver.hardcodedSubdomains(parsedUrl.subdomain);
 		if (hardCodedObjectId) return hardCodedObjectId;
@@ -147,15 +147,15 @@ export class UrlFetcher {
             const objectId = await this.suinsResolver.resolveSuiNsAddress(parsedUrl.subdomain);
             if (objectId) return objectId;
             logger.warn(
-                "Could not resolve SuiNs domain. Does the domain exist?",
-                {subdomain: parsedUrl.subdomain,
-            })
+                "Unable to resolve the SuiNS domain. Is the domain valid?",
+                { subdomain: parsedUrl.subdomain }
+            )
             return noObjectIdFound();
         } catch {
             logger.error(
-                "Failed to contact the full node while resolving suins domain",
-                {subdomain: parsedUrl.subdomain
-            });
+            	"Unable to reach the full node during suins domain resolution",
+                { subdomain: parsedUrl.subdomain }
+            );
             return fullNodeFail();
         }
     }
@@ -169,7 +169,6 @@ export class UrlFetcher {
         objectId: string,
         path: string,
     ): Promise<Response> {
-		logger.info('Fetching URL', {objectId, path });
         const result = await this.resourceFetcher.fetchResource(objectId, path, new Set<string>());
         if (!isResource(result) || !result.blob_id) {
             return resourceNotFound();
@@ -178,8 +177,8 @@ export class UrlFetcher {
         logger.info("Successfully fetched resource!", { fetchedResourceResult: JSON.stringify(result) });
 
         // We have a resource, get the range header.
-        logger.info("Add the range headers of the resource", { result: JSON.stringify(result.range) });
         let range_header = optionalRangeToRequestHeaders(result.range);
+        logger.info("Fetching blob from aggregator", {aggregatorUrl: this.aggregatorUrl, blob_id: result.blob_id})
         const contents = await this.fetchWithRetry(
             aggregatorEndpoint(result.blob_id, this.aggregatorUrl), { headers: range_header }
         );

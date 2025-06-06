@@ -77,6 +77,11 @@ export class RPCSelector implements RPCSelectorInterface {
 
     // Attempt to call the method on the selected client with a timeout.
     private async callSelectedClient<T>(methodName: string, args: any[]): Promise<T> {
+		logger.info("RPCSelector: Calling existing client", {
+			clientName: this.selectedClient.getURL().toString(),
+			methodName,
+			arguments: args
+		})
         const method = (this.selectedClient as any)[methodName] as Function;
         if (!method) {
             throw new Error(`Method ${methodName} not found on selected client`);
@@ -104,7 +109,8 @@ export class RPCSelector implements RPCSelectorInterface {
     }
 
     // Fallback to querying all clients using Promise.any.
-    private async callFallbackClients<T>(methodName: string, args: any[]): Promise<T> {
+	private async callFallbackClients<T>(methodName: string, args: any[]): Promise<T> {
+		logger.info("RPCSelector: Calling fallback clients", { methodName, arguments: args })
         const clientPromises = this.clients.map((client) =>
             new Promise<{ result: T; client: WrappedSuiClient }>(async (resolve, reject) => {
                 try {
@@ -125,7 +131,11 @@ export class RPCSelector implements RPCSelectorInterface {
             const { result, client } = await Promise.any(clientPromises);
             // Update the selected client for future calls.
             this.selectedClient = client;
-            logger.info("RPC selected", {rpcClientSelected: this.selectedClient.getURL() })
+            logger.info("RPCSelector: Client selected!", {
+            	clientSelected: this.selectedClient.getURL().toString(),
+             	methodName,
+              	arguments: args
+            })
 
             return result;
         } catch (error) {

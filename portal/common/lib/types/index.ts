@@ -1,5 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+import logger from "@lib/logger";
 
 /**
  * The origin of the request, divided into subdomain and path.
@@ -66,7 +67,9 @@ function rangeToHttpHeader(range: Range): string {
 
 export function optionalRangeToHeaders(range: Range | null): { [key: string]: string } {
     if (range) {
-        return { range: rangeToHttpHeader(range) };
+    	let headers = rangeToHttpHeader(range)
+    	logger.info("Appending range headers", { headers });
+        return { range: headers };
     } else {
         return {};
     }
