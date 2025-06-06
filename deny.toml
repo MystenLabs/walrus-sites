@@ -30,13 +30,15 @@ allow = [
     "Apache-2.0",
     "BSD-2-Clause",
     "BSD-3-Clause",
+    "BSL-1.0",
     "CC0-1.0",
+    "CDLA-Permissive-2.0",
     "ISC",
     "LicenseRef-ring",
     "MIT",
     "MPL-2.0",
-    "Unlicense",
     "Unicode-3.0",
+    "Unlicense",
 ]
 # The confidence threshold for detecting a license from license text.
 # The higher the value, the more closely the license text must be to the
@@ -91,11 +93,11 @@ unknown-registry = "deny"
 # in the allow list is encountered
 unknown-git = "deny"
 allow-git = [
+    "https://github.com/bmwill/axum-server",
+    "https://github.com/bmwill/openapiv3",
+    "https://github.com/hyperium/tonic",
     "https://github.com/wlmyng/jsonrpsee",
     "https://github.com/zhiburt/tabled",
-    "https://github.com/bmwill/openapiv3",
-    "https://github.com/bmwill/axum-server",
-    "https://github.com/wlmyng/jsonrpsee",
 ]
 
 [sources.allow-org]
