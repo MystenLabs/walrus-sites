@@ -7,28 +7,11 @@ import CookieMonster from "src/cookie_monster";
 import { genericError } from "@lib/http/http_error_responses";
 import main from "src/main";
 import { instrumentationFacade } from "@lib/instrumentation";
-import logger from "@lib/logger";
-import { configure, getConsoleSink, getJsonLinesFormatter } from "@logtape/logtape";
-import { getLogger } from "@logtape/logtape";
-
-await configure({
-	sinks: {
-		console: getConsoleSink({
-		formatter: getJsonLinesFormatter(),
-	}) },
-	loggers: [
-		{ category: "server-portal", lowestLevel: "debug", sinks: ["console"] }
-	],
-});
-
-const tapeLogger = getLogger(["server-portal", "my-module"]);
-logger.setInfoPredicate((args) => tapeLogger.info(args));
-logger.setDebugPredicate((args) => tapeLogger.debug(args));
-logger.setWarnPredicate((args) => tapeLogger.warn(args));
-logger.setErrorPredicate((args) => tapeLogger.error(args));
+import { setupTapelog } from "custom_logger";
 
 const PORT = 3000;
 console.log("Running Bun server at port", PORT, "...")
+await setupTapelog()
 serve({
 	port: PORT,
 	// Special Walrus Sites routes.
