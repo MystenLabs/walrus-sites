@@ -12,8 +12,9 @@ import { configure, getConsoleSink, getJsonLinesFormatter } from "@logtape/logta
 import { getLogger } from "@logtape/logtape";
 
 await configure({
-	sinks: { console: getConsoleSink({
-		formatter: getJsonLinesFormatter()
+	sinks: {
+		console: getConsoleSink({
+		formatter: getJsonLinesFormatter(),
 	}) },
 	loggers: [
 		{ category: "server-portal", lowestLevel: "debug", sinks: ["console"] }
