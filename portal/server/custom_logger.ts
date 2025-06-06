@@ -14,8 +14,9 @@ export async function setupTapelog() {
 	await configure({
 		sinks: {
 			console: getConsoleSink({
-			formatter: getJsonLinesFormatter(),
-		}) },
+				formatter: getJsonLinesFormatter(),
+			})
+		},
 		loggers: [
 			{ category: "server-portal", lowestLevel: "debug", sinks: ["console"] }
 		],
@@ -23,20 +24,41 @@ export async function setupTapelog() {
 	const tapeLogger = getLogger(["server-portal", "my-module"]);
 
 	// Integrate Tapelog by connecting the logger predicates to the tapeLogger instance
-	logger.setInfoPredicate((...args: any[]) =>
+	logger.setInfoPredicate((...args: any[]) => {
+		const message = args[0];
+		tapeLogger.info(message, getPropertiesWithContext(...args), logger.context);
+	});
+
+	logger.setDebugPredicate((...args: any[]) => {
+		const message = args[0];
+		tapeLogger.debug(message, getPropertiesWithContext(...args), logger.context);
+	});
+
+	logger.setWarnPredicate((...args: any[]) => {
+		const message = args[0];
+		tapeLogger.warn(message, getPropertiesWithContext(...args), logger.context);
+	});
+
+	logger.setErrorPredicate((...args: any[]) => {
 		// If args contains only one element, pass undefined as structured data
-		tapeLogger.info(args[0], args.length > 1 ? args.slice(1) : undefined)
-	);
-	logger.setDebugPredicate((...args: any[]) =>
-		// If args contains only one element, pass undefined as structured data
-		tapeLogger.debug(args[0], args.length > 1 ? args.slice(1) : undefined)
-	);
-	logger.setWarnPredicate((...args: any[]) =>
-		// If args contains only one element, pass undefined as structured data
-		tapeLogger.warn(args[0], args.length > 1 ? args.slice(1) : undefined)
-	);
-	logger.setErrorPredicate((...args: any[]) =>
-		// If args contains only one element, pass undefined as structured data
-		tapeLogger.error(args[0], args.length > 1 ? args.slice(1) : undefined)
-	);
+		const message = args[0];
+		tapeLogger.error(message, getPropertiesWithContext(), logger.context);
+	});
+}
+
+/**
+ * Extracts structured properties from the provided arguments and attaches the current logging context.
+ * If additional arguments are present, they are treated as structured data; otherwise, a default context is returned.
+ *
+ * @param args - The arguments passed to the logger, where the first argument is the message and subsequent arguments are optional structured data.
+ * @returns An object containing structured properties and the current logging context.
+ */
+function getPropertiesWithContext(...args: any[]) {
+	let properties: any = args.length > 1 ? args.slice(1) : undefined;
+	if (properties) {
+		properties.context = logger.context;
+	} else {
+		properties = { context: logger.context! };
+	}
+	return properties;
 }
