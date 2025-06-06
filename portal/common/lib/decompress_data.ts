@@ -12,6 +12,7 @@ export async function decompressData(
 	contentEncoding: string
 ): Promise<Uint8Array | null> {
 	try {
+		logger.info('Decompressing data', { dataSize: data.length, contentEncoding })
 		if (contentEncoding === "plaintext") {
 			return data;
 		}
@@ -36,7 +37,7 @@ export async function decompressData(
 			return decompressed;
 		}
 	} catch (e) {
-		logger.error("Pako decompression error", { error: e });
+		logger.error("Failed to decompress data", { error: e });
 	}
 	return null;
 }

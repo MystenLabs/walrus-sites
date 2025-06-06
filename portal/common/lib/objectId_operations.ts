@@ -4,7 +4,6 @@
 import {
     fromHex,
     isValidSuiObjectId,
-    isValidSuiAddress,
     toHex
 } from "@mysten/sui/utils";
 import logger from "./logger";
@@ -16,19 +15,18 @@ const b36 = baseX(BASE36);
 
 
 /**
- * Subdomain encoding and parsing.
+ * In case of base36 subdomain support, transform the subdomain from b36 to hex.
  *
  * Use base36 instead of HEX to encode object ids in the subdomain, as the subdomain must be < 64
  * characters.  The encoding must be case insensitive.
  */
 export function subdomainToObjectId(subdomain: string): string | null {
     try{
+        logger.info(
+        	"Verifying whether the provided Walrus Site subdomain can be transformed from base36 to Hex",
+         	{ subdomain }
+        )
         const objectId = Base36toHex(subdomain.toLowerCase());
-        logger.info( "Obtained object id", {
-            objectId: objectId,
-            isValidSuiObjectId: isValidSuiObjectId(objectId),
-            isValidSuiAddress: isValidSuiAddress(objectId)
-        });
         return isValidSuiObjectId(objectId) ? objectId : null;
     } catch (e) {
         return null;

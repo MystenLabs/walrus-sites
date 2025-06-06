@@ -33,6 +33,7 @@ export function redirectToAggregatorUrlResponse(scope: URL, blobId: string, aggr
  * Checks if the object has a redirect in its Display representation.
  */
 export function checkRedirect(object: SuiObjectResponse): string | null {
+	logger.info("Checking if the request should be redirected (existing Display object)", {objectId: object.data.objectId})
     if (object.data && object.data.display) {
         let display = object.data.display;
         // Check if "walrus site address" is set in the display field.
