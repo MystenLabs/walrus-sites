@@ -29,7 +29,7 @@ export class WalrusSitesRouter {
         const reqStartTime = Date.now();
         instrumentationFacade.increaseRequestsMade(1, siteObjectId);
 
-        logger.info({ message: "Fetching routes dynamic field.", siteObjectId });
+        logger.info("Fetching routes dynamic field.", { siteObjectId });
         const routesObj = await this.fetchRoutesDynamicFieldObject(siteObjectId);
         const objectData = routesObj.data;
         if (objectData && objectData.bcs && objectData.bcs.dataType === "moveObject") {
@@ -38,18 +38,18 @@ export class WalrusSitesRouter {
             return this.parseRoutesData(objectData.bcs.bcsBytes);
         }
         if (!objectData) {
-            logger.warn({
-                message: "Routes dynamic field does not contain a `data` field.",
-            });
+            logger.warn(
+                "Routes dynamic field does not contain a `data` field.",
+            );
             return;
         } else if (!objectData.bcs) {
-            logger.warn({
-                message: "Routes dynamic field does not contain a `bcs` field.",
-            });
+            logger.warn(
+                "Routes dynamic field does not contain a `bcs` field.",
+            );
         } else if (!objectData.bcs.dataType) {
-            logger.warn({
-                message: "Routes dynamic field does not contain a `dataType` field.",
-            });
+            logger.warn(
+                "Routes dynamic field does not contain a `dataType` field."
+            );
         }
         throw new Error("Routes object data could not be fetched.");
     }
@@ -115,7 +115,7 @@ export class WalrusSitesRouter {
                 .filter(([pattern, _]) => new RegExp(`^${pattern.replace(/\*/g, ".*")}$`).test(path));
 
         if (filteredRoutes.length === 0) {
-            logger.warn({ message: "No matching routes found.", path });
+            logger.warn("No matching routes found.", { path });
             return undefined;
         }
 

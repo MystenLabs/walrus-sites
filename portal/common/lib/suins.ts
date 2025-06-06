@@ -19,9 +19,9 @@ export class SuiNSResolver {
         const nameRecord: NameRecord | null = await this.rpcSelector.getNameRecord(`${subdomain}.sui`);
         if (nameRecord) {
             const resolvedSuiNSName = nameRecord.walrusSiteId;
-            logger.info({
-                message: "Resolved SuiNS name",
-                subdomain,
+            logger.info(
+                "Resolved SuiNS name",
+                {subdomain,
                 resolvedSuiNSName
             });
             const resolveSuiNsAddressDuration = Date.now() - reqStartTime;

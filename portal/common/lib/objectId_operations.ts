@@ -24,7 +24,7 @@ const b36 = baseX(BASE36);
 export function subdomainToObjectId(subdomain: string): string | null {
     try{
         const objectId = Base36toHex(subdomain.toLowerCase());
-        logger.info( {message: "obtained object id",
+        logger.info( "Obtained object id", {
             objectId: objectId,
             isValidSuiObjectId: isValidSuiObjectId(objectId),
             isValidSuiAddress: isValidSuiAddress(objectId)

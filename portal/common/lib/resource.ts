@@ -120,8 +120,8 @@ export class ResourceFetcher {
         dynamicFieldId: string): VersionedResource | HttpStatusCodes
     {
         if (!dynamicFieldResponse.data) {
-            logger.warn({
-                message: "No page data found for dynamic field id",
+            logger.warn(
+                "No page data found for dynamic field id", {
                 dynamicFieldId: dynamicFieldId
             });
             return HttpStatusCodes.NOT_FOUND;
@@ -129,9 +129,9 @@ export class ResourceFetcher {
 
         const siteResource = this.getResourceFields(dynamicFieldResponse.data);
         if (!siteResource || !siteResource.blob_id) {
-            logger.error({
-                message: "No site resource found inside the dynamicFieldResponse:",
-                error: dynamicFieldResponse
+            logger.error(
+                "No site resource found inside the dynamicFieldResponse:",
+                { error: dynamicFieldResponse
             });
             return HttpStatusCodes.NOT_FOUND;
         }

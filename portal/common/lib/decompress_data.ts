@@ -17,7 +17,7 @@ export async function decompressData(
 		}
 
 		const encodingIsSupported = ["gzip", "deflate", "deflate-raw"].includes(contentEncoding);
-		if (!encodingIsSupported) logger.warn({message: `Unsupported encoding: ${contentEncoding}.`})
+		if (!encodingIsSupported) logger.warn('Unsupported encoding.', { contentEncoding })
 		if (encodingIsSupported) {
 			let decompressed: Uint8Array;
 			switch (contentEncoding) {
@@ -36,7 +36,7 @@ export async function decompressData(
 			return decompressed;
 		}
 	} catch (e) {
-		logger.error({ message: "Pako decompression error", error: e });
+		logger.error("Pako decompression error", { error: e });
 	}
 	return null;
 }

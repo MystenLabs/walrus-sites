@@ -63,7 +63,7 @@ export class RPCSelector implements RPCSelectorInterface {
 
         const isNoSelectedClient = !this.selectedClient;
         if (isNoSelectedClient) {
-            logger.info({message: "No selected RPC, looking for fallback..."})
+            logger.info("No selected RPC, looking for fallback...")
             return await this.callFallbackClients<T>(methodName, args);
         }
 
@@ -95,9 +95,9 @@ export class RPCSelector implements RPCSelectorInterface {
         ]);
 
         if (result == null && this.selectedClient) {
-            logger.info({
-                message: "Result null from current client",
-                nullCurrentRPCClientUrl: this.selectedClient.getURL().toString()})
+            logger.info(
+                "Result null from current client",
+                {nullCurrentRPCClientUrl: this.selectedClient.getURL().toString()})
         }
 
         return result
@@ -125,12 +125,12 @@ export class RPCSelector implements RPCSelectorInterface {
             const { result, client } = await Promise.any(clientPromises);
             // Update the selected client for future calls.
             this.selectedClient = client;
-            logger.info({ message: "RPC selected", rpcClientSelected: this.selectedClient.getURL() })
+            logger.info("RPC selected", {rpcClientSelected: this.selectedClient.getURL() })
 
             return result;
         } catch (error) {
             const message = `Failed to contact fallback RPC clients.`
-            logger.error({ message, error: JSON.stringify(error) });
+            logger.error( message, { error: JSON.stringify(error) });
             throw new Error(message);
         }
     }
@@ -142,7 +142,7 @@ export class RPCSelector implements RPCSelectorInterface {
             return true;
         }
         if (error) {
-            logger.warn({message: 'Failed to get object', error: JSON.stringify(error)})
+            logger.warn('Failed to get object', {error: JSON.stringify(error)})
             return true
         }
         return false
