@@ -16,7 +16,9 @@ type LoggingPredicate = (...args: any[]) => void;
     private infoPredicate: LoggingPredicate;
     private warnPredicate: LoggingPredicate;
     private errorPredicate: LoggingPredicate;
-    context?: String; // Acts as the unique identifier for structured logging, with a default value.
+    // Context is useful for structured logging. Use it to group logs by a specific property
+    // e.g. user ID or request ID.
+    context?: String;
 
     /// Constructor. Initializes the predicates for logging.
     /// If no predicates are provided, the console object is used.
