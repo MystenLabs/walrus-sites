@@ -35,6 +35,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@amplitude/analytics-node": "^1.3.6",
+        "@logtape/logtape": "^0.11.0",
         "@sentry/bun": "^9.1.0",
         "@sentry/nextjs": "^8",
         "@vercel/analytics": "^1.4.1",
@@ -244,6 +245,8 @@
     "@jsonjoy.com/util": ["@jsonjoy.com/util@1.5.0", "", { "peerDependencies": { "tslib": "2" } }, "sha512-ojoNsrIuPI9g6o8UxhraZQSyF2ByJanAY4cTFbc8Mf2AXEF4aQRGY1dJxyJpuyav8r9FGflEt/Ff3u5Nt6YMPA=="],
 
     "@leichtgewicht/ip-codec": ["@leichtgewicht/ip-codec@2.0.5", "", {}, "sha512-Vo+PSpZG2/fmgmiNzYK9qWRh8h/CHrwD0mo1h1DzL4yzHNSfWYujGTYsWGreD000gcgmZ7K4Ys6Tx9TxtsKdDw=="],
+
+    "@logtape/logtape": ["@logtape/logtape@0.11.0", "", {}, "sha512-CV14Jf+gXCdgICvMZbkUOrVPJ2eBuLFaacEYJ3vI6ohv6n2mVepakxTfuZNhtWYVeIB1EblRRQNkFs/n5vFYqA=="],
 
     "@mysten/bcs": ["@mysten/bcs@1.5.0", "", { "dependencies": { "@scure/base": "^1.2.4" } }, "sha512-v39dm5oNfKYMAf2CVI+L0OaJiG9RVXsjqPM4BwTKcHNCZOvr35IIewGtXtWXsI67SQU2TRq8lhQzeibdiC/CNg=="],
 

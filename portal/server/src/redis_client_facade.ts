@@ -23,9 +23,9 @@ export default class RedisClientFacade {
             const value = await this.client.EXISTS(key);
             return !!value;
         } catch (error) {
-            logger.error({
-                message: `Error Redis check: checking the presence of "${key}".`, error
-            });
+            logger.error(
+				`Error Redis check: checking the presence of "${key}".`, { error }
+            );
             throw error;
         }
     }
