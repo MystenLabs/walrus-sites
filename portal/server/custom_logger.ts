@@ -21,7 +21,7 @@ export async function setupTapelog() {
 			{ category: "server-portal", lowestLevel: "debug", sinks: ["console"] }
 		],
 	});
-	const tapeLogger = getLogger(["server-portal", "my-module"]);
+	const tapeLogger = getLogger(["server-portal"]);
 
 	// Integrate Tapelog by connecting the logger predicates to the tapeLogger instance
 	logger.setInfoPredicate((...args: any[]) => {
