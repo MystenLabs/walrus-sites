@@ -202,10 +202,10 @@ impl Display for OperationsSummary {
         let ops = self
             .0
             .iter()
-            .map(|s| format!("  - {}", s))
+            .map(|s| format!("  - {s}"))
             .collect::<Vec<_>>()
             .join("\n");
-        write!(f, "Operations performed:\n{}", ops)
+        write!(f, "Operations performed:\n{ops}")
     }
 }
 
