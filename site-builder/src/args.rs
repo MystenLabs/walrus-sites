@@ -186,8 +186,7 @@ impl ObjectIdOrName {
 
                 if let Some(object_id) = object_id {
                     println!(
-                        "The SuiNS name {} points to the Walrus Site object: {} (on {})",
-                        domain, object_id, context
+                        "The SuiNS name {domain} points to the Walrus Site object: {object_id} (on {context})"
                     );
                     Ok(object_id)
                 } else {
@@ -203,7 +202,7 @@ impl ObjectIdOrName {
     /// Normalizes the suins name, changing it to the format `<name>.sui`.
     pub(crate) fn normalize_name(name: &str) -> String {
         if let Some(stripped) = name.strip_prefix('@') {
-            format!("{}.sui", stripped)
+            format!("{stripped}.sui")
         } else {
             name.to_owned()
         }
