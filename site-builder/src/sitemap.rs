@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 
 use anyhow::{anyhow, bail, Context, Result};
-use chrono::{Duration, NaiveDate};
+use chrono::{DateTime, Duration, NaiveDate};
 use prettytable::{
     format::{self, FormatBuilder},
     row,
@@ -21,7 +21,8 @@ use crate::{
     config::Config,
     retry_client::RetriableSuiClient,
     site::{RemoteSiteFactory, SiteData},
-    util::type_origin_map_for_package,
+    types::Staking,
+    util::{get_staking_object, type_origin_map_for_package},
     walrus::{output::SuiBlob, types::BlobId},
 };
 
@@ -58,7 +59,13 @@ pub(crate) async fn display_sitemap(
         return Ok(());
     }
 
-    let table = MapTable::new(&site_data, &owned_blobs, &context);
+    let staking_object_id = config
+        .staking_object
+        .ok_or_else(|| anyhow!("staking_object not defined in the config"))?;
+    dbg!("Using staking object:", staking_object_id);
+
+    let staking_object = get_staking_object(&sui_client, staking_object_id).await?;
+    let table = SiteMapTable::new(&site_data, &owned_blobs, &staking_object);
     table.printstd();
 
     Ok(())
@@ -94,28 +101,43 @@ async fn get_site_resources_and_blobs(
     Ok((site, owned_blobs))
 }
 
-struct MapTable(Vec<(String, BlobId, Option<ObjectID>, Option<String>)>);
+struct SiteMapTable(Vec<(String, BlobId, Option<ObjectID>, Option<NaiveDate>)>);
 
-impl MapTable {
-    fn new(site_data: &SiteData, owned_blobs: &HashMap<BlobId, SuiBlob>, context: &str) -> Self {
+impl SiteMapTable {
+    fn new(
+        site_data: &SiteData,
+        owned_blobs: &HashMap<BlobId, SuiBlob>,
+        staking_obj: &Staking,
+    ) -> Self {
         let mut data = Vec::with_capacity(site_data.resources().len());
+
+        let epoch_duration = staking_obj.inner.epoch_duration;
+        let epoch_1_start =
+            DateTime::from_timestamp_millis(staking_obj.inner.first_epoch_start as i64).unwrap();
+
         site_data.resources().iter().for_each(|resource| {
             let info = &resource.info;
             let blob_object_id = owned_blobs.get(&info.blob_id).map(|blob| blob.id);
-            let epoch_days = match context {
-                "testnet" => 2,
-                "mainnet" => 14,
-                _ => 14, // default fallback
-            };
-            let expiration = owned_blobs.get(&info.blob_id).map(|blob| {
-                let end_epoch = blob.storage.end_epoch;
-                let days_since_epoch_1 = (end_epoch.saturating_sub(1)) * epoch_days;
-                let epoch_1 = NaiveDate::from_ymd_opt(2025, 3, 27).unwrap();
-                let expiration_date = epoch_1 + Duration::days(days_since_epoch_1.into());
-                expiration_date.format("%Y-%m-%d").to_string()
+
+            let expiration = owned_blobs.get(&info.blob_id).and_then(|blob| {
+                let end_epoch = blob.storage.end_epoch as u64;
+                let epoch_offset = end_epoch.saturating_sub(1);
+                let total_ms = epoch_offset.checked_mul(epoch_duration)?;
+
+                let secs = total_ms / 1000;
+                let nanos = ((total_ms % 1000) * 1_000_000) as u32;
+
+                Some(
+                    (epoch_1_start
+                        + Duration::seconds(secs as i64)
+                        + Duration::nanoseconds(nanos as i64))
+                    .date_naive(),
+                )
             });
+
             data.push((info.path.clone(), info.blob_id, blob_object_id, expiration));
         });
+
         Self(data)
     }
 
@@ -152,7 +174,7 @@ impl MapTable {
             titles.add_cell(Cell::new("Owned blob object ID (if any)").style_spec("b"));
         }
         if has_expiration {
-            titles.add_cell(Cell::new("Expiration Date").style_spec("b"));
+            titles.add_cell(Cell::new("Earliest Expiration Date").style_spec("b"));
         }
 
         table.set_titles(titles);
@@ -166,7 +188,10 @@ impl MapTable {
                 ));
             }
             if has_expiration {
-                row.add_cell(Cell::new(expiration_opt.as_deref().unwrap_or("-")));
+                let exp_str = expiration_opt
+                    .map(|dt| dt.format("%Y-%m-%d").to_string())
+                    .unwrap_or_else(|| "-".to_string());
+                row.add_cell(Cell::new(&exp_str));
             }
 
             table.add_row(row);

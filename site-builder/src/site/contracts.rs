@@ -249,3 +249,14 @@ pub mod suins {
     contract_ident!(struct name_record::NameRecord);
     contract_ident!(struct domain::Domain);
 }
+
+pub mod staking {
+    use super::*;
+
+    contract_ident!(struct staking::Staking);
+}
+pub mod staking_inner {
+    use super::*;
+
+    contract_ident!(struct staking_inner::StakingInnerV1);
+}

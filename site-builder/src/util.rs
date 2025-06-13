@@ -7,6 +7,7 @@ use std::{
 
 use anyhow::{anyhow, bail, Context, Result};
 use futures::Future;
+use serde::{Deserialize, Deserializer};
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{
     rpc_types::{
@@ -22,12 +23,14 @@ use sui_sdk::{
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
     transaction::{ProgrammableTransaction, TransactionData},
+    TypeTag,
 };
 
 use crate::{
     display,
     retry_client::RetriableSuiClient,
     site::{config::WSResources, contracts::TypeOriginMap},
+    types::{Staking, StakingInnerV1, StakingObjectForDeserialization},
 };
 
 pub async fn sign_and_send_ptb(
@@ -322,6 +325,36 @@ pub fn persist_site_id_and_name(
     Ok(ws_resources_to_save)
 }
 
+/// Fetches the staking object by its ID and the current walrus package ID.
+/// Returns a `StakingObject` that includes version, package IDs, and staking parameters.
+pub async fn get_staking_object(
+    sui_client: &RetriableSuiClient,
+    staking_object_id: ObjectID,
+) -> Result<Staking> {
+    let StakingObjectForDeserialization {
+        id,
+        version,
+        package_id,
+        new_package_id,
+    } = sui_client
+        .get_sui_object(staking_object_id)
+        .await
+        .context("Failed to fetch staking object data")?;
+
+    let inner = sui_client
+        .get_dynamic_field::<u64, StakingInnerV1>(staking_object_id, TypeTag::U64, version)
+        .await
+        .context("Failed to fetch inner staking data")?;
+
+    Ok(Staking {
+        id,
+        version,
+        package_id,
+        new_package_id,
+        inner,
+    })
+}
+
 // Resolution
 
 #[cfg(test)]
@@ -342,4 +375,13 @@ mod test_util {
             "5d8t4gd5q8x4xcfyctpygyr5pnk85x54o7ndeq2j4pg9l7rmw"
         );
     }
+}
+
+#[tracing::instrument(err, skip_all)]
+pub(crate) fn deserialize_bag_or_table<'de, D>(deserializer: D) -> Result<ObjectID, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let (object_id, _length): (ObjectID, u64) = Deserialize::deserialize(deserializer)?;
+    Ok(object_id)
 }
