@@ -154,6 +154,14 @@ impl SiteManager {
         } else {
             SuiTransactionBlockResponse::default()
         };
+
+        // Extract the BlobIDs from deleted resources for Walrus cleanup
+        let blobs_to_delete: Vec<BlobId> = collect_deletable_blob_candidates(&site_updates);
+
+        if !blobs_to_delete.is_empty() {
+            self.delete_from_walrus(&blobs_to_delete).await?;
+        }
+
         Ok((result, site_updates.summary(&self.blob_options)))
     }
 
@@ -504,4 +512,17 @@ fn is_retriable_error(error: &Error) -> bool {
     } else {
         false
     }
+}
+
+/// Collects the `BlobId`s from the site_updates Deleted ResourceOps.
+/// These are candidates for deletion from Walrus.
+fn collect_deletable_blob_candidates(site_updates: &SiteDataDiff) -> Vec<BlobId> {
+    site_updates
+        .resource_ops
+        .iter()
+        .filter_map(|op| match op {
+            ResourceOp::Deleted(resource) => Some(resource.info.blob_id),
+            _ => None,
+        })
+        .collect()
 }
