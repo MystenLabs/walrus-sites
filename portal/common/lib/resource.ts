@@ -55,6 +55,7 @@ export class ResourceFetcher {
         seenResources: Set<string>,
         depth: number = 0,
     ): Promise<VersionedResource | HttpStatusCodes> {
+    	logger.info('Fetching resource', { path })
         const error = this.checkRedirectLimits(objectId, seenResources, depth);
         if (error) return error;
 
@@ -92,6 +93,7 @@ export class ResourceFetcher {
         objectId: string,
         dynamicFieldId: string
     ): Promise<SuiObjectResponse[]> {
+    	logger.info('Fetching Display object and Dynamic Field object', {objectIdForDisplay: objectId, dynamicFieldId})
         // MultiGetObjects returns the objects *always* in the order they were requested.
         const pageData = await this.rpcSelector.multiGetObjects(
             {
@@ -119,9 +121,10 @@ export class ResourceFetcher {
         dynamicFieldResponse: SuiObjectResponse,
         dynamicFieldId: string): VersionedResource | HttpStatusCodes
     {
+    	logger.info('Extracting resource data from the dynamic field object', {dynamicFieldId})
         if (!dynamicFieldResponse.data) {
-            logger.warn({
-                message: "No page data found for dynamic field id",
+            logger.warn(
+                "No page resource data found for dynamic field object", {
                 dynamicFieldId: dynamicFieldId
             });
             return HttpStatusCodes.NOT_FOUND;
@@ -129,10 +132,10 @@ export class ResourceFetcher {
 
         const siteResource = this.getResourceFields(dynamicFieldResponse.data);
         if (!siteResource || !siteResource.blob_id) {
-            logger.error({
-                message: "No site resource found inside the dynamicFieldResponse:",
-                error: dynamicFieldResponse
-            });
+            logger.error(
+                "No site resource found inside the dynamicFieldResponse:",
+                { error: dynamicFieldResponse }
+            );
             return HttpStatusCodes.NOT_FOUND;
         }
 

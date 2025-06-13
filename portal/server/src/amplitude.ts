@@ -28,7 +28,7 @@ export async function sendToAmplitude(request: Request, originalUrl: URL): Promi
 		return;
 	}
 	if (!config.amplitudeApiKey) {
-		logger.warn({ message: "Amplitude API key not found. Skipping tracking." });
+		logger.warn("Amplitude API key not found. Skipping tracking.");
 		return;
 	}
 	try {

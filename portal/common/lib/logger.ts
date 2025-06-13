@@ -3,7 +3,7 @@
 
 /// Provides a simple logger interface function for
 /// logging messages on different runtimes.
-type LoggingPredicate = (args: any) => void;
+type LoggingPredicate  = (message: string, ...args: any[]) => void
 
 /**
  * Logger used as an abstraction for logging messages on different runtimes.
@@ -16,6 +16,9 @@ type LoggingPredicate = (args: any) => void;
     private infoPredicate: LoggingPredicate;
     private warnPredicate: LoggingPredicate;
     private errorPredicate: LoggingPredicate;
+    // Context is useful for structured logging. Use it to group logs by a specific property
+    // e.g. user ID or request ID.
+    context?: String;
 
     /// Constructor. Initializes the predicates for logging.
     /// If no predicates are provided, the console object is used.
@@ -24,10 +27,10 @@ type LoggingPredicate = (args: any) => void;
     /// @param warnPredicate Function for warning messages.
     /// @param errorPredicate Function for error messages.
     constructor(
-		debugPredicate: LoggingPredicate = (value) => console.debug(JSON.stringify(value).replace('\n', '')),
-        logPredicate: LoggingPredicate = (value) => console.log(JSON.stringify(value).replace('\n', '')),
-        warnPredicate: LoggingPredicate = (value) => console.warn(JSON.stringify(value).replace('\n', '')),
-        errorPredicate: LoggingPredicate = (value) => console.error(JSON.stringify(value).replace('\n', ''))
+		debugPredicate: LoggingPredicate = (...args) => console.debug(...args),
+        logPredicate: LoggingPredicate = (...args) => console.log(...args),
+        warnPredicate: LoggingPredicate = (...args) => console.warn(...args),
+        errorPredicate: LoggingPredicate = (...args) => console.error(...args)
     ) {
         this.debugPredicate = debugPredicate;
         this.infoPredicate = logPredicate;
@@ -36,24 +39,24 @@ type LoggingPredicate = (args: any) => void;
     }
 
     /// The highest level of logging, used for debugging purposes.
-    debug(args: any): void {
-        this.debugPredicate(args);
+    debug(message: string, ...args: any[]): void {
+        this.debugPredicate(message, ...args);
     }
 
     /// General logging level, used for informational messages.
-    info(args: any): void {
-        this.infoPredicate(args);
+    info(message: string, ...args: any[]): void {
+        this.infoPredicate(message, ...args);
     }
 
     /// Logging level for warnings, used for non-critical issues, or states
     /// that need to be considered.
-    warn(args: any): void {
-        this.warnPredicate(args);
+    warn(message: string, ...args: any[]): void {
+        this.warnPredicate(message, ...args);
     }
 
     /// Logging level for errors, used for critical issues.
-    error(args: any): void {
-        this.errorPredicate(args);
+    error(message: string, ...args: any[]): void {
+        this.errorPredicate(message, ...args);
     }
 
     setDebugPredicate(predicate: LoggingPredicate): void {

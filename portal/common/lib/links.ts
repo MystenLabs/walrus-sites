@@ -12,11 +12,11 @@ import logger from "./logger";
  *  This links to a walrus site on sui.
  */
 export function getObjectIdLink(url: URL): DomainDetails | null {
-    logger.info({ message: "Trying to extract the sui link from:", originalUrl: url.href});
+	logger.info("Attempting to match a regex pattern to extract the Sui link from the provided URL", { originalUrl: url.href });
     const suiResult = /^https:\/\/(.+)\.suiobj.invalid\/(.*)$/.exec(url.href);
     if (suiResult) {
         const parsedDomainDetails = { subdomain: suiResult[1], path: "/" + suiResult[2] };
-        logger.info({ message: "Matched sui link", parsedDomainDetails: parsedDomainDetails });
+        logger.info("Matched Sui link!", { result: parsedDomainDetails });
         return parsedDomainDetails;
     }
     return null;
@@ -29,10 +29,10 @@ export function getObjectIdLink(url: URL): DomainDetails | null {
  * `/[blobid.walrus]`
  */
 export function getBlobIdLink(url: URL): string | null {
-    logger.info({ message: "Trying to extract the walrus link from:", originalUrl: url.href });
+    logger.info("Attempting to match a regex pattern to extract the Walrus link from the provided URL", { originalUrl: url.href });
     const walrusResult = /^https:\/\/blobid\.walrus.invalid\/(.+)$/.exec(url.href);
     if (walrusResult) {
-        logger.info({ message: "Matched walrus link using blobid.walrus", walrusResult: walrusResult[1]});
+        logger.info("Matched Walrus link!", { result: walrusResult[1] });
         return walrusResult[1];
     }
     return null;
