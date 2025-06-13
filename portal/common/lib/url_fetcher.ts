@@ -184,11 +184,9 @@ export class UrlFetcher {
         );
         if (!contents.ok) {
             logger.error(
-                {
-                    message: "Failed to fetch resource! Response from aggregator endpoint not ok.",
-                    path: result.path,
-                    status: contents.status
-                });
+                "Failed to fetch resource! Response from aggregator endpoint not ok.",
+                {path: result.path, status: contents.status}
+            );
             return siteNotFound();
         }
 
