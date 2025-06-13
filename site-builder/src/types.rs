@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Collection of types to mirror the Sui move structs.
-
 use std::{
     borrow::Borrow,
     collections::{btree_map, BTreeMap},
+    num::NonZeroU16,
     str::FromStr,
 };
 
@@ -18,6 +18,7 @@ use sui_types::{
 
 use crate::{
     site::contracts::{self, AssociatedContractStruct, StructTag},
+    util::deserialize_bag_or_table,
     walrus::types::BlobId,
 };
 
@@ -348,4 +349,96 @@ impl Domain {
 
 impl AssociatedContractStruct for NameRecord {
     const CONTRACT_STRUCT: StructTag<'static> = contracts::suins::NameRecord;
+}
+/// Sui type for staking object
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Staking {
+    /// Object id of the Sui object.
+    pub id: ObjectID,
+    /// The version of the staking object.
+    pub version: u64,
+    /// The package ID of the staking object.
+    pub package_id: ObjectID,
+    /// The new package ID of the staking object.
+    pub(crate) new_package_id: Option<ObjectID>,
+    /// The inner staking state.
+    pub(crate) inner: StakingInnerV1,
+}
+
+impl AssociatedContractStruct for StakingObjectForDeserialization {
+    const CONTRACT_STRUCT: StructTag<'static> = contracts::staking::Staking;
+}
+
+type CommitteeShardAssignment = Vec<(ObjectID, Vec<u16>)>;
+
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub(crate) struct EpochParams {
+    /// The storage capacity of the system.
+    total_capacity_size: u64,
+    /// The price per unit size of storage.
+    storage_price_per_unit_size: u64,
+    /// The write price per unit size.
+    write_price_per_unit_size: u64,
+}
+
+/// The epoch state.
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub enum EpochState {
+    /// The epoch change is currently in progress.
+    ///
+    /// Contains the weight of the nodes that have already attested that they finished the sync.
+    EpochChangeSync(u16),
+    /// The epoch change has been completed at the contained timestamp.
+    #[serde(deserialize_with = "chrono::serde::ts_milliseconds::deserialize")]
+    EpochChangeDone(chrono::DateTime<chrono::Utc>),
+    /// The parameters for the next epoch have been selected.
+    ///
+    /// The contained timestamp is the start of the current epoch.
+    #[serde(deserialize_with = "chrono::serde::ts_milliseconds::deserialize")]
+    NextParamsSelected(chrono::DateTime<chrono::Utc>),
+}
+
+/// Sui type for inner staking object
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub(crate) struct StakingInnerV1 {
+    /// The number of shards in the system.
+    pub(crate) n_shards: NonZeroU16,
+    /// The duration of an epoch in ms. Does not affect the first (zero) epoch.
+    pub(crate) epoch_duration: u64,
+    /// Special parameter, used only for the first epoch. The timestamp when the
+    /// first epoch can be started.
+    pub(crate) first_epoch_start: u64,
+    /// Object ID of the object table storing the staking pools.
+    #[serde(deserialize_with = "deserialize_bag_or_table")]
+    pub(crate) pools: ObjectID,
+    /// The current epoch of the Walrus system.
+    pub(crate) epoch: u32,
+    /// Stores the active set of storage nodes. Provides automatic sorting and
+    /// tracks the total amount of staked WAL.
+    pub(crate) active_set: ObjectID,
+    /// The next committee in the system.
+    pub(crate) next_committee: Option<CommitteeShardAssignment>,
+    /// The current committee in the system.
+    pub(crate) committee: CommitteeShardAssignment,
+    /// The previous committee in the system.
+    pub(crate) previous_committee: CommitteeShardAssignment,
+    /// The next epoch parameters.
+    pub(crate) next_epoch_params: Option<EpochParams>,
+    /// The state of the current epoch.
+    pub(crate) epoch_state: EpochState,
+    /// Extended field holding public keys for the next epoch.
+    pub(crate) next_epoch_public_keys: ObjectID,
+}
+
+impl AssociatedContractStruct for StakingInnerV1 {
+    const CONTRACT_STRUCT: StructTag<'static> = contracts::staking_inner::StakingInnerV1;
+}
+
+/// Sui type for outer staking object. Used for deserialization.
+#[derive(Debug, Clone, Deserialize)]
+pub struct StakingObjectForDeserialization {
+    pub id: ObjectID,
+    pub version: u64,
+    pub package_id: ObjectID,
+    pub new_package_id: Option<ObjectID>,
 }

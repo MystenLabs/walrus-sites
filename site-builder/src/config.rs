@@ -32,6 +32,7 @@ pub(crate) struct Config {
     pub package: ObjectID,
     #[serde(default)]
     pub general: GeneralArgs,
+    pub staking_object: Option<ObjectID>,
 }
 
 pub(crate) fn default_portal() -> String {
