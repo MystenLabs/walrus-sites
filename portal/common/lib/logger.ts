@@ -3,7 +3,7 @@
 
 /// Provides a simple logger interface function for
 /// logging messages on different runtimes.
-type LoggingPredicate = (...args: any[]) => void;
+type LoggingPredicate  = (message: string, ...args: any[]) => void
 
 /**
  * Logger used as an abstraction for logging messages on different runtimes.
@@ -39,24 +39,24 @@ type LoggingPredicate = (...args: any[]) => void;
     }
 
     /// The highest level of logging, used for debugging purposes.
-    debug(...args: any[]): void {
-        this.debugPredicate(...args);
+    debug(message: string, ...args: any[]): void {
+        this.debugPredicate(message, ...args);
     }
 
     /// General logging level, used for informational messages.
-    info(...args: any[]): void {
-        this.infoPredicate(...args);
+    info(message: string, ...args: any[]): void {
+        this.infoPredicate(message, ...args);
     }
 
     /// Logging level for warnings, used for non-critical issues, or states
     /// that need to be considered.
-    warn(...args: any[]): void {
-        this.warnPredicate(...args);
+    warn(message: string, ...args: any[]): void {
+        this.warnPredicate(message, ...args);
     }
 
     /// Logging level for errors, used for critical issues.
-    error(...args: any[]): void {
-        this.errorPredicate(...args);
+    error(message: string, ...args: any[]): void {
+        this.errorPredicate(message, ...args);
     }
 
     setDebugPredicate(predicate: LoggingPredicate): void {
