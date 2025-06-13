@@ -1,8 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-//
-use anyhow::Result;
 
+use anyhow::Result;
 use walrus_service::test_utils::test_cluster;
 use walrus_sui::test_utils::LocalOrExternalTestCluster;
 
