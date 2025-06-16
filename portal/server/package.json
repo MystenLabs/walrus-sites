@@ -1,6 +1,7 @@
 {
     "name": "server",
-    "version": "0.1.0",
+    "description": "The server based implementation of the Walrus Sites portal.",
+    "version": "1.0.0",
     "private": true,
     "scripts": {
         "start": "bun --hot run index.ts"
