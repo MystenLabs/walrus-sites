@@ -29,7 +29,7 @@ export class InstrumentationFacade {
     constructor (port: number) {
         // Create the Prometheus exporter
         const exporter = new PrometheusExporter({ port: port }, () => {
-            logger.info(`Prometheus Exporter endpoint running on port ${port}`);
+            logger.info(`Prometheus Exporter endpoint running on port ${ port }`);
         });
 
         // Initialize the Meter provider

@@ -14,6 +14,7 @@ import { sendToAmplitude } from "src/amplitude";
 import { Base36toHex } from "@lib/objectId_operations";
 import { instrumentationFacade } from "@lib/instrumentation";
 import { bringYourOwnDomainDoesNotSupportSubdomainsYet } from "@lib/http/http_error_responses";
+import logger from "@lib/logger";
 
 if (config.enableSentry) {
     // Only integrate Sentry on production.
@@ -22,6 +23,7 @@ if (config.enableSentry) {
 
 export default async function main(req: Request) {
 	const url = new URL(req.url);
+	logger.info("Processing new request", {url})
 
 	if (config.enableVercelWebAnalytics) {
 		await sendToWebAnalytics(req);

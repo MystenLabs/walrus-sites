@@ -15,21 +15,18 @@ export class SuiNSResolver {
     */
     async resolveSuiNsAddress(subdomain: string
     ): Promise<string | null> {
+    	logger.info("Resolving SuiNS domain", {suinsDomain: subdomain})
     	const reqStartTime = Date.now();
         const nameRecord: NameRecord | null = await this.rpcSelector.getNameRecord(`${subdomain}.sui`);
         if (nameRecord) {
-            const resolvedSuiNSName = nameRecord.walrusSiteId;
-            logger.info({
-                message: "Resolved SuiNS name",
-                subdomain,
-                resolvedSuiNSName
-            });
+            const resolvedSuiNSObjectId = nameRecord.walrusSiteId;
+            logger.info("Resolved SuiNS name", {subdomain, resolvedSuiNSObjectId});
             const resolveSuiNsAddressDuration = Date.now() - reqStartTime;
 			instrumentationFacade.recordResolveSuiNsAddressTime(
 				resolveSuiNsAddressDuration,
 				nameRecord.name,
 			);
-            return resolvedSuiNSName;
+            return resolvedSuiNSObjectId;
         }
         return null;
     }

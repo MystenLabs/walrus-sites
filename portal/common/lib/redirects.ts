@@ -15,7 +15,7 @@ export function redirectToPortalURLResponse(
 ): Response {
     // Redirect to the walrus site for the specified domain and path
     const redirectUrl = getPortalUrl(path, scope.href, portalDomainNameLength);
-    logger.info({ message: "Redirecting to the Walrus Site link", path: path, redirectUrl: redirectUrl });
+    logger.info("Redirecting to the Walrus Site link", { path: path, redirectUrl: redirectUrl });
     return makeRedirectResponse(redirectUrl);
 }
 
@@ -25,7 +25,7 @@ export function redirectToPortalURLResponse(
 export function redirectToAggregatorUrlResponse(scope: URL, blobId: string, aggregatorUrl: string): Response {
     // Redirect to the walrus site for the specified domain and path
     const redirectUrl = aggregatorEndpoint(blobId, aggregatorUrl);
-    logger.info({ message: "Redirecting to the Walrus Blob link", redirectUrl: redirectUrl });
+    logger.info("Redirecting to the Walrus Blob link", { redirectUrl: redirectUrl });
     return makeRedirectResponse(redirectUrl.href);
 }
 
@@ -33,6 +33,7 @@ export function redirectToAggregatorUrlResponse(scope: URL, blobId: string, aggr
  * Checks if the object has a redirect in its Display representation.
  */
 export function checkRedirect(object: SuiObjectResponse): string | null {
+	logger.info("Checking if the request should be redirected (existing Display object)", {objectId: object.data.objectId})
     if (object.data && object.data.display) {
         let display = object.data.display;
         // Check if "walrus site address" is set in the display field.
