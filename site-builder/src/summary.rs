@@ -106,6 +106,6 @@ impl Summarizable for SiteDataDiffSummary {
             "No Metadata updated."
         };
 
-        format!("{}\n{}\n{}", resource_str, route_str, metadata_str)
+        format!("{resource_str}\n{route_str}\n{metadata_str}")
     }
 }

@@ -84,7 +84,7 @@ impl DirNode {
         };
 
         let resource_path = full_path_to_resource_path(&actual_link, root)?;
-        Ok(format!("<a href=\"{}\">{}</a>", resource_path, link_name,))
+        Ok(format!("<a href=\"{resource_path}\">{link_name}</a>",))
     }
 
     fn to_html(&self, root: &Path) -> Result<String> {

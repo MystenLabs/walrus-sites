@@ -201,7 +201,7 @@ pub fn load_wallet_context(
     let path = path_or_defaults_if_exist(path, &default_paths)
         .ok_or(anyhow!("could not find a valid wallet config file"))?;
     tracing::info!(conf_path = %path.display(), "using Sui wallet configuration");
-    let mut wallet_context: WalletContext = WalletContext::new(&path, None, None)?;
+    let mut wallet_context: WalletContext = WalletContext::new(&path)?;
 
     if let Some(target_env) = wallet_env {
         if !wallet_context

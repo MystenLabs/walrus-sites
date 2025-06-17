@@ -321,7 +321,7 @@ impl SiteEditor<EditOptions> {
                     tracing::info!("change detected: {:?}", event);
                     self.run_single_and_print_summary().await?;
                 }
-                Err(e) => println!("Watch error!: {}", e),
+                Err(e) => println!("Watch error!: {e}"),
             }
         }
     }
@@ -347,7 +347,7 @@ fn print_summary(
     println!("{}\n", summary.to_summary());
     let object_id = match site_id {
         SiteIdentifier::ExistingSite(id) => {
-            println!("Site object ID: {}", id);
+            println!("Site object ID: {id}");
             *id
         }
         SiteIdentifier::NewSite(name) => {
@@ -358,7 +358,7 @@ fn print_summary(
                     .as_ref()
                     .ok_or(anyhow::anyhow!("response did not contain effects"))?,
             );
-            println!("Created new site: {}\nNew site object ID: {}", name, id);
+            println!("Created new site: {name}\nNew site object ID: {id}");
             id
         }
     };

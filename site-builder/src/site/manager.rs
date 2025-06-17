@@ -177,8 +177,7 @@ impl SiteManager {
                 let total_storage_cost = self.dry_run_walrus_store(&walrus_updates).await?;
                 // Before doing the actual execution, perform a dry run
                 display::action(format!(
-                    "Estimated Storage Cost for this publish/update (Gas Cost Excluded): {} FROST",
-                    total_storage_cost
+                    "Estimated Storage Cost for this publish/update (Gas Cost Excluded): {total_storage_cost} FROST"
                 ));
 
                 // Add user confirmation prompt.
@@ -198,7 +197,7 @@ impl SiteManager {
     }
 
     /// Publishes the resources to Walrus.
-    async fn store_to_walrus<'b>(&mut self, walrus_updates: &[&ResourceOp<'b>]) -> Result<()> {
+    async fn store_to_walrus(&mut self, walrus_updates: &[&ResourceOp<'_>]) -> Result<()> {
         for (idx, update_set) in walrus_updates
             .chunks(self.max_parallel_stores.get())
             .enumerate()
@@ -216,9 +215,9 @@ impl SiteManager {
         Ok(())
     }
 
-    async fn store_multiple_to_walrus_with_retry<'b>(
+    async fn store_multiple_to_walrus_with_retry(
         &mut self,
-        update_batch: &[&ResourceOp<'b>],
+        update_batch: &[&ResourceOp<'_>],
     ) -> Result<()> {
         let deletable = !self.walrus_options.permanent;
         let resource_paths = update_batch
@@ -270,7 +269,7 @@ impl SiteManager {
     }
 
     /// Deletes the resources from Walrus.
-    pub async fn delete_from_walrus<'b>(&mut self, blob_ids: &[BlobId]) -> Result<()> {
+    pub async fn delete_from_walrus(&mut self, blob_ids: &[BlobId]) -> Result<()> {
         tracing::debug!(?blob_ids, "deleting blob from Walrus");
         display::action("Running the delete commands on Walrus");
         let output = self.walrus.delete(blob_ids).await?;
@@ -283,8 +282,7 @@ impl SiteManager {
                 } else {
                     display::error(
                         format!(
-                            "Could not delete blob {}, may be already deleted or may be a permanent blob",
-                            blob_id
+                            "Could not delete blob {blob_id}, may be already deleted or may be a permanent blob"
                         ));
                 }
             } else {
@@ -296,9 +294,9 @@ impl SiteManager {
     }
 
     /// Executes the updates on Sui.
-    async fn execute_sui_updates<'b>(
+    async fn execute_sui_updates(
         &self,
-        updates: &SiteDataDiff<'b>,
+        updates: &SiteDataDiff<'_>,
     ) -> Result<SuiTransactionBlockResponse> {
         tracing::debug!(
             address=?self.active_address()?,
@@ -411,8 +409,7 @@ impl SiteManager {
             let total_storage_cost = self.dry_run_walrus_store(&walrus_ops).await?;
             // Before doing the actual execution, perform a dry run
             display::action(format!(
-                "Estimated Storage Cost for this publish/update (Gas Cost Excluded): {} FROST",
-                total_storage_cost
+                "Estimated Storage Cost for this publish/update (Gas Cost Excluded): {total_storage_cost} FROST"
             ));
             // Add user confirmation prompt.
             display::action("Waiting for user confirmation...");
