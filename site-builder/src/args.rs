@@ -23,9 +23,10 @@ use crate::{
     walrus::output::EpochCount,
 };
 
+
 #[derive(Parser, Clone, Debug, Deserialize)]
 #[command(rename_all = "kebab-case")]
-pub(crate) struct GeneralArgs {
+pub struct GeneralArgs {
     /// The URL or the RPC endpoint to connect the client to.
     ///
     /// Can be specified as a CLI argument or in the config.
@@ -211,7 +212,7 @@ impl ObjectIdOrName {
 
 #[derive(Subcommand, Debug)]
 #[command(rename_all = "kebab-case")]
-pub(crate) enum Commands {
+pub enum Commands {
     /// Deploy a new site on Sui.
     ///
     /// If the site has not been published before, this command publishes it and stores
