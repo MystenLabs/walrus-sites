@@ -8,12 +8,16 @@ mod localnode;
 // fatal runtime error: stack overflow
 // ```
 #[tokio::test]
-async fn test_start_walrus_sites_cluster() -> anyhow::Result<()> {
+async fn start_walrus_sites_cluster() -> anyhow::Result<()> {
     let WalrusSitesClusterState {
         walrus_sites_publisher: WalrusSitesPublisher::FromSuiClusterHandle(publisher),
         walrus_sites_package_id,
         ..
     } = WalrusSitesClusterState::new().await?;
-    println!("Published walrus_sites at {walrus_sites_package_id} from the address {publisher} which is generated during Sui Cluster initialization.");
+    println!(
+        r#"Published walrus_sites
+- at {walrus_sites_package_id}
+- from the address {publisher} which is generated during Sui Cluster initialization."#
+    );
     Ok(())
 }
