@@ -156,7 +156,7 @@ impl GeneralArgs {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum ObjectIdOrName {
+pub enum ObjectIdOrName {
     /// The object ID of the site.
     ObjectId(ObjectID),
     /// The name of the site.
@@ -352,7 +352,7 @@ pub enum Commands {
 }
 
 #[derive(Parser, Debug, Clone)]
-pub(crate) struct PublishOptions {
+pub struct PublishOptions {
     /// The directory containing the site sources.
     pub(crate) directory: PathBuf,
     /// Preprocess the directory before publishing.
@@ -374,7 +374,7 @@ pub(crate) struct PublishOptions {
 
 #[derive(Parser, Debug, Clone, Default)]
 /// Common configurations across publish, update, and update-resource commands.
-pub(crate) struct WalrusStoreOptions {
+pub struct WalrusStoreOptions {
     /// The path to the Walrus sites resources file.
     ///
     /// This JSON configuration file defined HTTP resource headers and other utilities for your
@@ -436,7 +436,7 @@ pub struct EpochArg {
 /// Can be either a non-zero number of epochs or the special value `max`, which will store the blobs
 /// for the maximum number of epochs allowed by the system object on chain.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) enum EpochCountOrMax {
+pub enum EpochCountOrMax {
     /// Store the blobs for the maximum number of epochs allowed.
     #[serde(rename = "max")]
     Max,
