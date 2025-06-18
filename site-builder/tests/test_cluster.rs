@@ -1,6 +1,5 @@
-use localnode::{WalrusSitesClusterState, WalrusSitesPublisher};
-
 mod localnode;
+use localnode::{WalrusSitesClusterState, WalrusSitesPublisher};
 
 // Running this in `opt-level = 0` mode can fail with:
 // ```

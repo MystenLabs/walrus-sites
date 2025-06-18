@@ -32,9 +32,6 @@ mod walrus;
 /// The default path to the configuration file for the site builder.
 const SITES_CONFIG_NAME: &str = "./sites-config.yaml";
 
-#[cfg(test)]
-mod test_util;
-
 pub async fn run(
     config: Option<PathBuf>,
     context: Option<String>,
@@ -252,20 +249,5 @@ fn sites_config_default_paths() -> Vec<PathBuf> {
         );
     }
     default_paths
-}
-
-#[cfg(test)]
-use test_util::ArgsForTesting;
-
-#[cfg(test)]
-pub async fn run_for_testing(
-    ArgsForTesting {
-        config,
-        context,
-        general,
-        command,
-    }: ArgsForTesting,
-) -> anyhow::Result<()> {
-    run_internal(config, context, general, command).await
 }
 
