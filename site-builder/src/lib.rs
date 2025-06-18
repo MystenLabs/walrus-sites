@@ -15,7 +15,7 @@ use util::{id_to_base36, path_or_defaults_if_exist};
 
 pub mod args;
 mod backoff;
-mod config;
+pub mod config;
 mod display;
 mod network;
 mod preprocessor;
@@ -250,4 +250,3 @@ fn sites_config_default_paths() -> Vec<PathBuf> {
     }
     default_paths
 }
-

@@ -23,64 +23,63 @@ use crate::{
     walrus::output::EpochCount,
 };
 
-
-#[derive(Parser, Clone, Debug, Deserialize)]
+#[derive(Parser, Clone, Debug, Deserialize, Serialize)]
 #[command(rename_all = "kebab-case")]
 pub struct GeneralArgs {
     /// The URL or the RPC endpoint to connect the client to.
     ///
     /// Can be specified as a CLI argument or in the config.
     #[arg(long)]
-    pub(crate) rpc_url: Option<String>,
+    pub rpc_url: Option<String>,
     /// The path to the Sui Wallet config.
     ///
     /// Can be specified as a CLI argument or in the config.
     #[arg(long)]
-    pub(crate) wallet: Option<PathBuf>,
+    pub wallet: Option<PathBuf>,
     /// The env to be used for the Sui wallet.
     ///
     /// If not specified, the env specified in the sites-config (under `wallet_env`) will be used.
     /// If the wallet env is also not specified in the config, the env configured in the Sui client
     /// will be used.
     #[arg(long)]
-    pub(crate) wallet_env: Option<String>,
+    pub wallet_env: Option<String>,
     /// The address to be used for the Sui wallet.
     ///
     /// If not specified, the address specified in the sites-config (under `wallet_address`) will be
     /// used. If the wallet address is also not specified in the config, the address configured in
     /// the Sui client will be used.
     #[arg(long)]
-    pub(crate) wallet_address: Option<SuiAddress>,
+    pub wallet_address: Option<SuiAddress>,
     /// The context that will be passed to the Walrus binary.
     ///
     /// If not specified, the Walrus context specified in the sites-config will be
     /// used. If it is also not specified in the config, no context will be passed.
     #[arg(long)]
-    pub(crate) walrus_context: Option<String>,
+    pub walrus_context: Option<String>,
     /// The path or name of the walrus binary.
     ///
     /// The Walrus binary will then be called with this configuration to perform actions on Walrus.
     /// Can be specified as a CLI argument or in the config.
     #[arg(long)]
     #[serde(default = "default::walrus_binary")]
-    pub(crate) walrus_binary: Option<String>,
+    pub walrus_binary: Option<String>,
     /// The path to the configuration for the Walrus client.
     ///
     /// This will be passed to the calls to the Walrus binary.
     /// Can be specified as a CLI argument or in the config.
     #[arg(long)]
-    pub(crate) walrus_config: Option<PathBuf>,
+    pub walrus_config: Option<PathBuf>,
     /// The package ID of the Walrus package on the selected network.
     ///
     /// This is currently only used for the `sitemap` command.
     #[arg(long)]
-    pub(crate) walrus_package: Option<ObjectID>,
+    pub walrus_package: Option<ObjectID>,
     /// The gas budget for the operations on Sui.
     ///
     /// Can be specified as a CLI argument or in the config.
     #[arg(long)]
     #[serde(default = "default::gas_budget")]
-    pub(crate) gas_budget: Option<u64>,
+    pub gas_budget: Option<u64>,
 }
 
 impl Default for GeneralArgs {
