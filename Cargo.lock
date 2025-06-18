@@ -8477,8 +8477,10 @@ dependencies = [
  "toml 0.8.22",
  "tracing",
  "tracing-subscriber",
+ "walrus-sdk",
  "walrus-service",
  "walrus-sui",
+ "walrus-test-utils",
 ]
 
 [[package]]
