@@ -44,3 +44,4 @@ walrus-service = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-
 walrus-sui = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.26.2" }
 walrus-sdk = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.26.2" }
 walrus-test-utils = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.26.2" }
+tempfile = "=3.19.0"
