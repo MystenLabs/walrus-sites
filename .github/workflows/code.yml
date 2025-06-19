@@ -117,13 +117,13 @@ jobs:
     if: ${{ needs.diff.outputs.isRust == 'true' }}
     runs-on: ubuntu-ghcloud
     steps:
+      - name: Install Walrus
+        run: |
+          curl -sSf https://docs.wal.app/setup/walrus-install.sh | sh
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2.7.3
         with:
           save-if: ${{ github.ref == 'refs/heads/main' && 'true' || 'false' }}
-      - name: Install Walrus
-        run: |
-          curl -sSf https://docs.wal.app/setup/walrus-install.sh | sh
       - name: Run tests
         run: cargo test -- --include-ignored
   check-all:
