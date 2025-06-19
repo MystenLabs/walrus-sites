@@ -121,6 +121,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2.7.3
         with:
           save-if: ${{ github.ref == 'refs/heads/main' && 'true' || 'false' }}
+      - name: Install Walrus
+        run: |
+          curl -sSf https://docs.wal.app/setup/walrus-install.sh | sh
       - name: Run tests
         run: cargo test -- --include-ignored
   check-all:
