@@ -20,7 +20,6 @@ pub mod args;
 mod backoff;
 pub mod config;
 mod display;
-mod network;
 mod preprocessor;
 mod publish;
 mod retry_client;
