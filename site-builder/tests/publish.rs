@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod localnode;
-use std::{fs::File, num::NonZeroU32, path::PathBuf, time::Duration};
+use std::{fs::File, num::NonZeroU32, path::PathBuf};
 
 use localnode::WalrusSitesClusterState;
 use site_builder::{
