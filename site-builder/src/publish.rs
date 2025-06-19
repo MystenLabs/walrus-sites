@@ -407,12 +407,6 @@ fn print_summary(
 ///
 /// Returns an error if the active address or transaction effects are missing,
 /// or if the persistence operation fails.
-///
-/// # Example
-///
-/// ```ignore
-/// persist_site_identifier(&self.edit_options.site_id, &site_manager, &response, ws_resources, &path_for_saving)?;
-/// ```
 fn persist_site_identifier(
     site_id: &SiteIdentifier,
     site_manager: &SiteManager,
