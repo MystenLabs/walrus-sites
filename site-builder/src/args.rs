@@ -353,22 +353,22 @@ pub enum Commands {
 #[derive(Parser, Debug, Clone)]
 pub struct PublishOptions {
     /// The directory containing the site sources.
-    pub(crate) directory: PathBuf,
+    pub directory: PathBuf,
     /// Preprocess the directory before publishing.
     /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
     #[arg(long)]
-    pub(crate) list_directory: bool,
+    pub list_directory: bool,
     /// The maximum number of concurrent calls to the Walrus CLI for the computation of blob IDs.
     #[arg(long)]
-    pub(crate) max_concurrent: Option<NonZeroUsize>,
+    pub max_concurrent: Option<NonZeroUsize>,
     /// The maximum number of blobs that can be stored concurrently.
     ///
     /// More blobs can be stored concurrently, but this will increase memory usage.
     #[arg(long, default_value_t = default::max_parallel_stores())]
-    pub(crate) max_parallel_stores: NonZeroUsize,
+    pub max_parallel_stores: NonZeroUsize,
     /// Common configurations.
     #[clap(flatten)]
-    pub(crate) walrus_options: WalrusStoreOptions,
+    pub walrus_options: WalrusStoreOptions,
 }
 
 #[derive(Parser, Debug, Clone, Default)]
@@ -382,22 +382,22 @@ pub struct WalrusStoreOptions {
     ///
     /// The configuration file _will not_ be uploaded to Walrus.
     #[arg(long)]
-    pub(crate) ws_resources: Option<PathBuf>,
+    pub ws_resources: Option<PathBuf>,
     /// The epoch argument to specify either the number of epochs to store the blob, or the
     /// end epoch, or the earliest expiry time in rfc3339 format.
     ///
     #[command(flatten)]
-    pub(crate) epoch_arg: EpochArg,
+    pub epoch_arg: EpochArg,
     /// Make the stored resources permanent.
     ///
     /// By default, sites are deletable with site-builder delete command. By passing --permanent,
     /// the site is deleted only after `epochs` expiration. Make resources permanent
     /// (non-deletable)
     #[arg(long, action = clap::ArgAction::SetTrue)]
-    pub(crate) permanent: bool,
+    pub permanent: bool,
     /// Perform a dry run (you'll be asked for confirmation before committing changes).
     #[arg(long)]
-    pub(crate) dry_run: bool,
+    pub dry_run: bool,
 }
 
 /// The number of epochs to store the blob for.
@@ -484,16 +484,16 @@ impl EpochCountOrMax {
     }
 }
 
-mod default {
+pub mod default {
     use std::num::NonZeroUsize;
 
-    pub(crate) fn walrus_binary() -> Option<String> {
+    pub fn walrus_binary() -> Option<String> {
         Some("walrus".to_owned())
     }
-    pub(crate) fn gas_budget() -> Option<u64> {
+    pub fn gas_budget() -> Option<u64> {
         Some(500_000_000)
     }
-    pub(crate) fn max_parallel_stores() -> NonZeroUsize {
+    pub fn max_parallel_stores() -> NonZeroUsize {
         NonZeroUsize::new(50).unwrap()
     }
 }

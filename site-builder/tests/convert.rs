@@ -1,5 +1,5 @@
 mod localnode;
-use std::{fs::File, time::Duration};
+use std::fs::File;
 
 use localnode::WalrusSitesClusterState;
 use site_builder::{args::GeneralArgs, config::Config, run};
@@ -9,7 +9,7 @@ use walrus_test_utils::WithTempDir;
 
 // Important: For tests to pass, the system they are running on need to have walrus installed.
 #[tokio::test]
-async fn snake() -> anyhow::Result<()> {
+async fn converts_random_site_id() -> anyhow::Result<()> {
     let cluster = WalrusSitesClusterState::new().await?;
     let temp_dir = TempDir::new().expect("able to create a temporary directory");
     let sites_config_path = temp_dir.path().to_path_buf().join("sites-config.yaml");
@@ -57,7 +57,6 @@ async fn snake() -> anyhow::Result<()> {
 
     let mut file = File::create(sites_config_path.as_path())?;
     serde_yaml::to_writer(&mut file, &config.inner)?;
-
 
     run(
         Some(sites_config_path),
