@@ -1,8 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{path::PathBuf, sync::Arc};
+use std::{fs::File, path::PathBuf, sync::Arc};
 
+use site_builder::{args::GeneralArgs, config::Config};
 use sui_move_build::BuildConfig;
 use sui_sdk::{
     rpc_types::{ObjectChange, SuiTransactionBlockEffectsAPI, SuiTransactionBlockResponseOptions},
@@ -15,11 +16,12 @@ use sui_types::{
     quorum_driver_types::ExecuteTransactionRequestType,
     transaction::TransactionData,
 };
+use tempfile::TempDir;
 use tokio::sync::Mutex as TokioMutex;
 use walrus_sdk::client::Client as WalrusSDKClient;
 use walrus_service::test_utils::{test_cluster, StorageNodeHandle, TestCluster};
 use walrus_sui::{
-    client::SuiContractClient,
+    client::{contract_config::ContractConfig, SuiContractClient},
     config::load_wallet_context_from_path,
     test_utils::{system_setup::SystemContext, LocalOrExternalTestCluster, TestClusterHandle},
 };
@@ -31,9 +33,11 @@ pub struct WalrusSitesClusterState {
     pub walrus_cluster: TestCluster<StorageNodeHandle>,
     pub admin_wallet_with_client: WithTempDir<WalrusSDKClient<SuiContractClient>>,
     pub system_context: SystemContext,
+    pub walrus_config: WithTempDir<(ContractConfig, PathBuf)>,
     pub walrus_sites_publisher: WalrusSitesPublisher,
     pub walrus_sites_package_id: ObjectID,
     pub sui_execute_client: SuiClient,
+    pub sites_config: WithTempDir<(Config, PathBuf)>,
 }
 
 #[allow(dead_code)]
@@ -159,14 +163,85 @@ impl WalrusSitesClusterState {
             })
             .expect("Expected published object change");
 
+        let read_client = admin_wallet_with_client.inner.sui_client().read_client();
+        // Create walrus config
+        let walrus_config = {
+            // TODO: create Config structs instead of files.
+            let walrus_config = read_client.contract_config();
+            let temp_dir = TempDir::new().expect("able to create a temporary directory");
+            let walrus_config_path = temp_dir
+                .path()
+                .to_path_buf()
+                .join("walrus_client_config.yaml");
+            println!("walrus_config_path: {walrus_config_path:?}");
+            // tokio::time::sleep(std::time::Duration::from_secs(300)).await;
+            let mut walrus_yaml_file = File::create(walrus_config_path.as_path())?;
+            serde_yaml::to_writer(&mut walrus_yaml_file, &walrus_config)?;
+            WithTempDir {
+                inner: (walrus_config, walrus_config_path.clone()),
+                temp_dir,
+            }
+        };
+
+        // Create sites_config
+        let sites_config = {
+            let temp_dir = TempDir::new().expect("able to create a temporary directory");
+            let sites_config_path = temp_dir.path().to_path_buf().join("sites-config.yaml");
+            let rpc_url = sui_cluster_handle.lock().await.rpc_url();
+            let wallet_path = admin_wallet_with_client
+                .temp_dir
+                .path()
+                .to_path_buf()
+                .join("wallet_config.yaml");
+            println!("rpc_url: {rpc_url}");
+            println!("wallet_path: {}", wallet_path.to_str().unwrap());
+
+            let sites_config = Config {
+                portal: "".to_string(),
+                package: walrus_sites_package_id,
+                general: GeneralArgs {
+                    rpc_url: Some(rpc_url),
+                    wallet: Some(wallet_path),
+                    walrus_config: Some(walrus_config.inner.1.clone()),
+                    ..Default::default()
+                },
+                staking_object: Some(read_client.get_staking_object_id()),
+            };
+            let mut file = File::create(sites_config_path.as_path())?;
+            serde_yaml::to_writer(&mut file, &sites_config)?;
+            // TODO: This should probably be done in localnode.
+            // Config created:
+            // ```
+            // portal: ''
+            // package: 0x1399dde83b06a80b2eb65f4c529596141bb0723411ce8386d8b2fea1c4cf6f28
+            // general:
+            //   rpc_url: http://127.0.0.1:62139
+            //   wallet: <tmp-dir>/wallet_config.yaml
+            //   wallet_env: null
+            //   wallet_address: null
+            //   walrus_context: null
+            //   walrus_binary: walrus
+            //   walrus_config: <tmp-dir>/walrus_client_config.yaml
+            //   walrus_package: null
+            //   gas_budget: 500000000
+            // staking_object: 0x992a12ab8fe6d1530bed5832c2875064a40d404c53a00357cc61ffd2cbbe8382
+            // ```
+            WithTempDir {
+                inner: (sites_config, sites_config_path),
+                temp_dir,
+            }
+        };
+
         Ok(WalrusSitesClusterState {
             sui_cluster_handle,
             walrus_cluster,
             admin_wallet_with_client,
             system_context,
+            walrus_config,
             walrus_sites_publisher: WalrusSitesPublisher::FromSuiClusterHandle(publisher),
             walrus_sites_package_id,
             sui_execute_client,
+            sites_config,
         })
     }
 }
