@@ -410,7 +410,7 @@ fn print_summary(
 ///
 /// # Example
 ///
-/// ```rust,ignore
+/// ```no_run
 /// persist_site_identifier(&self.edit_options.site_id, &site_manager, &response, ws_resources, &path_for_saving)?;
 /// ```
 fn persist_site_identifier(
