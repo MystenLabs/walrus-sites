@@ -13,11 +13,16 @@ inputs:
     SUI_NETWORK:
         description: The Sui network to use
         default: mainnet
+    CONTEXT:
+      description: The Walrus context
+      required: true
+    EPOCHS:
+        description: Epochs to keep
+        required: false
+        default: "5"
 
 runs:
     using: "composite"
-    env:
-      NO_COLOR: 1
     steps:
         - name: Checkout to the walrus site repo
           uses: actions/checkout@v4 # pin@v4
@@ -32,17 +37,21 @@ runs:
               cache: "pnpm"
         - name: Install dependencies
           run: pnpm install --frozen-lockfile
+          shell: bash
         - name: Build
           run: pnpm build
+          shell: bash
         - name: Setup Walrus
           uses: "MystenLabs/walrus/.github/actions/set-up-walrus/@ae35f928a5e214df7f22796e9375d575a8c0ca09" # pin@main
           with:
-              SUI_ADDRESS: "${{ vars.SUI_ADDRESS }}"
-              SUI_KEYSTORE: "${{ secrets.SUI_KEYSTORE }}"
-              WALRUS_CONFIG: "${{ vars.WALRUS_CONFIG }}"
+              SUI_ADDRESS: "${{ inputs.SUI_ADDRESS }}"
+              SUI_KEYSTORE: "${{ inputs.SUI_KEYSTORE }}"
+              WALRUS_CONFIG: "${{ inputs.WALRUS_CONFIG }}"
         - name: "Publish the site"
           run: >
               site-builder publish dist
-              --context=${{ vars.CONTEXT }}
-              --epochs ${{ vars.EPOCHS }}
+              --context=${{ inputs.CONTEXT }}
+              --epochs ${{ inputs.EPOCHS }}
               --force
+          shell: bash
+
