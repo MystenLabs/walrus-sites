@@ -53,6 +53,5 @@ runs:
           run: >
               site-builder publish dist
               --epochs ${{ inputs.EPOCHS }}
-              --force
           shell: bash
 
