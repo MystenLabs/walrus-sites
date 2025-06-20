@@ -1,0 +1,48 @@
+name: "Deploy Walrus Site"
+description: "Deploys a site to Walrus and publishes it as a webpage"
+inputs:
+    SUI_ADDRESS:
+        description: The Sui address to use
+        required: true
+    SUI_KEYSTORE:
+        description: The content of the Sui keystore file
+        required: true
+    WALRUS_CONFIG:
+        description: The content of the Walrus configuration file
+        required: true
+    SUI_NETWORK:
+        description: The Sui network to use
+        default: mainnet
+
+runs:
+    using: "composite"
+    env:
+      NO_COLOR: 1
+    steps:
+        - name: Checkout to the walrus site repo
+          uses: actions/checkout@v4 # pin@v4
+        - name: Setup pnpm
+          uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # pin@v4
+          with:
+              version: 9.9.0
+        - name: Setup node
+          uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # pin@v4
+          with:
+              node-version: 22
+              cache: "pnpm"
+        - name: Install dependencies
+          run: pnpm install --frozen-lockfile
+        - name: Build
+          run: pnpm build
+        - name: Setup Walrus
+          uses: "MystenLabs/walrus/.github/actions/set-up-walrus/@ae35f928a5e214df7f22796e9375d575a8c0ca09" # pin@main
+          with:
+              SUI_ADDRESS: "${{ vars.SUI_ADDRESS }}"
+              SUI_KEYSTORE: "${{ secrets.SUI_KEYSTORE }}"
+              WALRUS_CONFIG: "${{ vars.WALRUS_CONFIG }}"
+        - name: "Publish the site"
+          run: >
+              site-builder publish dist
+              --context=${{ vars.CONTEXT }}
+              --epochs ${{ vars.EPOCHS }}
+              --force
