@@ -52,7 +52,7 @@ runs:
               WALRUS_CONFIG: "${{ inputs.WALRUS_CONFIG }}"
         - name: "Publish the site"
           run: >
-              site-builder publish ${{ inputs.SITE_PATH }}
+              site-builder publish ${{ inputs.SITE_PATH }}/dist
               --context=${{ inputs.CONTEXT }}
               --epochs ${{ inputs.EPOCHS }}
               --force
