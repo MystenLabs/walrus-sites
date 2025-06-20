@@ -37,7 +37,6 @@ runs:
           uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # pin@v4
           with:
               node-version: 22
-              cache: "pnpm"
         - name: Install dependencies
           working-directory: ${{ inputs.SITE_FOLDER }}
           run: pnpm install --frozen-lockfile
