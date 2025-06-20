@@ -56,8 +56,10 @@ runs:
         - name: "Publish the site"
           working-directory: ${{ inputs.SITE_FOLDER }}
           run: >
-              site-builder publish dist
-              --epochs ${{ inputs.EPOCHS }}  
+              site-builder 
               --config sites-config.yaml
+              publish dist
+              --epochs ${{ inputs.EPOCHS }}  
+
           shell: bash
 
