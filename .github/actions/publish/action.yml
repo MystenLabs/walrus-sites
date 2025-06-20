@@ -16,9 +16,6 @@ inputs:
     SUI_NETWORK:
         description: The Sui network to use
         default: mainnet
-    CONTEXT:
-      description: The Walrus context
-      required: true
     EPOCHS:
         description: Epochs to keep
         required: false
@@ -55,7 +52,6 @@ runs:
           working-directory: ${{ inputs.SITE_FOLDER }}
           run: >
               site-builder publish dist
-              --context=${{ inputs.CONTEXT }}
               --epochs ${{ inputs.EPOCHS }}
               --force
           shell: bash
