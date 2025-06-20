@@ -1,6 +1,9 @@
 name: "Deploy Walrus Site"
 description: "Deploys a site to Walrus and publishes it as a webpage"
 inputs:
+    SITE_PATH:
+      description: Path to the directory with the built site
+      required: true
     SUI_ADDRESS:
         description: The Sui address to use
         required: true
@@ -49,7 +52,7 @@ runs:
               WALRUS_CONFIG: "${{ inputs.WALRUS_CONFIG }}"
         - name: "Publish the site"
           run: >
-              site-builder publish dist
+              site-builder publish ${{ inputs.SITE_PATH }}
               --context=${{ inputs.CONTEXT }}
               --epochs ${{ inputs.EPOCHS }}
               --force
