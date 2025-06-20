@@ -1,7 +1,7 @@
 name: "Deploy Walrus Site"
 description: "Deploys a site to Walrus and publishes it as a webpage"
 inputs:
-    SITE_PATH:
+    SITE_FOLDER:
       description: Path to the directory with the built site
       required: true
     SUI_ADDRESS:
@@ -39,14 +39,12 @@ runs:
               node-version: 22
               cache: "pnpm"
         - name: Install dependencies
-          run: |
-            cd "${{ inputs.SITE_FOLDER }}"
-            pnpm install --frozen-lockfile
+          working-directory: ${{ inputs.SITE_FOLDER }}
+          run: pnpm install --frozen-lockfile
           shell: bash
         - name: Build
-          run: |
-            cd "${{ inputs.SITE_FOLDER }}"
-            pnpm build
+          working-directory: ${{ inputs.SITE_FOLDER }}
+          run: pnpm build
           shell: bash
         - name: Setup Walrus
           uses: "MystenLabs/walrus/.github/actions/set-up-walrus/@ae35f928a5e214df7f22796e9375d575a8c0ca09" # pin@main
@@ -55,8 +53,9 @@ runs:
               SUI_KEYSTORE: "${{ inputs.SUI_KEYSTORE }}"
               WALRUS_CONFIG: "${{ inputs.WALRUS_CONFIG }}"
         - name: "Publish the site"
+          working-directory: ${{ inputs.SITE_FOLDER }}
           run: >
-              site-builder publish ${{ inputs.SITE_PATH }}/dist
+              site-builder publish dist
               --context=${{ inputs.CONTEXT }}
               --epochs ${{ inputs.EPOCHS }}
               --force
