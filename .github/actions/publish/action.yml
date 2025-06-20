@@ -1,0 +1,65 @@
+name: "Deploy Walrus Site"
+description: "Deploys a site to Walrus and publishes it as a webpage"
+inputs:
+    SITE_FOLDER:
+      description: Path to the directory with the built site
+      required: true
+    SUI_ADDRESS:
+        description: The Sui address to use
+        required: true
+    SUI_KEYSTORE:
+        description: The content of the Sui keystore file
+        required: true
+    WALRUS_CONFIG:
+        description: The content of the Walrus configuration file
+        required: true
+    SUI_NETWORK:
+        description: The Sui network to use
+        default: mainnet
+    EPOCHS:
+        description: Epochs to keep
+        required: false
+        default: "5"
+
+runs:
+    using: "composite"
+    steps:
+        - name: Checkout to the walrus site repo
+          uses: actions/checkout@v4 # pin@v4
+        - name: Setup pnpm
+          uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # pin@v4
+          with:
+              version: 9.9.0
+        - name: Setup node
+          uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # pin@v4
+          with:
+              node-version: 22
+        - name: Install dependencies
+          working-directory: ${{ inputs.SITE_FOLDER }}
+          run: pnpm install --frozen-lockfile
+          shell: bash
+        - name: Build
+          working-directory: ${{ inputs.SITE_FOLDER }}
+          run: pnpm build
+          shell: bash
+        - name: Setup Walrus
+          uses: "MystenLabs/walrus/.github/actions/set-up-walrus/@ae35f928a5e214df7f22796e9375d575a8c0ca09" # pin@main
+          with:
+              SUI_ADDRESS: "${{ inputs.SUI_ADDRESS }}"
+              SUI_KEYSTORE: "${{ inputs.SUI_KEYSTORE }}"
+              WALRUS_CONFIG: "${{ inputs.WALRUS_CONFIG }}"
+        - name: Download latest sites-config.yaml
+          working-directory: ${{ inputs.SITE_FOLDER }}
+          run: |
+            curl -L https://raw.githubusercontent.com/MystenLabs/walrus-sites/refs/heads/mainnet/sites-config.yaml -o sites-config.yaml
+          shell: bash
+        - name: "Publish the site"
+          working-directory: ${{ inputs.SITE_FOLDER }}
+          run: >
+              site-builder 
+              --config sites-config.yaml
+              publish dist
+              --epochs ${{ inputs.EPOCHS }}  
+
+          shell: bash
+
