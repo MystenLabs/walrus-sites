@@ -48,10 +48,16 @@ runs:
               SUI_ADDRESS: "${{ inputs.SUI_ADDRESS }}"
               SUI_KEYSTORE: "${{ inputs.SUI_KEYSTORE }}"
               WALRUS_CONFIG: "${{ inputs.WALRUS_CONFIG }}"
+        - name: Download latest sites-config.yaml
+          working-directory: ${{ inputs.SITE_FOLDER }}
+          run: |
+            curl -L https://raw.githubusercontent.com/MystenLabs/walrus-sites/refs/heads/mainnet/sites-config.yaml -o sites-config.yaml
+          shell: bash
         - name: "Publish the site"
           working-directory: ${{ inputs.SITE_FOLDER }}
           run: >
               site-builder publish dist
-              --epochs ${{ inputs.EPOCHS }}
+              --epochs ${{ inputs.EPOCHS }}  
+              --config sites-config.yaml
           shell: bash
 
