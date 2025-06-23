@@ -201,6 +201,7 @@ pub async fn new_wallet_with_sui_and_wal(
     sui_cluster_handle: Arc<TokioMutex<TestClusterHandle>>,
     walrus_sui_client: &SuiContractClient,
 ) -> anyhow::Result<WithTempDir<Wallet>> {
+    #[allow(clippy::inconsistent_digit_grouping)]
     const WAL_FUND: u64 = 1000_000_000_000;
 
     let mut test_wallet = new_wallet_on_sui_test_cluster(sui_cluster_handle.clone()).await?;
