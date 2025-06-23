@@ -4,7 +4,7 @@
 mod localnode;
 use std::{num::NonZeroU32, path::PathBuf};
 
-use localnode::WalrusSitesClusterState;
+use localnode::TestSetup;
 use site_builder::args::{
     default,
     Commands,
@@ -18,19 +18,13 @@ use site_builder::args::{
 // Important: For tests to pass, the system they are running on need to have walrus installed.
 #[tokio::test]
 async fn publish_snake() -> anyhow::Result<()> {
-    let cluster = WalrusSitesClusterState::new().await?;
+    let cluster = TestSetup::new().await?;
     let directory = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
         .join("examples")
         .join("snake");
     let ws_resources = directory.join("ws-resources.json");
-
-    // use tokio::io::AsyncBufReadExt;
-    // tokio::io::BufReader::new(tokio::io::stdin())
-    //     .read_line(&mut String::new())
-    //     .await
-    //     .unwrap();
 
     site_builder::run(
         Some(cluster.sites_config.inner.1),

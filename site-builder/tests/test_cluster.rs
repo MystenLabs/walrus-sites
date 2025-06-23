@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod localnode;
-use localnode::{WalrusSitesClusterState, WalrusSitesPublisher};
+use localnode::{TestSetup, WalrusSitesClusterState};
 
 // Running this in `opt-level = 0` mode can fail with:
 // ```
@@ -11,15 +11,23 @@ use localnode::{WalrusSitesClusterState, WalrusSitesPublisher};
 // ```
 #[tokio::test]
 async fn start_walrus_sites_cluster() -> anyhow::Result<()> {
-    let WalrusSitesClusterState {
-        walrus_sites_publisher: WalrusSitesPublisher::FromSuiClusterHandle(publisher),
+    let TestSetup {
+        cluster_state:
+            WalrusSitesClusterState {
+                mut walrus_sites_publisher,
+                ..
+            },
         walrus_sites_package_id,
-        ..
-    } = WalrusSitesClusterState::new().await?;
+        sites_config,
+    } = TestSetup::new().await?;
     println!(
         r#"Published walrus_sites
 - at {walrus_sites_package_id}
-- from the address {publisher} which is generated during Sui Cluster initialization."#
+- from the address {} which is generated during Sui Cluster initialization.
+- Sites config:
+{}"#,
+        walrus_sites_publisher.inner.active_address()?,
+        serde_yaml::to_string(&sites_config.inner.0)?
     );
     Ok(())
 }
