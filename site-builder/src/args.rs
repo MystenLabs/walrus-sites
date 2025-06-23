@@ -30,11 +30,13 @@ pub struct GeneralArgs {
     ///
     /// Can be specified as a CLI argument or in the config.
     #[arg(long)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub rpc_url: Option<String>,
     /// The path to the Sui Wallet config.
     ///
     /// Can be specified as a CLI argument or in the config.
     #[arg(long)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub wallet: Option<PathBuf>,
     /// The env to be used for the Sui wallet.
     ///
@@ -42,6 +44,7 @@ pub struct GeneralArgs {
     /// If the wallet env is also not specified in the config, the env configured in the Sui client
     /// will be used.
     #[arg(long)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub wallet_env: Option<String>,
     /// The address to be used for the Sui wallet.
     ///
@@ -49,12 +52,14 @@ pub struct GeneralArgs {
     /// used. If the wallet address is also not specified in the config, the address configured in
     /// the Sui client will be used.
     #[arg(long)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub wallet_address: Option<SuiAddress>,
     /// The context that will be passed to the Walrus binary.
     ///
     /// If not specified, the Walrus context specified in the sites-config will be
     /// used. If it is also not specified in the config, no context will be passed.
     #[arg(long)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub walrus_context: Option<String>,
     /// The path or name of the walrus binary.
     ///
@@ -68,11 +73,13 @@ pub struct GeneralArgs {
     /// This will be passed to the calls to the Walrus binary.
     /// Can be specified as a CLI argument or in the config.
     #[arg(long)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub walrus_config: Option<PathBuf>,
     /// The package ID of the Walrus package on the selected network.
     ///
     /// This is currently only used for the `sitemap` command.
     #[arg(long)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub walrus_package: Option<ObjectID>,
     /// The gas budget for the operations on Sui.
     ///

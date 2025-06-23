@@ -32,6 +32,7 @@ pub struct Config {
     pub package: ObjectID,
     #[serde(default)]
     pub general: GeneralArgs,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub staking_object: Option<ObjectID>,
 }
 
