@@ -1,6 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#[allow(dead_code)]
 mod localnode;
 use localnode::{TestSetup, WalrusSitesClusterState};
 
@@ -20,7 +21,7 @@ async fn start_walrus_sites_cluster() -> anyhow::Result<()> {
         walrus_sites_package_id,
         sites_config,
         ..
-    } = TestSetup::new().await?;
+    } = TestSetup::start_local_test_cluster().await?;
     println!(
         r#"Published walrus_sites
 - at {walrus_sites_package_id}

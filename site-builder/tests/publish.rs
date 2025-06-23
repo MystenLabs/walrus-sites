@@ -1,24 +1,18 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-mod localnode;
-use std::{num::NonZeroU32, path::PathBuf};
+use std::path::PathBuf;
 
-use localnode::TestSetup;
-use site_builder::args::{
-    default,
-    Commands,
-    EpochArg,
-    EpochCountOrMax,
-    GeneralArgs,
-    PublishOptions,
-    WalrusStoreOptions,
-};
+use site_builder::args::{Commands, EpochCountOrMax, GeneralArgs};
+
+#[allow(dead_code)]
+mod localnode;
+use localnode::{PublishOptionsBuilder, TestSetup};
 
 // Important: For tests to pass, the system they are running on need to have walrus installed.
 #[tokio::test]
 async fn publish_snake() -> anyhow::Result<()> {
-    let cluster = TestSetup::new().await?;
+    let cluster = TestSetup::start_local_test_cluster().await?;
     let directory = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
@@ -31,22 +25,11 @@ async fn publish_snake() -> anyhow::Result<()> {
         None,
         GeneralArgs::default(),
         Commands::Publish {
-            publish_options: PublishOptions {
-                directory,
-                list_directory: false,
-                max_concurrent: None,
-                max_parallel_stores: default::max_parallel_stores(),
-                walrus_options: WalrusStoreOptions {
-                    ws_resources: Some(ws_resources),
-                    epoch_arg: EpochArg {
-                        epochs: Some(EpochCountOrMax::Epochs(NonZeroU32::new(1).unwrap())),
-                        earliest_expiry_time: None,
-                        end_epoch: None,
-                    },
-                    permanent: false,
-                    dry_run: false,
-                },
-            },
+            publish_options: PublishOptionsBuilder::default()
+                .with_directory(directory)
+                .with_ws_resources(Some(ws_resources))
+                .with_epoch_count_or_max(EpochCountOrMax::Max)
+                .build()?,
             site_name: None,
         },
     )

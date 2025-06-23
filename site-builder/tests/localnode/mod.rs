@@ -34,6 +34,10 @@ use walrus_sui::{
 use walrus_test_utils::WithTempDir;
 
 #[allow(dead_code)]
+mod publish_options_builder;
+#[allow(unused_imports)]
+pub use publish_options_builder::PublishOptionsBuilder;
+
 pub struct WalrusSitesClusterState {
     // TODO: Specify if this is indeed the walrus publisher
     pub admin_wallet_with_client: WithTempDir<WalrusSDKClient<SuiContractClient>>,
@@ -43,7 +47,6 @@ pub struct WalrusSitesClusterState {
     pub walrus_sites_publisher: WithTempDir<Wallet>,
 }
 
-#[allow(dead_code)]
 pub struct TestSetup {
     pub cluster_state: WalrusSitesClusterState,
     pub client: SuiClient,
@@ -53,10 +56,8 @@ pub struct TestSetup {
     pub walrus_sites_package_id: ObjectID,
 }
 
-#[allow(dead_code)]
 impl TestSetup {
-    // It is a little messy but it gets the job done for now
-    pub async fn new() -> anyhow::Result<Self> {
+    pub async fn start_local_test_cluster() -> anyhow::Result<Self> {
         let (sui_cluster_handle, walrus_cluster, walrus_sui_admin, system_context) =
             test_cluster::E2eTestSetupBuilder::new().build().await?;
         let rpc_url = sui_cluster_handle.as_ref().lock().await.rpc_url();
@@ -76,7 +77,6 @@ impl TestSetup {
         let test_wallet =
             new_wallet_with_sui_and_wal(sui_cluster_handle.clone(), walrus_sui_client).await?;
 
-        // Create sites_config
         let sites_config = create_sites_config(
             test_wallet.inner.get_config_path().to_path_buf(),
             walrus_sites_package_id,
@@ -97,20 +97,6 @@ impl TestSetup {
             walrus_config,
             walrus_sites_package_id,
         })
-
-        // Ok(WalrusSitesClusterState {
-        //     sui_cluster_handle: sui_cluster_handle.clone(),
-        //     walrus_cluster,
-        //     admin_wallet_with_client: walrus_sui_client,
-        //     system_context,
-        //     walrus_config,
-        //     walrus_sites_publisher: WalrusSitesPublisher::FromSuiClusterHandle(
-        //         load_wallet_context_from_path(Some(path.as_path()), None)?.active_address()?,
-        //     ),
-        //     walrus_sites_package_id,
-        //     sui_execute_client: sui_client,
-        //     sites_config,
-        // })
     }
 }
 
@@ -153,8 +139,8 @@ async fn publish_walrus_sites(
         ],
     );
     builder.transfer_arg(wallet_active_address, upgrade_cap);
-
     let pt = builder.finish();
+
     let tx_data = TransactionData::new_programmable(
         wallet_active_address,
         gas_data.into_iter().map(|c| c.object_ref()).collect(),
@@ -215,14 +201,12 @@ pub fn create_walrus_config(
     walrus_sui_client: &SuiContractClient,
 ) -> anyhow::Result<WithTempDir<(ContractConfig, PathBuf)>> {
     let read_client = walrus_sui_client.read_client();
-    // TODO: create Config structs instead of files.
     let walrus_config = read_client.contract_config();
     let temp_dir = TempDir::new().expect("able to create a temporary directory");
     let walrus_config_path = temp_dir
         .path()
         .to_path_buf()
         .join("walrus_client_config.yaml");
-    // tokio::time::sleep(std::time::Duration::from_secs(300)).await;
     let mut walrus_yaml_file = File::create(walrus_config_path.as_path())?;
     serde_yaml::to_writer(&mut walrus_yaml_file, &walrus_config)?;
     Ok(WithTempDir {
@@ -251,34 +235,8 @@ pub fn create_sites_config(
     };
     let mut file = File::create(sites_config_path.as_path())?;
     serde_yaml::to_writer(&mut file, &sites_config)?;
-    // TODO: This should probably be done in localnode.
-    // Config created:
-    // ```
-    // portal: ''
-    // package: 0x1399dde83b06a80b2eb65f4c529596141bb0723411ce8386d8b2fea1c4cf6f28
-    // general:
-    //   rpc_url: http://127.0.0.1:62139
-    //   wallet: <tmp-dir>/wallet_config.yaml
-    //   wallet_env: null
-    //   wallet_address: null
-    //   walrus_context: null
-    //   walrus_binary: walrus
-    //   walrus_config: <tmp-dir>/walrus_client_config.yaml
-    //   walrus_package: null
-    //   gas_budget: 500000000
-    // staking_object: 0x992a12ab8fe6d1530bed5832c2875064a40d404c53a00357cc61ffd2cbbe8382
-    // ```
     Ok(WithTempDir {
         inner: (sites_config, sites_config_path),
         temp_dir,
     })
 }
-
-// TODO: use a new address for walrus-sites publisher, instead of the first address in the
-// test-cluster.
-// async fn get_addresses_from_local(cluster: &TestClusterHandle) -> Vec<SuiAddress> {
-//     let walrus_sui::test_utils::LocalOrExternalTestCluster::Local { cluster } = cluster.cluster() else {
-//         panic!("Expected Local cluster")
-//     };
-//     cluster.get_addresses()
-// }
