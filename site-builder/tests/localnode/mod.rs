@@ -60,7 +60,7 @@ impl TestSetup {
         let (sui_cluster_handle, walrus_cluster, walrus_sui_admin, system_context) =
             test_cluster::E2eTestSetupBuilder::new().build().await?;
         let rpc_url = sui_cluster_handle.as_ref().lock().await.rpc_url();
-        let sui_client = SuiClientBuilder::default().build(rpc_url.clone()).await?;
+        let sui_client = SuiClientBuilder::default().build(rpc_url).await?;
 
         // ================================= Publish Walrus-Sites ==================================
         let mut walrus_sites_publisher =
@@ -78,11 +78,9 @@ impl TestSetup {
 
         // Create sites_config
         let sites_config = create_sites_config(
-            rpc_url,
             test_wallet.inner.get_config_path().to_path_buf(),
             walrus_sites_package_id,
             walrus_config.inner.1.clone(),
-            walrus_sui_client.read_client().get_staking_object_id(),
         )?;
 
         Ok(TestSetup {
@@ -233,11 +231,9 @@ pub fn create_walrus_config(
 }
 
 pub fn create_sites_config(
-    rpc_url: String,
     wallet_path: PathBuf,
     walrus_sites_package_id: ObjectID,
     walrus_config_path: PathBuf,
-    staking_object: ObjectID,
 ) -> anyhow::Result<WithTempDir<(SitesConfig, PathBuf)>> {
     let temp_dir = TempDir::new().expect("able to create a temporary directory");
     let sites_config_path = temp_dir.path().to_path_buf().join("sites-config.yaml");
@@ -246,14 +242,11 @@ pub fn create_sites_config(
         portal: "".to_string(),
         package: walrus_sites_package_id,
         general: GeneralArgs {
-            // Do I need this?
-            rpc_url: Some(rpc_url),
             wallet: Some(wallet_path),
             walrus_config: Some(walrus_config_path),
             ..Default::default()
         },
-        // TODO: DO I need this?
-        staking_object: Some(staking_object),
+        staking_object: None,
     };
     let mut file = File::create(sites_config_path.as_path())?;
     serde_yaml::to_writer(&mut file, &sites_config)?;

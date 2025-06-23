@@ -19,6 +19,7 @@ async fn start_walrus_sites_cluster() -> anyhow::Result<()> {
             },
         walrus_sites_package_id,
         sites_config,
+        ..
     } = TestSetup::new().await?;
     println!(
         r#"Published walrus_sites
