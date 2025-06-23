@@ -151,11 +151,13 @@ impl RetriableSuiClient {
     }
 
     /// Returns a reference to the inner backoff configuration.
+    #[allow(dead_code)]
     pub fn backoff_config(&self) -> &ExponentialBackoffConfig {
         &self.backoff_config
     }
 
     /// Creates a new retriable client from an RCP address.
+    #[allow(dead_code)]
     pub async fn new_for_rpc<S: AsRef<str>>(
         rpc_address: S,
         backoff_config: ExponentialBackoffConfig,
@@ -180,6 +182,7 @@ impl RetriableSuiClient {
     /// Return a list of coins for the given address, or an error upon failure.
     ///
     /// Calls [`sui_sdk::apis::CoinReadApi::select_coins`] internally.
+    #[allow(dead_code)]
     #[tracing::instrument(level = Level::DEBUG, skip_all)]
     pub async fn select_coins(
         &self,
@@ -200,6 +203,7 @@ impl RetriableSuiClient {
     /// Returns the balance for the given coin type owned by address.
     ///
     /// Calls [`sui_sdk::apis::CoinReadApi::get_balance`] internally.
+    #[allow(dead_code)]
     #[tracing::instrument(level = Level::DEBUG, skip_all)]
     pub async fn get_balance(
         &self,
@@ -298,6 +302,7 @@ impl RetriableSuiClient {
     /// Return a list of [SuiObjectResponse] from the given vector of [ObjectID]s.
     ///
     /// Calls [`sui_sdk::apis::ReadApi::multi_get_object_with_options`] internally.
+    #[allow(dead_code)]
     #[tracing::instrument(level = Level::DEBUG, skip_all)]
     pub async fn multi_get_object_with_options(
         &self,
@@ -317,6 +322,7 @@ impl RetriableSuiClient {
     ///
     /// Internally calls the [`SuiClient::event_api`] function. Note that no retries are
     /// implemented for this function.
+    #[allow(dead_code)]
     pub fn event_api(&self) -> &EventApi {
         self.sui_client.event_api()
     }
@@ -342,6 +348,7 @@ impl RetriableSuiClient {
     }
 
     /// Gets the type origin map for a given package.
+    #[allow(dead_code)]
     pub(crate) async fn type_origin_map_for_package(
         &self,
         package_id: ObjectID,

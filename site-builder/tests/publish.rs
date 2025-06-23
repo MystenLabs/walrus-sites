@@ -14,11 +14,10 @@ use site_builder::args::{
     PublishOptions,
     WalrusStoreOptions,
 };
-use tokio::io::AsyncBufReadExt;
 
 // Important: For tests to pass, the system they are running on need to have walrus installed.
 #[tokio::test]
-async fn snake() -> anyhow::Result<()> {
+async fn publish_snake() -> anyhow::Result<()> {
     let cluster = WalrusSitesClusterState::new().await?;
     let directory = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -27,10 +26,11 @@ async fn snake() -> anyhow::Result<()> {
         .join("snake");
     let ws_resources = directory.join("ws-resources.json");
 
-    tokio::io::BufReader::new(tokio::io::stdin())
-        .read_line(&mut String::new())
-        .await
-        .unwrap();
+    // use tokio::io::AsyncBufReadExt;
+    // tokio::io::BufReader::new(tokio::io::stdin())
+    //     .read_line(&mut String::new())
+    //     .await
+    //     .unwrap();
 
     site_builder::run(
         Some(cluster.sites_config.inner.1),
