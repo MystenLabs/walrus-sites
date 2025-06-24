@@ -1,0 +1,25 @@
+name: publish snake
+on:
+  workflow_dispatch:
+    inputs:
+      SUI_NETWORK:
+        description: 'Sui network to use'
+        required: true
+        default: 'testnet'
+      SUI_ADDRESS:
+        description: 'Sui address to deploy from'
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: deploy site
+        uses: MystenLabs/walrus-sites/.github/actions/publish@SEW-154-add-gh-action-to-publish
+        with:
+          SUI_NETWORK: ${{ inputs.SUI_NETWORK }}
+          SUI_ADDRESS: ${{ inputs.SUI_ADDRESS }}
+          SUI_KEYSTORE: ${{ secrets.SUI_KEYSTORE }}
+          DIST_FOLDER: examples/snake
+          EPOCHS: 1
