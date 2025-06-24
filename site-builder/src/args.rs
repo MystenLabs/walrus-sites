@@ -23,6 +23,24 @@ use crate::{
     walrus::output::EpochCount,
 };
 
+#[derive(Parser, Debug)]
+#[command(rename_all = "kebab-case")]
+pub struct ArgsInner {
+    /// The path to the configuration file for the site builder.
+    #[arg(short, long)]
+    pub config: Option<PathBuf>,
+    /// The context with which to load the configuration.
+    ///
+    /// If specified, the context will be taken from the config file. Otherwise, the default
+    /// context, which is also specified in the config file, will be used.
+    #[arg(long)]
+    pub context: Option<String>,
+    #[clap(flatten)]
+    pub general: GeneralArgs,
+    #[command(subcommand)]
+    pub command: Commands,
+}
+
 #[derive(Parser, Clone, Debug, Deserialize, Serialize)]
 #[command(rename_all = "kebab-case")]
 pub struct GeneralArgs {

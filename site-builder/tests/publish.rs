@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-use site_builder::args::{Commands, EpochCountOrMax, GeneralArgs};
+use site_builder::args::{ArgsInner, Commands, EpochCountOrMax, GeneralArgs};
 
 #[allow(dead_code)]
 mod localnode;
@@ -20,11 +20,11 @@ async fn publish_snake() -> anyhow::Result<()> {
         .join("snake");
     let ws_resources = directory.join("ws-resources.json");
 
-    site_builder::run(
-        Some(cluster.sites_config.inner.1),
-        None,
-        GeneralArgs::default(),
-        Commands::Publish {
+    let args = ArgsInner {
+        config: Some(cluster.sites_config.inner.1),
+        context: None,
+        general: GeneralArgs::default(),
+        command: Commands::Publish {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory)
                 .with_ws_resources(Some(ws_resources))
@@ -32,8 +32,8 @@ async fn publish_snake() -> anyhow::Result<()> {
                 .build()?,
             site_name: None,
         },
-    )
-    .await?;
+    };
+    site_builder::run(args).await?;
 
     Ok(())
 }

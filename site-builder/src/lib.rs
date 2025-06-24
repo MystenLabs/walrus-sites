@@ -4,7 +4,7 @@
 use std::{num::NonZeroUsize, path::PathBuf};
 
 use anyhow::anyhow;
-use args::{Commands, GeneralArgs};
+use args::{ArgsInner, Commands};
 use config::Config;
 use preprocessor::Preprocessor;
 use publish::{load_ws_resources, BlobManagementOptions, ContinuousEditing, SiteEditor};
@@ -34,13 +34,8 @@ mod walrus;
 /// The default path to the configuration file for the site builder.
 const SITES_CONFIG_NAME: &str = "./sites-config.yaml";
 
-pub async fn run(
-    config: Option<PathBuf>,
-    context: Option<String>,
-    general: GeneralArgs,
-    command: Commands,
-) -> anyhow::Result<()> {
-    run_internal(config, context, general, command)
+pub async fn run(inner_args: ArgsInner) -> anyhow::Result<()> {
+    run_internal(inner_args)
         .await
         .inspect_err(|_| display::error("Error during execution"))
 }
@@ -48,14 +43,12 @@ pub async fn run(
 // `Args` can currently only live in `main`, as it needs the `VERSION` constant which is created
 // using `bin_version::bin_version!();` which can only run in `main`.
 async fn run_internal(
-    config: Option<PathBuf>,
-    // The context with which to load the configuration.
-    //
-    // If specified, the context will be taken from the config file. Otherwise, the default
-    // context, which is also specified in the config file, will be used.
-    context: Option<String>,
-    general: GeneralArgs,
-    command: Commands,
+    ArgsInner {
+        config,
+        context,
+        general,
+        command,
+    }: ArgsInner,
 ) -> anyhow::Result<()> {
     let config_path = path_or_defaults_if_exist(config.as_deref(), &sites_config_default_paths())
         .ok_or(anyhow!(

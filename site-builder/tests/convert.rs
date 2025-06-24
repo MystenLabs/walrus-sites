@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use site_builder::args::GeneralArgs;
+use site_builder::args::{ArgsInner, GeneralArgs};
 use sui_types::base_types::ObjectID;
 
 #[allow(dead_code)]
@@ -13,14 +13,14 @@ use localnode::TestSetup;
 async fn converts_random_site_id() -> anyhow::Result<()> {
     let cluster = TestSetup::start_local_test_cluster().await?;
 
-    site_builder::run(
-        Some(cluster.sites_config.inner.1),
-        None,
-        GeneralArgs::default(),
-        site_builder::args::Commands::Convert {
+    let args = ArgsInner {
+        config: Some(cluster.sites_config.inner.1),
+        context: None,
+        general: GeneralArgs::default(),
+        command: site_builder::args::Commands::Convert {
             object_id: ObjectID::random(),
         },
-    )
-    .await?;
+    };
+    site_builder::run(args).await?;
     Ok(())
 }
