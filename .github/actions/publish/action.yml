@@ -47,7 +47,7 @@ runs:
             if [[ -n "${{ inputs.WALRUS_CONFIG }}" ]]; then
               CONFIG_CONTENT="${{ inputs.WALRUS_CONFIG }}"
             else
-              CONFIG_CONTENT=$(curl -sL https://raw.githubusercontent.com/MystenLabs/walrus/refs/heads/main/setup/client_config_${{ inputs.SUI_NETWORK }}.yaml)
+              CONFIG_CONTENT=$(curl -sL https://raw.githubusercontent.com/MystenLabs/walrus/refs/heads/main/setup/client_config.yaml)
             fi
             EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
             echo "walrus_config<<$EOF" >> "$GITHUB_OUTPUT"
@@ -70,7 +70,7 @@ runs:
             if [[ -n "${{ inputs.SITES_CONFIG }}" ]]; then
               echo "${{ inputs.SITES_CONFIG }}" > sites-config.yaml
             else
-              curl -sL https://raw.githubusercontent.com/MystenLabs/walrus-sites/refs/heads/mainnet/sites-config.${{ inputs.SUI_NETWORK }}-singleton.yaml -o sites-config.yaml
+              curl -sL https://raw.githubusercontent.com/MystenLabs/walrus-sites/refs/heads/mainnet/sites-config.yaml -o sites-config.yaml
             fi
           shell: bash
         - name: "Deploy the site"
