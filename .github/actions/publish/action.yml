@@ -63,13 +63,13 @@ runs:
             ${{ inputs.SITE_BUILD_COMMANDS }}
           shell: bash
         - name: Prepare Sites Config
-          shell: bash
           run: |
             if [[ -n "${{ inputs.SITES_CONFIG }}" ]]; then
               echo "${{ inputs.SITES_CONFIG }}" > sites-config.yaml
             else
               curl -sL https://raw.githubusercontent.com/MystenLabs/walrus-sites/refs/heads/mainnet/sites-config.yaml -o sites-config.yaml
             fi
+          shell: bash
         - name: "Deploy the site"
           run: |
             ARGS=(
@@ -82,3 +82,28 @@ runs:
             fi
             site-builder "${ARGS[@]}"
           shell: bash
+        - name: Detect changes to the ws-resources file
+          id: file_change
+          run: |
+            git config --global user.name "github-actions"
+            git config --global user.email "github-actions@github.com"
+            if ! git diff --quiet HEAD -- ${{ inputs.WS_RESOURCES }}; then
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+            fi
+          shell: bash
+        - name: Commit and Push changes
+          if: steps.file_change.outputs.changed == 'true'
+          run: |
+            git add ${{ inputs.WS_RESOURCES }}
+            git commit -m "Update ${{ inputs.WS_RESOURCES }} with the site object ID"
+            git push origin HEAD:update-ws_resources-${{ github.run_id }}
+        - name: Create Pull Request
+          if: steps.file_change.outputs.changed == 'true'
+          uses: peter-evans/create-pull-request@v6
+          with:
+            token: ${{ secrets.GITHUB_TOKEN }}
+            branch: update-ws_resources-${{ github.run_id }}
+            title: "ci: Update ${{ inputs.WS_RESOURCES }} to include site object ID"
+            body: "This PR was created because `object_id` field was appened to ${{ inputs.WS_RESOURCES }}"
