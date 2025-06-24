@@ -1,9 +1,11 @@
 name: deploy snake
 on:
-  push:
-    branches:
-      - 'SEW-154-add-gh-action-to-publish'
   workflow_dispatch:
+    inputs:
+      EPOCHS:
+        description: 'Epochs to keep the site alive'
+        required: false
+        default: '1'
 
 jobs:
   deploy:
@@ -13,9 +15,9 @@ jobs:
       - name: deploy site
         uses: MystenLabs/walrus-sites/.github/actions/publish@SEW-154-add-gh-action-to-publish
         with:
-          SUI_NETWORK: testnet
-          SUI_ADDRESS: ${{ vars.SUI_ADDRESS_TESTNET }}
-          SUI_KEYSTORE: ${{ secrets.SUI_KEYSTORE_TESTNET }}
+          SUI_NETWORK: mainnet
+          SUI_ADDRESS: ${{ vars.SUI_ADDRESS }}
+          SUI_KEYSTORE: ${{ secrets.SUI_KEYSTORE }}
           DIST_FOLDER: examples/snake
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          EPOCHS: 1
+          EPOCHS: ${{ inputs.EPOCHS }}
