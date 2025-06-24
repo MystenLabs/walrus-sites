@@ -25,12 +25,15 @@ inputs:
       description: The content of the sites-config.yaml file. If not provided, it will be downloaded from the walrus-sites repository.
       required: false
     WS_RESOURCES:
-      description: "Path to the ws-resources.json file."
+      description: "Full-path to the 'ws-resources.json' file. Note site-builder defaults to searching for 'ws-resources.json' directly inside the `DIST_FOLDER`."
       required: false
     EPOCHS:
         description: Epochs to keep
         required: false
         default: "5"
+    GITHUB_TOKEN:
+        description: The GITHUB_TOKEN for creating a PR, in case of ws-resources changed during site-publishing. If not provided, the PR creation step will be skipped.
+        required: false
 
 runs:
     using: "composite"
@@ -82,28 +85,39 @@ runs:
             fi
             site-builder "${ARGS[@]}"
           shell: bash
-        - name: Detect changes to the ws-resources file
+        - name: Set ws-resources path
+          id: ws_path
+          if: inputs.GITHUB_TOKEN != ''
+          shell: bash
+          run: |
+            if [[ -n "${{ inputs.WS_RESOURCES }}" ]]; then
+              echo "path=${{ inputs.WS_RESOURCES }}" >> "$GITHUB_OUTPUT"
+            else
+              echo "path=${{ inputs.DIST_FOLDER }}/ws-resources.json" >> "$GITHUB_OUTPUT"
+            fi
+        - name: Detect if there was any change in ws-resources
           id: file_change
+          if: inputs.GITHUB_TOKEN != ''
           run: |
             git config --global user.name "github-actions"
             git config --global user.email "github-actions@github.com"
-            if ! git diff --quiet HEAD -- ${{ inputs.WS_RESOURCES }}; then
+            if ! git diff --quiet HEAD -- ${{ steps.ws_path.outputs.path }}; then
               echo "changed=true" >> "$GITHUB_OUTPUT"
             else
               echo "changed=false" >> "$GITHUB_OUTPUT"
             fi
           shell: bash
         - name: Commit and Push changes
-          if: steps.file_change.outputs.changed == 'true'
+          if: inputs.GITHUB_TOKEN != '' && steps.file_change.outputs.changed == 'true'
           run: |
-            git add ${{ inputs.WS_RESOURCES }}
-            git commit -m "Update ${{ inputs.WS_RESOURCES }} with the site object ID"
-            git push origin HEAD:update-ws_resources-${{ github.run_id }}
+            git add ${{ steps.ws_path.outputs.path }}
+            git commit -m "ci: Update ${{ steps.ws_path.outputs.path }} after deployment"
+            git push origin HEAD:update-ws-resources-${{ github.run_id }}
         - name: Create Pull Request
-          if: steps.file_change.outputs.changed == 'true'
+          if: inputs.GITHUB_TOKEN != '' && steps.file_change.outputs.changed == 'true'
           uses: peter-evans/create-pull-request@v6
           with:
-            token: ${{ secrets.GITHUB_TOKEN }}
-            branch: update-ws_resources-${{ github.run_id }}
-            title: "ci: Update ${{ inputs.WS_RESOURCES }} to include site object ID"
-            body: "This PR was created because `object_id` field was appened to ${{ inputs.WS_RESOURCES }}"
+            token: ${{ inputs.GITHUB_TOKEN }}
+            branch: update-ws-resources-${{ github.run_id }}
+            title: "ci: Update ${{ steps.ws_path.outputs.path }} after deployment"
+            body: "This PR was created because ws-resources file was updated during deployment"

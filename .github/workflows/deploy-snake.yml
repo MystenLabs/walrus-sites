@@ -17,4 +17,5 @@ jobs:
           SUI_ADDRESS: ${{ vars.SUI_ADDRESS_TESTNET }}
           SUI_KEYSTORE: ${{ secrets.SUI_KEYSTORE_TESTNET }}
           DIST_FOLDER: examples/snake
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           EPOCHS: 1
