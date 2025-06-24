@@ -6,7 +6,6 @@ use std::path::PathBuf;
 use site_builder::args::{Args, Commands, GeneralArgs};
 use thiserror::Error;
 
-#[allow(dead_code)]
 pub mod publish_options_builder;
 #[allow(unused_imports)]
 pub use publish_options_builder::PublishOptionsBuilder;

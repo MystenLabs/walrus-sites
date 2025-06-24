@@ -10,7 +10,6 @@ use std::{
 use site_builder::args::{default as sites_default, EpochCountOrMax, PublishOptions};
 use thiserror::Error;
 
-#[allow(dead_code)]
 mod walrus_store_options_builder;
 use walrus_store_options_builder::{InvalidWalrusStoreOptionsConfig, WalrusStoreOptionsBuilder};
 

@@ -33,7 +33,6 @@ use walrus_sui::{
 };
 use walrus_test_utils::WithTempDir;
 
-#[allow(dead_code)]
 pub mod args_builder;
 
 pub struct WalrusSitesClusterState {
