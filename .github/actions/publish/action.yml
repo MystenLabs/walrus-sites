@@ -1,21 +1,32 @@
 name: "Deploy Walrus Site"
 description: "Deploys a site to Walrus and publishes it as a webpage"
 inputs:
-    SITE_FOLDER:
-      description: Path to the directory with the built site
-      required: true
+    # Setup Walrus action inputs:
     SUI_ADDRESS:
-        description: The Sui address to use
+        description: The Sui address to use.
         required: true
     SUI_KEYSTORE:
-        description: The content of the Sui keystore file
+        description: The content of the Sui keystore file.
         required: true
     WALRUS_CONFIG:
-        description: The content of the Walrus configuration file
-        required: true
+        description: The content of the Walrus configuration file. If not provided, it will be downloaded from the Walrus repository.
+        required: false
     SUI_NETWORK:
-        description: The Sui network to use
+        description: The Sui network to use.
         default: mainnet
+    # Deploy site action inputs:
+    DIST_FOLDER:
+      description: Path to the directory with the built site.
+      required: true
+    SITE_BUILD_COMMANDS:
+      description: Any necessary actions to build the site into the `DIST_FOLDER`.
+      required: false
+    SITES_CONFIG:
+      description: The content of the sites-config.yaml file. If not provided, it will be downloaded from the walrus-sites repository.
+      required: false
+    WS_RESOURCES:
+      description: "Path to the ws-resources.json file."
+      required: false
     EPOCHS:
         description: Epochs to keep
         required: false
@@ -26,40 +37,48 @@ runs:
     steps:
         - name: Checkout to the walrus site repo
           uses: actions/checkout@v4 # pin@v4
-        - name: Setup pnpm
-          uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # pin@v4
-          with:
-              version: 9.9.0
-        - name: Setup node
-          uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # pin@v4
-          with:
-              node-version: 22
-        - name: Install dependencies
-          working-directory: ${{ inputs.SITE_FOLDER }}
-          run: pnpm install --frozen-lockfile
+        - name: Prepare Walrus Config
+          id: walrus_config_step
           shell: bash
-        - name: Build
-          working-directory: ${{ inputs.SITE_FOLDER }}
-          run: pnpm build
-          shell: bash
+          run: |
+            if [[ -n "${{ inputs.WALRUS_CONFIG }}" ]]; then
+              CONFIG_CONTENT="${{ inputs.WALRUS_CONFIG }}"
+            else
+              CONFIG_CONTENT=$(curl -sL https://raw.githubusercontent.com/MystenLabs/walrus/refs/heads/main/setup/client_config.yaml)
+            fi
+            EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+            echo "walrus_config<<$EOF" >> "$GITHUB_OUTPUT"
+            echo "$CONFIG_CONTENT" >> "$GITHUB_OUTPUT"
+            echo "$EOF" >> "$GITHUB_OUTPUT"
         - name: Setup Walrus
           uses: "MystenLabs/walrus/.github/actions/set-up-walrus/@ae35f928a5e214df7f22796e9375d575a8c0ca09" # pin@main
           with:
               SUI_ADDRESS: "${{ inputs.SUI_ADDRESS }}"
               SUI_KEYSTORE: "${{ inputs.SUI_KEYSTORE }}"
-              WALRUS_CONFIG: "${{ inputs.WALRUS_CONFIG }}"
-        - name: Download latest sites-config.yaml
-          working-directory: ${{ inputs.SITE_FOLDER }}
+              WALRUS_CONFIG: "${{ steps.walrus_config_step.outputs.walrus_config }}"
+              SUI_NETWORK: "${{ inputs.SUI_NETWORK }}"
+        - name: Build the site
+          if: inputs.SITE_BUILD_COMMANDS != ''
           run: |
-            curl -L https://raw.githubusercontent.com/MystenLabs/walrus-sites/refs/heads/mainnet/sites-config.yaml -o sites-config.yaml
+            ${{ inputs.SITE_BUILD_COMMANDS }}
           shell: bash
-        - name: "Publish the site"
-          working-directory: ${{ inputs.SITE_FOLDER }}
-          run: >
-              site-builder 
+        - name: Prepare Sites Config
+          shell: bash
+          run: |
+            if [[ -n "${{ inputs.SITES_CONFIG }}" ]]; then
+              echo "${{ inputs.SITES_CONFIG }}" > sites-config.yaml
+            else
+              curl -sL https://raw.githubusercontent.com/MystenLabs/walrus-sites/refs/heads/mainnet/sites-config.yaml -o sites-config.yaml
+            fi
+        - name: "Deploy the site"
+          run: |
+            ARGS=(
               --config sites-config.yaml
-              publish dist
-              --epochs ${{ inputs.EPOCHS }}  
-
+              deploy ${{ inputs.DIST_FOLDER }}
+              --epochs "${{ inputs.EPOCHS }}"
+            )
+            if [[ -n "${{ inputs.WS_RESOURCES }}" ]]; then
+              ARGS+=(--ws-resources "${{ inputs.WS_RESOURCES }}")
+            fi
+            site-builder "${ARGS[@]}"
           shell: bash
-
