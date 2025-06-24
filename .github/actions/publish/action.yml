@@ -65,13 +65,10 @@ runs:
           run: |
             ${{ inputs.SITE_BUILD_COMMANDS }}
           shell: bash
-        - name: Prepare Sites Config
+        - name: Prepare Sites Config # If not given, Setup Walrus already downloads and creates the file.
+          if: inputs.SITES_CONFIG != ''
           run: |
-            if [[ -n "${{ inputs.SITES_CONFIG }}" ]]; then
-              echo "${{ inputs.SITES_CONFIG }}" > sites-config.yaml
-            else
-              curl -sL https://raw.githubusercontent.com/MystenLabs/walrus-sites/refs/heads/mainnet/sites-config.${{ inputs.SUI_NETWORK }}-singleton.yaml -o sites-config.yaml
-            fi
+            echo "${{ inputs.SITES_CONFIG }}" > sites-config.yaml
           shell: bash
         - name: "Deploy the site"
           run: |
