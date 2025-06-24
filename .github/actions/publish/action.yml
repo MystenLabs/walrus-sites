@@ -79,6 +79,7 @@ runs:
               --config sites-config.yaml
               deploy ${{ inputs.DIST_FOLDER }}
               --epochs "${{ inputs.EPOCHS }}"
+              --context "${{ inputs.SUI_NETWORK }}"
             )
             if [[ -n "${{ inputs.WS_RESOURCES }}" ]]; then
               ARGS+=(--ws-resources "${{ inputs.WS_RESOURCES }}")
