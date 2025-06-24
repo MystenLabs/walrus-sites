@@ -355,6 +355,15 @@ pub async fn get_staking_object(
     })
 }
 
+#[tracing::instrument(err, skip_all)]
+pub(crate) fn deserialize_bag_or_table<'de, D>(deserializer: D) -> Result<ObjectID, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let (object_id, _length): (ObjectID, u64) = Deserialize::deserialize(deserializer)?;
+    Ok(object_id)
+}
+
 // Resolution
 
 #[cfg(test)]
@@ -377,11 +386,3 @@ mod test_util {
     }
 }
 
-#[tracing::instrument(err, skip_all)]
-pub(crate) fn deserialize_bag_or_table<'de, D>(deserializer: D) -> Result<ObjectID, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let (object_id, _length): (ObjectID, u64) = Deserialize::deserialize(deserializer)?;
-    Ok(object_id)
-}

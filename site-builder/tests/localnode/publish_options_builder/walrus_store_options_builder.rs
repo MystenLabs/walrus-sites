@@ -1,3 +1,6 @@
+// Copyright (c) Mysten Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 use std::{num::NonZeroU32, path::PathBuf, time::SystemTime};
 
 use site_builder::args::{EpochArg, EpochCountOrMax, WalrusStoreOptions};
