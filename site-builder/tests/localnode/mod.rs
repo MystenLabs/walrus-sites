@@ -36,8 +36,7 @@ use walrus_test_utils::WithTempDir;
 pub mod args_builder;
 
 pub struct WalrusSitesClusterState {
-    // TODO: Specify if this is indeed the walrus publisher
-    pub admin_wallet_with_client: WithTempDir<WalrusSDKClient<SuiContractClient>>,
+    pub walrus_admin_client: WithTempDir<WalrusSDKClient<SuiContractClient>>,
     pub sui_cluster_handle: Arc<TokioMutex<TestClusterHandle>>,
     pub system_context: SystemContext,
     pub walrus_cluster: TestCluster<StorageNodeHandle>,
@@ -55,7 +54,7 @@ pub struct TestSetup {
 
 impl TestSetup {
     pub async fn start_local_test_cluster() -> anyhow::Result<Self> {
-        let (sui_cluster_handle, walrus_cluster, walrus_sui_admin, system_context) =
+        let (sui_cluster_handle, walrus_cluster, walrus_admin_client, system_context) =
             test_cluster::E2eTestSetupBuilder::new().build().await?;
         let rpc_url = sui_cluster_handle.as_ref().lock().await.rpc_url();
         let sui_client = SuiClientBuilder::default().build(rpc_url).await?;
@@ -67,7 +66,7 @@ impl TestSetup {
             publish_walrus_sites(&sui_client, &mut walrus_sites_publisher.inner).await?;
 
         // ================================= Create walrus config ==================================
-        let walrus_sui_client = walrus_sui_admin.inner.sui_client();
+        let walrus_sui_client = walrus_admin_client.inner.sui_client();
         let walrus_config = create_walrus_config(walrus_sui_client)?;
 
         // ========================== Create new wallet and sites config ===========================
@@ -82,7 +81,7 @@ impl TestSetup {
 
         Ok(TestSetup {
             cluster_state: WalrusSitesClusterState {
-                admin_wallet_with_client: walrus_sui_admin,
+                walrus_admin_client,
                 sui_cluster_handle,
                 system_context,
                 walrus_cluster,
