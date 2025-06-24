@@ -1,9 +1,9 @@
-name: publish snake
+name: deploy snake
 on:
-  workflow_dispatch
   push:
     branches:
       - 'SEW-154-add-gh-action-to-publish'
+  workflow_dispatch:
 
 jobs:
   deploy:
