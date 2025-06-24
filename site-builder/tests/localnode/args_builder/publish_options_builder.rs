@@ -29,6 +29,8 @@ pub struct PublishOptionsBuilder {
     // #[arg(long, default_value_t = default::max_parallel_stores())]
     pub max_parallel_stores: NonZeroUsize,
     /// Common configurations.
+    // Note: We are currently re-using `WalrusStoreOptionsBuilder`'s methods for convenience,
+    // and keeping walrus_store_options_builder mod private.
     pub walrus_options: WalrusStoreOptionsBuilder,
 }
 

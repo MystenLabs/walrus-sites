@@ -25,7 +25,7 @@ use crate::{
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
-pub struct ArgsInner {
+pub struct Args {
     /// The path to the configuration file for the site builder.
     #[arg(short, long)]
     pub config: Option<PathBuf>,
@@ -234,7 +234,7 @@ impl ObjectIdOrName {
     }
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Debug, Clone)]
 #[command(rename_all = "kebab-case")]
 pub enum Commands {
     /// Deploy a new site on Sui.

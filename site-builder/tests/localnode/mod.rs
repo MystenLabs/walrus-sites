@@ -34,9 +34,7 @@ use walrus_sui::{
 use walrus_test_utils::WithTempDir;
 
 #[allow(dead_code)]
-mod publish_options_builder;
-#[allow(unused_imports)]
-pub use publish_options_builder::PublishOptionsBuilder;
+pub mod args_builder;
 
 pub struct WalrusSitesClusterState {
     // TODO: Specify if this is indeed the walrus publisher

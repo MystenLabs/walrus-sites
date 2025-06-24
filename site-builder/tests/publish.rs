@@ -3,11 +3,14 @@
 
 use std::path::PathBuf;
 
-use site_builder::args::{ArgsInner, Commands, EpochCountOrMax, GeneralArgs};
+use site_builder::args::{Commands, EpochCountOrMax};
 
 #[allow(dead_code)]
 mod localnode;
-use localnode::{PublishOptionsBuilder, TestSetup};
+use localnode::{
+    args_builder::{ArgsBuilder, PublishOptionsBuilder},
+    TestSetup,
+};
 
 // Important: For tests to pass, the system they are running on need to have walrus installed.
 #[tokio::test]
@@ -20,19 +23,17 @@ async fn publish_snake() -> anyhow::Result<()> {
         .join("snake");
     let ws_resources = directory.join("ws-resources.json");
 
-    let args = ArgsInner {
-        config: Some(cluster.sites_config.inner.1),
-        context: None,
-        general: GeneralArgs::default(),
-        command: Commands::Publish {
+    let args = ArgsBuilder::default()
+        .with_config(Some(cluster.sites_config.inner.1))
+        .with_command(Commands::Publish {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory)
                 .with_ws_resources(Some(ws_resources))
                 .with_epoch_count_or_max(EpochCountOrMax::Max)
                 .build()?,
             site_name: None,
-        },
-    };
+        })
+        .build()?;
     site_builder::run(args).await?;
 
     Ok(())
