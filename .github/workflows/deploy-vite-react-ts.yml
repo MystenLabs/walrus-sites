@@ -30,8 +30,8 @@ jobs:
         uses: MystenLabs/walrus-sites/.github/actions/deploy@SEW-154-add-gh-action-to-publish
         with:
           SUI_NETWORK: ${{ inputs.SUI_NETWORK }}
-          SUI_ADDRESS: ${{ vars.SUI_ADDRESS_TESTNET }}
-          SUI_KEYSTORE: ${{ secrets.SUI_KEYSTORE_TESTNET }}
+          SUI_ADDRESS: ${{ vars.SUI_ADDRESS }}
+          SUI_KEYSTORE: ${{ secrets.SUI_KEYSTORE }}
           DIST_FOLDER: examples/vite-react-ts/dist
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           EPOCHS: ${{ inputs.EPOCHS }}
