@@ -38,8 +38,6 @@ inputs:
 runs:
     using: "composite"
     steps:
-        - name: Checkout to the walrus site repo
-          uses: actions/checkout@v4 # pin@v4
         - name: Prepare Walrus Config
           id: walrus_config_step
           shell: bash

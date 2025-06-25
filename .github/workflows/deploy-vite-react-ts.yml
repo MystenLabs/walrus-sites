@@ -27,7 +27,7 @@ jobs:
         run: npm run build
         working-directory: examples/vite-react-ts
       - name: deploy site
-        uses: ./.github/actions/deploy
+        uses: MystenLabs/walrus-sites/.github/actions/publish@SEW-154-add-gh-action-to-publish
         with:
           SUI_NETWORK: ${{ inputs.SUI_NETWORK }}
           SUI_ADDRESS: ${{ vars.SUI_ADDRESS_TESTNET }}
