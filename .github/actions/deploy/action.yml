@@ -106,6 +106,8 @@ runs:
               echo "changed=false" >> "$GITHUB_OUTPUT"
             fi
           shell: bash
+        - name: Inform whether there was any change in ws-resources
+          run: echo "${{ steps.ws_path.outputs.path }} has changed: ${{ steps.file_change.outputs.changed }} and GITHUB_TOKEN is something: $( [[ -n "${{ inputs.GITHUB_TOKEN }}" ]] && echo "yes" || echo "no" )"
         - name: Commit and Push changes
           if: inputs.GITHUB_TOKEN != '' && steps.file_change.outputs.changed == 'true'
           run: |
