@@ -5,14 +5,11 @@ on:
       EPOCHS:
         description: 'Epochs to keep the site alive'
         required: false
-        default: '1'
+        default: '5'
       SUI_NETWORK:
         description: 'Sui network to deploy to'
         required: false
-        default: 'testnet'
-  push:
-    branches:
-      - 'SEW-154-add-gh-action-to-publish'
+        default: 'mainnet'
 
 jobs:
   deploy:
