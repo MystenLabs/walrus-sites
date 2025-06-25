@@ -1,6 +1,0 @@
-{
-  "use_gitignore": true,
-  "ignore": [
-    "examples/vite-react-ts/**"
-  ]
-}
