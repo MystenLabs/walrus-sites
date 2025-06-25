@@ -2,14 +2,14 @@ name: deploy vite-react-ts
 on:
   workflow_dispatch:
     inputs:
-      EPOCHS:
-        description: 'Epochs to keep the site alive'
-        required: false
-        default: '5'
       SUI_NETWORK:
         description: 'Sui network to deploy to'
         required: false
         default: 'mainnet'
+      EPOCHS:
+        description: 'Epochs to keep the site alive'
+        required: false
+        default: '5'
 
 jobs:
   deploy:
