@@ -1,5 +1,12 @@
 name: "Deploy Walrus Site"
-description: "Deploys a site to Walrus and publishes it as a webpage"
+description: |
+  Deploys a static site to Walrus and publishes it as a webpage.
+
+  **Note:** This action operates on an existing set of static files. You'll typically want to run a checkout and optionally a build step before using this action.
+
+  For usage examples, see the workflow files and their corresponding sites:
+  - Workflow: `.github/workflows/deploy-snake.yml` | Site: `examples/snake` (a site with ready-to-deploy assets)
+  - Workflow: `.github/workflows/deploy-vite-react-ts.yml` | Site: `examples/vite-react-ts` (a site that needs a build step first)
 inputs:
     # Setup Walrus action inputs:
     SUI_ADDRESS:
