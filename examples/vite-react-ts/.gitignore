@@ -8,8 +8,9 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
+dist/*
 dist-ssr
+!dist/ws-resources.json
 *.local
 
 # Editor directories and files
