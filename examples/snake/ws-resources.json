@@ -1,24 +1,28 @@
 {
   "headers": {
-    "/index.html": {
-      "Content-Type": "text/html; charset=utf-8",
-      "Cache-Control": "max-age=3500"
-    },
     "/*.svg": {
-        "Cache-Control": "public, max-age=86400",
-        "ETag": "\"abc123\""
+      "Cache-Control": "public, max-age=86400",
+      "ETag": "\"abc123\""
+    },
+    "/index.html": {
+      "Cache-Control": "max-age=3500",
+      "Content-Type": "text/html; charset=utf-8"
     }
   },
   "routes": {
     "/path/*": "/file.svg"
   },
   "metadata": {
-	   "link": "https://docs.wal.app",
-	   "image_url": "https://www.walrus.xyz/walrus-site",
-	   "description": "This is a walrus site.",
-	   "project_url": "https://github.com/MystenLabs/walrus-sites/",
-	   "creator": "MystenLabs"
-	},
+    "link": "https://docs.wal.app",
+    "image_url": "https://www.walrus.xyz/walrus-site",
+    "description": "This is a walrus site.",
+    "project_url": "https://github.com/MystenLabs/walrus-sites/",
+    "creator": "MystenLabs"
+  },
   "site_name": "Walrus Snake Game",
-  "ignore": ["/private/*", "/secret.txt"]
+  "object_id": "0x14d67d70c2143db280e852b085b12752d433a944bdafd1e1add19727db7fb769",
+  "ignore": [
+    "/private/*",
+    "/secret.txt"
+  ]
 }
