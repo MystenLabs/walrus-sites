@@ -100,7 +100,7 @@ runs:
           run: |
             git config --global user.name "github-actions"
             git config --global user.email "github-actions@github.com"
-            if ! git diff --quiet HEAD -- ${{ steps.ws_path.outputs.path }}; then
+            if [[ -n "$(git status --porcelain -- ${{ steps.ws_path.outputs.path }})" ]]; then
               echo "changed=true" >> "$GITHUB_OUTPUT"
             else
               echo "changed=false" >> "$GITHUB_OUTPUT"
