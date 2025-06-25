@@ -1,0 +1,40 @@
+name: deploy vite-react-ts
+on:
+  workflow_dispatch:
+    inputs:
+      EPOCHS:
+        description: 'Epochs to keep the site alive'
+        required: false
+        default: '1'
+      SUI_NETWORK:
+        description: 'Sui network to deploy to'
+        required: false
+        default: 'testnet'
+  push:
+    branches:
+      - 'SEW-154-add-gh-action-to-publish'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'latest'
+      - name: Install dependencies
+        run: npm install
+        working-directory: examples/vite-react-ts
+      - name: Build application
+        run: npm run build
+        working-directory: examples/vite-react-ts
+      - name: deploy site
+        uses: ./.github/actions/deploy
+        with:
+          SUI_NETWORK: ${{ inputs.SUI_NETWORK }}
+          SUI_ADDRESS: ${{ vars.SUI_ADDRESS_TESTNET }}
+          SUI_KEYSTORE: ${{ secrets.SUI_KEYSTORE_TESTNET }}
+          DIST_FOLDER: examples/vite-react-ts/dist
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EPOCHS: ${{ inputs.EPOCHS }} 

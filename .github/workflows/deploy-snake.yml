@@ -5,7 +5,11 @@ on:
       EPOCHS:
         description: 'Epochs to keep the site alive'
         required: false
-        default: '1'
+        default: '5'
+      SUI_NETWORK:
+        description: 'Sui network to deploy to'
+        required: false
+        default: 'mainnet'
 
 jobs:
   deploy:

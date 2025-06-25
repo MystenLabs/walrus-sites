@@ -19,7 +19,7 @@ inputs:
       description: Path to the directory with the built site.
       required: true
     SITE_BUILD_COMMANDS:
-      description: Any necessary actions to build the site into the `DIST_FOLDER`.
+      description: "Optional commands to run before deployment, typically for building the site. You can use separate steps in your workflow for building instead."
       required: false
     SITES_CONFIG:
       description: The content of the sites-config.yaml file. If not provided, it will be downloaded from the walrus-sites repository.
