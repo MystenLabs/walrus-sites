@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: deploy site
-        uses: MystenLabs/walrus-sites/.github/actions/publish@SEW-154-add-gh-action-to-publish
+        uses: MystenLabs/walrus-sites/.github/actions/deploy@SEW-154-add-gh-action-to-publish
         with:
           SUI_NETWORK: mainnet
           SUI_ADDRESS: ${{ vars.SUI_ADDRESS }}
