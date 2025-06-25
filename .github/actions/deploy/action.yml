@@ -139,7 +139,7 @@ runs:
           if: inputs.GITHUB_TOKEN != '' && steps.file_change.outputs.changed == 'true'
           run: |
             git add ${{ steps.ws_path.outputs.path }}
-            git commit -m "ci: Update ${{ steps.ws_path.outputs.path }} after deployment"
+            git commit -m "ci: Update ${{ steps.ws_path.outputs.path }} after deployment" -- ${{ steps.ws_path.outputs.path }}
             git push origin HEAD:update-ws-resources-${{ github.run_id }}
           shell: bash
         - name: Create Pull Request
