@@ -2,11 +2,14 @@ name: "Deploy Walrus Site"
 description: |
   Deploys a static site to Walrus and publishes it as a webpage.
 
-  **Note:** This action operates on an existing set of static files. You'll typically want to run a checkout and optionally a build step before using this action.
+  **Note:** This action operates on an existing set of static files.
+  You'll typically want to run a checkout and optionally a build step before using this action.
 
-  For usage examples, see the workflow files and their corresponding sites:
-  - Workflow: `.github/workflows/deploy-snake.yml` | Site: `examples/snake` (a site with ready-to-deploy assets)
-  - Workflow: `.github/workflows/deploy-vite-react-ts.yml` | Site: `examples/vite-react-ts` (a site that needs a build step first)
+  For usage examples, see the following workflows and their corresponding sites:
+  - `.github/workflows/deploy-snake.yml`: Deploys `examples/snake`, a site with ready-to-deploy
+    assets.
+  - `.github/workflows/deploy-vite-react-ts.yml`: Deploys `examples/vite-react-ts`, which requires a
+    build step first.
 inputs:
     # Setup Walrus action inputs:
     SUI_ADDRESS:
@@ -16,7 +19,9 @@ inputs:
         description: The content of the Sui keystore file.
         required: true
     WALRUS_CONFIG:
-        description: The content of the Walrus configuration file. If not provided, it will be downloaded from the Walrus repository.
+        description: |
+          The content of the Walrus configuration file. If not provided, it will be downloaded from
+          the Walrus repository.
         required: false
     SUI_NETWORK:
         description: The Sui network to use.
@@ -26,23 +31,34 @@ inputs:
       description: Path to the directory with the built site.
       required: true
     SITES_CONFIG:
-      description: The content of the sites-config.yaml file. If not provided, it will be downloaded from the walrus-sites repository.
+      description: |
+        The content of the sites-config.yaml file. If not provided, it will be downloaded from the
+        walrus-sites repository.
       required: false
     WS_RESOURCES:
-      description: "Full-path to the 'ws-resources.json' file. Note site-builder defaults to searching for 'ws-resources.json' directly inside the `DIST_FOLDER`."
+      description: |
+        Full-path to the 'ws-resources.json' file. Note site-builder defaults to searching for
+        'ws-resources.json' directly inside the `DIST_FOLDER`.
       required: false
     EPOCHS:
         description: Epochs to keep
         required: false
         default: "5"
     EXTRA_ARGS_PRE_COMMAND:
-        description: "Extra arguments to pass to the site-builder command before the 'deploy' subcommand."
+        description: |
+          Extra arguments to pass to the site-builder command before the 'deploy' subcommand.
         required: false
     EXTRA_ARGS_POST_COMMAND:
-        description: "Extra arguments to pass to the site-builder deploy command."
+        description: |
+          Extra arguments to pass to the site-builder deploy command.
         required: false
     GITHUB_TOKEN:
-        description: The GITHUB_TOKEN for creating a PR, in case of ws-resources changed during site-publishing. If not provided, the PR creation step will be skipped.
+        description: |
+          The GITHUB_TOKEN for creating a PR, in case of ws-resources changed during
+          site-publishing.
+          If not provided, the PR creation step will be skipped.
+          When using this, the workflow must have `contents: write` and `pull-requests: write`
+          permissions.
         required: false
 
 runs:
