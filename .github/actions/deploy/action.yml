@@ -18,9 +18,6 @@ inputs:
     DIST_FOLDER:
       description: Path to the directory with the built site.
       required: true
-    SITE_BUILD_COMMANDS:
-      description: "Optional commands to run before deployment, typically for building the site. You can use separate steps in your workflow for building instead."
-      required: false
     SITES_CONFIG:
       description: The content of the sites-config.yaml file. If not provided, it will be downloaded from the walrus-sites repository.
       required: false
@@ -31,6 +28,12 @@ inputs:
         description: Epochs to keep
         required: false
         default: "5"
+    EXTRA_ARGS_PRE_COMMAND:
+        description: "Extra arguments to pass to the site-builder command before the 'deploy' subcommand."
+        required: false
+    EXTRA_ARGS_POST_COMMAND:
+        description: "Extra arguments to pass to the site-builder deploy command."
+        required: false
     GITHUB_TOKEN:
         description: The GITHUB_TOKEN for creating a PR, in case of ws-resources changed during site-publishing. If not provided, the PR creation step will be skipped.
         required: false
@@ -58,11 +61,6 @@ runs:
               SUI_KEYSTORE: "${{ inputs.SUI_KEYSTORE }}"
               WALRUS_CONFIG: "${{ steps.walrus_config_step.outputs.walrus_config }}"
               SUI_NETWORK: "${{ inputs.SUI_NETWORK }}"
-        - name: Build the site
-          if: inputs.SITE_BUILD_COMMANDS != ''
-          run: |
-            ${{ inputs.SITE_BUILD_COMMANDS }}
-          shell: bash
         - name: Prepare Sites Config
           run: |
             if [[ -n "${{ inputs.SITES_CONFIG }}" ]]; then
@@ -76,11 +74,19 @@ runs:
             ARGS=(
               --context "${{ inputs.SUI_NETWORK }}"
               --config sites-config.yaml
+            )
+            if [[ -n "${{ inputs.EXTRA_ARGS_PRE_COMMAND }}" ]]; then
+              ARGS+=(${{ inputs.EXTRA_ARGS_PRE_COMMAND }})
+            fi
+            ARGS+=(
               deploy ${{ inputs.DIST_FOLDER }}
               --epochs "${{ inputs.EPOCHS }}"
             )
             if [[ -n "${{ inputs.WS_RESOURCES }}" ]]; then
               ARGS+=(--ws-resources "${{ inputs.WS_RESOURCES }}")
+            fi
+            if [[ -n "${{ inputs.EXTRA_ARGS_POST_COMMAND }}" ]]; then
+              ARGS+=(${{ inputs.EXTRA_ARGS_POST_COMMAND }})
             fi
             site-builder "${ARGS[@]}"
           shell: bash
