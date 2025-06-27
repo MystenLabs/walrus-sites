@@ -22,7 +22,7 @@ jobs:
       - name: deploy site
         uses: MystenLabs/walrus-sites/.github/actions/deploy@SEW-154-add-gh-action-to-publish
         with:
-          SUI_NETWORK: mainnet
+          SUI_NETWORK: ${{ inputs.SUI_NETWORK }}
           SUI_ADDRESS: ${{ vars.SUI_ADDRESS }}
           SUI_KEYSTORE: ${{ secrets.SUI_KEYSTORE }}
           DIST_FOLDER: examples/snake
