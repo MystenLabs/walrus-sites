@@ -27,7 +27,7 @@ inputs:
         description: The Sui network to use.
         default: mainnet
     # Deploy site action inputs:
-    DIST_FOLDER:
+    DIST:
       description: Path to the directory with the built site.
       required: true
     SITES_CONFIG:
@@ -38,20 +38,12 @@ inputs:
     WS_RESOURCES:
       description: |
         Full-path to the 'ws-resources.json' file. Note site-builder defaults to searching for
-        'ws-resources.json' directly inside the `DIST_FOLDER`.
+        'ws-resources.json' directly inside the `DIST`.
       required: false
     EPOCHS:
         description: Epochs to keep
         required: false
         default: "5"
-    EXTRA_ARGS_PRE_COMMAND:
-        description: |
-          Extra arguments to pass to the site-builder command before the 'deploy' subcommand.
-        required: false
-    EXTRA_ARGS_POST_COMMAND:
-        description: |
-          Extra arguments to pass to the site-builder deploy command.
-        required: false
     GITHUB_TOKEN:
         description: |
           The GITHUB_TOKEN for creating a PR, in case of ws-resources changed during
@@ -70,9 +62,11 @@ runs:
         - name: Prepare Walrus Config
           id: walrus_config_step
           shell: bash
+          env:
+            WALRUS_CONFIG_CONTENT: ${{ inputs.WALRUS_CONFIG }}
           run: |
-            if [[ -n "${{ inputs.WALRUS_CONFIG }}" ]]; then
-              CONFIG_CONTENT="${{ inputs.WALRUS_CONFIG }}"
+            if [[ -n "$WALRUS_CONFIG_CONTENT" ]]; then
+              CONFIG_CONTENT="$WALRUS_CONFIG_CONTENT"
             else
               CONFIG_CONTENT=$(curl -sL https://raw.githubusercontent.com/MystenLabs/walrus/refs/heads/main/setup/client_config.yaml)
             fi
@@ -93,34 +87,33 @@ runs:
         # It uses the `SITES_CONFIG` input if provided; otherwise, it downloads the default
         # configuration for the mainnet from the walrus-sites repository.
         - name: Prepare Sites Config
+          env:
+            SITES_CONFIG_CONTENT: ${{ inputs.SITES_CONFIG }}
           run: |
-            if [[ -n "${{ inputs.SITES_CONFIG }}" ]]; then
-              echo "${{ inputs.SITES_CONFIG }}" > sites-config.yaml
+            if [[ -n "$SITES_CONFIG_CONTENT" ]]; then
+              echo "$SITES_CONFIG_CONTENT" > sites-config.yaml
             else
               curl -sL https://raw.githubusercontent.com/MystenLabs/walrus-sites/refs/heads/main/sites-config.yaml -o sites-config.yaml
             fi
           shell: bash
         # This is the core step that deploys the site. It constructs the command-line arguments for
-        # the `site-builder` CLI, including the network context, config file, distribution folder,
-        # and any extra arguments provided as inputs.
+        # the `site-builder` CLI, including the network context, config file, and distribution
+        # folder.
         - name: "Deploy the site"
+          env:
+            DIST_PATH: ${{ inputs.DIST }}
+            WS_RESOURCES_PATH: ${{ inputs.WS_RESOURCES }}
           run: |
             ARGS=(
               --context "${{ inputs.SUI_NETWORK }}"
               --config sites-config.yaml
             )
-            if [[ -n "${{ inputs.EXTRA_ARGS_PRE_COMMAND }}" ]]; then
-              ARGS+=(${{ inputs.EXTRA_ARGS_PRE_COMMAND }})
-            fi
             ARGS+=(
-              deploy ${{ inputs.DIST_FOLDER }}
+              deploy "$DIST_PATH"
               --epochs "${{ inputs.EPOCHS }}"
             )
-            if [[ -n "${{ inputs.WS_RESOURCES }}" ]]; then
-              ARGS+=(--ws-resources "${{ inputs.WS_RESOURCES }}")
-            fi
-            if [[ -n "${{ inputs.EXTRA_ARGS_POST_COMMAND }}" ]]; then
-              ARGS+=(${{ inputs.EXTRA_ARGS_POST_COMMAND }})
+            if [[ -n "$WS_RESOURCES_PATH" ]]; then
+              ARGS+=(--ws-resources "$WS_RESOURCES_PATH")
             fi
             site-builder "${ARGS[@]}"
           shell: bash
@@ -130,20 +123,25 @@ runs:
         - name: Set ws-resources path
           id: ws_path
           if: inputs.GITHUB_TOKEN != ''
+          env:
+            WS_RESOURCES_PATH: ${{ inputs.WS_RESOURCES }}
+            DIST_PATH: ${{ inputs.DIST }}
           shell: bash
           run: |
-            if [[ -n "${{ inputs.WS_RESOURCES }}" ]]; then
-              echo "path=${{ inputs.WS_RESOURCES }}" >> "$GITHUB_OUTPUT"
+            if [[ -n "$WS_RESOURCES_PATH" ]]; then
+              echo "path=$WS_RESOURCES_PATH" >> "$GITHUB_OUTPUT"
             else
-              echo "path=${{ inputs.DIST_FOLDER }}/ws-resources.json" >> "$GITHUB_OUTPUT"
+              echo "path=$DIST_PATH/ws-resources.json" >> "$GITHUB_OUTPUT"
             fi
         # This step checks if the `ws-resources.json` file was modified during the deployment. It uses
         # `git status` to detect changes and sets an output variable `changed` to true or false.
         - name: Detect if there was any change in ws-resources
           id: file_change
           if: inputs.GITHUB_TOKEN != ''
+          env:
+            WS_RESOURCES_PATH_FROM_STEP: ${{ steps.ws_path.outputs.path }}
           run: |
-            if [[ -n "$(git status --porcelain -- ${{ steps.ws_path.outputs.path }})" ]]; then
+            if [[ -n "$(git status --porcelain -- "$WS_RESOURCES_PATH_FROM_STEP")" ]]; then
               echo "changed=true" >> "$GITHUB_OUTPUT"
             else
               echo "changed=false" >> "$GITHUB_OUTPUT"
