@@ -158,7 +158,7 @@ runs:
           with:
             token: ${{ inputs.GITHUB_TOKEN }}
             branch: update-ws-resources-${{ github.run_id }}
-            title: "ci: Update ${{ steps.ws_path.outputs.path }} after deployment"
+            title: "ci: Update ${{ steps.ws_path.outputs.path }} after deployment to ${{ inputs.SUI_NETWORK }}"
             body: "This PR was created because ws-resources file was updated during deployment"
             add-paths: ${{ steps.ws_path.outputs.path }}
             commit-message: "ci: Update ${{ steps.ws_path.outputs.path }} after deployment"
