@@ -1,0 +1,212 @@
+name: Attach Walrus Sites binaries to a release
+run-name: Attach Walrus Sites binaries to a ${{ github.event.inputs.site-builder-tag || github.ref_name }} release
+
+on:
+  release:
+    types: created
+  workflow_dispatch:
+    inputs:
+      site-builder-tag:
+        description: "Walrus Sites repo tag to attach builds to"
+        type: string
+        required: true
+
+concurrency: ${{ github.workflow }}-${{ inputs.site-builder-tag || github.ref }}
+
+env:
+  TAG_NAME: "${{ github.event.inputs.site-builder-tag || github.ref_name }}"
+  BINARY_LIST_FILE: "./binary-build-list.json"
+  CARGO_TERM_COLOR: always
+  # Disable incremental compilation.
+  #
+  # Incremental compilation is useful as part of an edit-build-test-edit cycle,
+  # as it lets the compiler avoid recompiling code that hasn't changed. However,
+  # on CI, we're not making small edits; we're almost always building the entire
+  # project from scratch. Thus, incremental compilation on CI actually
+  # introduces *additional* overhead to support making future builds
+  # faster...but no future builds will ever occur in any given CI environment.
+  #
+  # See https://matklad.github.io/2021/09/04/fast-rust-builds.html#ci-workflow
+  # for details.
+  CARGO_INCREMENTAL: 0
+  # Allow more retries for network requests in cargo (downloading crates) and
+  # rustup (installing toolchains). This should help to reduce flaky CI failures
+  # from transient network timeouts or other issues.
+  CARGO_NET_RETRY: 10
+  RUSTUP_MAX_RETRIES: 10
+  # Don't emit giant backtraces in the CI logs.
+  RUST_BACKTRACE: short
+  TMP_BUILD_DIR: "./tmp/release"
+
+jobs:
+  release-build:
+    name: Build & Publish Binaries
+    timeout-minutes: 120
+    strategy:
+      matrix:
+        os:
+          - ubuntu-ghcloud # ubuntu-x86_64
+          - windows-ghcloud # windows-x86_64
+          - macos-latest-large # macos-x86_64
+          - macos-latest-xlarge # macos-arm64
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Clean up and validate tag name
+        shell: bash
+        run: |
+          export site-builder-tag=$(echo ${{ env.TAG_NAME }} | sed s/'refs\/tags\/'//)
+          [[ "${site-builder-tag}" == "main" ]] && echo "tag cannot be equals to 'main'" && exit 1
+          echo "site-builder-tag=${site-builder-tag}" >> $GITHUB_ENV
+
+      - name: Check out ${{ env.site-builder-tag }}
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # pin@v4
+        with:
+          ref: ${{ env.site-builder-tag }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@77e7a554d41e2ee56fc945c52dfd3f33d12def9a # pin@v2
+        with:
+          version: ">= 363.0.0"
+
+      - name: Configure GCP service user auth
+        id: auth
+        uses: google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193 # pin@v2
+        with:
+          credentials_json: ${{ secrets.GCP_WALRUS_RELEASE_BUCKET_SVCUSER_CREDENTIALS }}
+
+      - name: Set os/arch variables (Windows)
+        if: ${{ startsWith(matrix.os, 'windows') }}
+        shell: bash
+        run: |
+          export arch=$(uname -m)
+          export os_type="windows-${arch}"
+          echo "os_type=${os_type}" >> $GITHUB_ENV
+          echo "extention=$(echo ".exe")" >> $GITHUB_ENV
+
+      - name: Set os/arch variables
+        if: ${{ !startsWith(matrix.os, 'windows') }}
+        shell: bash
+        run: |
+          export arch=$(uname -m)
+          export system_os=$(echo ${{ matrix.os }} | cut -d- -f1)
+          export os_type="${system_os}-${arch}"
+          echo "os_type=${system_os}-${arch}" >> $GITHUB_ENV
+
+      - name: Check if tar balls have been uploaded already
+        continue-on-error: true
+        shell: bash
+        run: |
+          site-builder_tarball_exist=$(gcloud storage ls gs://mysten-walrus-releases | \
+            grep -w "site-builder-${{ env.site-builder-tag }}-${{ env.os_type }}.tgz" | \
+            head -n 1 || echo '')
+
+          echo "site-builder_tarball_exist=$site_builder_tarball_exist" >> $GITHUB_ENV
+
+      - name: Download archive, if it exists
+        if: ${{ env.site-builder_tarball_exist != '' }}
+        shell: bash
+        run: |
+          mkdir -p ${{ env.TMP_BUILD_DIR }}
+          gcloud storage cp gs://mysten-walrus-releases/site-builder-${{ env.site-builder-tag }}-${os_type}.tgz ./tmp/site-builder-${{ env.site-builder-tag }}-${os_type}.tgz
+          tar -xf ./tmp/site-builder-${{ env.site-builder-tag }}-${os_type}.tgz -C ${{ env.TMP_BUILD_DIR }}
+
+      - name: Install nexttest (Windows)
+        if: ${{ startsWith(matrix.os, 'windows') && env.walrus_sites_tarball_exist == '' }}
+        uses: taiki-e/install-action@cargo-hack # pin@cargo-hack
+
+      - name: Install postgres (Windows)
+        if: ${{ startsWith(matrix.os, 'windows') && env.walrus_sites_tarball_exist == '' }}
+        shell: bash
+        run: |
+          choco install postgresql12 --force --params '/Password:root'
+          echo "C:\Program Files\PostgreSQL\12\bin" >> $GITHUB_PATH
+          echo "C:\Program Files\PostgreSQL\12\lib" >> $GITHUB_PATH
+          echo "PQ_LIB_DIR=C:\Program Files\PostgreSQL\12\lib" >> $GITHUB_ENV
+          echo "PG_DATABASE_URL=postgres://postgres:root@localhost/" >> $GITHUB_ENV
+          echo "PG_EXAMPLE_DATABASE_URL=postgres://postgres:root@localhost/diesel_example" >> $GITHUB_ENV
+
+      - name: Set git config for long paths (Windows)
+        if: ${{ startsWith(matrix.os, 'windows') }}
+        run: |
+          git config --system core.longpaths true
+
+      - name: Install postgres (MacOS arm64)
+        if: ${{ matrix.os == 'macos-latest-xlarge' && env.walrus_sites_tarball_exist == '' }}
+        shell: bash
+        env:
+          PQ_LIB_DIR: "$(brew --prefix libpq)/lib"
+          LIBRARY_PATH: "/opt/homebrew/lib:$LIBRARY_PATH"
+          PKG_CONFIG_PATH: "/opt/homebrew/lib/pkgconfig:$PKG_CONFIG_PATH"
+          PATH: "/opt/homebrew/bin:$PATH"
+        run: |
+          brew install postgresql
+
+      - name: Install postgres (Ubuntu arm64)
+        if: ${{ matrix.os == 'ubuntu-arm64' && env.walrus_sites_tarball_exist == '' }}
+        shell: bash
+        run: |
+          sudo apt update && sudo apt install libpq-dev
+
+      - name: Remove unused apps (MacOS arm64)
+        if: ${{ matrix.os == 'macos-latest-xlarge' && env.walrus_sites_tarball_exist == '' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          # MacOS arm64 runner only has 14GB avaialble, which is too small for our builds, so removing unused softwared.
+          df -h /
+          sudo rm -rf /Applications/Xcode*.app
+          sudo rm -rf ~/Library/Developer/Xcode/DerivedData
+          sudo rm -rf ~/Library/Developer/CoreSimulator/Caches/*
+          sudo rm -rf ~/Library/Developer/Xcode/iOS\ DeviceSupport/*
+          df -h /
+
+      - name: Cargo build for ${{ matrix.os }} platform
+        if: ${{ env.walrus_sites_tarball_exist == '' }}
+        shell: bash
+        run: |
+          [ -f ~/.cargo/env ] && source ~/.cargo/env ; cargo build --release
+
+      - name: Rename and archive binaries for ${{ matrix.os }}
+        if: ${{ env.walrus_sites_tarball_exist == '' }}
+        shell: bash
+        run: |
+          mkdir -p ${{ env.TMP_BUILD_DIR }}
+
+          [ ! -f ${{ env.BINARY_LIST_FILE }} ] && echo "${{ env.BINARY_LIST_FILE }} cannot be found" && exit 1
+          for binary in $(cat ${{ env.BINARY_LIST_FILE }} | jq -r '.release_binaries[]'); do
+            export binary=$(echo ${binary} | tr -d $'\r')
+            mv ./target/release/${binary}${{ env.extention }} ${{ env.TMP_BUILD_DIR }}/${binary}${{ env.extention }}
+          done
+
+          tar -cvzf ./tmp/site-builder-${{ env.site-builder-tag }}-${{ env.os_type }}.tgz -C ${{ env.TMP_BUILD_DIR }} .
+
+      - name: Remove temp staging files
+        shell: bash
+        run: rm -rf ${{ env.TMP_BUILD_DIR }}
+
+      - name: List upload directory contents
+        shell: bash
+        run: ls -al ./tmp
+
+      - name: Upload binaries for ${{ inputs.os }} platform to GCP
+        uses: google-github-actions/upload-cloud-storage@7c6e11cb7291594c5dfe0bc1dd9cd905e31e600c # pin@v2
+        with:
+          path: "./tmp"
+          destination: "mysten-walrus-releases"
+          parent: false
+
+      - name: Upload release artifacts for ${{ matrix.os }} platform
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # pin@4.6.2
+        with:
+          name: walrus-binaries-${{ matrix.os }}
+          if-no-files-found: error
+          path: |
+            ./tmp/site-builder-${{ env.site-builder-tag }}-${{ env.os_type }}.tgz
+
+      - name: Attach artifacts to ${{ env.site-builder-tag }} release in GH
+        uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # pin@v2.2.2
+        with:
+          tag_name: ${{ env.site-builder-tag }}
+          files: |
+            ./tmp/site-builder-${{ env.site-builder-tag }}-${{ env.os_type }}.tgz
