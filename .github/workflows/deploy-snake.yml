@@ -1,0 +1,30 @@
+name: deploy snake
+on:
+  workflow_dispatch:
+    inputs:
+      EPOCHS:
+        description: 'Epochs to keep the site alive'
+        required: false
+        default: '5'
+      SUI_NETWORK:
+        description: 'Sui network to deploy to'
+        required: false
+        default: 'mainnet'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: deploy site
+        uses: MystenLabs/walrus-sites/.github/actions/deploy@SEW-154-add-gh-action-to-publish
+        with:
+          SUI_NETWORK: ${{ inputs.SUI_NETWORK }}
+          SUI_ADDRESS: ${{ vars.SUI_ADDRESS }}
+          SUI_KEYSTORE: ${{ secrets.SUI_KEYSTORE }}
+          DIST: examples/snake
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EPOCHS: ${{ inputs.EPOCHS }}

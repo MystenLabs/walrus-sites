@@ -3,7 +3,8 @@ build/
 .vercel
 .zed
 .DS_Store
-dist/
+**/dist/*
+!examples/vite-react-ts/dist/ws-resources.json
 __pycache__
 single-html/
 inlined.html
