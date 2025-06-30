@@ -6,7 +6,7 @@
 use std::{collections::HashMap, path::Path};
 
 use anyhow::{anyhow, bail, Result};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sui_sdk::wallet_context::WalletContext;
 use sui_types::base_types::ObjectID;
 
@@ -25,13 +25,14 @@ pub(crate) enum MultiConfig {
 }
 
 /// The configuration for the site builder.
-#[derive(Deserialize, Debug, Clone)]
-pub(crate) struct Config {
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct Config {
     #[serde(default = "default_portal")]
     pub portal: String,
     pub package: ObjectID,
     #[serde(default)]
     pub general: GeneralArgs,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub staking_object: Option<ObjectID>,
 }
 
