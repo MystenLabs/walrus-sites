@@ -77,7 +77,7 @@ runs:
         # This step sets up the Sui and Walrus environment using a dedicated GitHub Action. It
         # installs the necessary tools, like the `walrus` and `site-builder` binaries.
         - name: Setup Walrus
-          uses: "MystenLabs/walrus/.github/actions/set-up-walrus/@ae35f928a5e214df7f22796e9375d575a8c0ca09" # pin@main
+          uses: "MystenLabs/walrus/.github/actions/set-up-walrus/@ebb65a1b3f9e0e3cf663d3a041deb7928dc544fe" # main
           with:
               SUI_ADDRESS: "${{ inputs.SUI_ADDRESS }}"
               SUI_KEYSTORE: "${{ inputs.SUI_KEYSTORE }}"
@@ -152,7 +152,7 @@ runs:
         # creation. The PR will contain only the changes to the `ws-resources.json` file.
         - name: Create Pull Request
           if: inputs.GITHUB_TOKEN != '' && steps.file_change.outputs.changed == 'true'
-          uses: peter-evans/create-pull-request@v6
+          uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
           with:
             token: ${{ inputs.GITHUB_TOKEN }}
             branch: update-ws-resources-${{ github.run_id }}

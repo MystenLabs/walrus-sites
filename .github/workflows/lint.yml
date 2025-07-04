@@ -13,11 +13,11 @@ jobs:
       contents: read
       pull-requests: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
       - name: Check PR title
-        uses: amannn/action-semantic-pull-request@v5.5.2
+        uses: amannn/action-semantic-pull-request@0723387faaf9b38adef4775cd42cfd5155ed6017 # v5.5.3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -25,7 +25,7 @@ jobs:
     runs-on: "ubuntu-22.04"
     name: Check editorconfig
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - run: pip install editorconfig-checker=="2.7.3"
       - run: ec
 
@@ -33,14 +33,14 @@ jobs:
     runs-on: ubuntu-latest
     name: Check spelling
     steps:
-      - uses: actions/checkout@v4
-      - uses: crate-ci/typos@v1.21.0
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: crate-ci/typos@392b78fe18a52790c53f42456e46124f77346842 # v1.34.0
 
   license-headers:
     runs-on: ubuntu-latest
     name: Check license headers
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - run: cargo install licensesnip@1.5.0
       - run: licensesnip check
 
@@ -55,6 +55,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Decide whether all needed jobs succeeded
-      uses: re-actors/alls-green@v1.2.2
+      uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
       with:
         jobs: ${{ toJSON(needs) }}
