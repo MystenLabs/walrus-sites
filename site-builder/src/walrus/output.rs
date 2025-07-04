@@ -6,7 +6,7 @@
 use std::{num::NonZeroU16, path::PathBuf, process::Output};
 
 use anyhow::{anyhow, Context, Result};
-use serde::{de::DeserializeOwned, Deserialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_with::{base64::Base64, serde_as, DisplayFromStr};
 use sui_types::{base_types::ObjectID, event::EventID};
 
@@ -123,12 +123,13 @@ pub struct BlobStoreResultWithPath {
 }
 
 /// Supported Walrus encoding types.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Deserialize)]
+#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Deserialize, Serialize)]
 #[repr(u8)]
 pub enum EncodingType {
     /// Original RedStuff encoding using the RaptorQ erasure code.
     RedStuffRaptorQ = 0,
     /// RedStuff using the Reed-Solomon erasure code.
+    #[default]
     RS2 = 1,
 }
 

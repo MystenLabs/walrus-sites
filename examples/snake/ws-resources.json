@@ -20,7 +20,7 @@
     "creator": "MystenLabs"
   },
   "site_name": "Walrus Snake Game",
-  "object_id": "0xe382ebbe37ca5c12ac67c107abe46e67aa62a3ed36a3dbdf65e895bd76cc5887",
+  "object_id": "0x87b3c120dcb4f5e08b6ebeee9b7d3d320692815f25259d5222168139828cacc2",
   "ignore": [
     "/private/*",
     "/secret.txt"

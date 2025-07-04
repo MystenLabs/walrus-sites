@@ -20,7 +20,10 @@ use tokio::process::Command as CliCommand;
 use self::types::BlobId;
 use crate::{
     args::EpochArg,
-    walrus::{command::WalrusCmdBuilder, output::DestroyOutput},
+    walrus::{
+        command::{EncodingTypeArg, WalrusCmdBuilder},
+        output::DestroyOutput,
+    },
 };
 pub mod command;
 pub mod output;
@@ -124,7 +127,14 @@ impl Walrus {
         file: PathBuf,
         n_shards: Option<NonZeroU16>,
     ) -> Result<BlobIdOutput> {
-        create_command!(self, blob_id, file, n_shards, self.rpc_arg())
+        create_command!(
+            self,
+            blob_id,
+            file,
+            n_shards,
+            self.rpc_arg(),
+            self.encoding_type_arg()
+        )
     }
 
     /// Issues an `info` JSON command to the Walrus CLI, returning the number of shards.
@@ -153,5 +163,9 @@ impl Walrus {
         RpcArg {
             rpc_url: self.rpc_url.clone(),
         }
+    }
+
+    fn encoding_type_arg(&self) -> EncodingTypeArg {
+        EncodingTypeArg::default()
     }
 }
