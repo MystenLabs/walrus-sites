@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::path::PathBuf;
+use std::{fs, path::PathBuf};
 
 use site_builder::args::{Commands, EpochCountOrMax};
 
@@ -21,14 +21,19 @@ async fn publish_snake() -> anyhow::Result<()> {
         .unwrap()
         .join("examples")
         .join("snake");
-    let ws_resources = directory.join("ws-resources.json");
+    let original_ws_resources = directory.join("ws-resources.json");
+
+    // Create a temp file copy so the original doesn't get mutated
+    let temp_dir = tempfile::tempdir()?;
+    let temp_ws_resources = temp_dir.path().join("ws-resources.json");
+    fs::copy(&original_ws_resources, &temp_ws_resources)?;
 
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config.inner.1))
         .with_command(Commands::Publish {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory)
-                .with_ws_resources(Some(ws_resources))
+                .with_ws_resources(Some(temp_ws_resources))
                 .with_epoch_count_or_max(EpochCountOrMax::Max)
                 .build()?,
             site_name: None,
