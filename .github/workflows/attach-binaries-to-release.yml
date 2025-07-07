@@ -115,11 +115,11 @@ jobs:
           tar -xf ./tmp/site-builder-${{ env.site-builder-tag }}-${os_type}.tgz -C ${{ env.TMP_BUILD_DIR }}
 
       - name: Install nexttest (Windows)
-        if: ${{ startsWith(matrix.os, 'windows') && env.walrus_sites_tarball_exist == '' }}
+        if: ${{ startsWith(matrix.os, 'windows') && env.site_builder_tarball_exist == '' }}
         uses: taiki-e/install-action@cargo-hack # pin@cargo-hack
 
       - name: Install postgres (Windows)
-        if: ${{ startsWith(matrix.os, 'windows') && env.walrus_sites_tarball_exist == '' }}
+        if: ${{ startsWith(matrix.os, 'windows') && env.site_builder_tarball_exist == '' }}
         shell: bash
         run: |
           choco install postgresql12 --force --params '/Password:root'
@@ -135,7 +135,7 @@ jobs:
           git config --system core.longpaths true
 
       - name: Install postgres (MacOS arm64)
-        if: ${{ matrix.os == 'macos-latest-xlarge' && env.walrus_sites_tarball_exist == '' }}
+        if: ${{ matrix.os == 'macos-latest-xlarge' && env.site_builder_tarball_exist == '' }}
         shell: bash
         env:
           PQ_LIB_DIR: "$(brew --prefix libpq)/lib"
@@ -146,13 +146,13 @@ jobs:
           brew install postgresql
 
       - name: Install postgres (Ubuntu arm64)
-        if: ${{ matrix.os == 'ubuntu-arm64' && env.walrus_sites_tarball_exist == '' }}
+        if: ${{ matrix.os == 'ubuntu-arm64' && env.site_builder_tarball_exist == '' }}
         shell: bash
         run: |
           sudo apt update && sudo apt install libpq-dev
 
       - name: Remove unused apps (MacOS arm64)
-        if: ${{ matrix.os == 'macos-latest-xlarge' && env.walrus_sites_tarball_exist == '' }}
+        if: ${{ matrix.os == 'macos-latest-xlarge' && env.site_builder_tarball_exist == '' }}
         continue-on-error: true
         shell: bash
         run: |
@@ -165,13 +165,13 @@ jobs:
           df -h /
 
       - name: Cargo build for ${{ matrix.os }} platform
-        if: ${{ env.walrus_sites_tarball_exist == '' }}
+        if: ${{ env.site_builder_tarball_exist == '' }}
         shell: bash
         run: |
           [ -f ~/.cargo/env ] && source ~/.cargo/env ; cargo build --release
 
       - name: Rename and archive binaries for ${{ matrix.os }}
-        if: ${{ env.walrus_sites_tarball_exist == '' }}
+        if: ${{ env.site_builder_tarball_exist == '' }}
         shell: bash
         run: |
           mkdir -p ${{ env.TMP_BUILD_DIR }}
