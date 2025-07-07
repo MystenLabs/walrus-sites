@@ -42,6 +42,9 @@ jobs:
   release-build:
     name: Build & Publish Binaries
     timeout-minutes: 120
+    permissions:
+      contents: read
+      actions: write
     strategy:
       matrix:
         os:
