@@ -24,7 +24,7 @@ use crate::{
     publish::BlobManagementOptions,
     site::{config::WSResources, content::ContentType},
     types::{HttpHeaders, SuiResource, VecMap},
-    walrus::{types::BlobId, Walrus},
+    walrus::{output::EncodingType, types::BlobId, Walrus},
 };
 
 /// The resource that is to be created or updated on Sui.
@@ -41,6 +41,8 @@ pub(crate) struct Resource {
     pub unencoded_size: usize,
     /// The full path of the resource on disk.
     pub full_path: PathBuf,
+    /// The Walrus Encoding Type
+    pub encoding_type: EncodingType,
 }
 
 impl PartialOrd for Resource {
@@ -61,6 +63,7 @@ impl From<SuiResource> for Resource {
             info: source,
             unencoded_size: 0,
             full_path: PathBuf::default(),
+            encoding_type: EncodingType::default(),
         }
     }
 }
@@ -73,6 +76,7 @@ impl Resource {
         blob_id: BlobId,
         blob_hash: U256,
         unencoded_size: usize,
+        encoding_type: EncodingType,
     ) -> Self {
         Resource {
             info: SuiResource {
@@ -85,6 +89,7 @@ impl Resource {
             },
             unencoded_size,
             full_path,
+            encoding_type,
         }
     }
 }
@@ -419,9 +424,17 @@ impl ResourceManager {
             .or_insert(content_type.to_string());
 
         let plain_content: Vec<u8> = std::fs::read(full_path)?;
+
+        let encoding_type =
+            ResourceManager::choose_encoding_type(&self.ws_resources, &resource_path);
+
         let output = self
             .walrus
-            .blob_id(full_path.to_owned(), Some(self.n_shards))
+            .blob_id(
+                full_path.to_owned(),
+                Some(self.n_shards),
+                Some(encoding_type),
+            )
             .await
             .context(format!(
                 "error while computing the blob id for path: {}",
@@ -441,6 +454,7 @@ impl ResourceManager {
             output.blob_id,
             U256::from_le_bytes(&blob_hash),
             plain_content.len(),
+            encoding_type,
         )))
     }
 
@@ -540,6 +554,22 @@ impl ResourceManager {
             }
         }
         Ok(resources)
+    }
+
+    /// Chooses the Walrus Encoding Type for the specified resource
+    ///
+    /// TODO: currently returns the default RS2, which is the only
+    /// supported encoding type.
+    /// In the future, there might be new Encoding Types, for example,
+    /// an encoding type optimized for video streaming, in which case,
+    /// we would utilize this based on the mime-type of the resource.
+    /// We might also want to add this as a "global" configuration option
+    /// in the ws-resources.json
+    fn choose_encoding_type(
+        _ws_resources: &Option<WSResources>,
+        _resource_path: &str,
+    ) -> EncodingType {
+        EncodingType::default()
     }
 }
 

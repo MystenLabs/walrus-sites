@@ -21,8 +21,8 @@ use self::types::BlobId;
 use crate::{
     args::EpochArg,
     walrus::{
-        command::{EncodingTypeArg, WalrusCmdBuilder},
-        output::DestroyOutput,
+        command::WalrusCmdBuilder,
+        output::{DestroyOutput, EncodingType},
     },
 };
 pub mod command;
@@ -126,15 +126,9 @@ impl Walrus {
         &self,
         file: PathBuf,
         n_shards: Option<NonZeroU16>,
+        encoding_type: Option<EncodingType>,
     ) -> Result<BlobIdOutput> {
-        create_command!(
-            self,
-            blob_id,
-            file,
-            n_shards,
-            self.rpc_arg(),
-            self.encoding_type_arg()
-        )
+        create_command!(self, blob_id, file, n_shards, self.rpc_arg(), encoding_type)
     }
 
     /// Issues an `info` JSON command to the Walrus CLI, returning the number of shards.
@@ -163,9 +157,5 @@ impl Walrus {
         RpcArg {
             rpc_url: self.rpc_url.clone(),
         }
-    }
-
-    fn encoding_type_arg(&self) -> EncodingTypeArg {
-        EncodingTypeArg::default()
     }
 }

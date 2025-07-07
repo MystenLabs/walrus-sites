@@ -102,8 +102,8 @@ pub enum Command {
         #[serde(flatten)]
         rpc_arg: RpcArg,
         /// The Walrus Encoding Type.
-        #[serde(flatten)]
-        encoding_type: EncodingTypeArg,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        encoding_type: Option<EncodingType>,
     },
     Info {
         /// The URL of the Sui RPC node to use.
@@ -122,15 +122,6 @@ pub struct RpcArg {
     /// The RPC URL of a Sui full node.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rpc_url: Option<String>,
-}
-
-/// Represents the Walrus EncodingType argument.
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct EncodingTypeArg {
-    /// The Walrus EncodingType
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub encoding_type: Option<EncodingType>,
 }
 
 /// Subcommands for the `info` command.
@@ -249,12 +240,14 @@ impl WalrusCmdBuilder {
     }
 
     /// Adds a [`Command::BlobId`] command to the builder.
+    ///
+    /// NB: Added the encoding_type arg, to handle Issue SEW-288
     pub fn blob_id(
         self,
         file: PathBuf,
         n_shards: Option<NonZeroU16>,
         rpc_arg: RpcArg,
-        encoding_type: EncodingTypeArg,
+        encoding_type: Option<EncodingType>,
     ) -> WalrusCmdBuilder<Command> {
         let command = Command::BlobId {
             file,
