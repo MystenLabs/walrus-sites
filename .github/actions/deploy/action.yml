@@ -1,0 +1,162 @@
+name: "Deploy Walrus Site"
+description: |
+  Deploys a static site to Walrus and publishes it as a webpage.
+
+  **Note:** This action operates on an existing set of static files.
+  You'll typically want to run a checkout and optionally a build step before using this action.
+
+  For usage examples, see the following workflows and their corresponding sites:
+  - `.github/workflows/deploy-snake.yml`: Deploys `examples/snake`, a site with ready-to-deploy
+    assets.
+  - `.github/workflows/deploy-vite-react-ts.yml`: Deploys `examples/vite-react-ts`, which requires a
+    build step first.
+inputs:
+    # Setup Walrus action inputs:
+    SUI_ADDRESS:
+        description: The Sui address to use.
+        required: true
+    SUI_KEYSTORE:
+        description: The content of the Sui keystore file.
+        required: true
+    WALRUS_CONFIG:
+        description: |
+          The content of the Walrus configuration file. If not provided, it will be downloaded from
+          the Walrus repository.
+        required: false
+    SUI_NETWORK:
+        description: The Sui network to use.
+        default: mainnet
+    # Deploy site action inputs:
+    DIST:
+      description: Path to the directory with the built site.
+      required: true
+    SITES_CONFIG:
+      description: |
+        The content of the sites-config.yaml file. If not provided, it will be downloaded from the
+        walrus-sites repository.
+      required: false
+    WS_RESOURCES:
+      description: |
+        Full-path to the 'ws-resources.json' file. Note site-builder defaults to searching for
+        'ws-resources.json' directly inside the `DIST`.
+      required: false
+    EPOCHS:
+        description: Epochs to keep
+        required: false
+        default: "5"
+    GITHUB_TOKEN:
+        description: |
+          The GITHUB_TOKEN for creating a PR, in case of ws-resources changed during
+          site-publishing.
+          If not provided, the PR creation step will be skipped.
+          When using this, the workflow must have `contents: write` and `pull-requests: write`
+          permissions.
+        required: false
+
+runs:
+    using: "composite"
+    steps:
+        # This step prepares the Walrus configuration file. It uses the input `WALRUS_CONFIG` if
+        # provided; otherwise, it downloads the default configuration from the Walrus repository.
+        # The configuration is then passed to the next step via an output.
+        - name: Prepare Walrus Config
+          id: walrus_config_step
+          shell: bash
+          env:
+            WALRUS_CONFIG_CONTENT: ${{ inputs.WALRUS_CONFIG }}
+          run: |
+            if [[ -n "$WALRUS_CONFIG_CONTENT" ]]; then
+              CONFIG_CONTENT="$WALRUS_CONFIG_CONTENT"
+            else
+              CONFIG_CONTENT=$(curl -sL https://raw.githubusercontent.com/MystenLabs/walrus/refs/heads/main/setup/client_config.yaml)
+            fi
+            EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+            echo "walrus_config<<$EOF" >> "$GITHUB_OUTPUT"
+            echo "$CONFIG_CONTENT" >> "$GITHUB_OUTPUT"
+            echo "$EOF" >> "$GITHUB_OUTPUT"
+        # This step sets up the Sui and Walrus environment using a dedicated GitHub Action. It
+        # installs the necessary tools, like the `walrus` and `site-builder` binaries.
+        - name: Setup Walrus
+          uses: "MystenLabs/walrus/.github/actions/set-up-walrus/@ebb65a1b3f9e0e3cf663d3a041deb7928dc544fe" # main
+          with:
+              SUI_ADDRESS: "${{ inputs.SUI_ADDRESS }}"
+              SUI_KEYSTORE: "${{ inputs.SUI_KEYSTORE }}"
+              WALRUS_CONFIG: "${{ steps.walrus_config_step.outputs.walrus_config }}"
+              SUI_NETWORK: "${{ inputs.SUI_NETWORK }}"
+        # This step prepares the sites-config.yaml file, which defines the sites to be deployed.
+        # It uses the `SITES_CONFIG` input if provided; otherwise, it downloads the default
+        # configuration for the mainnet from the walrus-sites repository.
+        - name: Prepare Sites Config
+          env:
+            SITES_CONFIG_CONTENT: ${{ inputs.SITES_CONFIG }}
+          run: |
+            if [[ -n "$SITES_CONFIG_CONTENT" ]]; then
+              echo "$SITES_CONFIG_CONTENT" > sites-config.yaml
+            else
+              curl -sL https://raw.githubusercontent.com/MystenLabs/walrus-sites/refs/heads/main/sites-config.yaml -o sites-config.yaml
+            fi
+          shell: bash
+        # This is the core step that deploys the site. It constructs the command-line arguments for
+        # the `site-builder` CLI, including the network context, config file, and distribution
+        # folder.
+        - name: "Deploy the site"
+          env:
+            DIST_PATH: ${{ inputs.DIST }}
+            WS_RESOURCES_PATH: ${{ inputs.WS_RESOURCES }}
+          run: |
+            ARGS=(
+              --context "${{ inputs.SUI_NETWORK }}"
+              --config sites-config.yaml
+            )
+            ARGS+=(
+              deploy "$DIST_PATH"
+              --epochs "${{ inputs.EPOCHS }}"
+            )
+            if [[ -n "$WS_RESOURCES_PATH" ]]; then
+              ARGS+=(--ws-resources "$WS_RESOURCES_PATH")
+            fi
+            site-builder "${ARGS[@]}"
+          shell: bash
+        # If a GITHUB_TOKEN is provided, this step determines the path to the `ws-resources.json`
+        # file. This file contains the resources related to the deployed site. The path is needed for
+        # the subsequent steps that check for changes and create a pull request.
+        - name: Set ws-resources path
+          id: ws_path
+          if: inputs.GITHUB_TOKEN != ''
+          env:
+            WS_RESOURCES_PATH: ${{ inputs.WS_RESOURCES }}
+            DIST_PATH: ${{ inputs.DIST }}
+          shell: bash
+          run: |
+            if [[ -n "$WS_RESOURCES_PATH" ]]; then
+              echo "path=$WS_RESOURCES_PATH" >> "$GITHUB_OUTPUT"
+            else
+              echo "path=$DIST_PATH/ws-resources.json" >> "$GITHUB_OUTPUT"
+            fi
+        # This step checks if the `ws-resources.json` file was modified during the deployment. It uses
+        # `git status` to detect changes and sets an output variable `changed` to true or false.
+        - name: Detect if there was any change in ws-resources
+          id: file_change
+          if: inputs.GITHUB_TOKEN != ''
+          env:
+            WS_RESOURCES_PATH_FROM_STEP: ${{ steps.ws_path.outputs.path }}
+          run: |
+            if [[ -n "$(git status --porcelain -- "$WS_RESOURCES_PATH_FROM_STEP")" ]]; then
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+            fi
+          shell: bash
+        # If the `ws-resources.json` file has changed, this step creates a pull request with the
+        # updated file. It uses the `peter-evans/create-pull-request` action to automate the PR
+        # creation. The PR will contain only the changes to the `ws-resources.json` file.
+        - name: Create Pull Request
+          if: inputs.GITHUB_TOKEN != '' && steps.file_change.outputs.changed == 'true'
+          uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
+          with:
+            token: ${{ inputs.GITHUB_TOKEN }}
+            branch: update-ws-resources-${{ github.run_id }}
+            title: "ci: Update ${{ steps.ws_path.outputs.path }} after deployment to ${{ inputs.SUI_NETWORK }}"
+            body: "This PR was created because ws-resources file was updated during deployment"
+            add-paths: ${{ steps.ws_path.outputs.path }}
+            commit-message: "ci: Update ${{ steps.ws_path.outputs.path }} after deployment"

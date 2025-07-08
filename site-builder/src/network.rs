@@ -1,6 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+// NOTE: Is not yet used in site-builder at all.
+
 use std::{env, path::PathBuf};
 
 use anyhow::{ensure, Context, Result};
