@@ -3,15 +3,11 @@ module walrus_site::site;
 
 use std::string::String;
 use sui::{display::{Self, Display}, dynamic_field as df, package::{Self, Publisher}, vec_map};
-use walrus_site::{events::{emit_site_created, emit_site_burned}, metadata::Metadata};
+use walrus_site::{events_::{emit_site_created, emit_site_burned}, metadata_::Metadata};
 
 /// The name of the dynamic field containing the routes.
 const ROUTES_FIELD: vector<u8> = b"routes";
 
-/// An insertion of route was attempted, but the related resource does not exist.
-const EResourceDoesNotExist: u64 = 0;
-const ERangeStartGreaterThanRangeEnd: u64 = 1;
-const EStartAndEndRangeAreNone: u64 = 2;
 
 /// The site published on Sui.
 public struct Site has key, store {
@@ -24,39 +20,9 @@ public struct Site has key, store {
     creator: Option<String>,
 }
 
-/// A resource in a site.
-public struct Resource has drop, store {
-    path: String,
-    // Response, Representation and Payload headers
-    // regarding the contents of the resource.
-    headers: vec_map::VecMap<String, String>,
-    // The walrus blob id containing the bytes for this resource.
-    blob_id: u256,
-    // Contains the hash of the contents of the blob
-    // to verify its integrity.
-    blob_hash: u256,
-    // Defines the byte range of the resource contents
-    // in the case where multiple resources are stored
-    // in the same blob. This way, each resource will
-    // be parsed using its' byte range in the blob.
-    range: Option<Range>,
-}
-
-public struct Range has drop, store {
-    start: Option<u64>, // inclusive lower bound
-    end: Option<u64>, // exclusive upper bound
-}
-
-/// Representation of the resource path.
-///
-/// Ensures there are no namespace collisions in the dynamic fields.
-public struct ResourcePath has copy, drop, store {
-    path: String,
-}
-
 /// The routes for a site.
 public struct Routes has drop, store {
-    route_list: vec_map::VecMap<String, String>,
+    route_list: vec_map::VecMap<String, String>
 }
 
 /// One-Time-Witness for the module.
@@ -86,63 +52,6 @@ public fun new_site(name: String, metadata: Metadata, ctx: &mut TxContext): Site
     site
 }
 
-/// Optionally creates a new Range object.
-public fun new_range_option(range_start: Option<u64>, range_end: Option<u64>): Option<Range> {
-    if (range_start.is_none() && range_end.is_none()) {
-        return option::none<Range>()
-    };
-    option::some(new_range(range_start, range_end))
-}
-
-/// Creates a new Range object.
-///
-/// aborts if both range_start and range_end are none.
-public fun new_range(range_start: Option<u64>, range_end: Option<u64>): Range {
-    let start_is_defined = range_start.is_some();
-    let end_is_defined = range_end.is_some();
-
-    // At least one of the range bounds should be defined.
-    assert!(start_is_defined || end_is_defined, EStartAndEndRangeAreNone);
-
-    // If both range bounds are defined, the upper bound should be greater than the lower.
-    if (start_is_defined && end_is_defined) {
-        let start = option::borrow(&range_start);
-        let end = option::borrow(&range_end);
-        assert!(*end > *start, ERangeStartGreaterThanRangeEnd);
-    };
-
-    Range {
-        start: range_start,
-        end: range_end,
-    }
-}
-
-/// Creates a new resource.
-public fun new_resource(
-    path: String,
-    blob_id: u256,
-    blob_hash: u256,
-    range: Option<Range>,
-): Resource {
-    Resource {
-        path,
-        headers: vec_map::empty(),
-        blob_id,
-        blob_hash,
-        range,
-    }
-}
-
-/// Adds a header to the Resource's headers vector.
-public fun add_header(resource: &mut Resource, name: String, value: String) {
-    resource.headers.insert(name, value);
-}
-
-/// Creates a new resource path.
-fun new_path(path: String): ResourcePath {
-    ResourcePath { path }
-}
-
 /// Updates the name of a site.
 public fun update_name(site: &mut Site, new_name: String) {
     site.name = new_name
@@ -155,33 +64,6 @@ public fun update_metadata(site: &mut Site, metadata: Metadata) {
     site.description = metadata.description();
     site.project_url = metadata.project_url();
     site.creator = metadata.creator();
-}
-
-/// Adds a resource to an existing site.
-public fun add_resource(site: &mut Site, resource: Resource) {
-    let path_obj = new_path(resource.path);
-    df::add(&mut site.id, path_obj, resource);
-}
-
-/// Removes a resource from a site.
-///
-/// Aborts if the resource does not exist.
-public fun remove_resource(site: &mut Site, path: String): Resource {
-    let path_obj = new_path(path);
-    df::remove(&mut site.id, path_obj)
-}
-
-/// Removes a resource from a site if it exists.
-public fun remove_resource_if_exists(site: &mut Site, path: String): Option<Resource> {
-    let path_obj = new_path(path);
-    df::remove_if_exists(&mut site.id, path_obj)
-}
-
-/// Changes the path of a resource on a site.
-public fun move_resource(site: &mut Site, old_path: String, new_path: String) {
-    let mut resource = remove_resource(site, old_path);
-    resource.path = new_path;
-    add_resource(site, resource);
 }
 
 // Routes.
@@ -308,3 +190,20 @@ public fun get_site_creator(site: &Site): Option<String> {
 public fun init_for_testing(ctx: &mut TxContext) {
     init(SITE {}, ctx);
 }
+
+/// =========================== DEPRECATED ===========================
+
+public struct Resource has drop, store { path: String, headers: vec_map::VecMap<String, String>, blob_id: u256, blob_hash: u256, range: Option<Range> }
+public struct Range has drop, store { start: Option<u64>, end: Option<u64> }
+public struct ResourcePath has copy, drop, store { path: String }
+
+public fun new_range_option(range_start: Option<u64>, range_end: Option<u64>): Option<Range> { if (range_start.is_none() && range_end.is_none()) { return option::none<Range>() }; option::some(new_range(range_start, range_end)) }
+public fun new_range(range_start: Option<u64>, range_end: Option<u64>): Range { let start_is_defined = range_start.is_some(); let end_is_defined = range_end.is_some(); assert!(start_is_defined || end_is_defined, EStartAndEndRangeAreNone); if (start_is_defined && end_is_defined) { let start = option::borrow(&range_start); let end = option::borrow(&range_end); assert!(*end > *start, ERangeStartGreaterThanRangeEnd); }; Range { start: range_start, end: range_end, } }
+public fun new_resource( path: String, blob_id: u256, blob_hash: u256, range: Option<Range>): Resource { Resource { path, headers: vec_map::empty(), blob_id, blob_hash, range } }
+public fun add_header(resource: &mut Resource, name: String, value: String) { resource.headers.insert(name, value); }
+fun new_path(path: String): ResourcePath { ResourcePath { path } }
+
+public fun add_resource(site: &mut Site, resource: Resource) { let path_obj = new_path(resource.path); df::add(&mut site.id, path_obj, resource); }
+public fun remove_resource(site: &mut Site, path: String): Resource { let path_obj = new_path(path); df::remove(&mut site.id, path_obj) }
+public fun remove_resource_if_exists(site: &mut Site, path: String): Option<Resource> { let path_obj = new_path(path); df::remove_if_exists(&mut site.id, path_obj) }
+public fun move_resource(site: &mut Site, old_path: String, new_path: String) { let mut resource = remove_resource(site, old_path); resource.path = new_path; add_resource(site, resource); }

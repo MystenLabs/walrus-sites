@@ -2,27 +2,45 @@
 
 [move]
 version = 3
-manifest_digest = "6955A2973AF0DB196E469AD72FDB6D203278DF6207C4561B7B9FDC4BD1AC951D"
-deps_digest = "F8BBB0CCB2491CA29A3DF03D6F92277A4F3574266507ACD77214D37ECA3F3082"
+manifest_digest = "94248BFA23EACC291FB70081F240A66DA78BB016227D7CE24FAFCD557F25A9F9"
+deps_digest = "3C4103934B1E040BB6B23F1D610B4EF9F2F1166A50A104EADCF77467C004C600"
+
+dependencies = [
+  { id = "Sui", name = "Sui" },
+  { id = "Walrus", name = "Walrus" },
+]
+
+[[move.package]]
+id = "MoveStdlib"
+source = { git = "https://github.com/MystenLabs/sui.git", rev = "testnet-v1.45.2", subdir = "crates/sui-framework/packages/move-stdlib" }
+
+[[move.package]]
+id = "Sui"
+source = { git = "https://github.com/MystenLabs/sui.git", rev = "testnet-v1.45.2", subdir = "crates/sui-framework/packages/sui-framework" }
+
+dependencies = [
+  { id = "MoveStdlib", name = "MoveStdlib" },
+]
+
+[[move.package]]
+id = "WAL"
+source = { git = "https://github.com/MystenLabs/walrus.git", rev = "main", subdir = "testnet-contracts/wal" }
 
 dependencies = [
   { id = "Sui", name = "Sui" },
 ]
 
 [[move.package]]
-id = "MoveStdlib"
-source = { git = "https://github.com/MystenLabs/sui.git", rev = "framework/testnet", subdir = "crates/sui-framework/packages/move-stdlib" }
-
-[[move.package]]
-id = "Sui"
-source = { git = "https://github.com/MystenLabs/sui.git", rev = "framework/testnet", subdir = "crates/sui-framework/packages/sui-framework" }
+id = "Walrus"
+source = { git = "https://github.com/MystenLabs/walrus.git", rev = "main", subdir = "testnet-contracts/walrus" }
 
 dependencies = [
-  { id = "MoveStdlib", name = "MoveStdlib" },
+  { id = "Sui", name = "Sui" },
+  { id = "WAL", name = "WAL" },
 ]
 
 [move.toolchain-version]
-compiler-version = "1.44.3"
+compiler-version = "1.51.2"
 edition = "2024.beta"
 flavor = "sui"
 

@@ -1,4 +1,4 @@
-module walrus_site::metadata;
+module walrus_site::metadata_;
 
 use std::string::String;
 
