@@ -81,7 +81,7 @@ pub enum Command {
     },
     /// Deletes a blob from Walrus.
     Delete {
-        /// The the blob ID(s) of the blob(s) to delete.
+        /// The blob ID(s) of the blob(s) to delete.
         #[serde_as(as = "Vec<DisplayFromStr>")]
         blob_ids: Vec<BlobId>,
         /// Disable checking the status of the blob after deletion.

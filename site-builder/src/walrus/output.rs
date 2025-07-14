@@ -278,7 +278,7 @@ pub struct BlobIdentity {
 
 /// Contains the certification status of a blob.
 ///
-/// If the a permanent blob exists, it also contains its end epoch and the ID of the Sui event
+/// If a permanent blob exists, it also contains its end epoch and the ID of the Sui event
 /// from which the latest status (registered or certified) resulted.
 #[derive(Debug, Deserialize, PartialEq, Eq, Clone, Copy, Default, Hash)]
 #[serde(rename_all = "camelCase", rename_all_fields = "camelCase")]
