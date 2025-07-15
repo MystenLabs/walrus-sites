@@ -85,7 +85,7 @@ jobs:
           export arch=$(uname -m)
           export os_type="windows-${arch}"
           echo "os_type=${os_type}" >> $GITHUB_ENV
-          echo "extention=$(echo ".exe")" >> $GITHUB_ENV
+          echo "extention=.exe" >> $GITHUB_ENV
 
       - name: Set os/arch variables
         if: ${{ !startsWith(matrix.os, 'windows') }}
@@ -107,7 +107,7 @@ jobs:
           set -e # Reset default github workflow behavior.
           if [ ${exit_code} -eq 0 ]; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "gcloud_site_builder_bin=${gcloud_output}" >> $GITHUB_OUTPUT
+            echo "gcloud_site_builder_bin=${gcloud_output}" >> "$GITHUB_OUTPUT"
           elif [[ "${gcloud_output}" == *"URLs matched no objects"* ]]; then
             echo "exists=false" >> "$GITHUB_OUTPUT"
           else
@@ -147,7 +147,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p ${BINARIES_DIR}
-          mv ./target/release/site-builder ${BINARIES_DIR}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}
+          mv ./target/release/site-builder ${BINARIES_DIR}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}${{ env.extention }}
 
       - name: List upload directory contents
         shell: bash
@@ -167,11 +167,11 @@ jobs:
           name: walrus-binaries-${{ matrix.os }}
           if-no-files-found: error
           path: |
-            ${{ env.BINARIES_DIR }}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}
+            ${{ env.BINARIES_DIR }}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}${{ env.extention }}
 
       - name: Attach artifacts to ${{ steps.validate_tag_name.outputs.site-builder-tag }} release in GH
         uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # pin@v2.2.2
         with:
           tag_name: ${{ steps.validate_tag_name.outputs.site-builder-tag }}
           files: |
-            ${{ env.BINARIES_DIR }}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}
+            ${{ env.BINARIES_DIR }}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}${{ env.extention }}
