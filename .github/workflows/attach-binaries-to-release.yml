@@ -58,9 +58,9 @@ jobs:
         shell: bash
         id: validate_tag_name
         run: |
-          export site-builder-tag=$(echo ${{ env.TAG_NAME }} | sed s/'refs\/tags\/'//)
-          [[ "${site-builder-tag}" == "main" ]] && echo "tag cannot be equals to 'main'" && exit 1
-          echo "site-builder-tag=${site-builder-tag}" >> $GITHUB_OUTPUT
+          export site_builder_tag=$(echo ${{ env.TAG_NAME }} | sed s/'refs\/tags\/'//)
+          [[ "${site_builder_tag}" == "main" ]] && echo "tag cannot be equals to 'main'" && exit 1
+          echo "site-builder-tag=${site_builder_tag}" >> $GITHUB_OUTPUT
 
       - name: Check out ${{ steps.validate_tag_name.outputs.site-builder-tag }}
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # pin@v4
