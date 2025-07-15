@@ -2,6 +2,9 @@ name: Attach Walrus Sites binaries to a release
 run-name: Attach Walrus Sites binaries to a ${{ github.event.inputs.site-builder-tag || github.ref_name }} release
 
 on:
+  push:
+    branches:
+      - alextzimas/sew-235-create-release-workflow-attach-binaries
   release:
     types: created
   workflow_dispatch:
