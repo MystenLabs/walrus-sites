@@ -1,0 +1,177 @@
+name: Attach Walrus Sites binaries to a release
+run-name: Attach Walrus Sites binaries to a ${{ github.event.inputs.site-builder-tag || github.ref_name }} release
+
+on:
+  release:
+    types: created
+  workflow_dispatch:
+    inputs:
+      site-builder-tag:
+        description: "Walrus Sites repo tag to attach builds to"
+        type: string
+        required: true
+
+concurrency: ${{ github.workflow }}-${{ inputs.site-builder-tag || github.ref }}
+
+env:
+  TAG_NAME: "${{ github.event.inputs.site-builder-tag || github.ref_name }}"
+  CARGO_TERM_COLOR: always
+  # Disable incremental compilation.
+  #
+  # Incremental compilation is useful as part of an edit-build-test-edit cycle,
+  # as it lets the compiler avoid recompiling code that hasn't changed. However,
+  # on CI, we're not making small edits; we're almost always building the entire
+  # project from scratch. Thus, incremental compilation on CI actually
+  # introduces *additional* overhead to support making future builds
+  # faster...but no future builds will ever occur in any given CI environment.
+  #
+  # See https://matklad.github.io/2021/09/04/fast-rust-builds.html#ci-workflow
+  # for details.
+  CARGO_INCREMENTAL: 0
+  # Allow more retries for network requests in cargo (downloading crates) and
+  # rustup (installing toolchains). This should help to reduce flaky CI failures
+  # from transient network timeouts or other issues.
+  CARGO_NET_RETRY: 10
+  RUSTUP_MAX_RETRIES: 10
+  # Don't emit giant backtraces in the CI logs.
+  RUST_BACKTRACE: short
+  BINARIES_DIR: "./site-builder-binaries"
+
+jobs:
+  release-build:
+    name: Build & Publish Binaries
+    timeout-minutes: 120
+    permissions:
+      contents: write
+      actions: write
+    strategy:
+      matrix:
+        os:
+          - ubuntu-ghcloud # ubuntu-x86_64
+          - windows-ghcloud # windows-x86_64
+          - macos-latest-large # macos-x86_64
+          - macos-latest-xlarge # macos-arm64
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Clean up and validate tag name
+        shell: bash
+        id: validate_tag_name
+        run: |
+          export site_builder_tag=$(echo ${{ env.TAG_NAME }} | sed s/'refs\/tags\/'//)
+          [[ "${site_builder_tag}" == "main" ]] && echo "tag cannot be equals to 'main'" && exit 1
+          echo "site-builder-tag=${site_builder_tag}" >> $GITHUB_OUTPUT
+
+      - name: Check out ${{ steps.validate_tag_name.outputs.site-builder-tag }}
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # pin@v4
+        with:
+          ref: ${{ steps.validate_tag_name.outputs.site-builder-tag }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@77e7a554d41e2ee56fc945c52dfd3f33d12def9a # pin@v2
+        with:
+          version: ">= 363.0.0"
+
+      - name: Configure GCP service user auth
+        id: auth
+        uses: google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193 # pin@v2
+        with:
+          credentials_json: ${{ secrets.GCP_WALRUS_RELEASE_BUCKET_SVCUSER_CREDENTIALS }}
+
+      - name: Set os/arch variables (Windows)
+        if: ${{ startsWith(matrix.os, 'windows') }}
+        shell: bash
+        run: |
+          export arch=$(uname -m)
+          export os_type="windows-${arch}"
+          echo "os_type=${os_type}" >> $GITHUB_ENV
+          echo "extention=.exe" >> $GITHUB_ENV
+
+      - name: Set os/arch variables
+        if: ${{ !startsWith(matrix.os, 'windows') }}
+        shell: bash
+        run: |
+          export arch=$(uname -m)
+          export system_os=$(echo ${{ matrix.os }} | cut -d- -f1)
+          export os_type="${system_os}-${arch}"
+          echo "os_type=${system_os}-${arch}" >> $GITHUB_ENV
+          echo "extention=" >> $GITHUB_ENV
+
+      - name: Check if site-builder binary has been uploaded already
+        shell: bash
+        id: check_archive
+        run: |
+          set +e # By default github workflow terminates immediately on non-zero exit-code.
+          gcloud_output=$(gcloud storage ls "gs://mysten-walrus-binaries/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}${{ env.extention }}" 2>&1)
+          exit_code=$?
+          set -e # Reset default github workflow behavior.
+          if [ ${exit_code} -eq 0 ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "gcloud_site_builder_bin=${gcloud_output}" >> "$GITHUB_OUTPUT"
+          elif [[ "${gcloud_output}" == *"URLs matched no objects"* ]]; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "An unexpected error occurred checking for the binary:"
+            echo "${gcloud_output}"
+            exit 1
+          fi
+
+      - name: Download from archive, if it exists
+        if: ${{ steps.check_archive.outputs.exists == 'true' }}
+        shell: bash
+        run: |
+          mkdir -p ${BINARIES_DIR}
+          gcloud storage cp ${{ steps.check_archive.outputs.gcloud_site_builder_bin }} ${BINARIES_DIR}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${os_type}${{ env.extention }}
+
+      - name: Remove unused apps (MacOS arm64)
+        if: ${{ matrix.os == 'macos-latest-xlarge' && steps.check_archive.outputs.exists != 'true' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          # MacOS arm64 runner only has 14GB avaialble, which is too small for our builds, so removing unused softwared.
+          df -h /
+          sudo rm -rf /Applications/Xcode*.app
+          sudo rm -rf ~/Library/Developer/Xcode/DerivedData
+          sudo rm -rf ~/Library/Developer/CoreSimulator/Caches/*
+          sudo rm -rf ~/Library/Developer/Xcode/iOS\ DeviceSupport/*
+          df -h /
+
+      - name: Cargo build for ${{ matrix.os }} platform
+        if: ${{ steps.check_archive.outputs.exists != 'true' }}
+        shell: bash
+        run: |
+          [ -f ~/.cargo/env ] && source ~/.cargo/env ; cargo build --release
+
+      - name: Rename and archive binaries for ${{ matrix.os }}
+        if: ${{ steps.check_archive.outputs.exists != 'true' }}
+        shell: bash
+        run: |
+          mkdir -p ${BINARIES_DIR}
+          mv ./target/release/site-builder ${BINARIES_DIR}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}${{ env.extention }}
+
+      - name: List upload directory contents
+        shell: bash
+        run: ls -al ${BINARIES_DIR}
+
+      - name: Upload binaries for ${{ inputs.os }} platform to GCP
+        if: ${{ steps.check_archive.outputs.exists != 'true' }}
+        uses: google-github-actions/upload-cloud-storage@7c6e11cb7291594c5dfe0bc1dd9cd905e31e600c # pin@v2
+        with:
+          path: ${{ env.BINARIES_DIR }}
+          destination: "mysten-walrus-binaries"
+          parent: false
+
+      - name: Upload release artifacts for ${{ matrix.os }} platform
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # pin@4.6.2
+        with:
+          name: walrus-binaries-${{ matrix.os }}
+          if-no-files-found: error
+          path: |
+            ${{ env.BINARIES_DIR }}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}${{ env.extention }}
+
+      - name: Attach artifacts to ${{ steps.validate_tag_name.outputs.site-builder-tag }} release in GH
+        uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # pin@v2.2.2
+        with:
+          tag_name: ${{ steps.validate_tag_name.outputs.site-builder-tag }}
+          files: |
+            ${{ env.BINARIES_DIR }}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}${{ env.extention }}
