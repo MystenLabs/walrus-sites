@@ -115,14 +115,14 @@ jobs:
           fi
 
       - name: Download from archive, if it exists
-        if: ${{ steps.check_archive.outputs.exists == true }}
+        if: ${{ steps.check_archive.outputs.exists == 'true' }}
         shell: bash
         run: |
           mkdir -p ${BINARIES_DIR}
           gcloud storage cp gs://mysten-walrus-binaries/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${os_type} ${BINARIES_DIR}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${os_type}
 
       - name: Remove unused apps (MacOS arm64)
-        if: ${{ matrix.os == 'macos-latest-xlarge' && steps.check_archive.outputs.exists != true }}
+        if: ${{ matrix.os == 'macos-latest-xlarge' && steps.check_archive.outputs.exists != 'true' }}
         continue-on-error: true
         shell: bash
         run: |
@@ -135,13 +135,13 @@ jobs:
           df -h /
 
       - name: Cargo build for ${{ matrix.os }} platform
-        if: ${{ steps.check_archive.outputs.exists != true }}
+        if: ${{ steps.check_archive.outputs.exists != 'true' }}
         shell: bash
         run: |
           [ -f ~/.cargo/env ] && source ~/.cargo/env ; cargo build --release
 
       - name: Rename and archive binaries for ${{ matrix.os }}
-        if: ${{ steps.check_archive.outputs.exists != true }}
+        if: ${{ steps.check_archive.outputs.exists != 'true' }}
         shell: bash
         run: |
           mkdir -p ${BINARIES_DIR}
