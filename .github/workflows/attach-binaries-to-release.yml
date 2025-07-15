@@ -152,6 +152,7 @@ jobs:
         run: ls -al ${BINARIES_DIR}
 
       - name: Upload binaries for ${{ inputs.os }} platform to GCP
+        if: ${{ steps.check_archive.outputs.exists != 'true' }}
         uses: google-github-actions/upload-cloud-storage@7c6e11cb7291594c5dfe0bc1dd9cd905e31e600c # pin@v2
         with:
           path: ${{ env.BINARIES_DIR }}
