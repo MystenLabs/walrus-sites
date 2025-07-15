@@ -101,7 +101,7 @@ jobs:
         id: check_archive
         run: |
           set +e # By default github workflow terminates immediately on non-zero exit-code.
-          gcloud_output=$(gcloud storage ls gs://mysten-walrus-binaries/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }} 2>&1)
+          gcloud_output=$(gcloud storage ls "gs://mysten-walrus-binaries/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}*" 2>&1)
           exit_code=$?
           set -e # Reset default github workflow behavior.
           if [ ${exit_code} -eq 0 ]; then
