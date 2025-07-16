@@ -2,6 +2,7 @@ name: Attach Walrus Sites binaries to a release
 run-name: Attach Walrus Sites binaries to a ${{ github.event.inputs.site-builder-tag || github.ref_name }} release
 
 on:
+  push:
   release:
     types: created
   workflow_dispatch:
@@ -168,6 +169,12 @@ jobs:
           if-no-files-found: error
           path: |
             ${{ env.BINARIES_DIR }}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}${{ env.extention }}
+
+      - name: Create tarball for site-builder binary
+        if: ${{ steps.check_archive.outputs.exists != 'true' }}
+        shell: bash
+        run: |
+          tar -cvf ${BINARIES_DIR}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}.tar -C ${BINARIES_DIR} site-builder${{ env.extention }}
 
       - name: Attach artifacts to ${{ steps.validate_tag_name.outputs.site-builder-tag }} release in GH
         uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # pin@v2.2.2
