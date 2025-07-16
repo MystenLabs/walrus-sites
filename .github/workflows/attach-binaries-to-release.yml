@@ -181,4 +181,4 @@ jobs:
         with:
           tag_name: ${{ steps.validate_tag_name.outputs.site-builder-tag }}
           files: |
-            ${{ env.BINARIES_DIR }}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}${{ env.extention }}
+            ${{ env.BINARIES_DIR }}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}.tar
