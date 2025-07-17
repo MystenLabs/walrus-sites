@@ -19,10 +19,6 @@ const configurationSchema =
 		portalDomainNameLength: env.PORTAL_DOMAIN_NAME_LENGTH,
 		premiumRpcUrlList: env.PREMIUM_RPC_URL_LIST,
 		rpcUrlList: env.RPC_URL_LIST,
-		enableSentry: env.ENABLE_SENTRY,
-		sentryAuthToken: env.SENTRY_AUTH_TOKEN,
-		sentryDsn: env.SENTRY_DSN,
-		sentryTracesSampleRate: env.SENTRY_TRACES_SAMPLE_RATE,
 		suinsClientNetwork: env.SUINS_CLIENT_NETWORK, // TODO(alex): rename this to NETWORK
 		blocklistRedisUrl: env.BLOCKLIST_REDIS_URL,
 		allowlistRedisUrl: env.ALLOWLIST_REDIS_URL,
@@ -55,17 +51,7 @@ const configurationSchema =
 				(val) => typeof val === 'string' ? val.trim().split(',') : val,
 				z.array(z.string().url())
 			),
-		enableSentry: stringBoolean,
 		enableVercelWebAnalytics: stringBoolean,
-	  	sentryAuthToken: z.string().optional(),
-		sentryDsn: z.string().optional(),
-	  	sentryTracesSampleRate: z
-				.string()
-				.optional()
-				.transform((val) => (val ? Number(val) : undefined))
-				.refine((val) => val === undefined || (val >= 0 && val <= 1), {
-					message: "SENTRY_TRACES_SAMPLE_RATE must be between 0 and 1",
-				}),
 	    suinsClientNetwork: z.enum(["testnet", "mainnet"]),
 	    blocklistRedisUrl: z.string().url({message: "BLOCKLIST_REDIS_URL is not a valid URL!"}).optional().refine(
 				// Ensure that the database number is specified and is 0 - this is the blocklist database.
@@ -111,22 +97,7 @@ const configurationSchema =
       path: ["enableAllowlist"],
     },
   )
-  .refine(
-    (data) => {
-      if (data.enableSentry) {
-        return (
-          data.sentryAuthToken &&
-          data.sentryDsn &&
-          data.sentryTracesSampleRate !== undefined
-        );
-      }
-      return true;
-    },
-    {
-      message: "SENTRY settings are incomplete.",
-      path: ["enableSentry"],
-    },
-  ));
+);
 
 export type Configuration = z.infer<typeof configurationSchema>;
 
