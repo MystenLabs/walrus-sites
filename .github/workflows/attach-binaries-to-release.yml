@@ -173,7 +173,10 @@ jobs:
         if: ${{ steps.check_archive.outputs.exists != 'true' }}
         shell: bash
         run: |
-          tar -cvf ${BINARIES_DIR}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}.tar -C ${BINARIES_DIR} site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}${{ env.extention }}
+          tar -cvf ${BINARIES_DIR}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}.tar \
+            -C ${BINARIES_DIR} \
+            site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}${{ env.extention }} \
+            --transform="s/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}${{ env.extention }}/site-builder${{ env.extention }}/"
 
       - name: Attach artifacts to ${{ steps.validate_tag_name.outputs.site-builder-tag }} release in GH
         uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # pin@v2.2.2
