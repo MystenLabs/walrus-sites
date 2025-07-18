@@ -5,7 +5,6 @@ import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 
 import allowlistChecker from "src/allowlist_checker";
 import { siteNotFound } from "@lib/http/http_error_responses";
-import integrateLoggerWithSentry from "src/sentry_logger";
 import blocklistChecker from "src/blocklist_checker";
 import { config } from "src/configuration_loader";
 import { standardUrlFetcher, premiumUrlFetcher } from "src/url_fetcher_factory";
@@ -15,11 +14,6 @@ import { Base36toHex } from "@lib/objectId_operations";
 import { instrumentationFacade } from "@lib/instrumentation";
 import { bringYourOwnDomainDoesNotSupportSubdomainsYet } from "@lib/http/http_error_responses";
 import logger from "@lib/logger";
-
-if (config.enableSentry) {
-    // Only integrate Sentry on production.
-    integrateLoggerWithSentry();
-}
 
 export default async function main(req: Request) {
 	const url = new URL(req.url);
