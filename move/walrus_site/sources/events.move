@@ -1,4 +1,4 @@
-module walrus_site::events;
+module walrus_site::events_;
 
 use sui::event;
 
