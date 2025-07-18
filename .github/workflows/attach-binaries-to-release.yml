@@ -147,14 +147,14 @@ jobs:
         shell: bash
         run: |
           mkdir -p ${BINARIES_DIR}
-          mv ./target/release/site-builder ${BINARIES_DIR}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}${{ env.extention }}
+          mv ./target/release/site-builder ${BINARIES_DIR}/site-builder${{ env.extention }}
 
       - name: Upload binaries for ${{ inputs.os }} platform to GCP
         if: ${{ steps.check_archive.outputs.exists != 'true' }}
         uses: google-github-actions/upload-cloud-storage@7c6e11cb7291594c5dfe0bc1dd9cd905e31e600c # pin@v2
         with:
-          path: ${{ env.BINARIES_DIR }}
-          destination: "mysten-walrus-binaries"
+          path: ${{ env.BINARIES_DIR }}/site-builder${{ env.extention }}
+          destination: "mysten-walrus-binaries/site-builder${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}${{ env.extention }}"
           parent: false
 
       - name: Create tarball for site-builder binary
@@ -162,9 +162,7 @@ jobs:
         shell: bash
         run: |
           tar -cvf ${BINARIES_DIR}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}.tar \
-            -C ${BINARIES_DIR} \
-            site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}${{ env.extention }} \
-            --transform="s/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}${{ env.extention }}/site-builder${{ env.extention }}/"
+            ${BINARIES_DIR}
 
       - name: List upload directory contents
         shell: bash
