@@ -158,7 +158,6 @@ jobs:
           parent: false
 
       - name: Create tarball for site-builder binary
-        if: ${{ steps.check_archive.outputs.exists != 'true' }}
         shell: bash
         run: |
           tar -cvf ${BINARIES_DIR}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}.tar \
