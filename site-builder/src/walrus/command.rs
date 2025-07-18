@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
 use super::types::BlobId;
-use crate::args::EpochArg;
+use crate::{args::EpochArg, walrus::output::EncodingType};
 
 /// Represents a call to the JSON mode of the Walrus CLI.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -101,6 +101,9 @@ pub enum Command {
         /// The RPC endpoint to which the Walrus CLI should connect to.
         #[serde(flatten)]
         rpc_arg: RpcArg,
+        /// The Walrus Encoding Type.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        encoding_type: Option<EncodingType>,
     },
     Info {
         /// The URL of the Sui RPC node to use.
@@ -237,16 +240,20 @@ impl WalrusCmdBuilder {
     }
 
     /// Adds a [`Command::BlobId`] command to the builder.
+    ///
+    /// NB: Added the encoding_type arg, to handle Issue SEW-288
     pub fn blob_id(
         self,
         file: PathBuf,
         n_shards: Option<NonZeroU16>,
         rpc_arg: RpcArg,
+        encoding_type: Option<EncodingType>,
     ) -> WalrusCmdBuilder<Command> {
         let command = Command::BlobId {
             file,
             n_shards,
             rpc_arg,
+            encoding_type,
         };
         self.with_command(command)
     }
