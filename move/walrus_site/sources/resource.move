@@ -31,14 +31,6 @@ public struct Range has drop, store {
     end: Option<u16>, // exclusive upper bound
 }
 
-// TODO: MOVE to new df
-// /// Representation of the resource path.
-// ///
-// /// Ensures there are no namespace collisions in the dynamic fields.
-// public struct ResourcePath has copy, drop, store {
-//     path: String,
-// }
-
 /// Optionally creates a new Range object.
 public fun new_range_option(range_start: Option<u16>, range_end: Option<u16>): Option<Range> {
     if (range_start.is_none() && range_end.is_none()) {
@@ -91,3 +83,14 @@ public fun add_header(resource: &mut Resource, name: String, value: String) {
     resource.headers.insert(name, value);
 }
 
+public fun path_mut(self: &mut Resource): &mut String {
+    &mut self.path
+}
+
+public fun path(self: &Resource): &String {
+    &self.path
+}
+
+public fun blob_id(self: &Resource): u256 {
+    self.blob_id
+}

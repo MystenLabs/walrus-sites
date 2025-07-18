@@ -2,27 +2,30 @@
 module walrus_site::site;
 
 use std::string::String;
-use sui::{display::{Self, Display}, dynamic_field as df, package::{Self, Publisher}, vec_map};
-use walrus_site::{events_::{emit_site_created, emit_site_burned}, metadata_::Metadata};
+use sui::display::{Self, Display};
+use sui::object_table::ObjectTable;
+use sui::package::{Self, Publisher};
+use sui::versioned::{Self, Versioned};
 
-/// The name of the dynamic field containing the routes.
-const ROUTES_FIELD: vector<u8> = b"routes";
+use walrus::blob::Blob;
 
+use walrus_site::events_::{emit_site_created, emit_site_burned};
+use walrus_site::metadata_::Metadata;
+use walrus_site::site_data_1::{Self as site_data, SiteData};
+
+const VERSION: u64 = 1;
 
 /// The site published on Sui.
 public struct Site has key, store {
     id: UID,
+    site_data: Versioned,
+    // to here
     name: String,
     link: Option<String>,
     image_url: Option<String>,
     description: Option<String>,
     project_url: Option<String>,
     creator: Option<String>,
-}
-
-/// The routes for a site.
-public struct Routes has drop, store {
-    route_list: vec_map::VecMap<String, String>
 }
 
 /// One-Time-Witness for the module.
@@ -39,6 +42,7 @@ fun init(otw: SITE, ctx: &mut TxContext) {
 public fun new_site(name: String, metadata: Metadata, ctx: &mut TxContext): Site {
     let site = Site {
         id: object::new(ctx),
+        site_data: versioned::create(VERSION, site_data::new(ctx), ctx),
         name,
         link: metadata.link(),
         image_url: metadata.image_url(),
@@ -66,69 +70,33 @@ public fun update_metadata(site: &mut Site, metadata: Metadata) {
     site.creator = metadata.creator();
 }
 
-// Routes.
-
-/// Creates a new `Routes` object.
-fun new_routes(): Routes {
-    Routes { route_list: vec_map::empty() }
-}
-
-/// Inserts a route into the `Routes` object.
-///
-/// The insertion operation fails if the route already exists.
-fun routes_insert(routes: &mut Routes, route: String, resource_path: String) {
-    routes.route_list.insert(route, resource_path);
-}
-
-/// Removes a route from the `Routes` object.
-fun routes_remove(routes: &mut Routes, route: &String): (String, String) {
-    routes.route_list.remove(route)
-}
-
-// Routes management on the site.
-
-/// Add the routes dynamic field to the site.
-public fun create_routes(site: &mut Site) {
-    let routes = new_routes();
-    df::add(&mut site.id, ROUTES_FIELD, routes);
-}
-
-/// Remove all routes from the site.
-public fun remove_all_routes_if_exist(site: &mut Site): Option<Routes> {
-    df::remove_if_exists(&mut site.id, ROUTES_FIELD)
-}
-
-/// Add a route to the site.
-///
-/// The insertion operation fails:
-/// - if the route already exists; or
-/// - if the related resource path does not already exist as a dynamic field on the site.
-public fun insert_route(site: &mut Site, route: String, resource_path: String) {
-    let path_obj = new_path(resource_path);
-    assert!(df::exists_(&site.id, path_obj), EResourceDoesNotExist);
-    let routes = df::borrow_mut(&mut site.id, ROUTES_FIELD);
-    routes_insert(routes, route, resource_path);
-}
-
-/// Remove a route from the site.
-public fun remove_route(site: &mut Site, route: &String): (String, String) {
-    let routes = df::borrow_mut(&mut site.id, ROUTES_FIELD);
-    routes_remove(routes, route)
-}
-
 /// Deletes a site object.
 ///
 /// NB: This function does **NOT** delete the dynamic fields! Make sure to call this function
 /// after deleting manually all the dynamic fields attached to the sites object. If you don't
 /// delete the dynamic fields, they will become unaccessible and you will not be able to delete
 /// them in the future.
-public fun burn(site: Site) {
+public fun burn(site: Site): ObjectTable<u256, Blob> {
     emit_site_burned(object::id(&site));
     let Site {
         id,
-        ..,
+        site_data,
+        ..
     } = site;
     id.delete();
+    site_data.destroy<SiteData>().drop()
+}
+
+public fun destroy_empty(self: Site) {
+    let Site {
+        id,
+        site_data,
+        ..
+    } = self;
+    let site_id = id.to_inner();
+    id.delete();
+    emit_site_burned(site_id);
+    site_data.destroy<SiteData>().destroy_empty()
 }
 
 /// Define a Display for the Site objects.
@@ -191,19 +159,3 @@ public fun init_for_testing(ctx: &mut TxContext) {
     init(SITE {}, ctx);
 }
 
-/// =========================== DEPRECATED ===========================
-
-public struct Resource has drop, store { path: String, headers: vec_map::VecMap<String, String>, blob_id: u256, blob_hash: u256, range: Option<Range> }
-public struct Range has drop, store { start: Option<u64>, end: Option<u64> }
-public struct ResourcePath has copy, drop, store { path: String }
-
-public fun new_range_option(range_start: Option<u64>, range_end: Option<u64>): Option<Range> { if (range_start.is_none() && range_end.is_none()) { return option::none<Range>() }; option::some(new_range(range_start, range_end)) }
-public fun new_range(range_start: Option<u64>, range_end: Option<u64>): Range { let start_is_defined = range_start.is_some(); let end_is_defined = range_end.is_some(); assert!(start_is_defined || end_is_defined, EStartAndEndRangeAreNone); if (start_is_defined && end_is_defined) { let start = option::borrow(&range_start); let end = option::borrow(&range_end); assert!(*end > *start, ERangeStartGreaterThanRangeEnd); }; Range { start: range_start, end: range_end, } }
-public fun new_resource( path: String, blob_id: u256, blob_hash: u256, range: Option<Range>): Resource { Resource { path, headers: vec_map::empty(), blob_id, blob_hash, range } }
-public fun add_header(resource: &mut Resource, name: String, value: String) { resource.headers.insert(name, value); }
-fun new_path(path: String): ResourcePath { ResourcePath { path } }
-
-public fun add_resource(site: &mut Site, resource: Resource) { let path_obj = new_path(resource.path); df::add(&mut site.id, path_obj, resource); }
-public fun remove_resource(site: &mut Site, path: String): Resource { let path_obj = new_path(path); df::remove(&mut site.id, path_obj) }
-public fun remove_resource_if_exists(site: &mut Site, path: String): Option<Resource> { let path_obj = new_path(path); df::remove_if_exists(&mut site.id, path_obj) }
-public fun move_resource(site: &mut Site, old_path: String, new_path: String) { let mut resource = remove_resource(site, old_path); resource.path = new_path; add_resource(site, resource); }
