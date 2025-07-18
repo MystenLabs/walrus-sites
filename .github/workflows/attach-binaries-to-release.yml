@@ -161,14 +161,6 @@ jobs:
           destination: "mysten-walrus-binaries"
           parent: false
 
-      - name: Upload release artifacts for ${{ matrix.os }} platform
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # pin@4.6.2
-        with:
-          name: walrus-binaries-${{ matrix.os }}
-          if-no-files-found: error
-          path: |
-            ${{ env.BINARIES_DIR }}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}${{ env.extention }}
-
       - name: Create tarball for site-builder binary
         if: ${{ steps.check_archive.outputs.exists != 'true' }}
         shell: bash
@@ -177,6 +169,14 @@ jobs:
             -C ${BINARIES_DIR} \
             site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}${{ env.extention }} \
             --transform="s/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}${{ env.extention }}/site-builder${{ env.extention }}/"
+
+      - name: Upload release artifacts for ${{ matrix.os }} platform
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # pin@4.6.2
+        with:
+          name: walrus-binaries-${{ matrix.os }}
+          if-no-files-found: error
+          path: |
+            ${{ env.BINARIES_DIR }}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}.tar
 
       - name: Attach artifacts to ${{ steps.validate_tag_name.outputs.site-builder-tag }} release in GH
         uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # pin@v2.2.2
