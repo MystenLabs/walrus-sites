@@ -149,6 +149,10 @@ jobs:
           mkdir -p ${BINARIES_DIR}
           mv ./target/release/site-builder ${BINARIES_DIR}/site-builder${{ env.extention }}
 
+      - name: List upload directory contents 1
+        shell: bash
+        run: ls -al ${BINARIES_DIR}
+
       - name: Upload binaries for ${{ inputs.os }} platform to GCP
         if: ${{ steps.check_archive.outputs.exists != 'true' }}
         uses: google-github-actions/upload-cloud-storage@7c6e11cb7291594c5dfe0bc1dd9cd905e31e600c # pin@v2
@@ -157,13 +161,17 @@ jobs:
           destination: "mysten-walrus-binaries/site-builder${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}${{ env.extention }}"
           parent: false
 
+      - name: List upload directory contents 2
+        shell: bash
+        run: ls -al ${BINARIES_DIR}
+
       - name: Create tarball for site-builder binary
         shell: bash
         run: |
           tar -cvf ${BINARIES_DIR}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}.tar \
             ${BINARIES_DIR}
 
-      - name: List upload directory contents
+      - name: List upload directory contents 3
         shell: bash
         run: ls -al ${BINARIES_DIR}
 
