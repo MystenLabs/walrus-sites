@@ -121,7 +121,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p ${BINARIES_DIR}
-          gcloud storage cp ${{ steps.check_archive.outputs.gcloud_site_builder_bin }} ${BINARIES_DIR}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${os_type}${{ env.extention }}
+          gcloud storage cp ${{ steps.check_archive.outputs.gcloud_site_builder_bin }} ${BINARIES_DIR}/site-builder${{ env.extention }}
 
       - name: Remove unused apps (MacOS arm64)
         if: ${{ matrix.os == 'macos-latest-xlarge' && steps.check_archive.outputs.exists != 'true' }}
@@ -149,10 +149,6 @@ jobs:
           mkdir -p ${BINARIES_DIR}
           mv ./target/release/site-builder ${BINARIES_DIR}/site-builder${{ env.extention }}
 
-      - name: List upload directory contents 1
-        shell: bash
-        run: ls -al ${BINARIES_DIR}
-
       - name: Upload binaries for ${{ inputs.os }} platform to GCP
         if: ${{ steps.check_archive.outputs.exists != 'true' }}
         uses: google-github-actions/upload-cloud-storage@7c6e11cb7291594c5dfe0bc1dd9cd905e31e600c # pin@v2
@@ -161,17 +157,13 @@ jobs:
           destination: "mysten-walrus-binaries/site-builder${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}${{ env.extention }}"
           parent: false
 
-      - name: List upload directory contents 2
-        shell: bash
-        run: ls -al ${BINARIES_DIR}
-
       - name: Create tarball for site-builder binary
         shell: bash
         run: |
           tar -cvf ${BINARIES_DIR}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}.tar \
             ${BINARIES_DIR}
 
-      - name: List upload directory contents 3
+      - name: List runner binaries directory contents
         shell: bash
         run: ls -al ${BINARIES_DIR}
 
