@@ -160,8 +160,10 @@ jobs:
       - name: Create tarball for site-builder binary
         shell: bash
         run: |
+          TEMP_DIR=$(mktemp -d)
+          cp -r ${BINARIES_DIR}/* $TEMP_DIR
           tar -czvf ${BINARIES_DIR}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}.tgz \
-            ${BINARIES_DIR}
+            -C $TEMP_DIR .
 
       - name: List runner binaries directory contents
         shell: bash
