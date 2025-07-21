@@ -160,7 +160,7 @@ jobs:
       - name: Create tarball for site-builder binary
         shell: bash
         run: |
-          tar -cvf ${BINARIES_DIR}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}.tar \
+          tar -czvf ${BINARIES_DIR}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}.tgz \
             ${BINARIES_DIR}
 
       - name: List runner binaries directory contents
@@ -173,11 +173,11 @@ jobs:
           name: walrus-binaries-${{ matrix.os }}
           if-no-files-found: error
           path: |
-            ${{ env.BINARIES_DIR }}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}.tar
+            ${{ env.BINARIES_DIR }}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}.tgz
 
       - name: Attach artifacts to ${{ steps.validate_tag_name.outputs.site-builder-tag }} release in GH
         uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # pin@v2.2.2
         with:
           tag_name: ${{ steps.validate_tag_name.outputs.site-builder-tag }}
           files: |
-            ${{ env.BINARIES_DIR }}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}.tar
+            ${{ env.BINARIES_DIR }}/site-builder-${{ steps.validate_tag_name.outputs.site-builder-tag }}-${{ env.os_type }}.tgz
