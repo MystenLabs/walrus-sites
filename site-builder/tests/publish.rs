@@ -15,7 +15,7 @@ use localnode::{
 // Important: For tests to pass, the system they are running on need to have walrus installed.
 #[tokio::test]
 async fn publish_snake() -> anyhow::Result<()> {
-    let cluster = TestSetup::start_local_test_cluster().await?;
+    let cluster = TestSetup::start_local_test_cluster(&[]).await?;
     let directory = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()

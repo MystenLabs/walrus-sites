@@ -1,7 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{fs::File, path::PathBuf, sync::Arc};
+use std::{
+    fs::File,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use anyhow::{anyhow, bail};
 use site_builder::{args::GeneralArgs, config::Config as SitesConfig};
@@ -50,10 +54,11 @@ pub struct TestSetup {
     pub wallet: WithTempDir<Wallet>,
     pub walrus_config: WithTempDir<(ContractConfig, PathBuf)>,
     pub walrus_sites_package_id: ObjectID,
+    pub other_packages_ids: Vec<ObjectID>,
 }
 
 impl TestSetup {
-    pub async fn start_local_test_cluster() -> anyhow::Result<Self> {
+    pub async fn start_local_test_cluster(also_publish: &[&Path]) -> anyhow::Result<Self> {
         let (sui_cluster_handle, walrus_cluster, walrus_admin_client, system_context) =
             test_cluster::E2eTestSetupBuilder::new().build().await?;
         let rpc_url = sui_cluster_handle.as_ref().lock().await.rpc_url();
@@ -64,6 +69,14 @@ impl TestSetup {
             new_wallet_on_sui_test_cluster(sui_cluster_handle.clone()).await?;
         let walrus_sites_package_id =
             publish_walrus_sites(&sui_client, &mut walrus_sites_publisher.inner).await?;
+
+        // ================================ Publish other packages =================================
+        let mut other_packages_ids = vec![];
+        for &path in also_publish {
+            other_packages_ids
+                .push(publish_package(&sui_client, &mut walrus_sites_publisher.inner, path).await?);
+        }
+        let other_packages_ids = other_packages_ids;
 
         // ================================= Create walrus config ==================================
         let walrus_sui_client = walrus_admin_client.inner.sui_client();
@@ -92,6 +105,7 @@ impl TestSetup {
             wallet: test_wallet,
             walrus_config,
             walrus_sites_package_id,
+            other_packages_ids,
         })
     }
 }
@@ -100,15 +114,22 @@ async fn publish_walrus_sites(
     sui_client: &SuiClient,
     publisher: &mut Wallet,
 ) -> anyhow::Result<ObjectID> {
-    const PUBLISH_GAS_BUDGET: u64 = 5_000_000_000;
-
     // Build package
     let path_buf = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
         .join("move")
         .join("walrus_site");
-    let path = path_buf.as_path();
+    publish_package(sui_client, publisher, path_buf.as_path()).await
+}
+
+async fn publish_package(
+    sui_client: &SuiClient,
+    publisher: &mut Wallet,
+    path: &Path,
+) -> anyhow::Result<ObjectID> {
+    const PUBLISH_GAS_BUDGET: u64 = 5_000_000_000;
+
     let move_build_config = BuildConfig::new_for_testing();
     let compiled_modules = move_build_config.build(path)?;
     let modules_bytes = compiled_modules.get_package_bytes(false);
