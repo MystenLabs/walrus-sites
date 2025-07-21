@@ -13,6 +13,17 @@ use walrus_site::events_::{emit_site_created, emit_site_burned};
 use walrus_site::metadata_::Metadata;
 use walrus_site::site_data_1::{Self as site_data, SiteData};
 
+public use fun walrus_site::facade_1::add_blob as Site.add_blob;
+public use fun walrus_site::facade_1::remove_blob as Site.remove_blob;
+
+public use fun walrus_site::facade_1::add_resource as Site.add_resource;
+public use fun walrus_site::facade_1::remove_resource as Site.remove_resource;
+public use fun walrus_site::facade_1::remove_resource_if_exists as Site.remove_resource_if_exists;
+public use fun walrus_site::facade_1::move_resource as Site.move_resource;
+
+public use fun walrus_site::facade_1::add_route as Site.add_route;
+public use fun walrus_site::facade_1::remove_route as Site.remove_route;
+
 const VERSION: u64 = 1;
 
 /// The site published on Sui.
@@ -152,6 +163,14 @@ public fun get_site_project_url(site: &Site): Option<String> {
 
 public fun get_site_creator(site: &Site): Option<String> {
     site.creator
+}
+
+public(package) fun site_data(self: &Site): &SiteData {
+    self.site_data.load_value()
+}
+
+public(package) fun site_data_mut(self: &mut Site): &mut SiteData {
+    self.site_data.load_value_mut()
 }
 
 #[test_only]

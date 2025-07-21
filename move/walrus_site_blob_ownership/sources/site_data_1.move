@@ -124,18 +124,12 @@ public fun remove_resource(self: &mut SiteData, path: String): Resource {
     resource
 }
 
-// THESE 2 functions can be moved to facade
-public fun remove_resource_if_exists(self: &mut SiteData, path: String): Option<Resource> {
-    match (self.resources.contains(path)) {
-        true => option::some(self.remove_resource(path)),
-        false => option::none()
-    }
+public fun contains_resource(self: &SiteData, path: String): bool {
+    self.resources.contains(path)
 }
 
-public fun move_resource(self: &mut SiteData, old_path: String, new_path: String) {
-    let mut resource = self.remove_resource(old_path);
-    *resource.path_mut() = new_path;
-    self.add_resource(resource);
+public fun resources(self: &SiteData): &Table<String, Resource> {
+    &self.resources
 }
 
 // ================= Routes =================
