@@ -424,7 +424,7 @@ async fn publish_snake() -> anyhow::Result<()> {
         "Used {sui_balance_post} - {sui_balance_new_post} = {} MIST",
         sui_balance_post - sui_balance_new_post
     );
-    tokio::time::sleep(std::time::Duration::from_secs(1000)).await;
+    // tokio::time::sleep(std::time::Duration::from_secs(1000)).await;
 
     Ok(())
 }
