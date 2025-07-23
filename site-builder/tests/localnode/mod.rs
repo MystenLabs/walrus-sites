@@ -4,12 +4,16 @@
 use std::{
     fs::File,
     path::{Path, PathBuf},
+    str::FromStr,
     sync::Arc,
 };
 
 use anyhow::{anyhow, bail};
+use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
+use move_package::resolution::resolution_graph::ResolvedGraph;
+use move_symbol_pool::Symbol;
 use site_builder::{args::GeneralArgs, config::Config as SitesConfig};
-use sui_move_build::BuildConfig;
+use sui_move_build::{build_from_resolution_graph, BuildConfig};
 use sui_sdk::{
     rpc_types::{
         ObjectChange,
@@ -32,7 +36,12 @@ use walrus_sdk::client::Client as WalrusSDKClient;
 use walrus_service::test_utils::{test_cluster, StorageNodeHandle, TestCluster};
 use walrus_sui::{
     client::{contract_config::ContractConfig, SuiContractClient},
-    test_utils::{new_wallet_on_sui_test_cluster, system_setup::SystemContext, TestClusterHandle},
+    test_utils::{
+        new_contract_client_on_sui_test_cluster,
+        new_wallet_on_sui_test_cluster,
+        system_setup::SystemContext,
+        TestClusterHandle,
+    },
     wallet::Wallet,
 };
 use walrus_test_utils::WithTempDir;
@@ -51,18 +60,23 @@ pub struct TestSetup {
     pub cluster_state: WalrusSitesClusterState,
     pub client: SuiClient,
     pub sites_config: WithTempDir<(SitesConfig, PathBuf)>,
-    pub wallet: WithTempDir<Wallet>,
+    pub walrus_wallet: WithTempDir<WalrusSDKClient<SuiContractClient>>,
     pub walrus_config: WithTempDir<(ContractConfig, PathBuf)>,
     pub walrus_sites_package_id: ObjectID,
     pub other_packages_ids: Vec<ObjectID>,
 }
 
 impl TestSetup {
-    pub async fn start_local_test_cluster(also_publish: &[&Path]) -> anyhow::Result<Self> {
+    pub async fn start_local_test_cluster() -> anyhow::Result<Self> {
         let (sui_cluster_handle, walrus_cluster, walrus_admin_client, system_context) =
-            test_cluster::E2eTestSetupBuilder::new().build().await?;
+            test_cluster::E2eTestSetupBuilder::default().build().await?;
         let rpc_url = sui_cluster_handle.as_ref().lock().await.rpc_url();
         let sui_client = SuiClientBuilder::default().build(rpc_url).await?;
+
+        // ================================= Create walrus config ==================================
+        // TODO: Check here how to get the wal_pkg
+        let walrus_sui_client = walrus_admin_client.inner.sui_client();
+        let walrus_config = create_walrus_config(walrus_sui_client)?;
 
         // ================================= Publish Walrus-Sites ==================================
         let mut walrus_sites_publisher =
@@ -71,23 +85,32 @@ impl TestSetup {
             publish_walrus_sites(&sui_client, &mut walrus_sites_publisher.inner).await?;
 
         // ================================ Publish other packages =================================
-        let mut other_packages_ids = vec![];
-        for &path in also_publish {
-            other_packages_ids
-                .push(publish_package(&sui_client, &mut walrus_sites_publisher.inner, path).await?);
-        }
-        let other_packages_ids = other_packages_ids;
-
-        // ================================= Create walrus config ==================================
-        let walrus_sui_client = walrus_admin_client.inner.sui_client();
-        let walrus_config = create_walrus_config(walrus_sui_client)?;
+        let wal_coin_type = StructTag::from_str(walrus_sui_client.read_client().wal_coin_type())?;
+        let wal_pkg = wal_coin_type.address;
+        let other_packages_ids = vec![
+            publish_blob_ownership(
+                &sui_client,
+                &mut walrus_sites_publisher.inner,
+                wal_pkg,
+                AccountAddress::from(system_context.walrus_pkg_id),
+            )
+            .await?,
+        ];
 
         // ========================== Create new wallet and sites config ===========================
-        let test_wallet =
-            new_wallet_with_sui_and_wal(sui_cluster_handle.clone(), walrus_sui_client).await?;
+        let mut walrus_wallet = new_walrus_wallet_with_sui_and_wal(
+            sui_cluster_handle.clone(),
+            &walrus_admin_client.inner,
+        )
+        .await?;
 
         let sites_config = create_sites_config(
-            test_wallet.inner.get_config_path().to_path_buf(),
+            walrus_wallet
+                .inner
+                .sui_client_mut()
+                .wallet_mut()
+                .get_config_path()
+                .to_path_buf(),
             walrus_sites_package_id,
             walrus_config.inner.1.clone(),
         )?;
@@ -102,7 +125,7 @@ impl TestSetup {
             },
             client: sui_client,
             sites_config,
-            wallet: test_wallet,
+            walrus_wallet,
             walrus_config,
             walrus_sites_package_id,
             other_packages_ids,
@@ -120,18 +143,88 @@ async fn publish_walrus_sites(
         .unwrap()
         .join("move")
         .join("walrus_site");
-    publish_package(sui_client, publisher, path_buf.as_path()).await
+    publish_package(sui_client, publisher, path_buf.as_path(), vec![]).await
+}
+
+async fn publish_blob_ownership(
+    sui_client: &SuiClient,
+    publisher: &mut Wallet,
+    wal_pkg_id: AccountAddress,
+    walrus_pkg_id: AccountAddress,
+) -> anyhow::Result<ObjectID> {
+    // Build package
+    let path_buf = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .join("move")
+        .join("walrus_site_blob_ownership");
+    publish_package(
+        sui_client,
+        publisher,
+        path_buf.as_path(),
+        vec![
+            PackageDependency {
+                pkg_name: "WAL",
+                pkg_address_name: "wal",
+                pkg_id: wal_pkg_id,
+            },
+            PackageDependency {
+                pkg_name: "Walrus",
+                pkg_address_name: "walrus",
+                pkg_id: walrus_pkg_id,
+            },
+        ],
+    )
+    .await
+}
+
+#[derive(Debug, Clone)]
+struct PackageDependency<'a> {
+    pub pkg_name: &'a str,
+    pub pkg_address_name: &'a str,
+    pub pkg_id: AccountAddress,
 }
 
 async fn publish_package(
     sui_client: &SuiClient,
     publisher: &mut Wallet,
     path: &Path,
+    modify_deps: Vec<PackageDependency<'_>>,
 ) -> anyhow::Result<ObjectID> {
     const PUBLISH_GAS_BUDGET: u64 = 5_000_000_000;
 
     let move_build_config = BuildConfig::new_for_testing();
-    let compiled_modules = move_build_config.build(path)?;
+    let compiled_modules = if modify_deps.len() > 0 {
+        let mut res_graph = move_build_config.resolution_graph(path, None)?;
+        for PackageDependency {
+            pkg_address_name,
+            pkg_id,
+            ..
+        } in &modify_deps
+        {
+            update_graph_dependency(&mut res_graph, pkg_address_name, pkg_id.clone())?;
+        }
+        let mut compiled_modules = build_from_resolution_graph(res_graph, false, false, None)?;
+        // Above, for comparing published vs unpublished it looks into the lock files, instead of
+        // the res-graph, this is why we need a second edit step
+        for PackageDependency {
+            pkg_name, pkg_id, ..
+        } in modify_deps
+        {
+            let pkg_name = Symbol::try_from(pkg_name)?;
+            compiled_modules
+                .dependency_ids
+                .unpublished
+                .remove(&pkg_name);
+            compiled_modules
+                .dependency_ids
+                .published
+                .insert(pkg_name, pkg_id.into());
+        }
+        compiled_modules
+    } else {
+        move_build_config.build(path)?
+    };
     let modules_bytes = compiled_modules.get_package_bytes(false);
 
     let wallet_active_address = publisher.active_address()?;
@@ -150,10 +243,7 @@ async fn publish_package(
     let mut builder = ProgrammableTransactionBuilder::new();
     let upgrade_cap = builder.publish_upgradeable(
         modules_bytes,
-        vec![
-            ObjectID::from_hex_literal("0x1").unwrap(),
-            ObjectID::from_hex_literal("0x2").unwrap(),
-        ],
+        compiled_modules.get_dependency_storage_package_ids(),
     );
     builder.transfer_arg(wallet_active_address, upgrade_cap);
     let pt = builder.finish();
@@ -200,18 +290,38 @@ async fn publish_package(
         .ok_or(anyhow!("No published package in response."))
 }
 
-pub async fn new_wallet_with_sui_and_wal(
+pub async fn new_walrus_wallet_with_sui_and_wal(
     sui_cluster_handle: Arc<TokioMutex<TestClusterHandle>>,
-    walrus_sui_client: &SuiContractClient,
-) -> anyhow::Result<WithTempDir<Wallet>> {
+    existing_wallet: &WalrusSDKClient<SuiContractClient>,
+) -> anyhow::Result<WithTempDir<WalrusSDKClient<SuiContractClient>>> {
     #[allow(clippy::inconsistent_digit_grouping)]
     const WAL_FUND: u64 = 1000_000_000_000;
 
-    let mut test_wallet = new_wallet_on_sui_test_cluster(sui_cluster_handle.clone()).await?;
+    let walrus_sui_client = existing_wallet.sui_client();
+    let mut test_wallet =
+        new_contract_client_on_sui_test_cluster(sui_cluster_handle.clone(), walrus_sui_client)
+            .await?;
     walrus_sui_client
-        .send_wal(WAL_FUND, test_wallet.inner.active_address()?)
+        .send_wal(WAL_FUND, test_wallet.inner.wallet_mut().active_address()?)
         .await?;
-    Ok(test_wallet)
+
+    let refresh_handle = existing_wallet
+        .config()
+        .refresh_config
+        .build_refresher_and_run(walrus_sui_client.read_client().clone())
+        .await?;
+    let walrus_wallet = test_wallet
+        .and_then_async(|inner| async move {
+            WalrusSDKClient::new_contract_client(
+                existing_wallet.config().clone(),
+                refresh_handle,
+                inner,
+            )
+            .await
+        })
+        .await?;
+
+    Ok(walrus_wallet)
 }
 
 pub fn create_walrus_config(
@@ -256,4 +366,25 @@ pub fn create_sites_config(
         inner: (sites_config, sites_config_path),
         temp_dir,
     })
+}
+
+fn update_graph_dependency(
+    res_graph: &mut ResolvedGraph,
+    pkg_address_name: &'_ str,
+    pkg_id: AccountAddress,
+) -> anyhow::Result<()> {
+    // let pkg_name = Symbol::try_from(pkg_name)?;
+    let pkg_address_name = Symbol::try_from(pkg_address_name)?;
+    let pkg_id = AccountAddress::from(pkg_id);
+
+    for (_, pkg_table_entry) in res_graph.package_table.iter_mut() {
+        let addresses = pkg_table_entry.source_package.addresses.as_mut().unwrap();
+        if let Some(some_id) = addresses.get_mut(&pkg_address_name) {
+            *some_id = Some(pkg_id)
+        };
+        if let Some(id) = pkg_table_entry.resolved_table.get_mut(&pkg_address_name) {
+            *id = pkg_id
+        };
+    }
+    Ok(())
 }

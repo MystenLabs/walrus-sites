@@ -11,7 +11,7 @@ use localnode::{args_builder::ArgsBuilder, TestSetup};
 // Important: For tests to pass, the system they are running on need to have walrus installed.
 #[tokio::test]
 async fn converts_random_site_id() -> anyhow::Result<()> {
-    let cluster = TestSetup::start_local_test_cluster(&[]).await?;
+    let cluster = TestSetup::start_local_test_cluster().await?;
 
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config.inner.1))

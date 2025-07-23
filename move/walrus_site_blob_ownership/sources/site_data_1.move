@@ -4,7 +4,7 @@ use std::string::String;
 
 use sui::object_table::{Self, ObjectTable};
 use sui::table::{Self, Table};
-use sui::vec_set::VecSet;
+use sui::vec_set::{Self, VecSet};
 
 use walrus::blob::Blob;
 
@@ -20,6 +20,7 @@ use walrus_site::resource::Resource;
 
 public struct SiteData has store {
     resources: Table<String, Resource>,
+    // NOTE: Here we could also choose between having to add a blob or not. eg for small files.
     blobs: ObjectTable<u256, Blob>,
     // NOTE: Could there be a blob that is assigned to more than eg 1000 resources?
     blob_resources: Table<u256, VecSet<String>>,
@@ -71,6 +72,7 @@ public fun drop(self: SiteData): ObjectTable<u256, Blob> {
 public fun add_blob(self: &mut SiteData, blob: Blob) {
     let blob_id = blob.blob_id();
     self.blobs.add(blob_id, blob);
+    self.blob_resources.add(blob_id, vec_set::empty());
 }
 
 public fun remove_blob(self: &mut SiteData, blob_id: u256): Blob {
@@ -108,7 +110,8 @@ public fun contains_blob(self: &SiteData, blob_id: u256): bool {
 // NOTE: We might want to add events here?
 public fun add_resource(self: &mut SiteData, resource: Resource) {
     let blob_id = resource.blob_id();
-    assert!(self.blobs.contains(blob_id));
+    assert!(self.blobs.contains(blob_id), 0);
+    assert!(self.blob_resources.contains(blob_id), 1);
     self.blob_resources[blob_id].insert(*resource.path());
     self.resources.add(*resource.path(), resource);
 }

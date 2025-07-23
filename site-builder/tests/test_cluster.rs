@@ -21,7 +21,7 @@ async fn start_walrus_sites_cluster() -> anyhow::Result<()> {
         walrus_sites_package_id,
         sites_config,
         ..
-    } = TestSetup::start_local_test_cluster(&[]).await?;
+    } = TestSetup::start_local_test_cluster().await?;
     println!(
         r#"Published walrus_sites
 - at {walrus_sites_package_id}
