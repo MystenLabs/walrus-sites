@@ -1,4 +1,9 @@
-use std::{fs, num::NonZeroU32, path::PathBuf, str::FromStr};
+use std::{
+    fs,
+    num::NonZeroU32,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 use anyhow::{anyhow, bail};
 use fastcrypto::hash::{HashFunction, Sha256};
@@ -32,11 +37,11 @@ use walrus_sdk::{
     store_when::StoreWhen,
 };
 use walrus_sui::{
-    client::{BlobPersistence, FixedSystemParameters, ReadClient, SuiContractClient},
+    client::{BlobPersistence, SuiContractClient},
     types::Blob,
 };
 
-fn get_snake_upload_files(dir: &PathBuf) -> (Vec<PathBuf>, Vec<&str>) {
+fn get_snake_upload_files(dir: &Path) -> (Vec<PathBuf>, Vec<&str>) {
     let filenames = vec!["Oi-Regular.ttf", "file.svg", "index.html", "walrus.svg"];
     (
         filenames.iter().map(|name| dir.join(name)).collect(),
@@ -65,7 +70,6 @@ async fn publish_blobs(
 
 #[tokio::test]
 async fn publish_snake() -> anyhow::Result<()> {
-    const GAS_BUDGET: u64 = 5_000_000_000;
     let mut cluster = TestSetup::start_local_test_cluster().await?;
 
     println!("sites-config: {:#?}", &cluster.sites_config);
@@ -103,7 +107,7 @@ async fn publish_snake() -> anyhow::Result<()> {
         .await?
         .total_balance;
     let args = ArgsBuilder::default()
-        .with_config(Some(cluster.sites_config.inner.1))
+        .with_config(Some(cluster.sites_config.inner.1.clone()))
         .with_command(Commands::Publish {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory.clone())
@@ -135,16 +139,39 @@ async fn publish_snake() -> anyhow::Result<()> {
         sui_balance_pre - sui_balance_post
     );
 
-    let FixedSystemParameters { n_shards, .. } = cluster
-        .walrus_wallet
-        .inner
-        .sui_client()
-        .read_client()
-        .fixed_system_parameters()
-        .await?;
-    cluster.cluster_state.walrus_cluster.n_shards = u16::from(n_shards) as usize;
-
     let (files, names) = get_snake_upload_files(&directory);
+    blob_ownership_site_creation(&mut cluster, (files, names)).await?;
+
+    let sui_balance_new_post = cluster
+        .client
+        .coin_read_api()
+        .get_balance(
+            cluster
+                .walrus_wallet
+                .inner
+                .sui_client_mut()
+                .wallet_mut()
+                .active_address()?,
+            None,
+        )
+        .await?
+        .total_balance;
+
+    println!(
+        "Used {sui_balance_post} - {sui_balance_new_post} = {} MIST",
+        sui_balance_post - sui_balance_new_post
+    );
+    // tokio::time::sleep(std::time::Duration::from_secs(1000)).await;
+
+    Ok(())
+}
+
+async fn blob_ownership_site_creation(
+    cluster: &mut TestSetup,
+    (files, names): (Vec<PathBuf>, Vec<&str>),
+) -> anyhow::Result<()> {
+    const GAS_BUDGET: u64 = 5_000_000_000;
+
     let contents = files
         .into_iter()
         .map(|f| {
@@ -396,35 +423,10 @@ async fn publish_snake() -> anyhow::Result<()> {
     println!("digest: {}", resp.digest);
     println!(
         "{}",
-        resp.effects
-            .as_ref()
-            .expect("with_effects()")
-            .status()
-            .to_string()
+        resp.effects.as_ref().expect("with_effects()").status()
     );
 
     assert!(resp.effects.expect("with_effects()").status().is_ok());
-
-    let sui_balance_new_post = cluster
-        .client
-        .coin_read_api()
-        .get_balance(
-            cluster
-                .walrus_wallet
-                .inner
-                .sui_client_mut()
-                .wallet_mut()
-                .active_address()?,
-            None,
-        )
-        .await?
-        .total_balance;
-
-    println!(
-        "Used {sui_balance_post} - {sui_balance_new_post} = {} MIST",
-        sui_balance_post - sui_balance_new_post
-    );
-    // tokio::time::sleep(std::time::Duration::from_secs(1000)).await;
 
     Ok(())
 }

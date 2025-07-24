@@ -35,7 +35,12 @@ use tokio::sync::Mutex as TokioMutex;
 use walrus_sdk::client::Client as WalrusSDKClient;
 use walrus_service::test_utils::{test_cluster, StorageNodeHandle, TestCluster};
 use walrus_sui::{
-    client::{contract_config::ContractConfig, SuiContractClient},
+    client::{
+        contract_config::ContractConfig,
+        FixedSystemParameters,
+        ReadClient,
+        SuiContractClient,
+    },
     test_utils::{
         new_contract_client_on_sui_test_cluster,
         new_wallet_on_sui_test_cluster,
@@ -68,8 +73,18 @@ pub struct TestSetup {
 
 impl TestSetup {
     pub async fn start_local_test_cluster() -> anyhow::Result<Self> {
-        let (sui_cluster_handle, walrus_cluster, walrus_admin_client, system_context) =
+        let (sui_cluster_handle, mut walrus_cluster, walrus_admin_client, system_context) =
             test_cluster::E2eTestSetupBuilder::default().build().await?;
+
+        let FixedSystemParameters { n_shards, .. } = walrus_admin_client
+            .inner
+            .sui_client()
+            .fixed_system_parameters()
+            .await?;
+        walrus_cluster.n_shards = u16::from(n_shards) as usize;
+        // Remove mut
+        let walrus_cluster = walrus_cluster;
+
         let rpc_url = sui_cluster_handle.as_ref().lock().await.rpc_url();
         let sui_client = SuiClientBuilder::default().build(rpc_url).await?;
 
@@ -194,7 +209,7 @@ async fn publish_package(
     const PUBLISH_GAS_BUDGET: u64 = 5_000_000_000;
 
     let move_build_config = BuildConfig::new_for_testing();
-    let compiled_modules = if modify_deps.len() > 0 {
+    let compiled_modules = if !modify_deps.is_empty() {
         let mut res_graph = move_build_config.resolution_graph(path, None)?;
         for PackageDependency {
             pkg_address_name,
@@ -202,7 +217,7 @@ async fn publish_package(
             ..
         } in &modify_deps
         {
-            update_graph_dependency(&mut res_graph, pkg_address_name, pkg_id.clone())?;
+            update_graph_dependency(&mut res_graph, pkg_address_name, *pkg_id)?;
         }
         let mut compiled_modules = build_from_resolution_graph(res_graph, false, false, None)?;
         // Above, for comparing published vs unpublished it looks into the lock files, instead of
@@ -211,7 +226,7 @@ async fn publish_package(
             pkg_name, pkg_id, ..
         } in modify_deps
         {
-            let pkg_name = Symbol::try_from(pkg_name)?;
+            let pkg_name = Symbol::from(pkg_name);
             compiled_modules
                 .dependency_ids
                 .unpublished
@@ -373,9 +388,8 @@ fn update_graph_dependency(
     pkg_address_name: &'_ str,
     pkg_id: AccountAddress,
 ) -> anyhow::Result<()> {
-    // let pkg_name = Symbol::try_from(pkg_name)?;
-    let pkg_address_name = Symbol::try_from(pkg_address_name)?;
-    let pkg_id = AccountAddress::from(pkg_id);
+    // let pkg_name = Symbol::from(pkg_name);
+    let pkg_address_name = Symbol::from(pkg_address_name);
 
     for (_, pkg_table_entry) in res_graph.package_table.iter_mut() {
         let addresses = pkg_table_entry.source_package.addresses.as_mut().unwrap();
