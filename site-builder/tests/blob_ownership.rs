@@ -139,8 +139,8 @@ async fn publish_snake() -> anyhow::Result<()> {
         sui_balance_pre - sui_balance_post
     );
 
-    let (files, names) = get_snake_upload_files(&directory);
-    blob_ownership_site_creation(&mut cluster, (files, names)).await?;
+    // Check snake cost:
+    blob_ownership_site_creation(&mut cluster, get_snake_upload_files(&directory), true).await?;
 
     let sui_balance_new_post = cluster
         .client
@@ -169,6 +169,8 @@ async fn publish_snake() -> anyhow::Result<()> {
 async fn blob_ownership_site_creation(
     cluster: &mut TestSetup,
     (files, names): (Vec<PathBuf>, Vec<&str>),
+    // Hack: hardcoded ws-resources file:
+    is_snake: bool,
 ) -> anyhow::Result<()> {
     const GAS_BUDGET: u64 = 5_000_000_000;
 
@@ -326,44 +328,46 @@ async fn blob_ownership_site_creation(
                 ));
             }
 
-            if path.ends_with(".svg") {
-                let svg_cache_key = ptb.pure("Cache-Control")?;
-                let svg_cache_value = ptb.pure("public, max-age=86400")?;
-                let svg_etag_key = ptb.pure("ETag")?;
-                let svg_etag_value = ptb.pure("\"abc123\"")?;
-                ptb.command(Command::move_call(
-                    cluster.other_packages_ids[0],
-                    Identifier::from_str("resource")?,
-                    Identifier::from_str("add_header")?,
-                    vec![],
-                    vec![resource, svg_cache_key, svg_cache_value],
-                ));
-                ptb.command(Command::move_call(
-                    cluster.other_packages_ids[0],
-                    Identifier::from_str("resource")?,
-                    Identifier::from_str("add_header")?,
-                    vec![],
-                    vec![resource, svg_etag_key, svg_etag_value],
-                ));
-            } else if path.ends_with("index.html") {
-                let index_cache_key = ptb.pure("Cache-Control")?;
-                let index_cache_value = ptb.pure("max-age=3500")?;
-                let index_content_key = ptb.pure("Content-Type")?;
-                let index_content_value = ptb.pure("text/html; charset=utf-8")?;
-                ptb.command(Command::move_call(
-                    cluster.other_packages_ids[0],
-                    Identifier::from_str("resource")?,
-                    Identifier::from_str("add_header")?,
-                    vec![],
-                    vec![resource, index_cache_key, index_cache_value],
-                ));
-                ptb.command(Command::move_call(
-                    cluster.other_packages_ids[0],
-                    Identifier::from_str("resource")?,
-                    Identifier::from_str("add_header")?,
-                    vec![],
-                    vec![resource, index_content_key, index_content_value],
-                ));
+            if is_snake {
+                if path.ends_with(".svg") {
+                    let svg_cache_key = ptb.pure("Cache-Control")?;
+                    let svg_cache_value = ptb.pure("public, max-age=86400")?;
+                    let svg_etag_key = ptb.pure("ETag")?;
+                    let svg_etag_value = ptb.pure("\"abc123\"")?;
+                    ptb.command(Command::move_call(
+                        cluster.other_packages_ids[0],
+                        Identifier::from_str("resource")?,
+                        Identifier::from_str("add_header")?,
+                        vec![],
+                        vec![resource, svg_cache_key, svg_cache_value],
+                    ));
+                    ptb.command(Command::move_call(
+                        cluster.other_packages_ids[0],
+                        Identifier::from_str("resource")?,
+                        Identifier::from_str("add_header")?,
+                        vec![],
+                        vec![resource, svg_etag_key, svg_etag_value],
+                    ));
+                } else if path.ends_with("index.html") {
+                    let index_cache_key = ptb.pure("Cache-Control")?;
+                    let index_cache_value = ptb.pure("max-age=3500")?;
+                    let index_content_key = ptb.pure("Content-Type")?;
+                    let index_content_value = ptb.pure("text/html; charset=utf-8")?;
+                    ptb.command(Command::move_call(
+                        cluster.other_packages_ids[0],
+                        Identifier::from_str("resource")?,
+                        Identifier::from_str("add_header")?,
+                        vec![],
+                        vec![resource, index_cache_key, index_cache_value],
+                    ));
+                    ptb.command(Command::move_call(
+                        cluster.other_packages_ids[0],
+                        Identifier::from_str("resource")?,
+                        Identifier::from_str("add_header")?,
+                        vec![],
+                        vec![resource, index_content_key, index_content_value],
+                    ));
+                }
             }
 
             ptb.command(Command::move_call(
