@@ -23,8 +23,9 @@ use crate::{
     walrus::output::EpochCount,
 };
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone, Deserialize)]
 #[command(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 pub struct Args {
     /// The path to the configuration file for the site builder.
     #[arg(short, long)]
@@ -39,6 +40,36 @@ pub struct Args {
     pub general: GeneralArgs,
     #[command(subcommand)]
     pub command: Commands,
+    // TODO: Not working
+    /// Write output as JSON.
+    ///
+    /// This is always done in JSON mode.
+    #[arg(long, global = true)]
+    #[serde(default)]
+    pub json: bool,
+}
+
+impl Args {
+    pub fn extract_json_command(&mut self) -> Result<()> {
+        while let Commands::Json { command_string } = &self.command {
+            tracing::info!("running in JSON mode");
+            let command_string = match command_string {
+                Some(s) => s,
+                None => {
+                    tracing::debug!("reading JSON input from stdin");
+                    &std::io::read_to_string(std::io::stdin())?
+                }
+            };
+            tracing::debug!(
+                command = command_string.replace('\n', ""),
+                "running JSON command"
+            );
+            let new_self = serde_json::from_str(command_string)?;
+            let _ = std::mem::replace(self, new_self);
+            self.json = true;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Parser, Clone, Debug, Deserialize, Serialize)]
@@ -179,7 +210,7 @@ impl GeneralArgs {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum ObjectIdOrName {
     /// The object ID of the site.
     ObjectId(ObjectID),
@@ -234,9 +265,39 @@ impl ObjectIdOrName {
     }
 }
 
-#[derive(Subcommand, Debug, Clone)]
+#[derive(Subcommand, Debug, Clone, Deserialize)]
 #[command(rename_all = "kebab-case")]
 pub enum Commands {
+    /// Run the client by specifying the arguments in a JSON string; CLI options are ignored.
+    Json {
+        /// The JSON-encoded args for the Walrus CLI; if not present, the args are read from stdin.
+        ///
+        /// The JSON structure follows the CLI arguments, containing global options and a "command"
+        /// object at the root level. The "command" object itself contains the command (e.g.,
+        /// "store", "read", "publisher", "blobStatus", ...) with an object containing the command
+        /// options.
+        ///
+        /// Note that where CLI options are in "kebab-case", the respective JSON strings are in
+        /// "camelCase".
+        ///
+        /// For example, to read a blob and write it to "some_output_file" using a specific
+        /// configuration file, you can use the following JSON input:
+        ///
+        /// {
+        ///   "config": "path/to/client_config.yaml",
+        ///   "command": {
+        ///     "read": {
+        ///       "blobId": "4BKcDC0Ih5RJ8R0tFMz3MZVNZV8b2goT6_JiEEwNHQo",
+        ///       "out": "some_output_file"
+        ///     }
+        ///   }
+        /// }
+        ///
+        /// Important: If the "read" command does not have an "out" file specified, the output JSON
+        /// string will contain the full bytes of the blob, encoded as a Base64 string.
+        #[arg(verbatim_doc_comment)]
+        command_string: Option<String>,
+    },
     /// Deploy a new site on Sui.
     ///
     /// If the site has not been published before, this command publishes it and stores
@@ -375,7 +436,7 @@ pub enum Commands {
     },
 }
 
-#[derive(Parser, Debug, Clone)]
+#[derive(Parser, Debug, Clone, Deserialize)]
 pub struct PublishOptions {
     /// The directory containing the site sources.
     pub directory: PathBuf,
@@ -396,7 +457,7 @@ pub struct PublishOptions {
     pub walrus_options: WalrusStoreOptions,
 }
 
-#[derive(Parser, Debug, Clone, Default)]
+#[derive(Parser, Debug, Clone, Default, Deserialize)]
 /// Common configurations across publish, update, and update-resource commands.
 pub struct WalrusStoreOptions {
     /// The path to the Walrus sites resources file.
