@@ -49,6 +49,92 @@ fn get_snake_upload_files(dir: &Path) -> (Vec<PathBuf>, Vec<&str>) {
     )
 }
 
+fn get_test_upload_files(dir: &Path, count: usize) -> (Vec<PathBuf>, Vec<String>) {
+    let filenames: Vec<String> = (1..=count).map(|i| format!("page{}.html", i)).collect();
+    (
+        filenames.iter().map(|name| dir.join(name)).collect(),
+        filenames,
+    )
+}
+
+fn generate_test_pages(num_files: usize) -> anyhow::Result<()> {
+    let binding = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let base_dir = binding.parent().unwrap();
+    let test_dir = base_dir.join("examples").join(format!("test-{}-pages", num_files));
+
+    // Create directory
+    std::fs::create_dir_all(&test_dir)?;
+
+    println!("Generating {} HTML pages...", num_files);
+
+    for i in 1..=num_files {
+        let file_path = test_dir.join(format!("page{}.html", i));
+        let unique_timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_nanos();
+
+        let content = format!(
+            r#"<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Page {}</title>
+</head>
+<body>
+    <h1>Page {}</h1>
+    <p>This is test page number {} generated for gas estimation testing.</p>
+    <p>Unique content: {}_{}</p>
+</body>
+</html>"#,
+            i, i, i, unique_timestamp, i
+        );
+
+        std::fs::write(&file_path, content)?;
+    }
+
+    println!("Done! Created {} HTML files in {:?}", num_files, test_dir);
+    Ok(())
+}
+
+fn cleanup_test_pages(num_files: usize) -> anyhow::Result<()> {
+    let binding = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let base_dir = binding.parent().unwrap();
+
+    let test_dir = base_dir.join("examples").join(format!("test-{}-pages", num_files));
+
+    if test_dir.exists() {
+        std::fs::remove_dir_all(&test_dir)?;
+        println!("Cleaned up test-{}-pages directory", num_files);
+    }
+
+    Ok(())
+}
+
+fn cleanup_all_test_pages() -> anyhow::Result<()> {
+    let binding = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let base_dir = binding.parent().unwrap();
+    let examples_dir = base_dir.join("examples");
+
+    if !examples_dir.exists() {
+        return Ok(());
+    }
+
+    // Clean up any test-*-pages directories
+    for entry in std::fs::read_dir(&examples_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_dir() {
+            if let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) {
+                if dir_name.starts_with("test-") && dir_name.ends_with("-pages") {
+                    std::fs::remove_dir_all(&path)?;
+                    println!("Cleaned up directory: {:?}", dir_name);
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
 async fn publish_blobs(
     walrus_wallet: &WalrusSDKClient<SuiContractClient>,
     contents: &[(PathBuf, Vec<u8>)],
@@ -430,7 +516,160 @@ async fn blob_ownership_site_creation(
         resp.effects.as_ref().expect("with_effects()").status()
     );
 
+    println!("computation_cost: {}", resp.effects.as_ref().unwrap().gas_cost_summary().computation_cost);
     assert!(resp.effects.expect("with_effects()").status().is_ok());
 
     Ok(())
 }
+
+#[tokio::test]
+async fn gas_estimation_50_pages_site_builder() -> anyhow::Result<()> {
+    const NUM_FILES: usize = 50;
+
+    // Clean up any existing test directories
+    cleanup_all_test_pages()?;
+
+    // Generate test pages
+    generate_test_pages(NUM_FILES)?;
+
+    let mut cluster = TestSetup::start_local_test_cluster().await?;
+
+    let directory = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .join("examples")
+        .join(format!("test-{}-pages", NUM_FILES));
+
+    println!("Testing {} pages with site_builder::run", NUM_FILES);
+    println!("sites-config: {:#?}", &cluster.sites_config);
+    println!("sites package_id: {}", &cluster.walrus_sites_package_id);
+
+    let sui_balance_pre = cluster
+        .client
+        .coin_read_api()
+        .get_balance(
+            cluster
+                .walrus_wallet
+                .inner
+                .sui_client_mut()
+                .wallet_mut()
+                .active_address()?,
+            None,
+        )
+        .await?
+        .total_balance;
+
+    let args = ArgsBuilder::default()
+        .with_config(Some(cluster.sites_config.inner.1.clone()))
+        .with_command(Commands::Publish {
+            publish_options: PublishOptionsBuilder::default()
+                .with_directory(directory.clone())
+                .with_epoch_count_or_max(EpochCountOrMax::Epochs(NonZeroU32::try_from(1)?))
+                .build()?,
+            site_name: Some(format!("Test Site {} Pages", NUM_FILES)),
+        })
+        .build()?;
+
+    site_builder::run(args).await?;
+
+    let sui_balance_post = cluster
+        .client
+        .coin_read_api()
+        .get_balance(
+            cluster
+                .walrus_wallet
+                .inner
+                .sui_client_mut()
+                .wallet_mut()
+                .active_address()?,
+            None,
+        )
+        .await?
+        .total_balance;
+
+    println!(
+        "{} pages site_builder::run - Used {sui_balance_pre} - {sui_balance_post} = {} MIST",
+        NUM_FILES,
+        sui_balance_pre - sui_balance_post
+    );
+
+    // Cleanup
+    cleanup_test_pages(NUM_FILES)?;
+    Ok(())
+}
+
+
+
+#[tokio::test]
+async fn gas_estimation_50_pages_blob_ownership() -> anyhow::Result<()> {
+    const NUM_FILES: usize = 50;
+
+    // Clean up any existing test directories
+    cleanup_all_test_pages()?;
+
+    // Generate test pages
+    generate_test_pages(NUM_FILES)?;
+
+    let mut cluster = TestSetup::start_local_test_cluster().await?;
+
+    let directory = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .join("examples")
+        .join(format!("test-{NUM_FILES}-pages"));
+
+    println!("Testing {} pages with blob_ownership_site_creation", NUM_FILES);
+    println!("sites-config: {:#?}", &cluster.sites_config);
+    println!("sites package_id: {}", &cluster.walrus_sites_package_id);
+
+    let sui_balance_pre = cluster
+        .client
+        .coin_read_api()
+        .get_balance(
+            cluster
+                .walrus_wallet
+                .inner
+                .sui_client_mut()
+                .wallet_mut()
+                .active_address()?,
+            None,
+        )
+        .await?
+        .total_balance;
+
+    let test_files = get_test_upload_files(&directory, NUM_FILES);
+    // Convert Vec<String> to Vec<&str> for compatibility
+    let test_files_refs: (Vec<PathBuf>, Vec<&str>) = (
+        test_files.0,
+        test_files.1.iter().map(|s| s.as_str()).collect(),
+    );
+
+    blob_ownership_site_creation(&mut cluster, test_files_refs, false).await?;
+
+    let sui_balance_post = cluster
+        .client
+        .coin_read_api()
+        .get_balance(
+            cluster
+                .walrus_wallet
+                .inner
+                .sui_client_mut()
+                .wallet_mut()
+                .active_address()?,
+            None,
+        )
+        .await?
+        .total_balance;
+
+    println!(
+        "{} pages blob_ownership_site_creation - Used {sui_balance_pre} - {sui_balance_post} = {} MIST",
+        NUM_FILES,
+        sui_balance_pre - sui_balance_post
+    );
+
+    // Cleanup
+    cleanup_test_pages(NUM_FILES)?;
+    Ok(())
+}
+
+
