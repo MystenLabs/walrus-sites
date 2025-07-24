@@ -21,8 +21,12 @@ use walrus_site::resource::Resource;
 public struct SiteData has store {
     resources: Table<String, Resource>,
     // NOTE: Here we could also choose between having to add a blob or not. eg for small files.
+    // NOTE: Using TTO here will probably increase complexity by a small amount but decrease storage
+    // costs
     blobs: ObjectTable<u256, Blob>,
     // NOTE: Could there be a blob that is assigned to more than eg 1000 resources?
+    // NOTE: Instead of having the contract support the invariance of ensuring all needed blobs are
+    // owned by the site, the client can (site-builder).
     blob_resources: Table<u256, VecSet<String>>,
     routes: Table<String, String>
 }
