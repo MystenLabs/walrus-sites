@@ -20,6 +20,7 @@ pub struct ArgsBuilder {
     pub context: Option<String>,
     pub general: GeneralArgs,
     pub command: Option<Commands>,
+    pub json: bool,
 }
 
 #[derive(Debug, Error)]
@@ -35,6 +36,7 @@ impl ArgsBuilder {
             context,
             general,
             command,
+            json,
         } = self;
         let Some(command) = command else {
             return Err(InvalidArgsConfig::MissingCommand);
@@ -45,6 +47,7 @@ impl ArgsBuilder {
             context,
             general,
             command,
+            json,
         })
     }
 
