@@ -37,6 +37,7 @@ pub struct Args {
     #[arg(long)]
     pub context: Option<String>,
     #[clap(flatten)]
+    #[serde(default)]
     pub general: GeneralArgs,
     #[command(subcommand)]
     pub command: Commands,
@@ -268,6 +269,7 @@ impl ObjectIdOrName {
 
 #[derive(Subcommand, Debug, Clone, Deserialize)]
 #[command(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 pub enum Commands {
     /// Run the client by specifying the arguments in a JSON string; CLI options are ignored.
     Json {
@@ -305,6 +307,7 @@ pub enum Commands {
     /// the object ID of the Site in the ws-resources.json file.
     /// If the site has been published before, this command updates the site(indicaded
     /// by the site_object_id field in the ws-resources.json file).
+    #[serde(rename_all = "camelCase")]
     Deploy {
         #[clap(flatten)]
         publish_options: PublishOptions,
@@ -322,6 +325,7 @@ pub enum Commands {
         /// When enabled, the command will continuously monitor the site directory and trigger a
         /// redepoloyment whenever changes are detected, allowing for rapid development iteration.
         #[arg(short, long)]
+        #[serde(default)]
         watch: bool,
         /// Checks and extends all blobs in an existing site during an update.
         ///
@@ -339,9 +343,11 @@ pub enum Commands {
         /// This implies that successive updates (without --check-extend) may result in the site
         /// having resources with different expiration times (and possibly some that are expired).
         #[arg(long)]
+        #[serde(default)]
         check_extend: bool,
     },
     /// Publish a new site on Sui.
+    #[serde(rename_all = "camelCase")]
     Publish {
         #[clap(flatten)]
         publish_options: PublishOptions,
@@ -350,6 +356,7 @@ pub enum Commands {
         site_name: Option<String>,
     },
     /// Update an existing site.
+    #[serde(rename_all = "camelCase")]
     Update {
         #[clap(flatten)]
         publish_options: PublishOptions,
@@ -360,6 +367,7 @@ pub enum Commands {
         /// When enabled, the command will continuously monitor the site directory and trigger a
         /// redepoloyment whenever changes are detected, allowing for rapid development iteration.
         #[arg(short, long)]
+        #[serde(default)]
         watch: bool,
         /// This flag is deprecated and will be removed in the future. Use --check-extend.
         ///
@@ -368,6 +376,7 @@ pub enum Commands {
         /// available on Sui.
         #[arg(long)]
         #[deprecated(note = "This flag is being removed; please use --check-extend")]
+        #[serde(default)]
         force: bool,
         /// Checks and extends all blobs in the site during the update.
         ///
@@ -385,11 +394,13 @@ pub enum Commands {
         /// successive updates (without --check-extend) may result in the site having resources
         /// with different expiration times (and possibly some that are expired).
         #[arg(long)]
+        #[serde(default)]
         check_extend: bool,
     },
     /// Convert an object ID in hex format to the equivalent Base36 format.
     ///
     /// This command may be useful to browse a site, given it object ID.
+    #[serde(rename_all = "camelCase")]
     Convert {
         /// The object id (in hex format) to convert
         object_id: ObjectID,
@@ -398,6 +409,7 @@ pub enum Commands {
     ///
     /// Running this command requires the `walrus_package` to be specified either in the config or
     /// through the `--walrus-package` flag.
+    #[serde(rename_all = "camelCase")]
     Sitemap {
         #[arg(value_parser = ObjectIdOrName::parse_sitemap_target)]
         /// The site to be mapped.
@@ -409,16 +421,19 @@ pub enum Commands {
     /// Preprocess the directory, creating and linking index files.
     /// This command allows to publish directories as sites. Warning: Rewrites all `index.html`
     /// files.
+    #[serde(rename_all = "camelCase")]
     ListDirectory { path: PathBuf },
     /// Completely destroys the site at the given object id.
     ///
     /// Removes all resources and routes, and destroys the site, returning the Sui storage rebate to
     /// the owner. Warning: this action is irreversible! Re-publishing the site will generate a
     /// different Site object ID.
+    #[serde(rename_all = "camelCase")]
     Destroy { object: ObjectID },
     /// Adds or updates a single resource in a site, eventually replacing any pre-existing ones.
     ///
     /// The ws_resource file will still be used to determine the resource's headers.
+    #[serde(rename_all = "camelCase")]
     UpdateResource {
         /// The path to the resource to be added.
         #[arg(long)]
@@ -438,12 +453,14 @@ pub enum Commands {
 }
 
 #[derive(Parser, Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PublishOptions {
     /// The directory containing the site sources.
     pub directory: PathBuf,
     /// Preprocess the directory before publishing.
     /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
     #[arg(long)]
+    #[serde(default)]
     pub list_directory: bool,
     /// The maximum number of concurrent calls to the Walrus CLI for the computation of blob IDs.
     #[arg(long)]
@@ -452,6 +469,7 @@ pub struct PublishOptions {
     ///
     /// More blobs can be stored concurrently, but this will increase memory usage.
     #[arg(long, default_value_t = default::max_parallel_stores())]
+    #[serde(default = "default::max_parallel_stores")]
     pub max_parallel_stores: NonZeroUsize,
     /// Common configurations.
     #[clap(flatten)]
@@ -459,6 +477,7 @@ pub struct PublishOptions {
 }
 
 #[derive(Parser, Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
 /// Common configurations across publish, update, and update-resource commands.
 pub struct WalrusStoreOptions {
     /// The path to the Walrus sites resources file.
@@ -474,6 +493,7 @@ pub struct WalrusStoreOptions {
     /// end epoch, or the earliest expiry time in rfc3339 format.
     ///
     #[command(flatten)]
+    #[serde(flatten)]
     pub epoch_arg: EpochArg,
     /// Make the stored resources permanent.
     ///
@@ -481,9 +501,11 @@ pub struct WalrusStoreOptions {
     /// the site is deleted only after `epochs` expiration. Make resources permanent
     /// (non-deletable)
     #[arg(long, action = clap::ArgAction::SetTrue)]
+    #[serde(default)]
     pub permanent: bool,
     /// Perform a dry run (you'll be asked for confirmation before committing changes).
     #[arg(long)]
+    #[serde(default)]
     pub dry_run: bool,
 }
 
@@ -493,6 +515,7 @@ pub struct WalrusStoreOptions {
     ArgGroup::new("epoch_arg")
         .args(&["epochs", "earliest_expiry_time", "end_epoch"])
         .required(true)
+        .multiple(false)
 ))]
 #[serde(rename_all = "camelCase")]
 pub struct EpochArg {
