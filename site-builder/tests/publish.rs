@@ -38,3 +38,38 @@ async fn publish_snake() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn json_publish_snake() -> anyhow::Result<()> {
+    let cluster = TestSetup::start_local_test_cluster().await?;
+    let directory = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .join("examples")
+        .join("snake");
+
+    let args = ArgsBuilder::default()
+        .with_command(Commands::Json {
+            command_string: Some(format!(
+                r#"{{
+            "config":"{}",
+            "command":{{
+                "publish":{{
+                    "publishOptions":{{
+                        "directory":"{}",
+                        "walrusOptions":{{
+                            "epochs":1
+                        }}
+                    }}
+                }}
+            }}
+        }}"#,
+                cluster.sites_config.inner.1.to_string_lossy(),
+                directory.to_string_lossy()
+            )),
+        })
+        .build()?;
+    site_builder::run(args).await?;
+
+    Ok(())
+}
