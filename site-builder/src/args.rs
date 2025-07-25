@@ -41,13 +41,6 @@ pub struct Args {
     pub general: GeneralArgs,
     #[command(subcommand)]
     pub command: Commands,
-    // TODO: Not working
-    /// Write output as JSON.
-    ///
-    /// This is always done in JSON mode.
-    #[arg(long, global = true)]
-    #[serde(default)]
-    pub json: bool,
 }
 
 impl Args {
@@ -67,7 +60,7 @@ impl Args {
             );
             let new_self = serde_json::from_str(command_string)?;
             let _ = std::mem::replace(self, new_self);
-            self.json = true;
+            // self.json = true;
         }
         Ok(())
     }
