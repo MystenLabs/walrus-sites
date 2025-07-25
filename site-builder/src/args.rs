@@ -269,27 +269,28 @@ pub enum Commands {
         ///
         /// The JSON structure follows the CLI arguments, containing global options and a "command"
         /// object at the root level. The "command" object itself contains the command (e.g.,
-        /// "store", "read", "publisher", "blobStatus", ...) with an object containing the command
+        /// "publish", "update", "deploy", "convert", ...) with an object containing the command
         /// options.
         ///
         /// Note that where CLI options are in "kebab-case", the respective JSON strings are in
         /// "camelCase".
         ///
-        /// For example, to read a blob and write it to "some_output_file" using a specific
-        /// configuration file, you can use the following JSON input:
+        /// For example, to publish a site using a specific configuration file, you can use the
+        /// following JSON input:
         ///
         /// {
-        ///   "config": "path/to/client_config.yaml",
+        ///   "config": "path/to/sites_config.yaml",
         ///   "command": {
-        ///     "read": {
-        ///       "blobId": "4BKcDC0Ih5RJ8R0tFMz3MZVNZV8b2goT6_JiEEwNHQo",
-        ///       "out": "some_output_file"
+        ///     "publish": {
+        ///       "publishOptions": {
+        ///         "directory": "/path/to/site_directory",
+        ///         "walrusOptions": {
+        ///           "epochs": 1
+        ///         }
+        ///       }
         ///     }
         ///   }
         /// }
-        ///
-        /// Important: If the "read" command does not have an "out" file specified, the output JSON
-        /// string will contain the full bytes of the blob, encoded as a Base64 string.
         #[arg(verbatim_doc_comment)]
         command_string: Option<String>,
     },
