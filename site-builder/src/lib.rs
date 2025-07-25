@@ -45,7 +45,6 @@ async fn run_internal(mut args: Args) -> anyhow::Result<()> {
         context,
         general,
         command,
-        .. // TODO: Use json arg
     } = args;
     let config_path = path_or_defaults_if_exist(config.as_deref(), &sites_config_default_paths())
         .ok_or(anyhow!(
