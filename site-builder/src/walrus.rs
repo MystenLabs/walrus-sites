@@ -20,7 +20,10 @@ use tokio::process::Command as CliCommand;
 use self::types::BlobId;
 use crate::{
     args::EpochArg,
-    walrus::{command::WalrusCmdBuilder, output::DestroyOutput},
+    walrus::{
+        command::{CommonStoreOptions, QuiltBlobInput, WalrusCmdBuilder},
+        output::{DestroyOutput, QuiltStoreResult, StoreQuiltDryRunOutput},
+    },
 };
 pub mod command;
 pub mod output;
@@ -93,7 +96,50 @@ impl Walrus {
         force: bool,
         deletable: bool,
     ) -> Result<StoreOutput> {
-        create_command!(self, store, files, epoch_arg, force, deletable, false)
+        let dry_run = false;
+        let ignore_resources = false;
+        let share = false;
+        create_command!(
+            self,
+            store,
+            files,
+            CommonStoreOptions {
+                epoch_arg,
+                dry_run,
+                force,
+                ignore_resources,
+                deletable,
+                share,
+            }
+        )
+    }
+
+    /// Issues a `store-quilt` JSON command to the Walrus CLI, returning the parsed output.
+    pub async fn store_quilt(
+        &mut self,
+        paths: Vec<PathBuf>,
+        blobs: Vec<QuiltBlobInput>,
+        epoch_arg: EpochArg,
+        force: bool,
+        deletable: bool,
+    ) -> Result<QuiltStoreResult> {
+        let dry_run = false;
+        let ignore_resources = false;
+        let share = false;
+        create_command!(
+            self,
+            store_quilt,
+            paths,
+            blobs,
+            CommonStoreOptions {
+                epoch_arg,
+                dry_run,
+                force,
+                ignore_resources,
+                deletable,
+                share,
+            }
+        )
     }
 
     /// Issues a `delete` JSON command to the Walrus CLI, returning the parsed output.
@@ -109,7 +155,53 @@ impl Walrus {
         deletable: bool,
         force: bool,
     ) -> Result<Vec<DryRunOutput>> {
-        create_command!(self, store, vec![file], epoch_arg, force, deletable, true)
+        let dry_run = true;
+        let ignore_resources = false;
+        let share = false;
+        create_command!(
+            self,
+            store,
+            vec![file],
+            CommonStoreOptions {
+                epoch_arg,
+                dry_run,
+                force,
+                ignore_resources,
+                deletable,
+                share,
+            }
+        )
+    }
+
+    /// Issues a `dry_run_store_quilt` JSON command to the Walrus CLI, returning the parsed output.
+    pub async fn dry_run_store_quilt(
+        &mut self,
+        path: Option<PathBuf>,
+        blobs: Option<QuiltBlobInput>,
+        epoch_arg: EpochArg,
+        force: bool,
+        deletable: bool,
+    ) -> Result<Vec<StoreQuiltDryRunOutput>> {
+        let dry_run = true;
+        let ignore_resources = false;
+        let share = false;
+        // The `paths` and `blobs` are in conflict with each other
+        let paths = path.map_or_else(Vec::new, |p| vec![p]);
+        let blobs = blobs.map_or_else(Vec::new, |b| vec![b]);
+        create_command!(
+            self,
+            store_quilt,
+            paths,
+            blobs,
+            CommonStoreOptions {
+                epoch_arg,
+                dry_run,
+                force,
+                ignore_resources,
+                deletable,
+                share,
+            }
+        )
     }
 
     /// Issues a `read` JSON command to the Walrus CLI, returning the parsed output.
