@@ -55,12 +55,8 @@ async fn json_publish_snake() -> anyhow::Result<()> {
             "config":"{}",
             "command":{{
                 "publish":{{
-                    "publishOptions":{{
-                        "directory":"{}",
-                        "walrusOptions":{{
-                            "epochs":1
-                        }}
-                    }}
+                    "directory":"{}",
+                    "epochs":1
                 }}
             }}
         }}"#,
