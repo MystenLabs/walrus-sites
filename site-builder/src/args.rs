@@ -303,6 +303,7 @@ pub enum Commands {
     #[serde(rename_all = "camelCase")]
     Deploy {
         #[clap(flatten)]
+        #[serde(flatten)]
         publish_options: PublishOptions,
         /// The name of the site.
         #[arg(short, long)]
@@ -343,6 +344,7 @@ pub enum Commands {
     #[serde(rename_all = "camelCase")]
     Publish {
         #[clap(flatten)]
+        #[serde(flatten)]
         publish_options: PublishOptions,
         /// The name of the site.
         #[arg(short, long)]
@@ -352,6 +354,7 @@ pub enum Commands {
     #[serde(rename_all = "camelCase")]
     Update {
         #[clap(flatten)]
+        #[serde(flatten)]
         publish_options: PublishOptions,
         /// The object ID of a partially published site to be completed.
         object_id: ObjectID,
@@ -441,6 +444,7 @@ pub enum Commands {
         site_object: ObjectID,
         /// Common configurations.
         #[clap(flatten)]
+        #[serde(flatten)]
         common: WalrusStoreOptions,
     },
 }
@@ -466,6 +470,7 @@ pub struct PublishOptions {
     pub max_parallel_stores: NonZeroUsize,
     /// Common configurations.
     #[clap(flatten)]
+    #[serde(flatten)]
     pub walrus_options: WalrusStoreOptions,
 }
 
