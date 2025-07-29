@@ -282,12 +282,8 @@ pub enum Commands {
         ///   "config": "path/to/sites_config.yaml",
         ///   "command": {
         ///     "publish": {
-        ///       "publishOptions": {
-        ///         "directory": "/path/to/site_directory",
-        ///         "walrusOptions": {
-        ///           "epochs": 1
-        ///         }
-        ///       }
+        ///       "directory": "/path/to/site_directory",
+        ///       "epochs": 1
         ///     }
         ///   }
         /// }
