@@ -52,16 +52,21 @@ async fn json_publish_snake() -> anyhow::Result<()> {
         .with_command(Commands::Json {
             command_string: Some(format!(
                 r#"{{
-            "config":"{}",
-            "command":{{
-                "publish":{{
-                    "directory":"{}",
-                    "epochs":1
+            "config": "{}",
+            "gas_budget": 5000000000,
+            "command": {{
+                "publish": {{
+                    "directory": "{}",
+                    "epochs": 1,
+                    "site_name": "Snake",
+                    "max_concurrent": 10,
+                    "ws_resources": "{}"
                 }}
             }}
         }}"#,
                 cluster.sites_config.inner.1.to_string_lossy(),
-                directory.to_string_lossy()
+                directory.to_string_lossy(),
+                directory.join("ws-resources.json").to_string_lossy(),
             )),
         })
         .build()?;
