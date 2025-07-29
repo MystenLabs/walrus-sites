@@ -176,8 +176,7 @@ impl Walrus {
     /// Issues a `dry_run_store_quilt` JSON command to the Walrus CLI, returning the parsed output.
     pub async fn dry_run_store_quilt(
         &mut self,
-        path: Option<PathBuf>,
-        blobs: Option<QuiltBlobInput>,
+        path_or_blob: PathOrBlob,
         epoch_arg: EpochArg,
         force: bool,
         deletable: bool,
@@ -186,8 +185,10 @@ impl Walrus {
         let ignore_resources = false;
         let share = false;
         // The `paths` and `blobs` are in conflict with each other
-        let paths = path.map_or_else(Vec::new, |p| vec![p]);
-        let blobs = blobs.map_or_else(Vec::new, |b| vec![b]);
+        let (paths, blobs) = match path_or_blob {
+            PathOrBlob::Path(path) => (vec![path], Vec::new()),
+            PathOrBlob::Blob(blob) => (Vec::new(), vec![blob]),
+        };
         create_command!(
             self,
             store_quilt,
@@ -246,4 +247,9 @@ impl Walrus {
             rpc_url: self.rpc_url.clone(),
         }
     }
+}
+
+pub enum PathOrBlob {
+    Path(PathBuf),
+    Blob(QuiltBlobInput),
 }

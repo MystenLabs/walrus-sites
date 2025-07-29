@@ -368,3 +368,94 @@ impl WalrusCmdBuilder<Command> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{collections::BTreeMap, path::PathBuf};
+
+    use super::*;
+    use crate::args::EpochArg;
+
+    #[test]
+    fn test_store_quilt_builder() {
+        // Dummy values for testing, we are not making any actual calls to the Walrus CLI.
+        let config = Some(PathBuf::from("/tmp/sites-config.yaml"));
+        let context = Some("testnet".to_string());
+        let wallet = Some(PathBuf::from("/tmp/wallet"));
+        let gas_budget = 12345;
+        let paths = vec![PathBuf::from("/tmp/some_blob.txt")];
+        let blobs = vec![QuiltBlobInput {
+            path: PathBuf::from("/tmp/some_blob.txt"),
+            identifier: Some("some_blob.txt".to_string()),
+            tags: BTreeMap::new(),
+        }];
+        let common_store_options = CommonStoreOptions {
+            epoch_arg: EpochArg::default(),
+            dry_run: false,
+            force: false,
+            ignore_resources: false,
+            deletable: false,
+            share: false,
+        };
+        let builder =
+            WalrusCmdBuilder::new(config.clone(), context.clone(), wallet.clone(), gas_budget)
+                .store_quilt(paths.clone(), blobs.clone(), common_store_options.clone());
+        let cmd = builder.build();
+        match cmd.command {
+            Command::StoreQuilt {
+                paths: p,
+                blobs: b,
+                common_options: o,
+            } => {
+                assert_eq!(p, paths);
+                assert_eq!(b, blobs);
+                assert_eq!(o, common_store_options);
+            }
+            _ => panic!("Expected StoreQuilt command"),
+        }
+    }
+
+    #[test]
+    fn test_dry_run_store_quilt_builder() {
+        // Dummy values for testing, we are not making any actual calls to the Walrus CLI.
+        let config = Some(PathBuf::from("/tmp/sites-config.yaml"));
+        let context = Some("testnet".to_string());
+        let wallet = Some(PathBuf::from("/tmp/wallet"));
+        let gas_budget = 12345;
+        let path = PathBuf::from("/tmp/some_blob.txt");
+        let blob = QuiltBlobInput {
+            path: path.clone(),
+            identifier: None,
+            tags: BTreeMap::new(),
+        };
+        let common_store_options = CommonStoreOptions {
+            epoch_arg: EpochArg::default(),
+            dry_run: true,
+            force: true,
+            ignore_resources: false,
+            deletable: true,
+            share: false,
+        };
+        let builder = WalrusCmdBuilder::new(config, context, wallet, gas_budget).store_quilt(
+            vec![path.clone()],
+            vec![blob.clone()],
+            common_store_options.clone(),
+        );
+        let cmd = builder.build();
+        match cmd.command {
+            Command::StoreQuilt {
+                paths,
+                blobs,
+                common_options,
+            } => {
+                assert_eq!(paths, vec![path]);
+                assert_eq!(blobs, vec![blob]);
+                assert_eq!(common_options, common_store_options);
+                assert!(common_options.dry_run);
+                assert!(common_options.force);
+                assert!(common_options.deletable);
+            }
+            _ => panic!("Expected StoreQuilt command for dry run"),
+        }
+    }
+}
