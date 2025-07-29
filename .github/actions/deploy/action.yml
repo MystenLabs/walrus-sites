@@ -210,7 +210,10 @@ runs:
             
             # Output the final values for subsequent steps
             echo "sui_address=$sui_address" >> "$GITHUB_OUTPUT"
-            echo "sui_keystore=$keystore_content" >> "$GITHUB_OUTPUT"
+            
+            # Remove newlines from keystore content for safe single-line output
+            keystore_oneline=$(echo "$keystore_content" | tr -d '\n\r')
+            echo "sui_keystore=$keystore_oneline" >> "$GITHUB_OUTPUT"
 
         # This step prepares the Walrus configuration file. It uses the input `WALRUS_CONFIG` if
         # provided; otherwise, it downloads the default configuration from the Walrus repository.
@@ -230,6 +233,7 @@ runs:
             echo "walrus_config<<$EOF" >> "$GITHUB_OUTPUT"
             echo "$CONFIG_CONTENT" >> "$GITHUB_OUTPUT"
             echo "$EOF" >> "$GITHUB_OUTPUT"
+            
         # This step sets up the Sui and Walrus environment using a dedicated GitHub Action. It
         # installs the necessary tools, like the `walrus` and `site-builder` binaries.
         - name: Setup Walrus
