@@ -10,12 +10,12 @@ description: |
   This action requires a Sui account to deploy your site. You can provide the account information in
   one of three ways:
 
-  1. **Address + Keystore** (existing method):
+  1. **Address + Keystore**:
      - Provide both `SUI_ADDRESS` and `SUI_KEYSTORE` inputs
      - Use this if you already have a Sui address and keystore file
 
-  2. **Private Key**:
-     - Provide `SUI_PRIVATE_KEY` input with a bech32 encoded private key
+  2. **Bech32 Private Key**:
+     - Provide `SUI_BECH32_PRIVATE_KEY` input with a bech32 encoded private key
      - The action will download the Sui binary and extract the address and keystore
 
   3. **Secret Phrase**:
@@ -33,11 +33,27 @@ description: |
 inputs:
     # Setup Walrus action inputs:
     SUI_ADDRESS:
-        description: The Sui address to use.
-        required: true
+        description: |
+          The Sui address to use. Must be provided together with SUI_KEYSTORE.
+          Cannot be used with SUI_BECH32_PRIVATE_KEY or SUI_SECRET_PHRASE.
+        required: false
     SUI_KEYSTORE:
-        description: The content of the Sui keystore file.
-        required: true
+        description: |
+          The content of the Sui keystore file. Must be provided together with SUI_ADDRESS.
+          Cannot be used with SUI_BECH32_PRIVATE_KEY or SUI_SECRET_PHRASE.
+        required: false
+    SUI_BECH32_PRIVATE_KEY:
+        description: |
+          Bech32 encoded Sui private key (format: suiprivkey1...). The action will download the Sui
+          binary, derive the address, and create the keystore from this private key.
+          Cannot be used with SUI_ADDRESS/SUI_KEYSTORE or SUI_SECRET_PHRASE.
+        required: false
+    SUI_SECRET_PHRASE:
+        description: |
+          Sui secret recovery phrase (mnemonic). The action will download the Sui binary and
+          generate the address and create the keystore from this recovery phrase.
+          Cannot be used with SUI_ADDRESS/SUI_KEYSTORE or SUI_BECH32_PRIVATE_KEY.
+        required: false
     WALRUS_CONFIG:
         description: |
           The content of the Walrus configuration file. If not provided, it will be downloaded from
