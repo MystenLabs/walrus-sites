@@ -5,6 +5,26 @@ description: |
   **Note:** This action operates on an existing set of static files.
   You'll typically want to run a checkout and optionally a build step before using this action.
 
+  **Deployer Sui Account Setup:**
+
+  This action requires a Sui account to deploy your site. You can provide the account information in
+  one of three ways:
+
+  1. **Address + Keystore** (existing method):
+     - Provide both `SUI_ADDRESS` and `SUI_KEYSTORE` inputs
+     - Use this if you already have a Sui address and keystore file
+
+  2. **Private Key**:
+     - Provide `SUI_PRIVATE_KEY` input with a bech32 encoded private key
+     - The action will download the Sui binary and extract the address and keystore
+
+  3. **Secret Phrase**:
+     - Provide `SUI_SECRET_PHRASE` input with a mnemonic recovery phrase
+     - The action will download the Sui binary and generate the address and keystore
+
+  **Important:** Use only one of these methods per deployment. The action will validate that exactly
+  one method is provided.
+
   For usage examples, see the following workflows and their corresponding sites:
   - `.github/workflows/deploy-snake.yml`: Deploys `examples/snake`, a site with ready-to-deploy
     assets.
