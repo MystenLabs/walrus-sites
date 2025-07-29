@@ -37,7 +37,7 @@ pub struct Args {
     #[arg(long)]
     pub context: Option<String>,
     #[clap(flatten)]
-    #[serde(default)]
+    #[serde(default, flatten)]
     pub general: GeneralArgs,
     #[command(subcommand)]
     pub command: Commands,
