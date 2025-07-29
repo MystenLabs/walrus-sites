@@ -166,14 +166,17 @@ runs:
             echo "📦 Installing suiup to manage Sui CLI tools..."
             curl -sSf https://raw.githubusercontent.com/MystenLabs/suiup/main/install.sh | bash
             
-            # TODO: Test if install.sh handles PATH automatically
-            # Add suiup to PATH for current and subsequent steps
-            # echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-            
-            # Verify installation works (test if PATH is set by install.sh)
-            # export PATH="$HOME/.local/bin:$PATH"
+            # Verify installation works
             suiup --version
             echo "✅ Suiup installed successfully"
+            
+            # Install Sui CLI for the specified network
+            echo "📥 Installing Sui CLI for ${{ inputs.SUI_NETWORK }} network..."
+            suiup install sui@${{ inputs.SUI_NETWORK }} -y
+            
+            # Verify Sui CLI installation
+            sui --version
+            echo "✅ Sui CLI installed successfully"
 
         # Setup Sui account (handles both direct inputs and derivation)
         - name: Setup Sui Account
