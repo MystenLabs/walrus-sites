@@ -38,8 +38,8 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
 
 // `Args` can currently only live in `main`, as it needs the `VERSION` constant which is created
 // using `bin_version::bin_version!();` which can only run in `main`.
-async fn run_internal(mut args: Args) -> anyhow::Result<()> {
-    args.extract_json_command()?;
+async fn run_internal(args: Args) -> anyhow::Result<()> {
+    let args = args.extract_json_command()?;
     let Args {
         config,
         context,
