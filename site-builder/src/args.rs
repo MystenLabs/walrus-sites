@@ -41,6 +41,9 @@ pub struct Args {
     pub general: GeneralArgs,
     #[command(subcommand)]
     pub command: Commands,
+    #[arg(long, global = true)]
+    #[serde(default)]
+    pub json: bool,
 }
 
 impl Args {
@@ -67,7 +70,7 @@ impl Args {
         let general_inside_command = Self::hoist_general_args(command_string)?;
         new_self.general.merge(&general_inside_command);
 
-        // new_self.json = true;
+        new_self.json = true;
         Ok(new_self)
     }
 
