@@ -10,7 +10,7 @@ use std::{
     time::SystemTime,
 };
 
-use anyhow::{anyhow, ensure, Result};
+use anyhow::{anyhow, bail, ensure, Result};
 use clap::{ArgGroup, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use sui_sdk::wallet_context::WalletContext;
@@ -28,13 +28,13 @@ use crate::{
 #[serde(rename_all = "camelCase")]
 pub struct Args {
     /// The path to the configuration file for the site builder.
-    #[arg(short, long)]
+    #[arg(short, long, global = true)]
     pub config: Option<PathBuf>,
     /// The context with which to load the configuration.
     ///
     /// If specified, the context will be taken from the config file. Otherwise, the default
     /// context, which is also specified in the config file, will be used.
-    #[arg(long)]
+    #[arg(long, global = true)]
     pub context: Option<String>,
     #[clap(flatten)]
     #[serde(default, flatten)]
@@ -44,41 +44,60 @@ pub struct Args {
 }
 
 impl Args {
-    pub fn extract_json_command(&mut self) -> Result<()> {
-        while let Commands::Json { command_string } = &self.command {
-            tracing::info!("running in JSON mode");
-            let command_string = match command_string {
-                Some(s) => s,
-                None => {
-                    tracing::debug!("reading JSON input from stdin");
-                    &std::io::read_to_string(std::io::stdin())?
-                }
-            };
-            tracing::debug!(
-                command = command_string.replace('\n', ""),
-                "running JSON command"
-            );
-            let new_self = serde_json::from_str(command_string)?;
-            let _ = std::mem::replace(self, new_self);
-            // self.json = true;
-        }
-        Ok(())
+    pub fn extract_json_command(self) -> Result<Self> {
+        let Commands::Json { command_string } = &self.command else {
+            return Ok(self);
+        };
+        tracing::info!("running in JSON mode");
+        let command_string = match command_string {
+            Some(s) => s,
+            None => {
+                tracing::debug!("reading JSON input from stdin");
+                &std::io::read_to_string(std::io::stdin())?
+            }
+        };
+        tracing::debug!(
+            command = command_string.replace('\n', ""),
+            "running JSON command"
+        );
+        let mut new_self: Args = serde_json::from_str(command_string)?;
+
+        // Someone might pass a global-argument inside the command in json, as clap allows it
+        // too. This is used to support the same behavior in json.
+        let general_inside_command = hoist_general_args(command_string)?;
+        new_self.general.merge(&general_inside_command);
+
+        // new_self.json = true;
+        Ok(new_self)
     }
+}
+
+fn hoist_general_args(serialized: &str) -> Result<GeneralArgs> {
+    let mut raw: serde_json::Value = serde_json::from_str(serialized)?;
+    let Some(command_obj) = raw.get_mut("command").and_then(|c| c.as_object_mut()) else {
+        bail!("Unexpected format. Expected \"command\" field inside arguments.")
+    };
+    let Some((_command, command_args)) = command_obj.into_iter().next() else {
+        bail!("Unexpected format. Expected \"command\" to include at least one field.")
+    };
+
+    Ok(serde_json::from_value(command_args.take())?)
 }
 
 #[derive(Parser, Clone, Debug, Deserialize, Serialize)]
 #[command(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 pub struct GeneralArgs {
     /// The URL or the RPC endpoint to connect the client to.
     ///
     /// Can be specified as a CLI argument or in the config.
-    #[arg(long)]
+    #[arg(long, global = true)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rpc_url: Option<String>,
     /// The path to the Sui Wallet config.
     ///
     /// Can be specified as a CLI argument or in the config.
-    #[arg(long)]
+    #[arg(long, global = true)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub wallet: Option<PathBuf>,
     /// The env to be used for the Sui wallet.
@@ -86,7 +105,7 @@ pub struct GeneralArgs {
     /// If not specified, the env specified in the sites-config (under `wallet_env`) will be used.
     /// If the wallet env is also not specified in the config, the env configured in the Sui client
     /// will be used.
-    #[arg(long)]
+    #[arg(long, global = true)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub wallet_env: Option<String>,
     /// The address to be used for the Sui wallet.
@@ -94,40 +113,40 @@ pub struct GeneralArgs {
     /// If not specified, the address specified in the sites-config (under `wallet_address`) will be
     /// used. If the wallet address is also not specified in the config, the address configured in
     /// the Sui client will be used.
-    #[arg(long)]
+    #[arg(long, global = true)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub wallet_address: Option<SuiAddress>,
     /// The context that will be passed to the Walrus binary.
     ///
     /// If not specified, the Walrus context specified in the sites-config will be
     /// used. If it is also not specified in the config, no context will be passed.
-    #[arg(long)]
+    #[arg(long, global = true)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub walrus_context: Option<String>,
     /// The path or name of the walrus binary.
     ///
     /// The Walrus binary will then be called with this configuration to perform actions on Walrus.
     /// Can be specified as a CLI argument or in the config.
-    #[arg(long)]
+    #[arg(long, global = true)]
     #[serde(default = "default::walrus_binary")]
     pub walrus_binary: Option<String>,
     /// The path to the configuration for the Walrus client.
     ///
     /// This will be passed to the calls to the Walrus binary.
     /// Can be specified as a CLI argument or in the config.
-    #[arg(long)]
+    #[arg(long, global = true)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub walrus_config: Option<PathBuf>,
     /// The package ID of the Walrus package on the selected network.
     ///
     /// This is currently only used for the `sitemap` command.
-    #[arg(long)]
+    #[arg(long, global = true)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub walrus_package: Option<ObjectID>,
     /// The gas budget for the operations on Sui.
     ///
     /// Can be specified as a CLI argument or in the config.
-    #[arg(long)]
+    #[arg(long, global = true)]
     #[serde(default = "default::gas_budget")]
     pub gas_budget: Option<u64>,
 }

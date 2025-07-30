@@ -53,14 +53,14 @@ async fn json_publish_snake() -> anyhow::Result<()> {
             command_string: Some(format!(
                 r#"{{
             "config": "{}",
-            "gas_budget": 5000000000,
+            "gasBudget": 5000000000,
             "command": {{
                 "publish": {{
                     "directory": "{}",
                     "epochs": 1,
-                    "site_name": "Snake",
-                    "max_concurrent": 10,
-                    "ws_resources": "{}"
+                    "siteName": "Snake",
+                    "maxConcurrent": 10,
+                    "wsResources": "{}"
                 }}
             }}
         }}"#,
