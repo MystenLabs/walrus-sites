@@ -15,6 +15,7 @@ pub use publish_options_builder::PublishOptionsBuilder;
 pub struct ArgsBuilder {
     pub general: GeneralArgs,
     pub command: Option<Commands>,
+    pub json: Option<bool>,
 }
 
 #[derive(Debug, Error)]
@@ -25,12 +26,20 @@ pub enum InvalidArgsConfig {
 
 impl ArgsBuilder {
     pub fn build(self) -> Result<Args, InvalidArgsConfig> {
-        let ArgsBuilder { general, command } = self;
+        let ArgsBuilder {
+            general,
+            command,
+            json,
+        } = self;
         let Some(command) = command else {
             return Err(InvalidArgsConfig::MissingCommand);
         };
 
-        Ok(Args { general, command })
+        Ok(Args {
+            general,
+            command,
+            json: json.unwrap_or_default(),
+        })
     }
 
     pub fn with_config(mut self, config: Option<PathBuf>) -> Self {
@@ -90,6 +99,11 @@ impl ArgsBuilder {
 
     pub fn with_command(mut self, command: Commands) -> Self {
         self.command.replace(command);
+        self
+    }
+
+    pub fn with_json(mut self, json: bool) -> Self {
+        self.json.replace(json);
         self
     }
 }

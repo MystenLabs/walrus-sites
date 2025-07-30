@@ -36,6 +36,9 @@ pub struct Args {
     pub general: GeneralArgs,
     #[command(subcommand)]
     pub command: Commands,
+    #[arg(long, global = true)]
+    #[serde(default)]
+    pub json: bool,
 }
 
 impl Args {
@@ -64,7 +67,7 @@ impl Args {
             new_self = tmp_self;
         }
 
-        // new_self.json = true;
+        new_self.json = true;
         Ok(new_self)
     }
 

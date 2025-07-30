@@ -40,7 +40,11 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
 // using `bin_version::bin_version!();` which can only run in `main`.
 async fn run_internal(args: Args) -> anyhow::Result<()> {
     let args = args.extract_json_if_present()?;
-    let Args { general, command } = args;
+    let Args {
+        general,
+        command,
+        json: _json,
+    } = args;
     let config_path =
         path_or_defaults_if_exist(general.config.as_deref(), &sites_config_default_paths()).ok_or(
             anyhow!(
