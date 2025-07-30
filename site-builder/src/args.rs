@@ -280,10 +280,14 @@ pub enum Commands {
         ///
         /// {
         ///   "config": "path/to/sites_config.yaml",
+        ///   "context": "testnet",
+        ///   "gas_budget": 5000000000,
         ///   "command": {
         ///     "publish": {
         ///       "directory": "/path/to/site_directory",
-        ///       "epochs": 1
+        ///       "epochs": 1,
+        ///       "site_name": "My Site Name"
+        ///       "ws_resources": "path/to/ws-resources.json"
         ///     }
         ///   }
         /// }
