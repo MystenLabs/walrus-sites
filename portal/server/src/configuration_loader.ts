@@ -14,7 +14,6 @@ const configurationSchema =
 		edgeConfigAllowlist: env.EDGE_CONFIG_ALLOWLIST,
 		enableBlocklist: env.ENABLE_BLOCKLIST,
 		enableAllowlist: env.ENABLE_ALLOWLIST,
-		enableVercelWebAnalytics: env.ENABLE_VERCEL_WEB_ANALYTICS,
 		landingPageOidB36: env.LANDING_PAGE_OID_B36,
 		portalDomainNameLength: env.PORTAL_DOMAIN_NAME_LENGTH,
 		premiumRpcUrlList: env.PREMIUM_RPC_URL_LIST,
@@ -51,7 +50,6 @@ const configurationSchema =
 				(val) => typeof val === 'string' ? val.trim().split(',') : val,
 				z.array(z.string().url())
 			),
-		enableVercelWebAnalytics: stringBoolean,
 	    suinsClientNetwork: z.enum(["testnet", "mainnet"]),
 	    blocklistRedisUrl: z.string().url({message: "BLOCKLIST_REDIS_URL is not a valid URL!"}).optional().refine(
 				// Ensure that the database number is specified and is 0 - this is the blocklist database.
