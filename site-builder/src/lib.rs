@@ -42,14 +42,14 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
 
 // `Args` can currently only live in `main`, as it needs the `VERSION` constant which is created
 // using `bin_version::bin_version!();` which can only run in `main`.
-async fn run_internal(
-    Args {
+async fn run_internal(args: Args) -> anyhow::Result<()> {
+    let args = args.extract_json_command()?;
+    let Args {
         config,
         context,
         general,
         command,
-    }: Args,
-) -> anyhow::Result<()> {
+    } = args;
     let config_path = path_or_defaults_if_exist(config.as_deref(), &sites_config_default_paths())
         .ok_or(anyhow!(
         "could not find a valid sites configuration file; \
@@ -220,6 +220,7 @@ async fn run_internal(
             site_manager.update_single_resource(resource).await?;
             display::header("Resource updated successfully");
         }
+        Commands::Json { .. } => unreachable!("we have extracted the json command above"),
     };
 
     Ok(())
