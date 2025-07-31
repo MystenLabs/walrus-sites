@@ -96,20 +96,17 @@ impl Walrus {
         force: bool,
         deletable: bool,
     ) -> Result<StoreOutput> {
-        let dry_run = false;
-        let ignore_resources = false;
-        let share = false;
         create_command!(
             self,
             store,
             files,
             CommonStoreOptions {
                 epoch_arg,
-                dry_run,
+                dry_run: false,
                 force,
-                ignore_resources,
+                ignore_resources: false,
                 deletable,
-                share,
+                share: false,
             }
         )
     }
@@ -123,9 +120,6 @@ impl Walrus {
         force: bool,
         deletable: bool,
     ) -> Result<QuiltStoreResult> {
-        let dry_run = false;
-        let ignore_resources = false;
-        let share = false;
         create_command!(
             self,
             store_quilt,
@@ -133,11 +127,11 @@ impl Walrus {
             blobs,
             CommonStoreOptions {
                 epoch_arg,
-                dry_run,
+                dry_run: false,
                 force,
-                ignore_resources,
+                ignore_resources: false,
                 deletable,
-                share,
+                share: false,
             }
         )
     }
@@ -155,20 +149,17 @@ impl Walrus {
         deletable: bool,
         force: bool,
     ) -> Result<Vec<DryRunOutput>> {
-        let dry_run = true;
-        let ignore_resources = false;
-        let share = false;
         create_command!(
             self,
             store,
             vec![file],
             CommonStoreOptions {
                 epoch_arg,
-                dry_run,
+                dry_run: true,
                 force,
-                ignore_resources,
+                ignore_resources: false,
                 deletable,
-                share,
+                share: false,
             }
         )
     }
@@ -181,9 +172,6 @@ impl Walrus {
         force: bool,
         deletable: bool,
     ) -> Result<Vec<StoreQuiltDryRunOutput>> {
-        let dry_run = true;
-        let ignore_resources = false;
-        let share = false;
         // The `paths` and `blobs` are in conflict with each other
         let (paths, blobs) = match path_or_blob {
             PathOrBlob::Path(path) => (vec![path], Vec::new()),
@@ -196,11 +184,11 @@ impl Walrus {
             blobs,
             CommonStoreOptions {
                 epoch_arg,
-                dry_run,
+                dry_run: true,
                 force,
-                ignore_resources,
+                ignore_resources: false,
                 deletable,
-                share,
+                share: false,
             }
         )
     }
