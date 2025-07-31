@@ -291,8 +291,8 @@ pub enum Commands {
         /// "publish", "update", "deploy", "convert", ...) with an object containing the command
         /// options.
         ///
-        /// Note that where CLI options are in "kebab-case", the respective JSON strings are in
-        /// "camelCase".
+        /// Note that where CLI flags are in "kebab-case", the respective JSON strings are in
+        /// "camelCase". For example, the CLI flag `--gas-budget` is specified as `gasBudget` in JSON. 
         ///
         /// For example, to publish a site using a specific configuration file, you can use the
         /// following JSON input:
