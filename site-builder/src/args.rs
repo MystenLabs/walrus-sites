@@ -64,24 +64,24 @@ impl Args {
 
         // Someone might pass a global-argument inside the command in json, as clap allows them
         // too. This is used to support the same behavior in json.
-        let general_inside_command = hoist_general_args(command_string)?;
+        let general_inside_command = Self::hoist_general_args(command_string)?;
         new_self.general.merge(&general_inside_command);
 
         // new_self.json = true;
         Ok(new_self)
     }
-}
 
-fn hoist_general_args(serialized: &str) -> Result<GeneralArgs> {
-    let mut raw: serde_json::Value = serde_json::from_str(serialized)?;
-    let Some(command_obj) = raw.get_mut("command").and_then(|c| c.as_object_mut()) else {
-        bail!("Unexpected format. Expected \"command\" field inside arguments.")
-    };
-    let Some((_command, command_args)) = command_obj.into_iter().next() else {
-        bail!("Unexpected format. Expected \"command\" to include at least one field.")
-    };
+    fn hoist_general_args(args_json: &str) -> Result<GeneralArgs> {
+        let mut raw: serde_json::Value = serde_json::from_str(args_json)?;
+        let Some(command_obj) = raw.get_mut("command").and_then(|c| c.as_object_mut()) else {
+            bail!("Unexpected format. Expected \"command\" field inside arguments.")
+        };
+        let Some((_command, command_args)) = command_obj.into_iter().next() else {
+            bail!("Unexpected format. Expected \"command\" to include at least one field.")
+        };
 
-    Ok(serde_json::from_value(command_args.take())?)
+        Ok(serde_json::from_value(command_args.take())?)
+    }
 }
 
 #[derive(Parser, Clone, Debug, Deserialize, Serialize)]
@@ -293,7 +293,7 @@ pub enum Commands {
         /// options.
         ///
         /// Note that where CLI flags are in "kebab-case", the respective JSON strings are in
-        /// "camelCase". For example, the CLI flag `--gas-budget` is specified as `gasBudget` in JSON. 
+        /// "camelCase". For example, the CLI flag `--gas-budget` is specified as `gasBudget` in JSON.
         ///
         /// For example, to publish a site using a specific configuration file, you can use the
         /// following JSON input:
