@@ -8,7 +8,6 @@ import { siteNotFound } from "@lib/http/http_error_responses";
 import blocklistChecker from "src/blocklist_checker";
 import { config } from "src/configuration_loader";
 import { standardUrlFetcher, premiumUrlFetcher } from "src/url_fetcher_factory";
-import { sendToWebAnalytics } from "src/web_analytics";
 import { sendToAmplitude } from "src/amplitude";
 import { Base36toHex } from "@lib/objectId_operations";
 import { instrumentationFacade } from "@lib/instrumentation";
@@ -19,9 +18,7 @@ export default async function main(req: Request) {
 	const url = new URL(req.url);
 	logger.info("Processing new request", {url})
 
-	if (config.enableVercelWebAnalytics) {
-		await sendToWebAnalytics(req);
-	}
+
 	const portalDomainNameLength = config.portalDomainNameLength;
 	const parsedUrl = getSubdomainAndPath(url, Number(portalDomainNameLength));
 	const portalDomain = getDomain(url, Number(portalDomainNameLength));
