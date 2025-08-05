@@ -8491,6 +8491,8 @@ dependencies = [
  "home",
  "humantime",
  "move-core-types",
+ "move-package",
+ "move-symbol-pool",
  "notify",
  "prettytable",
  "rand 0.8.5",
@@ -8510,10 +8512,12 @@ dependencies = [
  "toml 0.8.23",
  "tracing",
  "tracing-subscriber",
+ "walrus-core",
  "walrus-sdk",
  "walrus-service",
  "walrus-sui",
  "walrus-test-utils",
+ "walrus-utils",
 ]
 
 [[package]]
