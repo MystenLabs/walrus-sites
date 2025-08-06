@@ -82,6 +82,7 @@ impl SiteDataDiff<'_> {
                 .collect(),
             route_ops: self.route_ops.clone(),
             metadata_updated: !self.metadata_op.is_noop(),
+            site_name_updated: !self.site_name_op.is_noop(),
         }
     }
 }

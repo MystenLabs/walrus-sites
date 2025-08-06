@@ -67,6 +67,7 @@ pub struct SiteDataDiffSummary {
     pub resource_ops: Vec<ResourceOpSummary>,
     pub route_ops: RouteOps,
     pub metadata_updated: bool,
+    pub site_name_updated: bool,
 }
 
 impl From<&SiteDataDiff<'_>> for SiteDataDiffSummary {
@@ -75,6 +76,7 @@ impl From<&SiteDataDiff<'_>> for SiteDataDiffSummary {
             resource_ops: value.resource_ops.iter().map(|op| op.into()).collect(),
             route_ops: value.route_ops.clone(),
             metadata_updated: !value.metadata_op.is_noop(),
+            site_name_updated: !value.site_name_op.is_noop(),
         }
     }
 }
@@ -87,7 +89,11 @@ impl From<SiteDataDiff<'_>> for SiteDataDiffSummary {
 
 impl Summarizable for SiteDataDiffSummary {
     fn to_summary(&self) -> String {
-        if self.resource_ops.is_empty() && self.route_ops.is_unchanged() && !self.metadata_updated {
+        if self.resource_ops.is_empty()
+            && self.route_ops.is_unchanged()
+            && !self.metadata_updated
+            && !self.site_name_updated
+        {
             return "No operation needs to be performed.".to_owned();
         }
 
@@ -105,7 +111,12 @@ impl Summarizable for SiteDataDiffSummary {
         } else {
             "No Metadata updated."
         };
+        let site_name_str = if self.site_name_updated {
+            "The site name has been updated."
+        } else {
+            "Site name has not been updated."
+        };
 
-        format!("{resource_str}\n{route_str}\n{metadata_str}")
+        format!("{resource_str}\n{route_str}\n{metadata_str}\n{site_name_str}")
     }
 }
