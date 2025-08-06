@@ -28,6 +28,7 @@ use crate::{
         RouteOps,
         Routes,
         SiteFields,
+        SiteNameOp,
         SuiDynamicField,
     },
     util::{handle_pagination, type_origin_map_for_package},
@@ -47,6 +48,7 @@ pub struct SiteDataDiff<'a> {
     pub resource_ops: Vec<ResourceOp<'a>>,
     pub route_ops: RouteOps,
     pub metadata_op: MetadataOp,
+    pub site_name_op: SiteNameOp,
 }
 
 impl SiteDataDiff<'_> {
@@ -55,6 +57,7 @@ impl SiteDataDiff<'_> {
         self.resource_ops.iter().any(|op| op.is_change())
             || !self.route_ops.is_unchanged()
             || !self.metadata_op.is_noop()
+            || !self.site_name_op.is_noop()
     }
 
     /// Returns the resources that need to be updated on Walrus.
@@ -89,15 +92,22 @@ pub struct SiteData {
     resources: ResourceSet,
     routes: Option<Routes>,
     metadata: Option<Metadata>,
+    site_name: Option<String>,
 }
 
 impl SiteData {
     /// SiteData constructor.
-    pub fn new(resources: ResourceSet, routes: Option<Routes>, metadata: Option<Metadata>) -> Self {
+    pub fn new(
+        resources: ResourceSet,
+        routes: Option<Routes>,
+        metadata: Option<Metadata>,
+        site_name: Option<String>,
+    ) -> Self {
         Self {
             resources,
             routes,
             metadata,
+            site_name,
         }
     }
 
@@ -107,6 +117,7 @@ impl SiteData {
             resources: ResourceSet::empty(),
             routes: None,
             metadata: None,
+            site_name: None,
         }
     }
 
@@ -117,6 +128,7 @@ impl SiteData {
             resource_ops: self.resources.diff(&start.resources),
             route_ops: self.routes_diff(start),
             metadata_op: self.metadata_diff(start),
+            site_name_op: self.site_name_diff(start),
         }
     }
 
@@ -126,6 +138,7 @@ impl SiteData {
             resource_ops: self.resources.replace_all(&other.resources),
             route_ops: self.routes_diff(other),
             metadata_op: self.metadata_diff(other),
+            site_name_op: self.site_name_diff(other),
         }
     }
 
@@ -146,6 +159,14 @@ impl SiteData {
             MetadataOp::Update
         } else {
             MetadataOp::Noop
+        }
+    }
+
+    fn site_name_diff(&self, start: &Self) -> SiteNameOp {
+        if self.site_name != start.site_name {
+            SiteNameOp::Update
+        } else {
+            SiteNameOp::Noop
         }
     }
 
@@ -175,7 +196,8 @@ impl RemoteSiteFactory<'_> {
 
     /// Gets the remote site representation stored on chain
     pub async fn get_from_chain(&self, site_id: ObjectID) -> Result<SiteData> {
-        let metadata = Some(self.get_site_fields(site_id).await?.into());
+        let site_fields = self.get_site_fields(site_id).await?;
+        let metadata = Some(site_fields.clone().into());
         let dynamic_fields = self.get_all_dynamic_fields(site_id).await?;
         let resource_path_tag = self.resource_path_tag()?;
 
@@ -216,6 +238,7 @@ impl RemoteSiteFactory<'_> {
             resources,
             routes,
             metadata,
+            site_name: site_fields.name.into(),
         })
     }
 
@@ -327,8 +350,8 @@ mod tests {
         ];
 
         for (this_routes, other_routes, has_updates) in cases {
-            let this = SiteData::new(ResourceSet::empty(), this_routes, None);
-            let other = SiteData::new(ResourceSet::empty(), other_routes, None);
+            let this = SiteData::new(ResourceSet::empty(), this_routes, None, None);
+            let other = SiteData::new(ResourceSet::empty(), other_routes, None, None);
             let diff = this.diff(&other);
             assert_eq!(diff.has_updates(), has_updates);
         }
@@ -366,8 +389,8 @@ mod tests {
         ];
 
         for (this_metadata, other_metadata, has_updates) in cases {
-            let this = SiteData::new(ResourceSet::empty(), None, this_metadata);
-            let other = SiteData::new(ResourceSet::empty(), None, other_metadata);
+            let this = SiteData::new(ResourceSet::empty(), None, this_metadata, None);
+            let other = SiteData::new(ResourceSet::empty(), None, other_metadata, None);
             assert_eq!(this.diff(&other).has_updates(), has_updates);
         }
     }

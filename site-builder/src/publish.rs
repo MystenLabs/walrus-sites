@@ -169,6 +169,7 @@ impl SiteEditor {
                 BlobManagementOptions::no_status_check(),
                 WalrusStoreOptions::default(),
                 None,
+                None,
                 NonZeroUsize::new(1).expect("non-zero"),
             )
             .await?;
@@ -267,12 +268,18 @@ impl SiteEditor<EditOptions> {
             None => None,
         };
 
+        let site_name = match ws_resources.clone() {
+            Some(value) => value.site_name,
+            None => None,
+        };
+
         let mut site_manager = SiteManager::new(
             self.config.clone(),
             self.edit_options.site_id.clone(),
             self.edit_options.blob_options.clone(),
             self.edit_options.publish_options.walrus_options.clone(),
             site_metadata,
+            site_name,
             self.edit_options.publish_options.max_parallel_stores,
         )
         .await?;

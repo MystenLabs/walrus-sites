@@ -316,6 +316,17 @@ impl SitePtb<Argument> {
         )
     }
 
+    pub fn update_name(&mut self, name: &String) -> Result<()> {
+        tracing::debug!(name=%name, "new Move call: updating site name");
+        let name_input = self.pt_builder.input(pure_call_arg(&name.to_owned())?)?;
+        self.add_programmable_move_call(
+            contracts::site::update_name.identifier(),
+            vec![],
+            vec![self.site_argument, name_input],
+        );
+        Ok(())
+    }
+
     /// Burns the site.
     fn burn(&mut self) {
         self.add_programmable_move_call(

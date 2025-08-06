@@ -214,6 +214,7 @@ async fn run_internal(
                 BlobManagementOptions::no_status_check(),
                 common,
                 None, // TODO: update the site metadata.
+                None,
                 NonZeroUsize::new(1).expect("non-zero"),
             )
             .await?;
