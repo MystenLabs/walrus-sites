@@ -395,4 +395,32 @@ mod tests {
             assert_eq!(this.diff(&other).has_updates(), has_updates);
         }
     }
+
+    #[test]
+    fn test_site_name_diff() {
+        let cases = vec![
+            (None, None, false),
+            (Some("My Walrus Site".to_string()), None, true),
+            (None, Some("My Walrus Site".to_string()), true),
+            (
+                Some("My Walrus Site".to_string()),
+                Some("My Walrus Site".to_string()),
+                false,
+            ),
+            (
+                Some("My Walrus Site".to_string()),
+                Some("My New Walrus Site".to_string()),
+                true,
+            ),
+            (Some("".to_string()), Some("My Site".to_string()), true),
+            (Some("My Site".to_string()), Some("".to_string()), true),
+            (Some("".to_string()), Some("".to_string()), false),
+        ];
+
+        for (this_site_name, other_site_name, has_updates) in cases {
+            let this = SiteData::new(ResourceSet::empty(), None, None, this_site_name);
+            let other = SiteData::new(ResourceSet::empty(), None, None, other_site_name);
+            assert_eq!(this.diff(&other).has_updates(), has_updates);
+        }
+    }
 }
