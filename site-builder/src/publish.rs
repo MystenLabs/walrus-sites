@@ -91,6 +91,7 @@ impl BlobManagementOptions {
 pub(crate) struct EditOptions {
     pub publish_options: PublishOptions,
     pub site_id: Option<ObjectID>,
+    pub site_name: Option<String>,
     pub continuous_editing: ContinuousEditing,
     pub blob_options: BlobManagementOptions,
 }
@@ -114,6 +115,7 @@ impl SiteEditor {
         self,
         publish_options: PublishOptions,
         site_id: Option<ObjectID>,
+        site_name: Option<String>,
         continuous_editing: ContinuousEditing,
         blob_options: BlobManagementOptions,
     ) -> SiteEditor<EditOptions> {
@@ -123,6 +125,7 @@ impl SiteEditor {
             edit_options: EditOptions {
                 publish_options,
                 site_id,
+                site_name,
                 continuous_editing,
                 blob_options,
             },
@@ -276,7 +279,7 @@ impl SiteEditor<EditOptions> {
             self.edit_options.blob_options.clone(),
             self.edit_options.publish_options.walrus_options.clone(),
             site_metadata,
-            site_name,
+            self.edit_options.site_name.clone().or(site_name),
             self.edit_options.publish_options.max_parallel_stores,
         )
         .await?;
@@ -442,7 +445,7 @@ fn persist_site_identifier(
             );
             let name = ws_resources
                 .as_ref()
-                .and_then(|r| r.site_name.clone())
+                .and_then(|r| site_manager.site_name.clone().or(r.site_name.clone()))
                 .unwrap_or_else(|| "My Walrus Site".to_string());
 
             persist_site_id_and_name(new_site_object_id, Some(name.clone()), ws_resources, path)?;

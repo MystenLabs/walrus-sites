@@ -99,6 +99,7 @@ async fn run_internal(
                 .with_edit_options(
                     publish_options,
                     identifier,
+                    site_name,
                     continuous_editing,
                     blob_management,
                 )
@@ -120,6 +121,7 @@ async fn run_internal(
                 .with_edit_options(
                     publish_options,
                     None,
+                    site_name,
                     ContinuousEditing::Once,
                     BlobManagementOptions::no_status_check(),
                 )
@@ -144,6 +146,7 @@ async fn run_internal(
                 .with_edit_options(
                     publish_options,
                     Some(object_id),
+                    None,
                     ContinuousEditing::from_watch_flag(watch),
                     // Check the extension if either `check_extend` is true or `force` is true.
                     // This is for backwards compatibility.
