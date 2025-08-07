@@ -30,10 +30,7 @@ use crate::{
     site::{
         builder::SitePtb,
         config::WSResources,
-        manager::{
-            SiteIdentifier::{self, ExistingSite},
-            SiteManager,
-        },
+        manager::SiteManager,
         resource::ResourceManager,
         RemoteSiteFactory,
         SITE_MODULE,
@@ -93,7 +90,7 @@ impl BlobManagementOptions {
 
 pub(crate) struct EditOptions {
     pub publish_options: PublishOptions,
-    pub site_id: SiteIdentifier,
+    pub site_id: Option<ObjectID>,
     pub continuous_editing: ContinuousEditing,
     pub blob_options: BlobManagementOptions,
 }
@@ -116,7 +113,7 @@ impl SiteEditor {
     pub fn with_edit_options(
         self,
         publish_options: PublishOptions,
-        site_id: SiteIdentifier,
+        site_id: Option<ObjectID>,
         continuous_editing: ContinuousEditing,
         blob_options: BlobManagementOptions,
     ) -> SiteEditor<EditOptions> {
@@ -165,7 +162,7 @@ impl SiteEditor {
             // TODO: Change the site manager not to require the unnecessary info.
             let mut site_manager = SiteManager::new(
                 self.config.clone(),
-                ExistingSite(site_id),
+                Some(site_id),
                 BlobManagementOptions::no_status_check(),
                 WalrusStoreOptions::default(),
                 None,
@@ -337,7 +334,7 @@ impl SiteEditor<EditOptions> {
 fn print_summary(
     config: &Config,
     address: &SuiAddress,
-    site_id: &SiteIdentifier,
+    site_id: &Option<ObjectID>,
     response: &SuiTransactionBlockResponse,
     summary: &impl Summarizable,
 ) -> Result<()> {
@@ -353,11 +350,11 @@ fn print_summary(
     display::header("Execution completed");
     println!("{}\n", summary.to_summary());
     let object_id = match site_id {
-        SiteIdentifier::ExistingSite(id) => {
+        Some(id) => {
             println!("Site object ID: {id}");
             *id
         }
-        SiteIdentifier::NewSite(name) => {
+        None => {
             let id = get_site_id_from_response(
                 *address,
                 response
@@ -365,7 +362,7 @@ fn print_summary(
                     .as_ref()
                     .ok_or(anyhow::anyhow!("response did not contain effects"))?,
             );
-            println!("Created new site: {name}\nNew site object ID: {id}");
+            println!("Created new site! \nNew site object ID: {id}");
             id
         }
     };
@@ -396,7 +393,7 @@ fn print_summary(
 
 /// Persists the site identifier (ID and optional name) into the `ws-resources.json` file.
 ///
-/// This function handles both cases of `SiteIdentifier`:
+/// This function handles the following:
 /// - For an existing site, it logs the site ID and persists it.
 /// - For a newly published site, it extracts the new site ID from the transaction effects
 ///   and persists both the ID and the user-provided name.
@@ -415,21 +412,21 @@ fn print_summary(
 /// Returns an error if the active address or transaction effects are missing,
 /// or if the persistence operation fails.
 fn persist_site_identifier(
-    site_id: &SiteIdentifier,
+    site_id: &Option<ObjectID>,
     site_manager: &SiteManager,
     response: &SuiTransactionBlockResponse,
     ws_resources: Option<WSResources>,
     path: &Path,
 ) -> Result<()> {
     match site_id {
-        SiteIdentifier::ExistingSite(object_id) => {
+        Some(object_id) => {
             tracing::info!(
                 "Operation was on an existing site (ID: {}). This ID will be persisted in ws-resources.json.",
                 object_id
             );
             persist_site_id_and_name(*object_id, None, ws_resources, path)?;
         }
-        SiteIdentifier::NewSite(name) => {
+        None => {
             let active_address = site_manager.active_address()?;
 
             let tx_effects = response
@@ -443,6 +440,10 @@ fn persist_site_identifier(
                 "New site published. New ObjectID ({}) will be persisted in ws-resources.json.",
                 new_site_object_id
             );
+            let name = ws_resources
+                .as_ref()
+                .and_then(|r| r.site_name.clone())
+                .unwrap_or_else(|| "My Walrus Site".to_string());
 
             persist_site_id_and_name(new_site_object_id, Some(name.clone()), ws_resources, path)?;
         }

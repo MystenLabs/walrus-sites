@@ -8,11 +8,7 @@ use args::{Args, Commands};
 use config::Config;
 use preprocessor::Preprocessor;
 use publish::{load_ws_resources, BlobManagementOptions, ContinuousEditing, SiteEditor};
-use site::{
-    config::WSResources,
-    manager::{SiteIdentifier, SiteManager},
-    resource::ResourceManager,
-};
+use site::{config::WSResources, manager::SiteManager, resource::ResourceManager};
 use sitemap::display_sitemap;
 use util::{id_to_base36, path_or_defaults_if_exist};
 
@@ -88,16 +84,12 @@ async fn run_internal(
 
             let (identifier, continuous_editing, blob_management) = match site_object_id {
                 Some(object_id) => (
-                    SiteIdentifier::ExistingSite(object_id),
+                    Some(object_id),
                     ContinuousEditing::from_watch_flag(watch),
                     BlobManagementOptions { check_extend },
                 ),
                 None => (
-                    SiteIdentifier::NewSite(site_name.unwrap_or_else(|| {
-                        ws_resources
-                            .and_then(|res| res.site_name)
-                            .unwrap_or_else(|| "My Walrus Site".to_string())
-                    })),
+                    None,
                     ContinuousEditing::Once,
                     BlobManagementOptions::no_status_check(),
                 ),
@@ -123,16 +115,11 @@ async fn run_internal(
                 publish_options.walrus_options.ws_resources.as_deref(),
                 publish_options.directory.as_path(),
             )?;
-            let site_name = site_name.unwrap_or_else(|| {
-                ws_resources
-                    .and_then(|res| res.site_name)
-                    .unwrap_or_else(|| "My Walrus Site".to_string())
-            });
 
             SiteEditor::new(context, config)
                 .with_edit_options(
                     publish_options,
-                    SiteIdentifier::NewSite(site_name),
+                    None,
                     ContinuousEditing::Once,
                     BlobManagementOptions::no_status_check(),
                 )
@@ -156,7 +143,7 @@ async fn run_internal(
             SiteEditor::new(context, config)
                 .with_edit_options(
                     publish_options,
-                    SiteIdentifier::ExistingSite(object_id),
+                    Some(object_id),
                     ContinuousEditing::from_watch_flag(watch),
                     // Check the extension if either `check_extend` is true or `force` is true.
                     // This is for backwards compatibility.
@@ -210,7 +197,7 @@ async fn run_internal(
             // TODO: make when upload configurable.
             let mut site_manager = SiteManager::new(
                 config,
-                SiteIdentifier::ExistingSite(site_object),
+                Some(site_object),
                 BlobManagementOptions::no_status_check(),
                 common,
                 None, // TODO: update the site metadata.
