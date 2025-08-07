@@ -525,6 +525,9 @@ impl ResourceManager {
             self.ws_resources
                 .as_ref()
                 .and_then(|config| config.metadata.clone()),
+            self.ws_resources
+                .as_ref()
+                .and_then(|config| config.site_name.clone()),
         ))
     }
 

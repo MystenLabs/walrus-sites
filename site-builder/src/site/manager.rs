@@ -28,7 +28,7 @@ use crate::{
     publish::BlobManagementOptions,
     retry_client::RetriableSuiClient,
     summary::SiteDataDiffSummary,
-    types::{Metadata, MetadataOp},
+    types::{Metadata, MetadataOp, SiteNameOp},
     util::{get_site_id_from_response, sign_and_send_ptb},
     walrus::{types::BlobId, Walrus},
 };
@@ -54,6 +54,7 @@ pub struct SiteManager {
     pub blob_options: BlobManagementOptions,
     pub backoff_config: ExponentialBackoffConfig,
     pub metadata: Option<Metadata>,
+    pub site_name: Option<String>,
     pub walrus_options: WalrusStoreOptions,
     pub max_parallel_stores: NonZeroUsize,
 }
@@ -66,6 +67,7 @@ impl SiteManager {
         blob_options: BlobManagementOptions,
         walrus_options: WalrusStoreOptions,
         metadata: Option<Metadata>,
+        site_name: Option<String>,
         max_parallel_stores: NonZeroUsize,
     ) -> Result<Self> {
         Ok(SiteManager {
@@ -76,6 +78,7 @@ impl SiteManager {
             blob_options,
             backoff_config: ExponentialBackoffConfig::default(),
             metadata,
+            site_name,
             walrus_options,
             max_parallel_stores,
         })
@@ -324,6 +327,15 @@ impl SiteManager {
                 ptb.with_create_site(site_name, self.metadata.clone())?
             }
         };
+
+        if let Some(site_name) = &self.site_name {
+            match updates.site_name_op {
+                SiteNameOp::Update => ptb.update_name(site_name)?,
+                SiteNameOp::Noop => {
+                    // Name is not updated, do nothing.
+                }
+            }
+        }
 
         // Publish the first MAX_RESOURCES_PER_PTB resources, or all resources if there are fewer
         // than that.

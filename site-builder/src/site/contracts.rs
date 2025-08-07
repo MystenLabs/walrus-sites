@@ -215,6 +215,7 @@ pub mod site {
     contract_ident!(fn site::new_site, 1);
     contract_ident!(fn site::burn);
     contract_ident!(fn site::update_metadata);
+    contract_ident!(fn site::update_name);
     // Resource functions
     contract_ident!(struct site::Resource);
     contract_ident!(struct site::ResourcePath);
