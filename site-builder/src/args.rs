@@ -63,7 +63,7 @@ impl Args {
         let mut new_self: Args = serde_json::from_str(command_string)?;
 
         // Someone might pass a global-argument inside the command in json, as clap allows them
-        // too. This is used to support the same behavior in json.
+        // to. This is used to support the same behavior in json.
         let general_inside_command = Self::hoist_general_args(command_string)?;
         new_self.general.merge(&general_inside_command);
 
