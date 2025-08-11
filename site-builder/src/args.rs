@@ -10,7 +10,7 @@ use std::{
     time::SystemTime,
 };
 
-use anyhow::{anyhow, ensure, Result};
+use anyhow::{anyhow, bail, ensure, Result};
 use clap::{ArgGroup, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use sui_sdk::wallet_context::WalletContext;
@@ -23,37 +23,84 @@ use crate::{
     walrus::output::EpochCount,
 };
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone, Deserialize)]
 #[command(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 pub struct Args {
     /// The path to the configuration file for the site builder.
-    #[arg(short, long)]
+    #[arg(short, long, global = true)]
     pub config: Option<PathBuf>,
     /// The context with which to load the configuration.
     ///
     /// If specified, the context will be taken from the config file. Otherwise, the default
     /// context, which is also specified in the config file, will be used.
-    #[arg(long)]
+    #[arg(long, global = true)]
     pub context: Option<String>,
     #[clap(flatten)]
+    #[serde(default, flatten)]
     pub general: GeneralArgs,
     #[command(subcommand)]
     pub command: Commands,
+    #[arg(long, global = true)]
+    #[serde(default)]
+    pub json: bool,
+}
+
+impl Args {
+    pub fn extract_json_command(self) -> Result<Self> {
+        let Commands::Json { command_string } = &self.command else {
+            return Ok(self);
+        };
+        tracing::info!("running in JSON mode");
+        let command_string = match command_string {
+            Some(s) => s,
+            None => {
+                tracing::debug!("reading JSON input from stdin");
+                &std::io::read_to_string(std::io::stdin())?
+            }
+        };
+        tracing::debug!(
+            command = command_string.replace('\n', ""),
+            "running JSON command"
+        );
+        let mut new_self: Args = serde_json::from_str(command_string)?;
+
+        // Someone might pass a global-argument inside the command in json, as clap allows them
+        // too. This is used to support the same behavior in json.
+        let general_inside_command = Self::hoist_general_args(command_string)?;
+        new_self.general.merge(&general_inside_command);
+
+        new_self.json = true;
+        Ok(new_self)
+    }
+
+    fn hoist_general_args(args_json: &str) -> Result<GeneralArgs> {
+        let mut raw: serde_json::Value = serde_json::from_str(args_json)?;
+        let Some(command_obj) = raw.get_mut("command").and_then(|c| c.as_object_mut()) else {
+            bail!("Unexpected format. Expected \"command\" field inside arguments.")
+        };
+        let Some((_command, command_args)) = command_obj.into_iter().next() else {
+            bail!("Unexpected format. Expected \"command\" to include at least one field.")
+        };
+
+        Ok(serde_json::from_value(command_args.take())?)
+    }
 }
 
 #[derive(Parser, Clone, Debug, Deserialize, Serialize)]
 #[command(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 pub struct GeneralArgs {
     /// The URL or the RPC endpoint to connect the client to.
     ///
     /// Can be specified as a CLI argument or in the config.
-    #[arg(long)]
+    #[arg(long, global = true)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rpc_url: Option<String>,
     /// The path to the Sui Wallet config.
     ///
     /// Can be specified as a CLI argument or in the config.
-    #[arg(long)]
+    #[arg(long, global = true)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub wallet: Option<PathBuf>,
     /// The env to be used for the Sui wallet.
@@ -61,7 +108,7 @@ pub struct GeneralArgs {
     /// If not specified, the env specified in the sites-config (under `wallet_env`) will be used.
     /// If the wallet env is also not specified in the config, the env configured in the Sui client
     /// will be used.
-    #[arg(long)]
+    #[arg(long, global = true)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub wallet_env: Option<String>,
     /// The address to be used for the Sui wallet.
@@ -69,40 +116,40 @@ pub struct GeneralArgs {
     /// If not specified, the address specified in the sites-config (under `wallet_address`) will be
     /// used. If the wallet address is also not specified in the config, the address configured in
     /// the Sui client will be used.
-    #[arg(long)]
+    #[arg(long, global = true)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub wallet_address: Option<SuiAddress>,
     /// The context that will be passed to the Walrus binary.
     ///
     /// If not specified, the Walrus context specified in the sites-config will be
     /// used. If it is also not specified in the config, no context will be passed.
-    #[arg(long)]
+    #[arg(long, global = true)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub walrus_context: Option<String>,
     /// The path or name of the walrus binary.
     ///
     /// The Walrus binary will then be called with this configuration to perform actions on Walrus.
     /// Can be specified as a CLI argument or in the config.
-    #[arg(long)]
+    #[arg(long, global = true)]
     #[serde(default = "default::walrus_binary")]
     pub walrus_binary: Option<String>,
     /// The path to the configuration for the Walrus client.
     ///
     /// This will be passed to the calls to the Walrus binary.
     /// Can be specified as a CLI argument or in the config.
-    #[arg(long)]
+    #[arg(long, global = true)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub walrus_config: Option<PathBuf>,
     /// The package ID of the Walrus package on the selected network.
     ///
     /// This is currently only used for the `sitemap` command.
-    #[arg(long)]
+    #[arg(long, global = true)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub walrus_package: Option<ObjectID>,
     /// The gas budget for the operations on Sui.
     ///
     /// Can be specified as a CLI argument or in the config.
-    #[arg(long)]
+    #[arg(long, global = true)]
     #[serde(default = "default::gas_budget")]
     pub gas_budget: Option<u64>,
 }
@@ -179,7 +226,7 @@ impl GeneralArgs {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum ObjectIdOrName {
     /// The object ID of the site.
     ObjectId(ObjectID),
@@ -234,17 +281,51 @@ impl ObjectIdOrName {
     }
 }
 
-#[derive(Subcommand, Debug, Clone)]
+#[derive(Subcommand, Debug, Clone, Deserialize)]
 #[command(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 pub enum Commands {
+    /// Run the client by specifying the arguments in a JSON string; CLI options are ignored.
+    Json {
+        /// The JSON-encoded args for the Walrus CLI; if not present, the args are read from stdin.
+        ///
+        /// The JSON structure follows the CLI arguments, containing global options and a "command"
+        /// object at the root level. The "command" object itself contains the command (e.g.,
+        /// "publish", "update", "deploy", "convert", ...) with an object containing the command
+        /// options.
+        ///
+        /// Note that where CLI flags are in "kebab-case", the respective JSON strings are in
+        /// "camelCase". For example, the CLI flag `--gas-budget` is specified as `gasBudget` in JSON.
+        ///
+        /// For example, to publish a site using a specific configuration file, you can use the
+        /// following JSON input:
+        ///
+        /// {
+        ///   "config": "path/to/sites_config.yaml",
+        ///   "context": "testnet",
+        ///   "gasBudget": 5000000000,
+        ///   "command": {
+        ///     "publish": {
+        ///       "directory": "/path/to/site_directory",
+        ///       "epochs": 1,
+        ///       "siteName": "My Site Name"
+        ///       "wsResources": "path/to/ws-resources.json"
+        ///     }
+        ///   }
+        /// }
+        #[arg(verbatim_doc_comment)]
+        command_string: Option<String>,
+    },
     /// Deploy a new site on Sui.
     ///
     /// If the site has not been published before, this command publishes it and stores
     /// the object ID of the Site in the ws-resources.json file.
     /// If the site has been published before, this command updates the site(indicaded
     /// by the site_object_id field in the ws-resources.json file).
+    #[serde(rename_all = "camelCase")]
     Deploy {
         #[clap(flatten)]
+        #[serde(flatten)]
         publish_options: PublishOptions,
         /// The name of the site.
         #[arg(short, long)]
@@ -260,6 +341,7 @@ pub enum Commands {
         /// When enabled, the command will continuously monitor the site directory and trigger a
         /// redepoloyment whenever changes are detected, allowing for rapid development iteration.
         #[arg(short, long)]
+        #[serde(default)]
         watch: bool,
         /// Checks and extends all blobs in an existing site during an update.
         ///
@@ -277,19 +359,24 @@ pub enum Commands {
         /// This implies that successive updates (without --check-extend) may result in the site
         /// having resources with different expiration times (and possibly some that are expired).
         #[arg(long)]
+        #[serde(default)]
         check_extend: bool,
     },
     /// Publish a new site on Sui.
+    #[serde(rename_all = "camelCase")]
     Publish {
         #[clap(flatten)]
+        #[serde(flatten)]
         publish_options: PublishOptions,
         /// The name of the site.
         #[arg(short, long)]
         site_name: Option<String>,
     },
     /// Update an existing site.
+    #[serde(rename_all = "camelCase")]
     Update {
         #[clap(flatten)]
+        #[serde(flatten)]
         publish_options: PublishOptions,
         /// The object ID of a partially published site to be completed.
         object_id: ObjectID,
@@ -298,6 +385,7 @@ pub enum Commands {
         /// When enabled, the command will continuously monitor the site directory and trigger a
         /// redepoloyment whenever changes are detected, allowing for rapid development iteration.
         #[arg(short, long)]
+        #[serde(default)]
         watch: bool,
         /// This flag is deprecated and will be removed in the future. Use --check-extend.
         ///
@@ -306,6 +394,7 @@ pub enum Commands {
         /// available on Sui.
         #[arg(long)]
         #[deprecated(note = "This flag is being removed; please use --check-extend")]
+        #[serde(default)]
         force: bool,
         /// Checks and extends all blobs in the site during the update.
         ///
@@ -323,11 +412,13 @@ pub enum Commands {
         /// successive updates (without --check-extend) may result in the site having resources
         /// with different expiration times (and possibly some that are expired).
         #[arg(long)]
+        #[serde(default)]
         check_extend: bool,
     },
     /// Convert an object ID in hex format to the equivalent Base36 format.
     ///
     /// This command may be useful to browse a site, given it object ID.
+    #[serde(rename_all = "camelCase")]
     Convert {
         /// The object id (in hex format) to convert
         object_id: ObjectID,
@@ -336,6 +427,7 @@ pub enum Commands {
     ///
     /// Running this command requires the `walrus_package` to be specified either in the config or
     /// through the `--walrus-package` flag.
+    #[serde(rename_all = "camelCase")]
     Sitemap {
         #[arg(value_parser = ObjectIdOrName::parse_sitemap_target)]
         /// The site to be mapped.
@@ -347,16 +439,19 @@ pub enum Commands {
     /// Preprocess the directory, creating and linking index files.
     /// This command allows to publish directories as sites. Warning: Rewrites all `index.html`
     /// files.
+    #[serde(rename_all = "camelCase")]
     ListDirectory { path: PathBuf },
     /// Completely destroys the site at the given object id.
     ///
     /// Removes all resources and routes, and destroys the site, returning the Sui storage rebate to
     /// the owner. Warning: this action is irreversible! Re-publishing the site will generate a
     /// different Site object ID.
+    #[serde(rename_all = "camelCase")]
     Destroy { object: ObjectID },
     /// Adds or updates a single resource in a site, eventually replacing any pre-existing ones.
     ///
     /// The ws_resource file will still be used to determine the resource's headers.
+    #[serde(rename_all = "camelCase")]
     UpdateResource {
         /// The path to the resource to be added.
         #[arg(long)]
@@ -371,17 +466,20 @@ pub enum Commands {
         site_object: ObjectID,
         /// Common configurations.
         #[clap(flatten)]
+        #[serde(flatten)]
         common: WalrusStoreOptions,
     },
 }
 
-#[derive(Parser, Debug, Clone)]
+#[derive(Parser, Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PublishOptions {
     /// The directory containing the site sources.
     pub directory: PathBuf,
     /// Preprocess the directory before publishing.
     /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
     #[arg(long)]
+    #[serde(default)]
     pub list_directory: bool,
     /// The maximum number of concurrent calls to the Walrus CLI for the computation of blob IDs.
     #[arg(long)]
@@ -390,13 +488,16 @@ pub struct PublishOptions {
     ///
     /// More blobs can be stored concurrently, but this will increase memory usage.
     #[arg(long, default_value_t = default::max_parallel_stores())]
+    #[serde(default = "default::max_parallel_stores")]
     pub max_parallel_stores: NonZeroUsize,
     /// Common configurations.
     #[clap(flatten)]
+    #[serde(flatten)]
     pub walrus_options: WalrusStoreOptions,
 }
 
-#[derive(Parser, Debug, Clone, Default)]
+#[derive(Parser, Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
 /// Common configurations across publish, update, and update-resource commands.
 pub struct WalrusStoreOptions {
     /// The path to the Walrus sites resources file.
@@ -412,6 +513,7 @@ pub struct WalrusStoreOptions {
     /// end epoch, or the earliest expiry time in rfc3339 format.
     ///
     #[command(flatten)]
+    #[serde(flatten)]
     pub epoch_arg: EpochArg,
     /// Make the stored resources permanent.
     ///
@@ -419,9 +521,11 @@ pub struct WalrusStoreOptions {
     /// the site is deleted only after `epochs` expiration. Make resources permanent
     /// (non-deletable)
     #[arg(long, action = clap::ArgAction::SetTrue)]
+    #[serde(default)]
     pub permanent: bool,
     /// Perform a dry run (you'll be asked for confirmation before committing changes).
     #[arg(long)]
+    #[serde(default)]
     pub dry_run: bool,
 }
 
@@ -431,6 +535,7 @@ pub struct WalrusStoreOptions {
     ArgGroup::new("epoch_arg")
         .args(&["epochs", "earliest_expiry_time", "end_epoch"])
         .required(true)
+        .multiple(false)
 ))]
 #[serde(rename_all = "camelCase")]
 pub struct EpochArg {
