@@ -498,7 +498,7 @@ impl SiteManager {
     ///
     /// A new site needs to be transferred to the active address.
     fn needs_transfer(&self) -> bool {
-        matches!(self.site_id, None)
+        self.site_id.is_none()
     }
 }
 

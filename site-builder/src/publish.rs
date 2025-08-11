@@ -275,7 +275,7 @@ impl SiteEditor<EditOptions> {
 
         let mut site_manager = SiteManager::new(
             self.config.clone(),
-            self.edit_options.site_id.clone(),
+            self.edit_options.site_id,
             self.edit_options.blob_options.clone(),
             self.edit_options.publish_options.walrus_options.clone(),
             site_metadata,

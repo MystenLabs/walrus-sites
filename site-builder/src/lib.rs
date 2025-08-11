@@ -110,13 +110,6 @@ async fn run_internal(
             publish_options,
             site_name,
         } => {
-            // Use the passed, name, or load the ws-resources file, if it exists, to take the site
-            // name from it or use the default one.
-            let (ws_resources, _) = load_ws_resources(
-                publish_options.walrus_options.ws_resources.as_deref(),
-                publish_options.directory.as_path(),
-            )?;
-
             SiteEditor::new(context, config)
                 .with_edit_options(
                     publish_options,
