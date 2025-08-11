@@ -274,6 +274,18 @@ impl MetadataOp {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum SiteNameOp {
+    Update,
+    Noop,
+}
+
+impl SiteNameOp {
+    pub fn is_noop(&self) -> bool {
+        matches!(self, Self::Noop)
+    }
+}
+
 #[derive(Deserialize, Clone, Debug)]
 pub struct SiteFields {
     #[allow(dead_code)]
