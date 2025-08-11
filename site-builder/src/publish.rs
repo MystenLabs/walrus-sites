@@ -268,10 +268,7 @@ impl SiteEditor<EditOptions> {
             None => None,
         };
 
-        let site_name = match ws_resources.clone() {
-            Some(value) => value.site_name,
-            None => None,
-        };
+        let site_name = ws_resources.as_ref().and_then(|r| r.site_name.clone());
 
         let mut site_manager = SiteManager::new(
             self.config.clone(),

@@ -164,7 +164,7 @@ impl SiteData {
     }
 
     fn site_name_diff(&self, start: &Self) -> SiteNameOp {
-        if self.site_name != start.site_name {
+        if self.site_name.is_some() && self.site_name != start.site_name {
             SiteNameOp::Update
         } else {
             SiteNameOp::Noop
@@ -401,7 +401,7 @@ mod tests {
         let cases = vec![
             (None, None, false),
             (Some("My Walrus Site".to_string()), None, true),
-            (None, Some("My Walrus Site".to_string()), true),
+            (None, Some("My Walrus Site".to_string()), false),
             (
                 Some("My Walrus Site".to_string()),
                 Some("My Walrus Site".to_string()),

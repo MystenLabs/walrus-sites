@@ -320,13 +320,8 @@ impl SiteManager {
             )?,
         };
 
-        if let Some(site_name) = &self.site_name {
-            match updates.site_name_op {
-                SiteNameOp::Update => ptb.update_name(site_name)?,
-                SiteNameOp::Noop => {
-                    // Name is not updated, do nothing.
-                }
-            }
+        if let (Some(site_name), SiteNameOp::Update) = (&self.site_name, updates.site_name_op) {
+            ptb.update_name(site_name)?;
         }
 
         // Publish the first MAX_RESOURCES_PER_PTB resources, or all resources if there are fewer
