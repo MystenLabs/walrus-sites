@@ -37,20 +37,11 @@ const MAX_RESOURCES_PER_PTB: usize = 200;
 const OS_ERROR_DELAY: Duration = Duration::from_secs(1);
 const MAX_RETRIES: u32 = 10;
 
-/// The identifier for the new or existing site.
-///
-/// Either object ID (existing site) or name (new site).
-#[derive(Debug, Clone)]
-pub enum SiteIdentifier {
-    ExistingSite(ObjectID),
-    NewSite(String),
-}
-
 pub struct SiteManager {
     pub config: Config,
     pub walrus: Walrus,
     pub wallet: WalletContext,
-    pub site_id: SiteIdentifier,
+    pub site_id: Option<ObjectID>,
     pub blob_options: BlobManagementOptions,
     pub backoff_config: ExponentialBackoffConfig,
     pub metadata: Option<Metadata>,
@@ -63,7 +54,7 @@ impl SiteManager {
     /// Creates a new site manager.
     pub async fn new(
         config: Config,
-        site_id: SiteIdentifier,
+        site_id: Option<ObjectID>,
         blob_options: BlobManagementOptions,
         walrus_options: WalrusStoreOptions,
         metadata: Option<Metadata>,
@@ -124,13 +115,13 @@ impl SiteManager {
         tracing::debug!(?self.site_id, "creating or updating site");
         let retriable_client = self.sui_client().await?;
         let existing_site = match &self.site_id {
-            SiteIdentifier::ExistingSite(site_id) => {
+            Some(site_id) => {
                 RemoteSiteFactory::new(&retriable_client, self.config.package)
                     .await?
                     .get_from_chain(*site_id)
                     .await?
             }
-            SiteIdentifier::NewSite(_) => SiteData::empty(),
+            None => SiteData::empty(),
         };
         tracing::debug!(?existing_site, "checked existing site");
 
@@ -313,7 +304,7 @@ impl SiteManager {
 
         // Add the call arg if we are updating a site, or add the command to create a new site.
         let mut ptb = match &self.site_id {
-            SiteIdentifier::ExistingSite(site_id) => {
+            Some(site_id) => {
                 let ptb = ptb.with_call_arg(&self.wallet.get_object_ref(*site_id).await?.into())?;
                 // Also update metadata if there is a diff
                 match updates.metadata_op {
@@ -323,9 +314,10 @@ impl SiteManager {
                     MetadataOp::Noop => ptb,
                 }
             }
-            SiteIdentifier::NewSite(site_name) => {
-                ptb.with_create_site(site_name, self.metadata.clone())?
-            }
+            None => ptb.with_create_site(
+                self.site_name.as_deref().unwrap_or("My Walrus Site"),
+                self.metadata.clone(),
+            )?,
         };
 
         if let Some(site_name) = &self.site_name {
@@ -359,8 +351,8 @@ impl SiteManager {
             .await?;
 
         let site_object_id = match &self.site_id {
-            SiteIdentifier::ExistingSite(site_id) => *site_id,
-            SiteIdentifier::NewSite(_) => {
+            Some(site_id) => *site_id,
+            None => {
                 let resp = result
                     .effects
                     .as_ref()
@@ -398,7 +390,7 @@ impl SiteManager {
             Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
         )?;
 
-        let SiteIdentifier::ExistingSite(site_id) = &self.site_id else {
+        let Some(site_id) = &self.site_id else {
             anyhow::bail!("`add_single_resource` is only supported for existing sites");
         };
         let mut ptb = ptb.with_call_arg(&self.wallet.get_object_ref(*site_id).await?.into())?;
@@ -506,7 +498,7 @@ impl SiteManager {
     ///
     /// A new site needs to be transferred to the active address.
     fn needs_transfer(&self) -> bool {
-        matches!(self.site_id, SiteIdentifier::NewSite(_))
+        self.site_id.is_none()
     }
 }
 
