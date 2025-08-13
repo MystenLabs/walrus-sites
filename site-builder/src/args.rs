@@ -12,7 +12,7 @@ use std::{
 
 use anyhow::{anyhow, bail, ensure, Result};
 use clap::{ArgGroup, Parser, Subcommand};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use sui_sdk::wallet_context::WalletContext;
 use sui_types::base_types::{ObjectID, SuiAddress};
 
@@ -224,7 +224,7 @@ impl GeneralArgs {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum ObjectIdOrName {
     /// The object ID of the site.
     ObjectId(ObjectID),
@@ -233,11 +233,11 @@ pub enum ObjectIdOrName {
 }
 
 impl ObjectIdOrName {
-    fn parse_sitemap_target(input: &str) -> Result<Self> {
+    fn parse_sitemap_target(input: &str) -> Self {
         if let Ok(object_id) = ObjectID::from_str(input) {
-            Ok(Self::ObjectId(object_id))
+            Self::ObjectId(object_id)
         } else {
-            Ok(Self::Name(Self::normalize_name(input)))
+            Self::Name(Self::normalize_name(input))
         }
     }
 
@@ -276,6 +276,25 @@ impl ObjectIdOrName {
         } else {
             name.to_owned()
         }
+    }
+}
+
+impl<'de> Deserialize<'de> for ObjectIdOrName {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        // Deserialize as a String first
+        let s = String::deserialize(deserializer)?;
+        Ok(ObjectIdOrName::parse_sitemap_target(&s))
+    }
+}
+
+impl std::str::FromStr for ObjectIdOrName {
+    type Err = String;
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        Ok(ObjectIdOrName::parse_sitemap_target(input))
     }
 }
 
@@ -427,7 +446,6 @@ pub enum Commands {
     /// through the `--walrus-package` flag.
     #[serde(rename_all = "camelCase")]
     Sitemap {
-        #[arg(value_parser = ObjectIdOrName::parse_sitemap_target)]
         /// The site to be mapped.
         ///
         /// The site can be specified as object ID (in hex form) or as SuiNS name.
