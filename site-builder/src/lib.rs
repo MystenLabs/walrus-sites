@@ -40,21 +40,18 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
 // using `bin_version::bin_version!();` which can only run in `main`.
 async fn run_internal(args: Args) -> anyhow::Result<()> {
     let args = args.extract_json_if_present()?;
-    let Args {
-        config,
-        context,
-        general,
-        command,
-    } = args;
-    let config_path = path_or_defaults_if_exist(config.as_deref(), &sites_config_default_paths())
-        .ok_or(anyhow!(
-        "could not find a valid sites configuration file; \
+    let Args { general, command } = args;
+    let config_path =
+        path_or_defaults_if_exist(general.config.as_deref(), &sites_config_default_paths()).ok_or(
+            anyhow!(
+                "could not find a valid sites configuration file; \
             consider using  the --config flag to specify the config"
-    ))?;
+            ),
+        )?;
 
     tracing::info!(?config_path, "loading sites configuration");
     let (mut config, selected_context) =
-        Config::load_from_multi_config(config_path, context.as_deref())?;
+        Config::load_from_multi_config(config_path, general.context.as_deref())?;
     tracing::debug!(?config, "configuration before merging");
 
     // Merge the configs and the CLI args. Serde default ensures that the `walrus_binary` and
@@ -95,7 +92,7 @@ async fn run_internal(args: Args) -> anyhow::Result<()> {
                 ),
             };
 
-            SiteEditor::new(context, config)
+            SiteEditor::new(general.context, config)
                 .with_edit_options(
                     publish_options,
                     identifier,
@@ -110,7 +107,7 @@ async fn run_internal(args: Args) -> anyhow::Result<()> {
             publish_options,
             site_name,
         } => {
-            SiteEditor::new(context, config)
+            SiteEditor::new(general.context, config)
                 .with_edit_options(
                     publish_options,
                     None,
@@ -135,7 +132,7 @@ async fn run_internal(args: Args) -> anyhow::Result<()> {
                     version. Please use --check-extend instead.",
                 )
             }
-            SiteEditor::new(context, config)
+            SiteEditor::new(general.context, config)
                 .with_edit_options(
                     publish_options,
                     Some(object_id),
@@ -161,7 +158,7 @@ async fn run_internal(args: Args) -> anyhow::Result<()> {
             Preprocessor::preprocess(path.as_path())?;
         }
         Commands::Destroy { object } => {
-            let site_editor = SiteEditor::new(context, config);
+            let site_editor = SiteEditor::new(general.context, config);
             site_editor.destroy(object).await?;
         }
         Commands::UpdateResource {
