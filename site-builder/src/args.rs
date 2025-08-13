@@ -23,19 +23,11 @@ use crate::{
     walrus::output::EpochCount,
 };
 
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Parser, Debug, Clone, Deserialize)]
 #[command(rename_all = "kebab-case")]
 #[serde(rename_all = "camelCase")]
 pub struct Args {
-    /// The path to the configuration file for the site builder.
-    #[arg(short, long, global = true)]
-    pub config: Option<PathBuf>,
-    /// The context with which to load the configuration.
-    ///
-    /// If specified, the context will be taken from the config file. Otherwise, the default
-    /// context, which is also specified in the config file, will be used.
-    #[arg(long, global = true)]
-    pub context: Option<String>,
     #[clap(flatten)]
     #[serde(default, flatten)]
     pub general: GeneralArgs,
@@ -77,6 +69,7 @@ impl Args {
     /// `GeneralArgs`, but for serde_json. In other words, it deserializes fields inside the
     /// command as `GeneralArgs` in order to merge it with existing `GeneralArgs` outside the
     /// command.
+    /// Note that this will hoist only `GeneralArgs` residing inside the command, not besides it.
     fn hoist_general_args(args_json: &str) -> Result<GeneralArgs> {
         let mut raw: serde_json::Value = serde_json::from_str(args_json)?;
         let Some(command_obj) = raw.get_mut("command").and_then(|c| c.as_object_mut()) else {
@@ -92,9 +85,21 @@ impl Args {
 
 // GeneralArgs is used both in json parsing and in config parsing.
 // This means that we should not rename_all = "camelCase", but instead add aliases.
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Parser, Clone, Debug, Deserialize, Serialize)]
 #[command(rename_all = "kebab-case")]
 pub struct GeneralArgs {
+    /// The path to the configuration file for the site builder.
+    #[arg(short, long, global = true)]
+    #[serde(skip_serializing_if = "Option::is_none", alias = "config")]
+    pub config: Option<PathBuf>,
+    /// The context with which to load the configuration.
+    ///
+    /// If specified, the context will be taken from the config file. Otherwise, the default
+    /// context, which is also specified in the config file, will be used.
+    #[arg(long, global = true)]
+    #[serde(skip_serializing_if = "Option::is_none", alias = "context")]
+    pub context: Option<String>,
     /// The URL or the RPC endpoint to connect the client to.
     ///
     /// Can be specified as a CLI argument or in the config.
@@ -161,6 +166,8 @@ pub struct GeneralArgs {
 impl Default for GeneralArgs {
     fn default() -> Self {
         Self {
+            config: None,
+            context: None,
             rpc_url: None,
             wallet: None,
             wallet_env: None,
@@ -218,6 +225,8 @@ impl GeneralArgs {
         merge_fields!(
             self,
             other,
+            config,
+            context,
             rpc_url,
             wallet,
             wallet_env,
@@ -231,6 +240,7 @@ impl GeneralArgs {
     }
 }
 
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, Clone)]
 pub enum ObjectIdOrName {
     /// The object ID of the site.
@@ -305,6 +315,7 @@ impl std::str::FromStr for ObjectIdOrName {
     }
 }
 
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Subcommand, Debug, Clone, Deserialize)]
 #[command(rename_all = "kebab-case")]
 #[serde(rename_all = "camelCase", rename_all_fields = "camelCase")]
@@ -486,6 +497,7 @@ pub enum Commands {
     },
 }
 
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Parser, Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PublishOptions {
@@ -511,6 +523,7 @@ pub struct PublishOptions {
     pub walrus_options: WalrusStoreOptions,
 }
 
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Parser, Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 /// Common configurations across publish, update, and update-resource commands.
@@ -545,6 +558,7 @@ pub struct WalrusStoreOptions {
 }
 
 /// The number of epochs to store the blob for.
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Parser, Debug, Clone, Default, Serialize, Deserialize)]
 #[command(group(
     ArgGroup::new("epoch_arg")
@@ -640,5 +654,71 @@ pub mod default {
     }
     pub fn max_parallel_stores() -> NonZeroUsize {
         NonZeroUsize::new(50).unwrap()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use sui_types::base_types::ObjectID;
+
+    use super::{Args, Commands, GeneralArgs};
+
+    #[test]
+    fn test_json_hoist() -> anyhow::Result<()> {
+        const WALRUS_PACKAGE: &str =
+            "0xfdc88f7d7cf30afab2f82e8380d11ee8f70efb90e863d1de8616fae1bb09ea77";
+
+        let general_arg_inside = Args {
+            general: GeneralArgs::default(),
+            command: Commands::Json {
+                command_string: Some(format!(
+                    r#"
+{{
+    "command": {{
+        "sitemap": {{
+            "siteToMap": "My Walrus Site",
+            "walrusPackage": "{WALRUS_PACKAGE}"
+        }}
+    }}
+}}"#
+                )),
+            },
+        };
+
+        let general_arg_outside = Args {
+            general: GeneralArgs::default(),
+            command: Commands::Json {
+                command_string: Some(format!(
+                    r#"
+{{
+    "walrusPackage": "{WALRUS_PACKAGE}",
+    "command": {{
+        "sitemap": {{
+            "siteToMap": "My Walrus Site"
+        }}
+    }}
+}}"#
+                )),
+            },
+        };
+
+        let general = GeneralArgs {
+            walrus_package: Some(ObjectID::from_str(WALRUS_PACKAGE)?),
+            ..Default::default()
+        };
+        let parsed_inside = general_arg_inside.extract_json_if_present()?;
+        let parsed_outside = general_arg_outside.extract_json_if_present()?;
+        let expected = Args {
+            general,
+            command: Commands::Sitemap {
+                site_to_map: crate::args::ObjectIdOrName::Name("My Walrus Site".to_string()),
+            },
+        };
+
+        assert_eq!(parsed_inside, parsed_outside);
+        assert_eq!(parsed_inside, expected);
+        Ok(())
     }
 }
