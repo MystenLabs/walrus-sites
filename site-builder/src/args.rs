@@ -174,6 +174,7 @@ impl GeneralArgs {
             walrus_context,
             walrus_binary,
             walrus_config,
+            walrus_package,
             gas_budget,
         );
     }
