@@ -46,27 +46,28 @@ pub struct Args {
 impl Args {
     /// In case of using the json command, it will deserialize it as Self and return it.
     pub fn extract_json_if_present(self) -> Result<Self> {
-        let Commands::Json { command_string } = &self.command else {
-            return Ok(self);
-        };
-        tracing::info!("running in JSON mode");
-        let command_string = match command_string {
-            Some(s) => s,
-            None => {
-                tracing::debug!("reading JSON input from stdin");
-                &std::io::read_to_string(std::io::stdin())?
-            }
-        };
-        tracing::debug!(
-            command = command_string.replace('\n', ""),
-            "running JSON command"
-        );
-        let mut new_self: Args = serde_json::from_str(command_string)?;
-
-        // Someone might pass a global-argument inside the command in json, as clap allows them
-        // to. This is used to support the same behavior in json.
-        let general_inside_command = Self::hoist_general_args(command_string)?;
-        new_self.general.merge(&general_inside_command);
+        let mut new_self = self;
+        while let Commands::Json { command_string } = &new_self.command {
+            tracing::info!("running in JSON mode");
+            tracing::info!("command_string: {command_string:#?}");
+            let command_string = match command_string {
+                Some(s) => s,
+                None => {
+                    tracing::debug!("reading JSON input from stdin");
+                    &std::io::read_to_string(std::io::stdin())?
+                }
+            };
+            tracing::debug!(
+                command = command_string.replace('\n', ""),
+                "running JSON command"
+            );
+            let mut tmp_self: Args = serde_json::from_str(command_string)?;
+            // Someone might pass a global-argument inside the command in json, as clap allows them
+            // to. This is used to support the same behavior in json.
+            let general_inside_command = Self::hoist_general_args(command_string)?;
+            tmp_self.general.merge(&general_inside_command);
+            new_self = tmp_self;
+        }
 
         // new_self.json = true;
         Ok(new_self)
@@ -306,7 +307,7 @@ impl std::str::FromStr for ObjectIdOrName {
 
 #[derive(Subcommand, Debug, Clone, Deserialize)]
 #[command(rename_all = "kebab-case")]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum Commands {
     /// Run the client by specifying the arguments in a JSON string; CLI options are ignored.
     Json {
@@ -345,7 +346,6 @@ pub enum Commands {
     /// the object ID of the Site in the ws-resources.json file.
     /// If the site has been published before, this command updates the site(indicaded
     /// by the site_object_id field in the ws-resources.json file).
-    #[serde(rename_all = "camelCase")]
     Deploy {
         #[clap(flatten)]
         #[serde(flatten)]
@@ -386,7 +386,6 @@ pub enum Commands {
         check_extend: bool,
     },
     /// Publish a new site on Sui.
-    #[serde(rename_all = "camelCase")]
     Publish {
         #[clap(flatten)]
         #[serde(flatten)]
@@ -396,7 +395,6 @@ pub enum Commands {
         site_name: Option<String>,
     },
     /// Update an existing site.
-    #[serde(rename_all = "camelCase")]
     Update {
         #[clap(flatten)]
         #[serde(flatten)]
@@ -441,7 +439,6 @@ pub enum Commands {
     /// Convert an object ID in hex format to the equivalent Base36 format.
     ///
     /// This command may be useful to browse a site, given it object ID.
-    #[serde(rename_all = "camelCase")]
     Convert {
         /// The object id (in hex format) to convert
         object_id: ObjectID,
@@ -450,7 +447,6 @@ pub enum Commands {
     ///
     /// Running this command requires the `walrus_package` to be specified either in the config or
     /// through the `--walrus-package` flag.
-    #[serde(rename_all = "camelCase")]
     Sitemap {
         /// The site to be mapped.
         ///
@@ -461,19 +457,16 @@ pub enum Commands {
     /// Preprocess the directory, creating and linking index files.
     /// This command allows to publish directories as sites. Warning: Rewrites all `index.html`
     /// files.
-    #[serde(rename_all = "camelCase")]
     ListDirectory { path: PathBuf },
     /// Completely destroys the site at the given object id.
     ///
     /// Removes all resources and routes, and destroys the site, returning the Sui storage rebate to
     /// the owner. Warning: this action is irreversible! Re-publishing the site will generate a
     /// different Site object ID.
-    #[serde(rename_all = "camelCase")]
     Destroy { object: ObjectID },
     /// Adds or updates a single resource in a site, eventually replacing any pre-existing ones.
     ///
     /// The ws_resource file will still be used to determine the resource's headers.
-    #[serde(rename_all = "camelCase")]
     UpdateResource {
         /// The path to the resource to be added.
         #[arg(long)]
