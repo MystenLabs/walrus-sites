@@ -85,20 +85,23 @@ impl Args {
 
 // GeneralArgs is used both in json parsing and in config parsing.
 // This means that we should not rename_all = "camelCase", but instead add aliases.
+// We currently do GeneralArgs serialization in e2e tests where lower_snake_case is preferred as it
+// is serialized to yaml. If we want to also serialize to json and use camelCase, we will probably
+// need to have a separate struct for Json ser/de.
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Parser, Clone, Debug, Deserialize, Serialize)]
 #[command(rename_all = "kebab-case")]
 pub struct GeneralArgs {
     /// The path to the configuration file for the site builder.
     #[arg(short, long, global = true)]
-    #[serde(skip_serializing_if = "Option::is_none", alias = "config")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub config: Option<PathBuf>,
     /// The context with which to load the configuration.
     ///
     /// If specified, the context will be taken from the config file. Otherwise, the default
     /// context, which is also specified in the config file, will be used.
     #[arg(long, global = true)]
-    #[serde(skip_serializing_if = "Option::is_none", alias = "context")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub context: Option<String>,
     /// The URL or the RPC endpoint to connect the client to.
     ///

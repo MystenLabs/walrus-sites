@@ -25,7 +25,7 @@ pub(crate) enum MultiConfig {
 }
 
 /// The configuration for the site builder.
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
     #[serde(default = "default_portal")]
     pub portal: String,
