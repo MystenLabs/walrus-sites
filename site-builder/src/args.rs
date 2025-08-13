@@ -84,15 +84,16 @@ impl Args {
     }
 }
 
+// GeneralArgs is used both in json parsing and in config parsing.
+// This means that we should not rename_all = "camelCase", but instead add aliases.
 #[derive(Parser, Clone, Debug, Deserialize, Serialize)]
 #[command(rename_all = "kebab-case")]
-#[serde(rename_all = "camelCase")]
 pub struct GeneralArgs {
     /// The URL or the RPC endpoint to connect the client to.
     ///
     /// Can be specified as a CLI argument or in the config.
     #[arg(long, global = true)]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", alias = "rpcUrl")]
     pub rpc_url: Option<String>,
     /// The path to the Sui Wallet config.
     ///
@@ -106,7 +107,7 @@ pub struct GeneralArgs {
     /// If the wallet env is also not specified in the config, the env configured in the Sui client
     /// will be used.
     #[arg(long, global = true)]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", alias = "walletEnv")]
     pub wallet_env: Option<String>,
     /// The address to be used for the Sui wallet.
     ///
@@ -114,40 +115,40 @@ pub struct GeneralArgs {
     /// used. If the wallet address is also not specified in the config, the address configured in
     /// the Sui client will be used.
     #[arg(long, global = true)]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", alias = "walletAddress")]
     pub wallet_address: Option<SuiAddress>,
     /// The context that will be passed to the Walrus binary.
     ///
     /// If not specified, the Walrus context specified in the sites-config will be
     /// used. If it is also not specified in the config, no context will be passed.
     #[arg(long, global = true)]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", alias = "walrusContext")]
     pub walrus_context: Option<String>,
     /// The path or name of the walrus binary.
     ///
     /// The Walrus binary will then be called with this configuration to perform actions on Walrus.
     /// Can be specified as a CLI argument or in the config.
     #[arg(long, global = true)]
-    #[serde(default = "default::walrus_binary")]
+    #[serde(default = "default::walrus_binary", alias = "walrusBinary")]
     pub walrus_binary: Option<String>,
     /// The path to the configuration for the Walrus client.
     ///
     /// This will be passed to the calls to the Walrus binary.
     /// Can be specified as a CLI argument or in the config.
     #[arg(long, global = true)]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", alias = "walrusConfig")]
     pub walrus_config: Option<PathBuf>,
     /// The package ID of the Walrus package on the selected network.
     ///
     /// This is currently only used for the `sitemap` command.
     #[arg(long, global = true)]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", alias = "walrusPackage")]
     pub walrus_package: Option<ObjectID>,
     /// The gas budget for the operations on Sui.
     ///
     /// Can be specified as a CLI argument or in the config.
     #[arg(long, global = true)]
-    #[serde(default = "default::gas_budget")]
+    #[serde(default = "default::gas_budget", alias = "gasBudget")]
     pub gas_budget: Option<u64>,
 }
 
