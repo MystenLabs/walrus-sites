@@ -44,7 +44,8 @@ pub struct Args {
 }
 
 impl Args {
-    pub fn extract_json_command(self) -> Result<Self> {
+    /// In case of using the json command, it will deserialize it as Self and return it.
+    pub fn extract_json_if_present(self) -> Result<Self> {
         let Commands::Json { command_string } = &self.command else {
             return Ok(self);
         };
@@ -71,6 +72,10 @@ impl Args {
         Ok(new_self)
     }
 
+    /// Implements the `arg(global = true)` attribute that is applied to every field of
+    /// `GeneralArgs`, but for serde_json. In other words, it deserializes fields inside the
+    /// command as `GeneralArgs` in order to merge it with existing `GeneralArgs` outside the
+    /// command.
     fn hoist_general_args(args_json: &str) -> Result<GeneralArgs> {
         let mut raw: serde_json::Value = serde_json::from_str(args_json)?;
         let Some(command_obj) = raw.get_mut("command").and_then(|c| c.as_object_mut()) else {
