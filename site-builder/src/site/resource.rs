@@ -666,6 +666,7 @@ mod tests {
             site_name: None,
             object_id: None,
             ignore: None,
+            quilt_groups: None,
         })
     }
 }
