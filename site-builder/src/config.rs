@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use sui_sdk::wallet_context::WalletContext;
 use sui_types::base_types::ObjectID;
 
+use crate::args::default;
 pub(crate) use crate::{args::GeneralArgs, walrus::Walrus};
 
 /// Configuration for the site builder, complete with separate context for networks.
@@ -51,15 +52,12 @@ impl Config {
     pub fn walrus_binary(&self) -> String {
         self.general
             .walrus_binary
-            .as_ref()
-            .expect("serde default => binary exists")
-            .to_owned()
+            .clone()
+            .unwrap_or(default::walrus_binary())
     }
 
     pub fn gas_budget(&self) -> u64 {
-        self.general
-            .gas_budget
-            .expect("serde default => gas budget exists")
+        self.general.gas_budget.unwrap_or(default::gas_budget())
     }
 
     /// Returns a [`WalletContext`] from the configuration.
