@@ -52,14 +52,14 @@ impl Args {
                     &std::io::read_to_string(std::io::stdin())?
                 }
             };
-            tracing::debug!(
-                command = command_string.replace('\n', ""),
-                "running JSON command"
-            );
-            let mut tmp_self: Args = serde_json::from_str(command_string)?;
+            // serde_json complains with: `Error: control character (\u0000-\u001F) found`
+            // otherwise
+            let command_string = command_string.replace('\n', "");
+            tracing::debug!(command = command_string, "running JSON command");
+            let mut tmp_self: Args = serde_json::from_str(command_string.as_str())?;
             // Someone might pass a global-argument inside the command in json, as clap allows them
             // to. This is used to support the same behavior in json.
-            let general_inside_command = Self::hoist_general_args(command_string)?;
+            let general_inside_command = Self::hoist_general_args(command_string.as_str())?;
             tmp_self.general.merge(&general_inside_command);
             new_self = tmp_self;
         }
@@ -92,7 +92,7 @@ impl Args {
 // is serialized to yaml. If we want to also serialize to json and use camelCase, we will probably
 // need to have a separate struct for Json ser/de.
 #[cfg_attr(test, derive(PartialEq))]
-#[derive(Parser, Clone, Debug, Deserialize, Serialize)]
+#[derive(Parser, Clone, Debug, Default, Deserialize, Serialize)]
 #[command(rename_all = "kebab-case")]
 pub struct GeneralArgs {
     /// The path to the configuration file for the site builder.
@@ -146,7 +146,7 @@ pub struct GeneralArgs {
     /// The Walrus binary will then be called with this configuration to perform actions on Walrus.
     /// Can be specified as a CLI argument or in the config.
     #[arg(long, global = true)]
-    #[serde(default = "default::walrus_binary", alias = "walrusBinary")]
+    #[serde(skip_serializing_if = "Option::is_none", alias = "walrusBinary")]
     pub walrus_binary: Option<String>,
     /// The path to the configuration for the Walrus client.
     ///
@@ -165,26 +165,8 @@ pub struct GeneralArgs {
     ///
     /// Can be specified as a CLI argument or in the config.
     #[arg(long, global = true)]
-    #[serde(default = "default::gas_budget", alias = "gasBudget")]
+    #[serde(skip_serializing_if = "Option::is_none", alias = "gasBudget")]
     pub gas_budget: Option<u64>,
-}
-
-impl Default for GeneralArgs {
-    fn default() -> Self {
-        Self {
-            config: None,
-            context: None,
-            rpc_url: None,
-            wallet: None,
-            wallet_env: None,
-            wallet_address: None,
-            walrus_context: None,
-            walrus_binary: default::walrus_binary(),
-            walrus_config: None,
-            walrus_package: None,
-            gas_budget: default::gas_budget(),
-        }
-    }
 }
 
 impl GeneralArgs {
@@ -652,11 +634,11 @@ impl EpochCountOrMax {
 pub mod default {
     use std::num::NonZeroUsize;
 
-    pub fn walrus_binary() -> Option<String> {
-        Some("walrus".to_owned())
+    pub fn walrus_binary() -> String {
+        "walrus".to_owned()
     }
-    pub fn gas_budget() -> Option<u64> {
-        Some(500_000_000)
+    pub fn gas_budget() -> u64 {
+        500_000_000
     }
     pub fn max_parallel_stores() -> NonZeroUsize {
         NonZeroUsize::new(50).unwrap()
