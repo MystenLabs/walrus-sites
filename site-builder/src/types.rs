@@ -22,6 +22,8 @@ use crate::{
     walrus::types::BlobId,
 };
 
+pub mod quilt_group;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SuiDynamicField<N, V> {
     pub id: ObjectID,

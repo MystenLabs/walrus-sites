@@ -4,11 +4,12 @@
 use std::{collections::BTreeMap, path::Path};
 
 use anyhow::{Context, Result};
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use sui_types::base_types::ObjectID;
 
 use super::Routes;
-use crate::types::{HttpHeaders, Metadata};
+use crate::types::{quilt_group::QuiltGroup, HttpHeaders, Metadata};
 
 /// Deserialized object of the file's `ws-resource.json` contents.
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
@@ -38,6 +39,8 @@ pub struct WSResources {
     /// The paths to ignore when publishing/updating.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ignore: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none", alias = "quiltGroups")] // TODO TBD
+    pub quilt_groups: Option<IndexMap<String, QuiltGroup>>,
 }
 
 impl WSResources {
@@ -76,6 +79,11 @@ impl WSResources {
 
 #[cfg(test)]
 mod tests {
+
+    use std::str::FromStr;
+
+    use bytesize::ByteSize;
+    use regex::RegexSet;
 
     use super::*;
 
@@ -147,5 +155,98 @@ mod tests {
             serde_json::from_str(&valid_site_name_data).expect("parsing should succeed");
         assert!(parsed.site_name.is_some());
         assert_eq!(parsed.site_name.unwrap(), "A Walrus Site Name".to_string());
+    }
+
+    #[test]
+    fn test_quilt_groups_map() -> anyhow::Result<()> {
+        let ws_resources_str = r#"
+{
+    "quilt_groups": {
+        "static_assets": {
+            "patterns": [".*\\.css", ".*\\.js", "images/.*"],
+            "max_size": "10MB"
+        },
+        "content": {
+            "patterns": [".*\\.html", ".*\\.md"],
+            "max_size": "5MB"
+        },
+        "images": {
+            "patterns": [".*\\.png", ".*\\.jpg", ".*\\.jpeg", ".*\\.gif"],
+            "max_size": "2MB"
+        },
+        "fonts": {
+            "patterns": [".*\\.woff2", ".*\\.woff", ".*\\.ttf"],
+            "max_size": "4MB"
+        },
+        "svgs": {
+            "patterns": [".*\\.svg"],
+            "max_size": "1MB"
+        },
+        "data": {
+            "patterns": [".*\\.json", ".*\\.csv"],
+            "max_size": "3MB"
+        }
+    }
+}"#;
+
+        let expected = vec![
+            (
+                "static_assets".to_string(),
+                QuiltGroup {
+                    patterns: RegexSet::new(vec![".*\\.css", ".*\\.js", "images/.*"]).unwrap(),
+                    max_size: ByteSize::from_str("10MB").unwrap(),
+                },
+            ),
+            (
+                "content".to_string(),
+                QuiltGroup {
+                    patterns: RegexSet::new(vec![".*\\.html", ".*\\.md"]).unwrap(),
+                    max_size: ByteSize::from_str("5MB").unwrap(),
+                },
+            ),
+            (
+                "images".to_string(),
+                QuiltGroup {
+                    patterns: RegexSet::new(vec![".*\\.png", ".*\\.jpg", ".*\\.jpeg", ".*\\.gif"])
+                        .unwrap(),
+                    max_size: ByteSize::from_str("2MB").unwrap(),
+                },
+            ),
+            (
+                "fonts".to_string(),
+                QuiltGroup {
+                    patterns: RegexSet::new(vec![".*\\.woff2", ".*\\.woff", ".*\\.ttf"]).unwrap(),
+                    max_size: ByteSize::from_str("4MB").unwrap(),
+                },
+            ),
+            (
+                "svgs".to_string(),
+                QuiltGroup {
+                    patterns: RegexSet::new(vec![".*\\.svg"]).unwrap(),
+                    max_size: ByteSize::from_str("1MB").unwrap(),
+                },
+            ),
+            (
+                "data".to_string(),
+                QuiltGroup {
+                    patterns: RegexSet::new(vec![".*\\.json", ".*\\.csv"]).unwrap(),
+                    max_size: ByteSize::from_str("3MB").unwrap(),
+                },
+            ),
+        ]
+        .into_iter();
+
+        let parsed: WSResources = serde_json::from_str(ws_resources_str)?;
+        parsed
+            .quilt_groups
+            .unwrap()
+            .into_iter()
+            .zip(expected)
+            .for_each(|(p, e)| {
+                assert_eq!(p.0, e.0);
+                assert_eq!(p.1.patterns.patterns(), e.1.patterns.patterns())
+            });
+
+        Ok(())
     }
 }
