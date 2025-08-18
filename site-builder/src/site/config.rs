@@ -83,7 +83,6 @@ mod tests {
     use std::str::FromStr;
 
     use bytesize::ByteSize;
-    use regex::RegexSet;
 
     use super::*;
 
@@ -159,31 +158,33 @@ mod tests {
 
     #[test]
     fn test_quilt_groups_map() -> anyhow::Result<()> {
+        use glob::Pattern;
+
         let ws_resources_str = r#"
 {
     "quilt_groups": {
         "static_assets": {
-            "patterns": [".*\\.css", ".*\\.js", "images/.*"],
+            "patterns": ["*.css", "*.js", "images/*"],
             "max_size": "10MB"
         },
         "content": {
-            "patterns": [".*\\.html", ".*\\.md"],
+            "patterns": ["*.html", "*.md"],
             "max_size": "5MB"
         },
         "images": {
-            "patterns": [".*\\.png", ".*\\.jpg", ".*\\.jpeg", ".*\\.gif"],
+            "patterns": ["*.png", "*.jpg", "*.jpeg", "*.gif"],
             "max_size": "2MB"
         },
         "fonts": {
-            "patterns": [".*\\.woff2", ".*\\.woff", ".*\\.ttf"],
+            "patterns": ["*.woff2", "*.woff", "*.ttf"],
             "max_size": "4MB"
         },
         "svgs": {
-            "patterns": [".*\\.svg"],
+            "patterns": ["*.svg"],
             "max_size": "1MB"
         },
         "data": {
-            "patterns": [".*\\.json", ".*\\.csv"],
+            "patterns": ["*.json", "*.csv"],
             "max_size": "3MB"
         }
     }
@@ -193,43 +194,61 @@ mod tests {
             (
                 "static_assets".to_string(),
                 QuiltGroup {
-                    patterns: RegexSet::new(vec![".*\\.css", ".*\\.js", "images/.*"]).unwrap(),
+                    patterns: vec![
+                        Pattern::new("*.css").unwrap(),
+                        Pattern::new("*.js").unwrap(),
+                        Pattern::new("images/*").unwrap(),
+                    ],
                     max_size: ByteSize::from_str("10MB").unwrap(),
                 },
             ),
             (
                 "content".to_string(),
                 QuiltGroup {
-                    patterns: RegexSet::new(vec![".*\\.html", ".*\\.md"]).unwrap(),
+                    patterns: vec![
+                        Pattern::new("*.html").unwrap(),
+                        Pattern::new("*.md").unwrap(),
+                    ],
                     max_size: ByteSize::from_str("5MB").unwrap(),
                 },
             ),
             (
                 "images".to_string(),
                 QuiltGroup {
-                    patterns: RegexSet::new(vec![".*\\.png", ".*\\.jpg", ".*\\.jpeg", ".*\\.gif"])
-                        .unwrap(),
+                    patterns: vec![
+                        Pattern::new("*.png").unwrap(),
+                        Pattern::new("*.jpg").unwrap(),
+                        Pattern::new("*.jpeg").unwrap(),
+                        Pattern::new("*.gif").unwrap(),
+                    ],
                     max_size: ByteSize::from_str("2MB").unwrap(),
                 },
             ),
             (
                 "fonts".to_string(),
                 QuiltGroup {
-                    patterns: RegexSet::new(vec![".*\\.woff2", ".*\\.woff", ".*\\.ttf"]).unwrap(),
+                    patterns: vec![
+                        Pattern::new("*.woff2").unwrap(),
+                        Pattern::new("*.woff").unwrap(),
+                        Pattern::new("*.ttf").unwrap(),
+                    ],
                     max_size: ByteSize::from_str("4MB").unwrap(),
                 },
             ),
             (
                 "svgs".to_string(),
                 QuiltGroup {
-                    patterns: RegexSet::new(vec![".*\\.svg"]).unwrap(),
+                    patterns: vec![Pattern::new("*.svg").unwrap()],
                     max_size: ByteSize::from_str("1MB").unwrap(),
                 },
             ),
             (
                 "data".to_string(),
                 QuiltGroup {
-                    patterns: RegexSet::new(vec![".*\\.json", ".*\\.csv"]).unwrap(),
+                    patterns: vec![
+                        Pattern::new("*.json").unwrap(),
+                        Pattern::new("*.csv").unwrap(),
+                    ],
                     max_size: ByteSize::from_str("3MB").unwrap(),
                 },
             ),
@@ -244,7 +263,8 @@ mod tests {
             .zip(expected)
             .for_each(|(p, e)| {
                 assert_eq!(p.0, e.0);
-                assert_eq!(p.1.patterns.patterns(), e.1.patterns.patterns())
+                assert_eq!(p.1.patterns, e.1.patterns);
+                assert_eq!(p.1.max_size, e.1.max_size);
             });
 
         Ok(())

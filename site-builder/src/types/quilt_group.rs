@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use bytesize::ByteSize;
-use regex::RegexSet;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Debug, Clone)]
@@ -14,7 +13,7 @@ pub struct RerootedFilenameAndSize<'a> {
 
 #[derive(Debug, Clone)]
 pub struct QuiltGroup {
-    pub patterns: RegexSet,
+    pub patterns: Vec<glob::Pattern>,
     pub max_size: ByteSize,
 }
 
@@ -24,7 +23,7 @@ impl QuiltGroup {
         if file.size > self.max_size.as_u64() {
             return false;
         }
-        self.patterns.is_match(file.filename)
+        self.patterns.iter().any(|p| p.matches(file.filename))
     }
 }
 
@@ -40,14 +39,14 @@ impl<'de> Deserialize<'de> for QuiltGroup {
             max_size: ByteSize,
         }
 
-        let helper = Helper::deserialize(deserializer)?;
-        let patterns = RegexSet::new(&helper.patterns)
-            .map_err(|e| serde::de::Error::custom(format!("Invalid regex: {e}")))?;
+        let Helper { patterns, max_size } = Helper::deserialize(deserializer)?;
+        let patterns = patterns
+            .into_iter()
+            .map(|p| glob::Pattern::new(p.as_str()))
+            .collect::<Result<Vec<_>, glob::PatternError>>()
+            .map_err(|e| serde::de::Error::custom(format!("Failed parsing glob pattern: {e}")))?;
 
-        Ok(QuiltGroup {
-            patterns,
-            max_size: helper.max_size,
-        })
+        Ok(QuiltGroup { patterns, max_size })
     }
 }
 
@@ -59,7 +58,12 @@ impl Serialize for QuiltGroup {
         use serde::ser::SerializeStruct;
 
         let mut s = serializer.serialize_struct("QuiltGroup", 2)?;
-        s.serialize_field("patterns", &self.patterns.patterns())?;
+        let str_vec = self
+            .patterns
+            .iter()
+            .map(|p| p.as_str())
+            .collect::<Vec<&'_ str>>();
+        s.serialize_field("patterns", &str_vec)?;
         s.serialize_field("maxSize", &self.max_size)?;
         s.end()
     }
@@ -69,12 +73,17 @@ impl Serialize for QuiltGroup {
 mod tests {
     use std::str::FromStr;
 
+    use glob::Pattern;
+
     use super::*;
 
     #[test]
     fn test_match_within_size() {
         let g = QuiltGroup {
-            patterns: RegexSet::new(vec![".*\\.css", "images/.*"]).unwrap(),
+            patterns: vec![
+                Pattern::new("*.css").unwrap(),
+                Pattern::new("images/*").unwrap(),
+            ],
             max_size: ByteSize::from_str("10KB").unwrap(),
         };
         let f = RerootedFilenameAndSize {
@@ -87,7 +96,7 @@ mod tests {
     #[test]
     fn test_over_size_no_match() {
         let g = QuiltGroup {
-            patterns: RegexSet::new(vec![".*\\.css"]).unwrap(),
+            patterns: vec![Pattern::new("*.css").unwrap()],
             max_size: ByteSize::from_str("1KB").unwrap(),
         };
         let f = RerootedFilenameAndSize {
@@ -100,7 +109,10 @@ mod tests {
     #[test]
     fn test_no_pattern_no_match() {
         let g = QuiltGroup {
-            patterns: RegexSet::new(vec!["images/.*", ".*\\.json"]).unwrap(),
+            patterns: vec![
+                Pattern::new("images/*").unwrap(),
+                Pattern::new("*.json").unwrap(),
+            ],
             max_size: ByteSize::from_str("10KB").unwrap(),
         };
         let f = RerootedFilenameAndSize {
@@ -113,7 +125,7 @@ mod tests {
     #[test]
     fn test_boundary_equal_max_kb() {
         let g = QuiltGroup {
-            patterns: RegexSet::new(vec![".*"]).unwrap(),
+            patterns: vec![Pattern::new("*").unwrap()],
             max_size: ByteSize::from_str("1KB").unwrap(),
         };
         let f = RerootedFilenameAndSize {
@@ -126,7 +138,7 @@ mod tests {
     #[test]
     fn test_boundary_equal_max_kib() {
         let g = QuiltGroup {
-            patterns: RegexSet::new(vec![".*"]).unwrap(),
+            patterns: vec![Pattern::new("*").unwrap()],
             max_size: ByteSize::from_str("1KiB").unwrap(),
         };
         let f = RerootedFilenameAndSize {
@@ -139,7 +151,11 @@ mod tests {
     #[test]
     fn test_multiple_patterns() {
         let g = QuiltGroup {
-            patterns: RegexSet::new(vec![".*\\.html", ".*\\.css", "images/.*"]).unwrap(),
+            patterns: vec![
+                Pattern::new("*.html").unwrap(),
+                Pattern::new("*.css").unwrap(),
+                Pattern::new("images/*").unwrap(),
+            ],
             max_size: ByteSize::from_str("10KB").unwrap(),
         };
         let f1 = RerootedFilenameAndSize {
