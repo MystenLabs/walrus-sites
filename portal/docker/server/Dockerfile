@@ -29,7 +29,7 @@ ENV PREMIUM_RPC_URL_LIST=${PREMIUM_RPC_URL_LIST}
 ARG RPC_URL_LIST="https://fullnode.mainnet.sui.io,https://mainnet.suiet.app"
 ENV RPC_URL_LIST=${RPC_URL_LIST}
 
-ARG SUINS_CLIENT_NETWORK="testnet"
+ARG SUINS_CLIENT_NETWORK="mainnet"
 ENV SUINS_CLIENT_NETWORK=${SUINS_CLIENT_NETWORK}
 
 ARG AGGREGATOR_URL="https://aggregator.walrus-mainnet.walrus.space"
