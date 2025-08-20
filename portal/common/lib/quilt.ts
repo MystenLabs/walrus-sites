@@ -1,7 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import base from "base-x";
 import { Range } from "./types";
 import { base64UrlSafeEncode } from "./url_safe_base64";
 
