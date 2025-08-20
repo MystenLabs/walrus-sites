@@ -42,6 +42,33 @@ impl WalrusJsonCmd {
     }
 }
 
+/// Represents the mutually exclusive input for a store-quilt command.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum StoreQuiltInput {
+    /// Paths to files to include in the quilt.
+    ///
+    /// If a path is a directory, all the files in the directory will be included
+    /// in the quilt, recursively.
+    /// If a path is a file, the file will be included in the quilt.
+    /// The filenames are used as the identifiers of the quilt patches.
+    /// Note duplicate filenames are not allowed.
+    /// Custom identifiers and tags are NOT supported for quilt patches.
+    /// Use `--blobs` to specify custom identifiers and tags.
+    Paths(Vec<PathBuf>),
+    /// Blobs to include in the quilt, each blob is specified as a JSON string.
+    ///
+    /// Example:
+    ///   walrus store-quilt --epochs 10
+    ///     --blobs '{"path":"/path/to/food-locations.pdf","identifier":"paper-v2",\
+    ///     "tags":{"author":"Walrus","project":"food","status":"final-review"}}' \
+    ///     '{"path":"/path/to/water-locations.pdf","identifier":"water-v3",\
+    ///     "tags":{"author":"Walrus","project":"water","status":"draft"}}'
+    /// Note if identifier is not specified, the filename will be used as the identifier,
+    /// and duplicate identifiers are not allowed.
+    Blobs(Vec<QuiltBlobInput>),
+}
+
 /// Represents a command to be run on the Walrus CLI.
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,28 +84,9 @@ pub enum Command {
     },
     /// Store files as a quilt.
     StoreQuilt {
-        /// Paths to files to include in the quilt.
-        ///
-        /// If a path is a directory, all the files in the directory will be included
-        /// in the quilt, recursively.
-        /// If a path is a file, the file will be included in the quilt.
-        /// The filenames are used as the identifiers of the quilt patches.
-        /// Note duplicate filenames are not allowed.
-        /// Custom identifiers and tags are NOT supported for quilt patches.
-        /// Use `--blobs` to specify custom identifiers and tags.
-        paths: Vec<PathBuf>,
-        /// Blobs to include in the quilt, each blob is specified as a JSON string.
-        ///
-        /// Example:
-        ///   walrus store-quilt --epochs 10
-        ///     --blobs '{"path":"/path/to/food-locations.pdf","identifier":"paper-v2",\
-        ///     "tags":{"author":"Walrus","project":"food","status":"final-review"}}' \
-        ///     '{"path":"/path/to/water-locations.pdf","identifier":"water-v3",\
-        ///     "tags":{"author":"Walrus","project":"water","status":"draft"}}'
-        /// Note if identifier is not specified, the filename will be used as the identifier,
-        /// and duplicate identifiers are not allowed.
-        #[serde(default)]
-        blobs: Vec<QuiltBlobInput>,
+        /// The input for the quilt, which can be either paths or blobs.
+        #[serde(flatten)]
+        input: StoreQuiltInput,
         /// Common options shared between store and store-quilt commands.
         #[serde(flatten)]
         common_options: CommonStoreOptions,
@@ -283,13 +291,11 @@ impl WalrusCmdBuilder {
     /// Adds a [`Command::StoreQuilt`] command to the builder.
     pub fn store_quilt(
         self,
-        paths: Vec<PathBuf>,
-        blobs: Vec<QuiltBlobInput>,
+        store_quilt_input: StoreQuiltInput,
         common_store_options: CommonStoreOptions,
     ) -> WalrusCmdBuilder<Command> {
         let command = Command::StoreQuilt {
-            paths,
-            blobs,
+            input: store_quilt_input,
             common_options: common_store_options,
         };
         self.with_command(command)
@@ -384,11 +390,6 @@ mod tests {
         let wallet = Some(PathBuf::from("/tmp/wallet"));
         let gas_budget = 12345;
         let paths = vec![PathBuf::from("/tmp/some_blob.txt")];
-        let blobs = vec![QuiltBlobInput {
-            path: PathBuf::from("/tmp/some_blob.txt"),
-            identifier: Some("some_blob.txt".to_string()),
-            tags: BTreeMap::new(),
-        }];
         let common_store_options = CommonStoreOptions {
             epoch_arg: EpochArg::default(),
             dry_run: false,
@@ -399,16 +400,17 @@ mod tests {
         };
         let builder =
             WalrusCmdBuilder::new(config.clone(), context.clone(), wallet.clone(), gas_budget)
-                .store_quilt(paths.clone(), blobs.clone(), common_store_options.clone());
+                .store_quilt(
+                    StoreQuiltInput::Paths(paths.clone()),
+                    common_store_options.clone(),
+                );
         let cmd = builder.build();
         match cmd.command {
             Command::StoreQuilt {
-                paths: p,
-                blobs: b,
+                input,
                 common_options: o,
             } => {
-                assert_eq!(p, paths);
-                assert_eq!(b, blobs);
+                assert_eq!(input, StoreQuiltInput::Paths(paths));
                 assert_eq!(o, common_store_options);
             }
             _ => panic!("Expected StoreQuilt command"),
@@ -437,19 +439,16 @@ mod tests {
             share: false,
         };
         let builder = WalrusCmdBuilder::new(config, context, wallet, gas_budget).store_quilt(
-            vec![path.clone()],
-            vec![blob.clone()],
+            StoreQuiltInput::Blobs(vec![blob.clone()]),
             common_store_options.clone(),
         );
         let cmd = builder.build();
         match cmd.command {
             Command::StoreQuilt {
-                paths,
-                blobs,
+                input,
                 common_options,
             } => {
-                assert_eq!(paths, vec![path]);
-                assert_eq!(blobs, vec![blob]);
+                assert_eq!(input, StoreQuiltInput::Blobs(vec![blob]));
                 assert_eq!(common_options, common_store_options);
                 assert!(common_options.dry_run);
                 assert!(common_options.force);

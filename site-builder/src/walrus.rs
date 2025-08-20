@@ -21,7 +21,7 @@ use self::types::BlobId;
 use crate::{
     args::EpochArg,
     walrus::{
-        command::{CommonStoreOptions, QuiltBlobInput, WalrusCmdBuilder},
+        command::{CommonStoreOptions, StoreQuiltInput, WalrusCmdBuilder},
         output::{DestroyOutput, QuiltStoreResult, StoreQuiltDryRunOutput},
     },
 };
@@ -114,8 +114,7 @@ impl Walrus {
     /// Issues a `store-quilt` JSON command to the Walrus CLI, returning the parsed output.
     pub async fn store_quilt(
         &mut self,
-        paths: Vec<PathBuf>,
-        blobs: Vec<QuiltBlobInput>,
+        store_quilt_input: StoreQuiltInput,
         epoch_arg: EpochArg,
         force: bool,
         deletable: bool,
@@ -123,8 +122,7 @@ impl Walrus {
         create_command!(
             self,
             store_quilt,
-            paths,
-            blobs,
+            store_quilt_input,
             CommonStoreOptions {
                 epoch_arg,
                 dry_run: false,
@@ -167,21 +165,15 @@ impl Walrus {
     /// Issues a `dry_run_store_quilt` JSON command to the Walrus CLI, returning the parsed output.
     pub async fn dry_run_store_quilt(
         &mut self,
-        path_or_blob: PathOrBlob,
+        store_quilt_input: StoreQuiltInput,
         epoch_arg: EpochArg,
         force: bool,
         deletable: bool,
     ) -> Result<Vec<StoreQuiltDryRunOutput>> {
-        // The `paths` and `blobs` are in conflict with each other
-        let (paths, blobs) = match path_or_blob {
-            PathOrBlob::Path(path) => (vec![path], Vec::new()),
-            PathOrBlob::Blob(blob) => (Vec::new(), vec![blob]),
-        };
         create_command!(
             self,
             store_quilt,
-            paths,
-            blobs,
+            store_quilt_input,
             CommonStoreOptions {
                 epoch_arg,
                 dry_run: true,
@@ -235,9 +227,4 @@ impl Walrus {
             rpc_url: self.rpc_url.clone(),
         }
     }
-}
-
-pub enum PathOrBlob {
-    Path(PathBuf),
-    Blob(QuiltBlobInput),
 }
