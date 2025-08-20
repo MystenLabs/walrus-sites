@@ -427,7 +427,7 @@ pub struct WalrusStoreOptions {
 }
 
 /// The number of epochs to store the blob for.
-#[derive(Parser, Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Parser, Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[command(group(
     ArgGroup::new("epoch_arg")
         .args(&["epochs", "earliest_expiry_time", "end_epoch"])

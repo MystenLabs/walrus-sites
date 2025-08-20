@@ -3,9 +3,10 @@
 
 //! The representation of a walrus cli command.
 
-use std::{num::NonZeroU16, path::PathBuf};
+use std::{collections::BTreeMap, num::NonZeroU16, path::PathBuf};
 
 use anyhow::Result;
+use clap::Args;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
@@ -41,6 +42,33 @@ impl WalrusJsonCmd {
     }
 }
 
+/// Represents the mutually exclusive input for a store-quilt command.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum StoreQuiltInput {
+    /// Paths to files to include in the quilt.
+    ///
+    /// If a path is a directory, all the files in the directory will be included
+    /// in the quilt, recursively.
+    /// If a path is a file, the file will be included in the quilt.
+    /// The filenames are used as the identifiers of the quilt patches.
+    /// Note duplicate filenames are not allowed.
+    /// Custom identifiers and tags are NOT supported for quilt patches.
+    /// Use `--blobs` to specify custom identifiers and tags.
+    Paths(Vec<PathBuf>),
+    /// Blobs to include in the quilt, each blob is specified as a JSON string.
+    ///
+    /// Example:
+    ///   walrus store-quilt --epochs 10
+    ///     --blobs '{"path":"/path/to/food-locations.pdf","identifier":"paper-v2",\
+    ///     "tags":{"author":"Walrus","project":"food","status":"final-review"}}' \
+    ///     '{"path":"/path/to/water-locations.pdf","identifier":"water-v3",\
+    ///     "tags":{"author":"Walrus","project":"water","status":"draft"}}'
+    /// Note if identifier is not specified, the filename will be used as the identifier,
+    /// and duplicate identifiers are not allowed.
+    Blobs(Vec<QuiltBlobInput>),
+}
+
 /// Represents a command to be run on the Walrus CLI.
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,23 +76,20 @@ impl WalrusJsonCmd {
 pub enum Command {
     /// Stores a blob to Walrus.
     Store {
-        /// The path to the file to be stored.
+        /// The files containing the blob to be published to Walrus.
         files: Vec<PathBuf>,
-        /// The epoch argument to specify either the number of epochs to store the blob, or the
-        /// end epoch, or the earliest expiry time in rfc3339 format.
-        ///
+        /// Common options shared between store and store-quilt commands.
         #[serde(flatten)]
-        epoch_arg: EpochArg,
-        /// Do not check for the blob status before storing it.
-        ///
-        /// This will create a new blob even if the blob is already certified for a sufficient
-        /// duration.
-        #[serde(default)]
-        force: bool,
-        deletable: bool,
-        //dry_run
-        #[serde(default)]
-        dry_run: bool,
+        common_options: CommonStoreOptions,
+    },
+    /// Store files as a quilt.
+    StoreQuilt {
+        /// The input for the quilt, which can be either paths or blobs.
+        #[serde(flatten)]
+        input: StoreQuiltInput,
+        /// Common options shared between store and store-quilt commands.
+        #[serde(flatten)]
+        common_options: CommonStoreOptions,
     },
     /// Reads a blob from Walrus.
     Read {
@@ -110,6 +135,64 @@ pub enum Command {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         command: Option<InfoCommands>,
     },
+}
+
+/// Represents a blob to be stored in a quilt, together with its identifier and tags.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct QuiltBlobInput {
+    /// The path to the blob.
+    pub(crate) path: PathBuf,
+    /// The identifier of the blob.
+    ///
+    /// If not provided, the file name will be used as the identifier.
+    #[serde(default)]
+    pub(crate) identifier: Option<String>,
+    /// The tags of the blob.
+    #[serde(default)]
+    pub(crate) tags: BTreeMap<String, String>,
+}
+
+/// Common options shared between store and store-quilt commands.
+#[derive(Debug, Clone, Args, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CommonStoreOptions {
+    /// The epoch argument to specify either the number of epochs to store the blob, or the
+    /// end epoch, or the earliest expiry time in rfc3339 format.
+    #[command(flatten)]
+    #[serde(flatten)]
+    pub epoch_arg: EpochArg,
+    /// Perform a dry-run of the store without performing any actions on chain.
+    ///
+    /// This assumes `--force`; i.e., it does not check the current status of the blob/quilt.
+    #[arg(long)]
+    #[serde(default)]
+    pub dry_run: bool,
+    /// Do not check for the blob/quilt status before storing it.
+    ///
+    /// This will create a new blob/quilt even if it is already certified for a sufficient
+    /// duration.
+    #[arg(long)]
+    #[serde(default)]
+    pub force: bool,
+    /// Ignore the storage resources owned by the wallet.
+    ///
+    /// The client will not check if it can reuse existing resources, and just check the blob/quilt
+    /// status on chain.
+    #[arg(long)]
+    #[serde(default)]
+    pub ignore_resources: bool,
+    /// Mark the blob/quilt as deletable.
+    ///
+    /// Deletable blobs/quilts can be removed from Walrus before their expiration time.
+    ///
+    /// *This will become the default behavior in the future.*
+    #[serde(default)]
+    pub deletable: bool,
+    /// Whether to put the blob/quilt into a shared object.
+    #[arg(long)]
+    #[serde(default)]
+    pub share: bool,
 }
 
 /// Represents the Sui RPC endpoint argument.
@@ -196,17 +279,24 @@ impl WalrusCmdBuilder {
     pub fn store(
         self,
         files: Vec<PathBuf>,
-        epoch_arg: EpochArg,
-        force: bool,
-        deletable: bool,
-        dry_run: bool,
+        common_store_options: CommonStoreOptions,
     ) -> WalrusCmdBuilder<Command> {
         let command = Command::Store {
             files,
-            epoch_arg,
-            force,
-            deletable,
-            dry_run,
+            common_options: common_store_options,
+        };
+        self.with_command(command)
+    }
+
+    /// Adds a [`Command::StoreQuilt`] command to the builder.
+    pub fn store_quilt(
+        self,
+        store_quilt_input: StoreQuiltInput,
+        common_store_options: CommonStoreOptions,
+    ) -> WalrusCmdBuilder<Command> {
+        let command = Command::StoreQuilt {
+            input: store_quilt_input,
+            common_options: common_store_options,
         };
         self.with_command(command)
     }
@@ -281,6 +371,90 @@ impl WalrusCmdBuilder<Command> {
             wallet,
             gas_budget,
             command,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{collections::BTreeMap, path::PathBuf};
+
+    use super::*;
+    use crate::args::EpochArg;
+
+    #[test]
+    fn test_store_quilt_builder() {
+        // Dummy values for testing, we are not making any actual calls to the Walrus CLI.
+        let config = Some(PathBuf::from("/tmp/sites-config.yaml"));
+        let context = Some("testnet".to_string());
+        let wallet = Some(PathBuf::from("/tmp/wallet"));
+        let gas_budget = 12345;
+        let paths = vec![PathBuf::from("/tmp/some_blob.txt")];
+        let common_store_options = CommonStoreOptions {
+            epoch_arg: EpochArg::default(),
+            dry_run: false,
+            force: false,
+            ignore_resources: false,
+            deletable: false,
+            share: false,
+        };
+        let builder =
+            WalrusCmdBuilder::new(config.clone(), context.clone(), wallet.clone(), gas_budget)
+                .store_quilt(
+                    StoreQuiltInput::Paths(paths.clone()),
+                    common_store_options.clone(),
+                );
+        let cmd = builder.build();
+        match cmd.command {
+            Command::StoreQuilt {
+                input,
+                common_options: o,
+            } => {
+                assert_eq!(input, StoreQuiltInput::Paths(paths));
+                assert_eq!(o, common_store_options);
+            }
+            _ => panic!("Expected StoreQuilt command"),
+        }
+    }
+
+    #[test]
+    fn test_dry_run_store_quilt_builder() {
+        // Dummy values for testing, we are not making any actual calls to the Walrus CLI.
+        let config = Some(PathBuf::from("/tmp/sites-config.yaml"));
+        let context = Some("testnet".to_string());
+        let wallet = Some(PathBuf::from("/tmp/wallet"));
+        let gas_budget = 12345;
+        let path = PathBuf::from("/tmp/some_blob.txt");
+        let blob = QuiltBlobInput {
+            path: path.clone(),
+            identifier: None,
+            tags: BTreeMap::new(),
+        };
+        let common_store_options = CommonStoreOptions {
+            epoch_arg: EpochArg::default(),
+            dry_run: true,
+            force: true,
+            ignore_resources: false,
+            deletable: true,
+            share: false,
+        };
+        let builder = WalrusCmdBuilder::new(config, context, wallet, gas_budget).store_quilt(
+            StoreQuiltInput::Blobs(vec![blob.clone()]),
+            common_store_options.clone(),
+        );
+        let cmd = builder.build();
+        match cmd.command {
+            Command::StoreQuilt {
+                input,
+                common_options,
+            } => {
+                assert_eq!(input, StoreQuiltInput::Blobs(vec![blob]));
+                assert_eq!(common_options, common_store_options);
+                assert!(common_options.dry_run);
+                assert!(common_options.force);
+                assert!(common_options.deletable);
+            }
+            _ => panic!("Expected StoreQuilt command for dry run"),
         }
     }
 }
