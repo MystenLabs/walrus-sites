@@ -11,7 +11,10 @@ use serde_with::{base64::Base64, serde_as, DisplayFromStr};
 use sui_types::{base_types::ObjectID, event::EventID};
 
 use super::types::BlobId;
-use crate::site::contracts::{self, AssociatedContractStruct, StructTag};
+use crate::{
+    site::contracts::{self, AssociatedContractStruct, StructTag},
+    walrus::types::{QuiltIndex, QuiltStoreBlob, StoredQuiltPatch},
+};
 
 pub type Epoch = u32;
 pub type EpochCount = u32;
@@ -328,9 +331,41 @@ pub struct DeletableCounts {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[allow(dead_code)]
-pub(crate) struct StorageInfoOutput {
+pub struct StorageInfoOutput {
     pub(crate) n_shards: NonZeroU16,
     pub(crate) n_nodes: usize,
+}
+
+/// Result when attempting to store a quilt.
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct QuiltStoreResult {
+    /// The result of storing the quilt data as a blob.
+    pub blob_store_result: BlobStoreResult,
+    /// The structure of the quilt.
+    pub stored_quilt_blobs: Vec<StoredQuiltPatch>,
+}
+
+/// The output of the `store-quilt --dry-run` command.
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StoreQuiltDryRunOutput {
+    pub(crate) quilt_blob_output: DryRunOutput,
+    pub(crate) quilt_index: QuiltIndex,
+}
+
+/// The output of the `read-quilt` command.
+#[allow(dead_code)]
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReadQuiltOutput {
+    /// The output directory path.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub out: Option<PathBuf>,
+    /// The retrieved blobs.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub retrieved_blobs: Vec<QuiltStoreBlob<'static>>,
 }
 
 pub fn try_from_output<T: DeserializeOwned>(output: Output) -> Result<T> {
