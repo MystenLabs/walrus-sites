@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, it, expect } from 'vitest'
-import { Range } from './types'
 import { QuiltPatch } from './quilt'
 
-describe('derive quilt patch id from range', () => {
+describe('derive quilt patch id from internal identifier', () => {
 	it('happy path', () => {
 		const cases = [
 			{
@@ -19,7 +18,7 @@ describe('derive quilt patch id from range', () => {
 		];
 
 		for (const { patch_id, base_id } of cases) {
-			const range = extract_range(patch_id);
+			const range = extract_internal_identifier(patch_id);
 			const patch = new QuiltPatch(
 				base_id,
 				range
@@ -32,15 +31,62 @@ describe('derive quilt patch id from range', () => {
 	})
 })
 
+describe('bufferToHex', () => {
+	it('should convert ArrayBuffer to hex string', () => {
+		const buf = new Uint8Array([1, 0, 255, 16]).buffer;
+		expect(bufferToHex(buf)).toBe('0100ff10');
+	});
+
+	it('should handle empty buffer', () => {
+		const buf = new Uint8Array([]).buffer;
+		expect(bufferToHex(buf)).toBe('');
+	});
+});
+
+describe('hexToBuffer', () => {
+	it('should convert hex string to ArrayBuffer', () => {
+		const hex = '0100ff10';
+		const buf = QuiltPatch.hexToBuffer(hex);
+		expect(Array.from(new Uint8Array(buf))).toEqual([1, 0, 255, 16]);
+	});
+
+	it('should convert hex string to ArrayBuffer real patch 1', () => {
+		const hex = '0100010002';
+		const buf = QuiltPatch.hexToBuffer(hex);
+		expect(Array.from(new Uint8Array(buf))).toEqual([0x01, 0x00, 0x01, 0x0, 0x02]);
+	});
+
+	it('should convert hex string to ArrayBuffer real patch 2', () => {
+		const hex = '0100010003';
+		const buf = QuiltPatch.hexToBuffer(hex);
+		expect(Array.from(new Uint8Array(buf))).toEqual([0x01, 0x00, 0x01, 0x0, 0x03]);
+	});
+
+
+	it('should handle empty hex string', () => {
+		const buf = QuiltPatch.hexToBuffer('');
+		expect(Array.from(new Uint8Array(buf))).toEqual([]);
+	});
+});
+
 /**
  * Helper function to create the expected values of the tests QuiltPatch.derive_id tests.
  */
-function extract_range(patch_id: string) {
+function extract_internal_identifier(patch_id: string): string {
 	const identifier_buffer = Buffer.from(patch_id, 'base64')
 	const dv = new DataView(identifier_buffer.buffer, identifier_buffer.byteOffset)
-	const range = {
-		start: dv.getUint16(33, true),
-		end: dv.getUint16(35, true),
-	} as Range
-	return range
+	const internal_id_buf = Buffer.alloc(5)
+	const dv_internal_id = new DataView(internal_id_buf.buffer, internal_id_buf.byteOffset)
+	dv_internal_id.setUint8(0, dv.getUint16(32, true));
+	dv_internal_id.setUint16(1, dv.getUint16(33, true));
+	dv_internal_id.setUint16(3, dv.getUint16(35, true));
+	const hex = bufferToHex(dv_internal_id.buffer)
+	return hex
+}
+
+function bufferToHex(buffer: ArrayBuffer) {
+	const uint8Array = new Uint8Array(buffer);
+	return Array.from(uint8Array)
+		.map(b => b.toString(16).padStart(2, '0'))
+		.join('');
 }

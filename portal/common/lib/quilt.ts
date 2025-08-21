@@ -1,24 +1,16 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { Range } from "./types";
 import { base64UrlSafeEncode } from "./url_safe_base64";
 
 // This is also a constant at the Walrus core code.
 export const QUILT_VERSION_BYTE = 0x1;
 
 export class QuiltPatch {
-	public quilt_blob_id: string
-	public version: number
-	public start_index: number
-	public end_index: number
-
-	constructor(quilt_blob_id: string, range: Range) {
-		this.quilt_blob_id = quilt_blob_id;
-		this.version = QUILT_VERSION_BYTE
-		this.start_index = range.start
-		this.end_index = range.end
-	}
+	constructor(
+		public quilt_blob_id: string,
+		public quilt_patch_internal_id: string
+	) { }
 
 	/// Derive the base64 equivalent of the internal quilt patch id.
 	public derive_id(): string {
@@ -34,13 +26,19 @@ export class QuiltPatch {
 		// Use a data view which makes it easier to work with endians.
 		const view = new DataView(buffer.buffer, buffer.byteOffset);
 
+		const quilt_patch_internal_id_buf = QuiltPatch.hexToBuffer(this.quilt_patch_internal_id)
+		const internal_identifier_dv = new DataView(quilt_patch_internal_id_buf)
+		const version = internal_identifier_dv.getInt8(0)
+		const start_index = internal_identifier_dv.getInt16(1)
+		const end_index = internal_identifier_dv.getInt16(3)
+
 		// Include to the buffer the version, start and end index bytes.
 		const version_offset = 32
-		view.setUint8(version_offset, this.version);
+		view.setUint8(version_offset, version);
 		const start_index_offset = 33
-		view.setUint16(start_index_offset, this.start_index, little_endian);
+		view.setUint16(start_index_offset, start_index, little_endian);
 		const end_index_offset = 35
-		view.setUint16(end_index_offset, this.end_index, little_endian);
+		view.setUint16(end_index_offset, end_index, little_endian);
 
 		// Finally convert to base64.
 		const base64String = base64UrlSafeEncode(new Uint8Array(buffer))
@@ -49,5 +47,13 @@ export class QuiltPatch {
 		// Make sure that we do not surpass the 50 characters of the quilt id
 		// with accidental padding.
 		return base64String.slice(0, 50)
+	}
+
+	public static hexToBuffer(hex: string): ArrayBuffer {
+		const bytes = new Uint8Array(hex.length / 2);
+		for (let i = 0; i < hex.length; i += 2) {
+			bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
+		}
+		return bytes.buffer;
 	}
 }
