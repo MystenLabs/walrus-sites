@@ -12,14 +12,18 @@ use site::{config::WSResources, manager::SiteManager, resource::ResourceManager}
 use sitemap::display_sitemap;
 use util::{id_to_base36, path_or_defaults_if_exist};
 
+use crate::publish_new::SitePublisherBuilder;
+
 pub mod args;
 mod backoff;
 pub mod config;
 mod display;
 mod preprocessor;
 mod publish;
+mod publish_new;
 mod retry_client;
 mod site;
+mod site_new;
 mod sitemap;
 mod suins;
 mod summary;
@@ -110,16 +114,13 @@ async fn run_internal(
             publish_options,
             site_name,
         } => {
-            SiteEditor::new(context, config)
-                .with_edit_options(
-                    publish_options,
-                    None,
-                    site_name,
-                    ContinuousEditing::Once,
-                    BlobManagementOptions::no_status_check(),
-                )
-                .run()
-                .await?
+            let builder = SitePublisherBuilder {
+                context,
+                site_name,
+                publish_options,
+            };
+            let publisher = builder.build().await?;
+            publisher.run().await?
         }
         #[allow(deprecated)]
         Commands::Update {

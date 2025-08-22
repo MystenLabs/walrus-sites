@@ -65,6 +65,21 @@ pub(crate) struct SuiResource {
     pub range: Option<Range>,
 }
 
+/// Information about a resource.
+///
+/// This struct mirrors the information that is stored on chain.
+#[derive(PartialEq, Eq, Debug, Clone, PartialOrd, Ord, Serialize, Deserialize)]
+pub(crate) struct LocalSuiResource {
+    /// The relative path the resource will have on Sui.
+    pub path: String,
+    /// Response, Representation and Payload headers.
+    pub headers: HttpHeaders,
+    /// The hash of the blob contents.
+    pub blob_hash: U256,
+    /// Byte ranges for the resource.
+    pub range: Option<Range>,
+}
+
 /// Serialize as string to make sure that the json output uses the base64 encoding.
 fn serialize_blob_id<S>(blob_id: &BlobId, serializer: S) -> Result<S::Ok, S::Error>
 where

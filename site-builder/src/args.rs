@@ -513,6 +513,9 @@ impl EpochCountOrMax {
 pub mod default {
     use std::num::NonZeroUsize;
 
+    pub const DEFAULT_SITE_NAME: &str = "My Walrus Site";
+    pub const DEFAULT_WS_RESOURCES_FILE: &str = "ws-resources.json";
+
     pub fn walrus_binary() -> Option<String> {
         Some("walrus".to_owned())
     }
