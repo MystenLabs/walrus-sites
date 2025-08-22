@@ -28,8 +28,6 @@ pub(crate) struct ResourceManager {
     pub ignore_patterns: Vec<String>,
     /// The ws-resource file path.
     pub ws_resources_path: Option<PathBuf>,
-    /// The maximum number of concurrent calls to the walrus cli for computing the blob ID.
-    pub max_concurrent: Option<NonZeroUsize>,
 }
 
 impl ResourceManager {
@@ -38,7 +36,6 @@ impl ResourceManager {
         ignore_patterns: Vec<String>,
         // ws_resources: Option<WSResources>,
         ws_resources_path: Option<PathBuf>,
-        max_concurrent: Option<NonZeroUsize>,
     ) -> Self {
         // TODO(nikos): Dedup ignore_patterns
         // TODO(nikos): Test if this stil works
@@ -56,7 +53,6 @@ impl ResourceManager {
             ws_res_headers,
             ignore_patterns,
             ws_resources_path,
-            max_concurrent,
         }
     }
 

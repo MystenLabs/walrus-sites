@@ -52,8 +52,7 @@ impl SitePublisherBuilder {
         } = self;
         let PublishOptions {
             directory,
-            list_directory: _, // TODO(nikos) handle list-directory
-            max_concurrent,
+            list_directory: _,      // TODO(nikos) handle list-directory
             max_parallel_stores: _, // TODO(nikos) will proly need this later
             walrus_options:
                 WalrusStoreOptions {
@@ -62,6 +61,7 @@ impl SitePublisherBuilder {
                     permanent,
                     dry_run,
                 },
+            ..
         } = publish_options;
         let (ws_resources, ws_resources_path) =
             load_ws_resources(ws_resources.as_deref(), directory.as_path())?;
@@ -81,7 +81,6 @@ impl SitePublisherBuilder {
             headers.unwrap_or_default(),
             ignore.unwrap_or_default(),
             ws_resources_path,
-            max_concurrent,
         );
 
         Ok(SitePublisher {
