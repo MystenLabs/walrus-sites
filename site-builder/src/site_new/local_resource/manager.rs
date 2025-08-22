@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     fs,
     num::NonZeroUsize,
     path::{Path, PathBuf},
@@ -24,7 +24,9 @@ use crate::{
 #[derive(Debug)]
 pub(crate) struct ResourceManager {
     /// The ws-resources.json contents.
-    pub ws_resources: Option<WSResources>,
+    // pub ws_resources: Option<WSResources>,
+    pub ws_res_headers: BTreeMap<String, HttpHeaders>,
+    pub ignore_patterns: Vec<String>,
     /// The ws-resource file path.
     pub ws_resources_path: Option<PathBuf>,
     /// The maximum number of concurrent calls to the walrus cli for computing the blob ID.
@@ -33,26 +35,27 @@ pub(crate) struct ResourceManager {
 
 impl ResourceManager {
     pub fn new(
-        ws_resources: Option<WSResources>,
+        mut ws_res_headers: BTreeMap<String, HttpHeaders>,
+        ignore_patterns: Vec<String>,
+        // ws_resources: Option<WSResources>,
         ws_resources_path: Option<PathBuf>,
         max_concurrent: Option<NonZeroUsize>,
     ) -> Self {
+        // TODO(nikos): Dedup ignore_patterns
+        // TODO(nikos): Test if this stil works
         // Cast the keys to lowercase because http headers
         //  are case-insensitive: RFC7230 sec. 2.7.3
-        if let Some(resources) = ws_resources.as_ref() {
-            if let Some(ref headers) = resources.headers {
-                for (_, header_map) in headers.clone().iter_mut() {
-                    header_map.0 = header_map
-                        .0
-                        .iter()
-                        .map(|(k, v)| (k.to_lowercase(), v.clone()))
-                        .collect();
-                }
-            }
+        for (_, header_map) in ws_res_headers.iter_mut() {
+            header_map.0 = header_map
+                .0
+                .iter()
+                .map(|(k, v)| (k.to_lowercase(), v.clone()))
+                .collect();
         }
 
         ResourceManager {
-            ws_resources,
+            ws_res_headers,
+            ignore_patterns,
             ws_resources_path,
             max_concurrent,
         }
@@ -112,7 +115,7 @@ impl ResourceManager {
         }
 
         let mut http_headers: VecMap<String, String> =
-            ResourceManager::derive_http_headers(&self.ws_resources, &resource_path);
+            ResourceManager::derive_http_headers(&self.ws_res_headers, &resource_path);
         let extension = full_path
             .extension()
             .unwrap_or(
@@ -165,19 +168,14 @@ impl ResourceManager {
     ///  Matches the path of the resource to the wildcard paths in the configuration to
     ///  determine the headers to be added to the HTTP response.
     pub fn derive_http_headers(
-        ws_resources: &Option<WSResources>,
+        ws_res_headers: &BTreeMap<String, HttpHeaders>,
         resource_path: &str,
     ) -> VecMap<String, String> {
-        ws_resources
-            .as_ref()
-            .and_then(|config| config.headers.as_ref())
-            .and_then(|headers| {
-                headers
-                    .iter()
-                    .filter(|(path, _)| Self::is_pattern_match(path, resource_path))
-                    .max_by_key(|(path, _)| path.split('/').count())
-                    .map(|(_, header_map)| header_map.0.clone())
-            })
+        ws_res_headers
+            .iter()
+            .filter(|(path, _)| Self::is_pattern_match(path, resource_path))
+            .max_by_key(|(path, _)| path.split('/').count())
+            .map(|(_, header_map)| header_map.0.clone())
             .unwrap_or_default()
     }
 
@@ -195,15 +193,10 @@ impl ResourceManager {
 
     /// Returns true if the resource_path matches any of the ignore patterns.
     fn is_ignored(&self, resource_path: &str) -> bool {
-        if let Some(ws_resources) = &self.ws_resources {
-            if let Some(ignore_patterns) = &ws_resources.ignore {
-                // Find the longest matching pattern
-                return ignore_patterns
-                    .iter()
-                    .any(|pattern| Self::is_pattern_match(pattern, resource_path));
-            }
-        }
-        false
+        return self
+            .ignore_patterns
+            .iter()
+            .any(|pattern| Self::is_pattern_match(pattern, resource_path));
     }
 
     fn iter_dir(start: &Path, root: &Path) -> anyhow::Result<Vec<(PathBuf, PathBuf)>> {

@@ -7,6 +7,7 @@ use crate::{
     args::{default, PublishOptions},
     display,
     publish::load_ws_resources,
+    site::config::WSResources,
     site_new::local_resource::manager::ResourceManager,
 };
 
@@ -50,10 +51,25 @@ impl SitePublisherBuilder {
         } = publish_options;
         let (ws_resources, ws_resources_path) =
             load_ws_resources(walrus_options.ws_resources.as_deref(), directory.as_path())?;
-        let site_name = site_name.unwrap_or(default::DEFAULT_SITE_NAME.to_string());
 
-        let resource_manager =
-            ResourceManager::new(ws_resources, ws_resources_path, max_concurrent);
+        let WSResources {
+            headers,
+            routes: _,   // TODO(nikos) will proly need this later
+            metadata: _, // TODO(nikos) will proly need this later
+            site_name: ws_site_name,
+            object_id: _, // TODO(nikos) will proly need this later
+            ignore,
+        } = ws_resources.unwrap_or_default();
+        let site_name = site_name
+            .or(ws_site_name)
+            .unwrap_or(default::DEFAULT_SITE_NAME.to_string());
+
+        let resource_manager = ResourceManager::new(
+            headers.unwrap_or_default(),
+            ignore.unwrap_or_default(),
+            ws_resources_path,
+            max_concurrent,
+        );
 
         Ok(SitePublisher {
             context,
@@ -78,17 +94,19 @@ pub struct SitePublisher {
 impl SitePublisher {
     pub async fn run(self) -> anyhow::Result<()> {
         let Self {
-            context,
-            site_name,
+            context: _,   // TODO(nikos) will proly need this later
+            site_name: _, // TODO(nikos) will proly need this later
             mut resource_manager,
             directory,
         } = self;
 
         display::action(format!(
-            "Parsing the directory {} and locally computing blob IDs",
+            "Parsing the directory {}",
             directory.to_string_lossy()
         ));
-        let local_site_data = resource_manager.read_dir(directory.as_path()).await?;
+        let resources = resource_manager.read_dir(directory.as_path()).await?;
+        display::done();
+        tracing::debug!(?resources, "resources loaded from directory");
 
         Ok(())
     }
