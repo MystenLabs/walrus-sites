@@ -67,6 +67,8 @@ macro_rules! create_command {
 }
 
 impl Walrus {
+    pub const MAX_FILES_PER_QUILT: usize = 666;
+
     /// Creates a new Walrus CLI controller.
     pub fn new(
         bin: String,
@@ -109,6 +111,28 @@ impl Walrus {
                 share: false,
             }
         )
+    }
+
+    // TODO(nikos): Trait would fit nice here, see also comment at WalrusOp
+    pub async fn run(&mut self, op: WalrusOp) -> Result<WalrusOut> {
+        Ok(match op {
+            WalrusOp::StoreQuilt(StoreQuiltArguments {
+                store_quilt_input,
+                epoch_arg,
+                deletable,
+            }) => WalrusOut::StoreQuilt(
+                self.store_quilt(store_quilt_input, epoch_arg, false, deletable)
+                    .await?,
+            ),
+            WalrusOp::DryRunStoreQuilt(StoreQuiltArguments {
+                store_quilt_input,
+                epoch_arg,
+                deletable,
+            }) => WalrusOut::DryRunStoreQuilt(
+                self.dry_run_store_quilt(store_quilt_input, epoch_arg, false, deletable)
+                    .await?,
+            ),
+        })
     }
 
     /// Issues a `store-quilt` JSON command to the Walrus CLI, returning the parsed output.
@@ -162,6 +186,8 @@ impl Walrus {
         )
     }
 
+    // TODO(nikos): Now that we have the output as an enum, think about removing these extra
+    // functions which needed to be created because of different return-types.
     /// Issues a `dry_run_store_quilt` JSON command to the Walrus CLI, returning the parsed output.
     pub async fn dry_run_store_quilt(
         &mut self,
@@ -169,7 +195,7 @@ impl Walrus {
         epoch_arg: EpochArg,
         force: bool,
         deletable: bool,
-    ) -> Result<Vec<StoreQuiltDryRunOutput>> {
+    ) -> Result<StoreQuiltDryRunOutput> {
         create_command!(
             self,
             store_quilt,
@@ -227,4 +253,31 @@ impl Walrus {
             rpc_url: self.rpc_url.clone(),
         }
     }
+}
+
+pub struct StoreQuiltArguments {
+    pub store_quilt_input: StoreQuiltInput,
+    pub epoch_arg: EpochArg,
+    pub deletable: bool,
+}
+
+// TODO(nikos): Use WalrusOperation trait and return impl WalrusOperation for the
+// update strategies.
+// eg.
+// ```
+// impl WalrusOp for StoreQuiltArguments {
+//     type Output = QuiltStoreResult;
+//     pub fn run(self, walrus: &mut Walrus) ...
+// }
+// ```
+// then we can return Vec<Box<dyn WalrusRunnable>> for the update strategies for the part of the
+// walrus commands.
+pub enum WalrusOp {
+    StoreQuilt(StoreQuiltArguments),
+    DryRunStoreQuilt(StoreQuiltArguments),
+}
+
+pub enum WalrusOut {
+    StoreQuilt(QuiltStoreResult),
+    DryRunStoreQuilt(StoreQuiltDryRunOutput),
 }

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeMap,
     fs,
     num::NonZeroUsize,
     path::{Path, PathBuf},
@@ -10,13 +10,12 @@ use std::{
 
 use anyhow::anyhow;
 use fastcrypto::hash::{HashFunction, Sha256};
-use futures::{stream, StreamExt};
 use move_core_types::u256::U256;
 use regex::Regex;
 
 use super::{full_path_to_resource_path, LocalResource};
 use crate::{
-    site::{config::WSResources, content::ContentType},
+    site::content::ContentType,
     types::{HttpHeaders, VecMap},
 };
 
@@ -62,33 +61,28 @@ impl ResourceManager {
     }
 
     /// Recursively iterate a directory and load all [`Resources`][Resource] within.
-    pub async fn read_dir(&mut self, root: &Path) -> anyhow::Result<BTreeSet<LocalResource>> {
+    pub fn read_dir(&mut self, root: &Path) -> anyhow::Result<Vec<LocalResource>> {
         let resource_paths = Self::iter_dir(root, root)?;
 
-        let mut resources = BTreeSet::new();
         if resource_paths.is_empty() {
-            return Ok(resources);
+            return Ok(vec![]);
         }
 
-        let futures = resource_paths
+        let resources: Vec<LocalResource> = resource_paths
             .iter()
             .map(|(full_path, _)| {
-                full_path_to_resource_path(full_path, root)
-                    .map(|resource_path| self.read_resource(full_path, resource_path))
+                let resource_path = full_path_to_resource_path(full_path, root)?;
+                self.read_resource(full_path, resource_path)
             })
-            .collect::<anyhow::Result<Vec<_>>>()?;
-
-        // Limit the amount of futures awaited concurrently.
-        let concurrency_limit = self
-            .max_concurrent
-            .map(NonZeroUsize::get)
-            .unwrap_or_else(|| resource_paths.len());
-
-        let mut stream = stream::iter(futures).buffer_unordered(concurrency_limit);
-
-        while let Some(resource) = stream.next().await {
-            resources.extend(resource?);
-        }
+            .try_fold(
+                Vec::new(),
+                |mut acc, res_opt| -> anyhow::Result<Vec<LocalResource>> {
+                    if let Some(item) = res_opt? {
+                        acc.push(item);
+                    }
+                    Ok(acc)
+                },
+            )?;
 
         Ok(resources)
     }
@@ -96,7 +90,7 @@ impl ResourceManager {
     /// Read a resource at a path.
     ///
     /// Ignores empty files.
-    pub async fn read_resource(
+    pub fn read_resource(
         &self,
         full_path: &Path,
         resource_path: String,

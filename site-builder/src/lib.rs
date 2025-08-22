@@ -120,7 +120,8 @@ async fn run_internal(
                 publish_options,
             };
             let publisher = builder.build().await?;
-            publisher.run().await?
+            let _updates = publisher.run().await?;
+            todo!()
         }
         #[allow(deprecated)]
         Commands::Update {

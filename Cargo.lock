@@ -8490,6 +8490,7 @@ dependencies = [
  "futures",
  "home",
  "humantime",
+ "itertools 0.14.0",
  "move-core-types",
  "notify",
  "prettytable",

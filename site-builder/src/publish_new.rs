@@ -1,14 +1,22 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::path::PathBuf;
+use std::{collections::BTreeMap, path::PathBuf};
+
+use sui_types::programmable_transaction_builder::ProgrammableTransactionBuilder;
 
 use crate::{
-    args::{default, PublishOptions},
+    args::{default, EpochArg, PublishOptions, WalrusStoreOptions},
+    config::Walrus,
     display,
     publish::load_ws_resources,
     site::config::WSResources,
     site_new::local_resource::manager::ResourceManager,
+    walrus::{
+        command::{QuiltBlobInput, StoreQuiltInput},
+        StoreQuiltArguments,
+        WalrusOp,
+    },
 };
 
 /// Separates the argument parsing from actually building the site.
@@ -47,11 +55,16 @@ impl SitePublisherBuilder {
             list_directory: _, // TODO(nikos) handle list-directory
             max_concurrent,
             max_parallel_stores: _, // TODO(nikos) will proly need this later
-            walrus_options,
+            walrus_options:
+                WalrusStoreOptions {
+                    ws_resources,
+                    epoch_arg,
+                    permanent,
+                    dry_run,
+                },
         } = publish_options;
         let (ws_resources, ws_resources_path) =
-            load_ws_resources(walrus_options.ws_resources.as_deref(), directory.as_path())?;
-
+            load_ws_resources(ws_resources.as_deref(), directory.as_path())?;
         let WSResources {
             headers,
             routes: _,   // TODO(nikos) will proly need this later
@@ -76,6 +89,9 @@ impl SitePublisherBuilder {
             site_name,
             resource_manager,
             directory,
+            epoch_arg,
+            permanent,
+            dry_run,
         })
     }
 }
@@ -89,26 +105,86 @@ pub struct SitePublisher {
     pub resource_manager: ResourceManager,
     // TODO(nikos): Does it make sense to include directory inside the new `ResourceManager` above?
     pub directory: PathBuf,
+    pub epoch_arg: EpochArg,
+    pub permanent: bool,
+    pub dry_run: bool,
 }
 
 impl SitePublisher {
-    pub async fn run(self) -> anyhow::Result<()> {
+    pub async fn run(self) -> anyhow::Result<(Vec<WalrusOp>, ProgrammableTransactionBuilder)> {
         let Self {
             context: _,   // TODO(nikos) will proly need this later
             site_name: _, // TODO(nikos) will proly need this later
             mut resource_manager,
             directory,
+            epoch_arg,
+            permanent,
+            dry_run,
         } = self;
 
         display::action(format!(
             "Parsing the directory {}",
             directory.to_string_lossy()
         ));
-        let resources = resource_manager.read_dir(directory.as_path()).await?;
+        let resources = resource_manager.read_dir(directory.as_path())?;
         display::done();
         tracing::debug!(?resources, "resources loaded from directory");
 
-        Ok(())
+        tracing::debug!("creating site");
+
+        let walrus_ops = resources
+            .chunks(Walrus::MAX_FILES_PER_QUILT)
+            .map(|resources| {
+                let args = StoreQuiltArguments {
+                    store_quilt_input: StoreQuiltInput::Blobs(
+                        resources
+                            .into_iter()
+                            .map(|resource| {
+                                QuiltBlobInput {
+                                    path: resource.full_path.clone(),
+                                    // TODO(nikos): replace not-supported characters
+                                    identifier: Some(resource.info.path.clone()),
+                                    tags: BTreeMap::new(),
+                                }
+                            })
+                            .collect(),
+                    ),
+                    epoch_arg: epoch_arg.clone(),
+                    deletable: !permanent,
+                };
+                if dry_run {
+                    WalrusOp::DryRunStoreQuilt(args)
+                } else {
+                    WalrusOp::StoreQuilt(args)
+                }
+            })
+            .collect::<Vec<_>>();
+
+        // let site_updates = local_site_data.diff(&existing_site);
+        //
+        // let walrus_candidate_set = if self.blob_options.is_check_extend() {
+        //     // We need to check the status of all blobs: Return the full list of existing and added
+        //     // blobs as possible updates.
+        //     existing_site.replace_all(local_site_data)
+        // } else {
+        //     // We only need to upload the new blobs.
+        //     site_updates.clone()
+        // };
+        // // IMPORTANT: Perform the store operations on Walrus first, to ensure zero "downtime".
+        // self.select_and_store_to_walrus(&walrus_candidate_set)
+        //     .await?;
+        //
+        // // Check if there are any updates to the site on-chain.
+        // let result = if site_updates.has_updates() {
+        //     display::action("Applying the Walrus Site object updates on Sui");
+        //     let result = self.execute_sui_updates(&site_updates).await?;
+        //     display::done();
+        //     result
+        // } else {
+        //     SuiTransactionBlockResponse::default()
+        // };
+
+        todo!();
     }
 }
 
@@ -187,4 +263,62 @@ impl SitePublisher {
 
         Ok((site_manager.active_address()?, response, summary))
     }
+
+
+
+    /// Updates the site with the given [`Resource`].
+    ///
+    /// If the site does not exist, it is created and updated. The resources that need to be updated
+    /// or created are published to Walrus.
+    pub async fn update_site(
+        &mut self,
+        local_site_data: &SiteData,
+    ) -> Result<(SuiTransactionBlockResponse, SiteDataDiffSummary)> {
+        tracing::debug!(?self.site_id, "creating or updating site");
+        let retriable_client = self.sui_client().await?;
+        let existing_site = match &self.site_id {
+            Some(site_id) => {
+                RemoteSiteFactory::new(&retriable_client, self.config.package)
+                    .await?
+                    .get_from_chain(*site_id)
+                    .await?
+            }
+            None => SiteData::empty(),
+        };
+        tracing::debug!(?existing_site, "checked existing site");
+
+        let site_updates = local_site_data.diff(&existing_site);
+
+        let walrus_candidate_set = if self.blob_options.is_check_extend() {
+            // We need to check the status of all blobs: Return the full list of existing and added
+            // blobs as possible updates.
+            existing_site.replace_all(local_site_data)
+        } else {
+            // We only need to upload the new blobs.
+            site_updates.clone()
+        };
+        // IMPORTANT: Perform the store operations on Walrus first, to ensure zero "downtime".
+        self.select_and_store_to_walrus(&walrus_candidate_set)
+            .await?;
+
+        // Check if there are any updates to the site on-chain.
+        let result = if site_updates.has_updates() {
+            display::action("Applying the Walrus Site object updates on Sui");
+            let result = self.execute_sui_updates(&site_updates).await?;
+            display::done();
+            result
+        } else {
+            SuiTransactionBlockResponse::default()
+        };
+
+        // Extract the BlobIDs from deleted resources for Walrus cleanup
+        let blobs_to_delete: Vec<BlobId> = collect_deletable_blob_candidates(&site_updates);
+
+        if !blobs_to_delete.is_empty() {
+            self.delete_from_walrus(&blobs_to_delete).await?;
+        }
+
+        Ok((result, site_updates.summary(&self.blob_options)))
+    }
+
 */
