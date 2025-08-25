@@ -8488,6 +8488,7 @@ dependencies = [
  "fastcrypto 0.1.9",
  "flate2",
  "futures",
+ "hex",
  "home",
  "humantime",
  "itertools 0.14.0",

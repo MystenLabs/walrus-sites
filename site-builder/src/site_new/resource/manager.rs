@@ -4,7 +4,6 @@
 use std::{
     collections::BTreeMap,
     fs,
-    num::NonZeroUsize,
     path::{Path, PathBuf},
 };
 
@@ -13,7 +12,7 @@ use fastcrypto::hash::{HashFunction, Sha256};
 use move_core_types::u256::U256;
 use regex::Regex;
 
-use super::{full_path_to_resource_path, LocalResource};
+use super::local_resource::{full_path_to_resource_path, LocalResource};
 use crate::{
     site::content::ContentType,
     types::{HttpHeaders, VecMap},

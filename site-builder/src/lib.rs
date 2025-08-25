@@ -118,6 +118,7 @@ async fn run_internal(
                 context,
                 site_name,
                 publish_options,
+                config,
             };
             let publisher = builder.build().await?;
             let _updates = publisher.run().await?;

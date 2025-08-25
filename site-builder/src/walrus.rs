@@ -22,7 +22,7 @@ use crate::{
     args::EpochArg,
     walrus::{
         command::{CommonStoreOptions, StoreQuiltInput, WalrusCmdBuilder},
-        output::{DestroyOutput, QuiltStoreResult, StoreQuiltDryRunOutput},
+        output::{DestroyOutput, QuiltStoreResult, StoreQuiltDryRunOutput, WalrusOut},
     },
 };
 pub mod command;
@@ -277,7 +277,3 @@ pub enum WalrusOp {
     DryRunStoreQuilt(StoreQuiltArguments),
 }
 
-pub enum WalrusOut {
-    StoreQuilt(QuiltStoreResult),
-    DryRunStoreQuilt(StoreQuiltDryRunOutput),
-}

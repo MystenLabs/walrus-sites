@@ -19,7 +19,10 @@ use sui_types::{
 use crate::{
     site::contracts::{self, AssociatedContractStruct, StructTag},
     util::deserialize_bag_or_table,
-    walrus::types::BlobId,
+    walrus::{
+        output::PatchIdV1,
+        types::BlobId,
+    },
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -63,6 +66,35 @@ pub(crate) struct SuiResource {
     pub blob_hash: U256,
     /// Byte ranges for the resource.
     pub range: Option<Range>,
+}
+
+impl From<(LocalSuiResource, BlobId, PatchIdV1)> for SuiResource {
+    fn from(
+        (
+            LocalSuiResource {
+                path,
+                mut headers,
+                blob_hash,
+                range,
+            },
+            blob_id,
+            PatchIdV1(patch_bytes),
+        ): (LocalSuiResource, BlobId, PatchIdV1),
+    ) -> Self {
+        let patch_hex = format!("0x{}", hex::encode(patch_bytes));
+        // TODO(nikos): Check header key
+        const QUILT_PATCH_ID_INTERNAL_HEADER: &str = "x-quilt-internal-patch-id";
+        headers
+            .0
+            .insert(QUILT_PATCH_ID_INTERNAL_HEADER.to_string(), patch_hex);
+        SuiResource {
+            path,
+            headers,
+            blob_id,
+            blob_hash,
+            range,
+        }
+    }
 }
 
 /// Information about a resource.

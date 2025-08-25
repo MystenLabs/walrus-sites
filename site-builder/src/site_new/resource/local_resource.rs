@@ -11,8 +11,6 @@ use move_core_types::u256::U256;
 
 use crate::types::{HttpHeaders, LocalSuiResource};
 
-pub(crate) mod manager;
-
 /// The resource that is to be created or updated on Sui.
 ///
 /// This struct contains additional information that is not stored on chain, compared to

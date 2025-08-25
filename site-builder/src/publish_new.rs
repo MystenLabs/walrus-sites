@@ -3,15 +3,16 @@
 
 use std::{collections::BTreeMap, path::PathBuf};
 
-use sui_types::programmable_transaction_builder::ProgrammableTransactionBuilder;
+use anyhow::anyhow;
 
 use crate::{
     args::{default, EpochArg, PublishOptions, WalrusStoreOptions},
-    config::Walrus,
+    config::{Config, Walrus},
     display,
     publish::load_ws_resources,
-    site::config::WSResources,
-    site_new::local_resource::manager::ResourceManager,
+    site::{builder::SitePtb, config::WSResources, resource::Resource},
+    site_new::resource::{local_resource::LocalResource, manager::ResourceManager},
+    types::SuiResource,
     walrus::{
         command::{QuiltBlobInput, StoreQuiltInput},
         StoreQuiltArguments,
@@ -24,7 +25,7 @@ use crate::{
 pub struct SitePublisherBuilder {
     pub context: Option<String>,
     pub site_name: Option<String>,
-    // pub config: Config,
+    pub config: Config,
     pub publish_options: PublishOptions,
 }
 
@@ -48,6 +49,7 @@ impl SitePublisherBuilder {
         let Self {
             context,
             site_name,
+            config,
             publish_options,
         } = self;
         let PublishOptions {
@@ -83,6 +85,14 @@ impl SitePublisherBuilder {
             ws_resources_path,
         );
 
+        let walrus = Walrus::new(
+            config.walrus_binary(),
+            config.gas_budget(),
+            config.general.rpc_url.clone(),
+            config.general.walrus_config.clone(),
+            config.general.walrus_context.clone(),
+            config.general.wallet.clone(),
+        );
         Ok(SitePublisher {
             context,
             site_name,
@@ -91,6 +101,7 @@ impl SitePublisherBuilder {
             epoch_arg,
             permanent,
             dry_run,
+            walrus,
         })
     }
 }
@@ -107,10 +118,11 @@ pub struct SitePublisher {
     pub epoch_arg: EpochArg,
     pub permanent: bool,
     pub dry_run: bool,
+    pub walrus: Walrus,
 }
 
 impl SitePublisher {
-    pub async fn run(self) -> anyhow::Result<(Vec<WalrusOp>, ProgrammableTransactionBuilder)> {
+    pub async fn run(self) -> anyhow::Result<(Vec<WalrusOp>, SitePtb)> {
         let Self {
             context: _,   // TODO(nikos) will proly need this later
             site_name: _, // TODO(nikos) will proly need this later
@@ -119,6 +131,7 @@ impl SitePublisher {
             epoch_arg,
             permanent,
             dry_run,
+            mut walrus,
         } = self;
 
         display::action(format!(
@@ -131,17 +144,21 @@ impl SitePublisher {
 
         tracing::debug!("creating site");
 
-        let walrus_ops = resources
+        let local_resources_chunks: Vec<Vec<_>> = resources
             .chunks(Walrus::MAX_FILES_PER_QUILT)
+            .map(|r| r.to_vec())
+            .collect();
+        let walrus_ops = local_resources_chunks
+            .into_iter()
             .map(|resources| {
                 let args = StoreQuiltArguments {
                     store_quilt_input: StoreQuiltInput::Blobs(
                         resources
-                            .into_iter()
+                            .iter()
                             .map(|resource| {
                                 QuiltBlobInput {
                                     path: resource.full_path.clone(),
-                                    // TODO(nikos): replace not-supported characters
+                                    // TODO(nikos): error on not-supported characters
                                     identifier: Some(resource.info.path.clone()),
                                     tags: BTreeMap::new(),
                                 }
@@ -151,13 +168,55 @@ impl SitePublisher {
                     epoch_arg: epoch_arg.clone(),
                     deletable: !permanent,
                 };
-                if dry_run {
+                let op = if dry_run {
                     WalrusOp::DryRunStoreQuilt(args)
                 } else {
                     WalrusOp::StoreQuilt(args)
-                }
+                };
+                (resources, op)
             })
             .collect::<Vec<_>>();
+
+        let walrus_resps = {
+            let mut walrus_resps = vec![];
+            for op in walrus_ops {
+                walrus_resps.push((op.0, walrus.run(op.1).await?));
+            }
+            walrus_resps
+        };
+
+        let flattened: Vec<Resource> = walrus_resps
+            .into_iter()
+            .flat_map(|(chunk, resp)| {
+                let mut patches = resp.patch_ids()?;
+                let blob_id = *resp.blob_id();
+                let resources = chunk
+                    .into_iter()
+                    .map(
+                        |LocalResource {
+                             info,
+                             full_path,
+                             unencoded_size,
+                         }| {
+                            let path = info.path.as_str();
+                            let patch_idx = patches
+                                .iter()
+                                .position(|p| path == p.0)
+                                .ok_or(anyhow!("Did not find {path} in walrus response"))?;
+                            let patch = patches.swap_remove(patch_idx);
+                            let sui_resource = SuiResource::from((info, blob_id, patch.1));
+                            Ok(Resource {
+                                info: sui_resource,
+                                full_path,
+                                unencoded_size,
+                            })
+                        },
+                    )
+                    .collect::<anyhow::Result<Vec<Resource>>>()?;
+                Ok::<Vec<Resource>, anyhow::Error>(resources)
+            })
+            .flatten()
+            .collect();
 
         // let site_updates = local_site_data.diff(&existing_site);
         //

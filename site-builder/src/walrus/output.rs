@@ -3,9 +3,11 @@
 
 //! The output of running commands on the Walrus CLI.
 
-use std::{num::NonZeroU16, path::PathBuf, process::Output};
+use std::{num::NonZeroU16, path::PathBuf, process::Output, str::FromStr};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use itertools::Itertools;
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_with::{base64::Base64, serde_as, DisplayFromStr};
 use sui_types::{base_types::ObjectID, event::EventID};
@@ -13,11 +15,115 @@ use sui_types::{base_types::ObjectID, event::EventID};
 use super::types::BlobId;
 use crate::{
     site::contracts::{self, AssociatedContractStruct, StructTag},
-    walrus::types::{QuiltIndex, QuiltStoreBlob, StoredQuiltPatch},
+    walrus::types::{QuiltIndex, QuiltIndexV1, QuiltStoreBlob, StoredQuiltPatch},
 };
+
+const QUILT_PATCH_VERSION_1: u8 = 1;
+const QUILT_INDEX_END_INDEX: u16 = 1;
+const QUILT_PATCH_SIZE: usize = 5;
 
 pub type Epoch = u32;
 pub type EpochCount = u32;
+
+#[derive(Debug)]
+pub enum WalrusOut {
+    StoreQuilt(QuiltStoreResult),
+    DryRunStoreQuilt(StoreQuiltDryRunOutput),
+}
+
+#[derive(Clone)]
+pub struct PatchIdV1(pub [u8; QUILT_PATCH_SIZE]);
+
+impl From<(u8, u16, u16)> for PatchIdV1 {
+    fn from((version, start_index, end_index): (u8, u16, u16)) -> Self {
+        let mut bytes = [0u8; QUILT_PATCH_SIZE];
+        bytes[0] = version;
+        bytes[1..3].copy_from_slice(&start_index.to_le_bytes());
+        bytes[3..5].copy_from_slice(&end_index.to_le_bytes());
+        PatchIdV1(bytes)
+    }
+}
+
+impl FromStr for PatchIdV1 {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> anyhow::Result<Self> {
+        // Decode from Base64.
+        let bytes = URL_SAFE_NO_PAD.decode(s)?;
+
+        // Must have at least BlobId.LENGTH + 1 bytes (quilt_id + version).
+        if bytes.len() != BlobId::LENGTH + size_of::<PatchIdV1>() {
+            bail!(
+                "Expected {} bytes when decoding quilt-patch-id version 1.",
+                BlobId::LENGTH + size_of::<PatchIdV1>()
+            );
+        }
+
+        // Extract patch_id (bytes after the blob_id).
+        let bytes: [u8; QUILT_PATCH_SIZE] = bytes
+            [BlobId::LENGTH..BlobId::LENGTH + QUILT_PATCH_SIZE]
+            .try_into()
+            .unwrap();
+        let version = bytes[0];
+        if version != QUILT_PATCH_VERSION_1 {
+            bail!("Quilt patch version {version} is not implemented");
+        }
+        Ok(PatchIdV1(bytes))
+    }
+}
+
+impl WalrusOut {
+    pub fn blob_id(&self) -> &BlobId {
+        match self {
+            WalrusOut::StoreQuilt(QuiltStoreResult {
+                blob_store_result, ..
+            }) => blob_store_result.blob_id(),
+            WalrusOut::DryRunStoreQuilt(StoreQuiltDryRunOutput {
+                quilt_blob_output, ..
+            }) => &quilt_blob_output.blob_id,
+        }
+    }
+
+    pub fn patch_ids(&self) -> anyhow::Result<Vec<(&str, PatchIdV1)>> {
+        match self {
+            WalrusOut::StoreQuilt(QuiltStoreResult {
+                stored_quilt_blobs, ..
+            }) => stored_quilt_blobs
+                .iter()
+                .map(|q| {
+                    Ok((
+                        q.identifier.as_str(),
+                        PatchIdV1::from_str(q.quilt_patch_id.as_str())?,
+                    ))
+                })
+                .collect(),
+            WalrusOut::DryRunStoreQuilt(StoreQuiltDryRunOutput {
+                quilt_index: QuiltIndex::V1(QuiltIndexV1 { quilt_patches }),
+                ..
+            }) => {
+                let first_patch = quilt_patches
+                    .first()
+                    .ok_or(anyhow!("Expected at least one quilt-patch."))?;
+                Ok(std::iter::once((
+                    first_patch.identifier.as_str(),
+                    (
+                        QUILT_PATCH_VERSION_1,
+                        QUILT_INDEX_END_INDEX,
+                        first_patch.end_index,
+                    )
+                        .into(),
+                ))
+                .chain(quilt_patches.iter().tuple_windows().map(|(prev, next)| {
+                    (
+                        next.identifier.as_str(),
+                        (QUILT_PATCH_VERSION_1, prev.end_index, next.end_index).into(),
+                    )
+                }))
+                .collect())
+            }
+        }
+    }
+}
 
 /// Either an event ID or an object ID.
 #[derive(Debug, Clone, Deserialize)]
