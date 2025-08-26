@@ -3,16 +3,17 @@
 
 import { base64UrlSafeEncode } from "./url_safe_base64";
 
-// This is also a constant at the Walrus core code.
-export const QUILT_VERSION_BYTE = 0x1;
-
 export class QuiltPatch {
 	constructor(
-		public quilt_blob_id: string,
-		public quilt_patch_internal_id: string
+		private quilt_blob_id: string,
+		private quilt_patch_internal_id: string
 	) { }
 
-	/// Derive the base64 equivalent of the internal quilt patch id.
+	/**
+	* Derives the base64 URL-safe equivalent of the internal quilt patch ID.
+	* This ID is created by combining the quilt blob ID with the internal patch identifier,
+	* which includes the version, start index, and end index bytes.
+	*/
 	public derive_id(): string {
 		// 1 version byte + 2 start index bytes + 2 index bytes
 		const little_endian = true
@@ -49,6 +50,11 @@ export class QuiltPatch {
 		return base64String.slice(0, 50)
 	}
 
+	/**
+	* Converts a hexadecimal string to an ArrayBuffer.
+	* @param hex - The hexadecimal string to convert.
+	* @returns An ArrayBuffer representing the bytes of the input hex string.
+	*/
 	public static hexToBuffer(hex: string): ArrayBuffer {
 		const bytes = new Uint8Array(hex.length / 2);
 		for (let i = 0; i < hex.length; i += 2) {
