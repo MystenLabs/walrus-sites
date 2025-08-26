@@ -1,18 +1,36 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{
+    collections::{BTreeMap, BTreeSet, HashMap},
+    path::PathBuf,
+    str::FromStr,
+};
 
 use anyhow::anyhow;
+use sui_sdk::{
+    rpc_types::{SuiTransactionBlockEffectsAPI, SuiTransactionBlockResponse},
+    wallet_context::WalletContext,
+};
+use sui_types::{base_types::ObjectID, transaction::CallArg, Identifier};
 
 use crate::{
     args::{default, EpochArg, PublishOptions, WalrusStoreOptions},
+    backoff::ExponentialBackoffConfig,
     config::{Config, Walrus},
     display,
     publish::load_ws_resources,
-    site::{builder::SitePtb, config::WSResources, resource::Resource},
+    retry_client::RetriableSuiClient,
+    site::{
+        builder::SitePtb,
+        config::WSResources,
+        resource::{Resource, ResourceOp},
+        SiteDataDiff,
+        SITE_MODULE,
+    },
     site_new::resource::{local_resource::LocalResource, manager::ResourceManager},
-    types::SuiResource,
+    types::{Metadata, MetadataOp, RouteOps, Routes, SiteNameOp, SuiResource},
+    util::sign_and_send_ptb,
     walrus::{
         command::{QuiltBlobInput, StoreQuiltInput},
         StoreQuiltArguments,
@@ -69,8 +87,8 @@ impl SitePublisherBuilder {
             load_ws_resources(ws_resources.as_deref(), directory.as_path())?;
         let WSResources {
             headers,
-            routes: _,   // TODO(nikos) will proly need this later
-            metadata: _, // TODO(nikos) will proly need this later
+            routes,
+            metadata,
             site_name: ws_site_name,
             object_id: _, // TODO(nikos) will proly need this later
             ignore,
@@ -102,6 +120,11 @@ impl SitePublisherBuilder {
             permanent,
             dry_run,
             walrus,
+            routes,
+            metadata,
+            wallet: config.load_wallet()?,
+            gas_budget: config.gas_budget(),
+            package: config.package,
         })
     }
 }
@@ -111,7 +134,7 @@ impl SitePublisherBuilder {
 pub struct SitePublisher {
     pub context: Option<String>,
     pub site_name: String,
-    // TODO(nikos): We probably need to keep the path of the ws-resources in order to not upload.
+    // TODO(nikos): We need to keep the path of the ws-resources in order to not upload.
     pub resource_manager: ResourceManager,
     // TODO(nikos): Does it make sense to include directory inside the new `ResourceManager` above?
     pub directory: PathBuf,
@@ -119,19 +142,29 @@ pub struct SitePublisher {
     pub permanent: bool,
     pub dry_run: bool,
     pub walrus: Walrus,
+    pub routes: Option<Routes>,
+    pub metadata: Option<Metadata>,
+    pub wallet: WalletContext,
+    pub gas_budget: u64,
+    pub package: ObjectID,
 }
 
 impl SitePublisher {
-    pub async fn run(self) -> anyhow::Result<(Vec<WalrusOp>, SitePtb)> {
+    pub async fn run(self) -> anyhow::Result<Vec<SuiTransactionBlockResponse>> {
         let Self {
-            context: _,   // TODO(nikos) will proly need this later
-            site_name: _, // TODO(nikos) will proly need this later
+            context: _, // TODO(nikos) will proly need this later
+            site_name,  // TODO(nikos) will proly need this later
             mut resource_manager,
             directory,
             epoch_arg,
             permanent,
             dry_run,
             mut walrus,
+            routes,
+            metadata,
+            mut wallet,
+            gas_budget,
+            package,
         } = self;
 
         display::action(format!(
@@ -148,34 +181,45 @@ impl SitePublisher {
             .chunks(Walrus::MAX_FILES_PER_QUILT)
             .map(|r| r.to_vec())
             .collect();
-        let walrus_ops = local_resources_chunks
-            .into_iter()
-            .map(|resources| {
-                let args = StoreQuiltArguments {
-                    store_quilt_input: StoreQuiltInput::Blobs(
-                        resources
-                            .iter()
-                            .map(|resource| {
-                                QuiltBlobInput {
-                                    path: resource.full_path.clone(),
-                                    // TODO(nikos): error on not-supported characters
-                                    identifier: Some(resource.info.path.clone()),
-                                    tags: BTreeMap::new(),
-                                }
-                            })
-                            .collect(),
-                    ),
-                    epoch_arg: epoch_arg.clone(),
-                    deletable: !permanent,
-                };
-                let op = if dry_run {
+        println!("local_resources_chunks: {:#?}", local_resources_chunks);
+
+        let mut walrus_ops = vec![];
+        let mut path_to_identifier = HashMap::new();
+        for resources_chunk in local_resources_chunks {
+            let mut blobs = vec![];
+            for resource in &resources_chunk {
+                // TODO(nikos): handle not-supported characters
+                let resource_path = resource.info.path.clone();
+                let mut identifier = if resource_path.chars().next() == Some('/') {
+                    &resource_path[1..]
+                } else {
+                    resource_path.as_str()
+                }
+                .to_string();
+                identifier = identifier.replace("/", "__");
+                path_to_identifier.insert(resource_path.clone(), identifier.clone());
+                blobs.push(QuiltBlobInput {
+                    path: resource.full_path.clone(),
+                    identifier: Some(identifier),
+                    // TODO(nikos) determine path
+                    tags: BTreeMap::from([("path".to_string(), resource_path)]),
+                });
+            }
+            let args = StoreQuiltArguments {
+                store_quilt_input: StoreQuiltInput::Blobs(blobs),
+                epoch_arg: epoch_arg.clone(),
+                deletable: !permanent,
+            };
+            walrus_ops.push((
+                resources_chunk,
+                if dry_run {
                     WalrusOp::DryRunStoreQuilt(args)
                 } else {
                     WalrusOp::StoreQuilt(args)
-                };
-                (resources, op)
-            })
-            .collect::<Vec<_>>();
+                },
+            ));
+        }
+        println!("walrus_ops {:#?}", walrus_ops);
 
         let walrus_resps = {
             let mut walrus_resps = vec![];
@@ -184,10 +228,11 @@ impl SitePublisher {
             }
             walrus_resps
         };
+        println!("walrus_resps: {:#?}", walrus_resps);
 
-        let flattened: Vec<Resource> = walrus_resps
+        let resources: Vec<Resource> = walrus_resps
             .into_iter()
-            .flat_map(|(chunk, resp)| {
+            .map(|(chunk, resp)| {
                 let mut patches = resp.patch_ids()?;
                 let blob_id = *resp.blob_id();
                 let resources = chunk
@@ -199,10 +244,13 @@ impl SitePublisher {
                              unencoded_size,
                          }| {
                             let path = info.path.as_str();
+                            let identifier = path_to_identifier
+                                .get(path)
+                                .ok_or(anyhow!("Expected {path} in the map"))?;
                             let patch_idx = patches
                                 .iter()
-                                .position(|p| path == p.0)
-                                .ok_or(anyhow!("Did not find {path} in walrus response"))?;
+                                .position(|p| identifier == p.0)
+                                .ok_or(anyhow!("Did not find {identifier} in walrus response"))?;
                             let patch = patches.swap_remove(patch_idx);
                             let sui_resource = SuiResource::from((info, blob_id, patch.1));
                             Ok(Resource {
@@ -215,168 +263,156 @@ impl SitePublisher {
                     .collect::<anyhow::Result<Vec<Resource>>>()?;
                 Ok::<Vec<Resource>, anyhow::Error>(resources)
             })
+            .collect::<anyhow::Result<Vec<Vec<Resource>>>>()?
+            .into_iter()
             .flatten()
             .collect();
+        println!("resources: {:#?}", resources);
 
-        // let site_updates = local_site_data.diff(&existing_site);
-        //
-        // let walrus_candidate_set = if self.blob_options.is_check_extend() {
-        //     // We need to check the status of all blobs: Return the full list of existing and added
-        //     // blobs as possible updates.
-        //     existing_site.replace_all(local_site_data)
-        // } else {
-        //     // We only need to upload the new blobs.
-        //     site_updates.clone()
-        // };
-        // // IMPORTANT: Perform the store operations on Walrus first, to ensure zero "downtime".
-        // self.select_and_store_to_walrus(&walrus_candidate_set)
-        //     .await?;
-        //
-        // // Check if there are any updates to the site on-chain.
-        // let result = if site_updates.has_updates() {
-        //     display::action("Applying the Walrus Site object updates on Sui");
-        //     let result = self.execute_sui_updates(&site_updates).await?;
-        //     display::done();
-        //     result
-        // } else {
-        //     SuiTransactionBlockResponse::default()
-        // };
+        let route_ops = match routes {
+            Some(r) => RouteOps::Replace(r),
+            None => RouteOps::Unchanged,
+        };
+        let metadata_op = match metadata {
+            Some(_) => MetadataOp::Update,
+            None => MetadataOp::Noop,
+        };
 
-        todo!();
+        let resource_ops = resources.iter().map(|r| ResourceOp::Created(r)).collect();
+
+        let updates = SiteDataDiff {
+            route_ops,
+            metadata_op,
+            resource_ops,
+            site_name_op: SiteNameOp::Update,
+        };
+
+        SitePublisher::execute_sui_updates(
+            &mut wallet,
+            package,
+            site_name.as_str(),
+            metadata,
+            gas_budget,
+            &updates,
+        )
+        .await
     }
-}
 
-// Gets the configuration from the provided file, or looks in the default directory.
-/*
-    async fn run_single_edit(
-        &self,
-    ) -> Result<(SuiAddress, SuiTransactionBlockResponse, SiteDataDiffSummary)> {
-        if self.edit_options.publish_options.list_directory {
-            display::action(format!("Preprocessing: {}", self.directory().display()));
-            Preprocessor::preprocess(self.directory())?;
-            display::done();
-        }
-
-        // Note: `load_ws_resources` again. We already loaded them when parsing the name.
-        let (ws_resources, ws_resources_path) = load_ws_resources(
-            self.edit_options
-                .publish_options
-                .walrus_options
-                .ws_resources
-                .as_deref(),
-            self.directory(),
+    async fn execute_sui_updates(
+        wallet: &mut WalletContext,
+        package: ObjectID,
+        site_name: &str,
+        metadata: Option<Metadata>,
+        gas_budget: u64,
+        updates: &SiteDataDiff<'_>,
+    ) -> anyhow::Result<Vec<SuiTransactionBlockResponse>> {
+        let active_address = wallet.active_address()?;
+        tracing::debug!(
+            address=?active_address,
+            ?updates,
+            "starting to update site resources on chain",
+        );
+        let ptb = SitePtb::new(
+            package,
+            Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
         )?;
-        if let Some(path) = ws_resources_path.as_ref() {
-            println!(
-                "Using the Walrus sites resources file: {}",
-                path.to_string_lossy()
+
+        let mut ptb = ptb.with_create_site(site_name, metadata)?;
+        ptb.update_name(site_name)?;
+
+        // Publish the first MAX_RESOURCES_PER_PTB resources, or all resources if there are fewer
+        // than that.
+        const MAX_RESOURCES_PER_PTB: usize = 200;
+        let mut end = MAX_RESOURCES_PER_PTB.min(updates.resource_ops.len());
+        tracing::debug!(
+            total_ops = updates.resource_ops.len(),
+            end,
+            "preparing and committing the first PTB"
+        );
+
+        println!("resource_ops: {:#?}", &updates.resource_ops[..end]);
+        ptb.add_resource_operations(&updates.resource_ops[..end])?;
+        ptb.add_route_operations(&updates.route_ops)?;
+
+        ptb.transfer_site(active_address);
+
+        let backoff_config = ExponentialBackoffConfig::default();
+        let sui_client = RetriableSuiClient::new_from_wallet(wallet, backoff_config).await?;
+        let gas_coin = wallet
+            .gas_for_owner_budget(active_address, gas_budget, BTreeSet::new())
+            .await?
+            .1
+            .object_ref();
+        let resp = sign_and_send_ptb(
+            active_address,
+            wallet,
+            &sui_client,
+            ptb.finish(),
+            gas_coin,
+            gas_budget,
+        )
+        .await?;
+        let effects = resp
+            .effects
+            .as_ref()
+            .ok_or(anyhow!("the result did not have effects"))?;
+
+        tracing::debug!(
+            ?effects,
+            "getting the object ID of the created Walrus site."
+        );
+
+        println!("effects: {}", serde_json::to_string_pretty(effects)?);
+
+        let site_object_id = effects
+            .created()
+            .iter()
+            .find(|c| {
+                c.owner
+                    .get_owner_address()
+                    .map(|owner_address| owner_address == active_address)
+                    .unwrap_or(false)
+            })
+            .expect("could not find the object ID for the created Walrus site.")
+            .reference
+            .object_id;
+
+        let mut result = vec![resp];
+
+        // Keep iterating to load resources.
+        while end < updates.resource_ops.len() {
+            let start = end;
+            end = (end + MAX_RESOURCES_PER_PTB).min(updates.resource_ops.len());
+            tracing::debug!(%start, %end, "preparing and committing the next PTB");
+
+            let ptb = SitePtb::new(
+                package,
+                Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
+            )?;
+            let call_arg: CallArg = wallet.get_object_ref(site_object_id).await?.into();
+            let mut ptb = ptb.with_call_arg(&call_arg)?;
+            ptb.add_resource_operations(&updates.resource_ops[start..end])?;
+
+            // TODO: Optimize this
+            let gas_coin = wallet
+                .gas_for_owner_budget(active_address, gas_budget, BTreeSet::new())
+                .await?
+                .1
+                .object_ref();
+
+            result.push(
+                sign_and_send_ptb(
+                    active_address,
+                    wallet,
+                    &sui_client,
+                    ptb.finish(),
+                    gas_coin,
+                    gas_budget,
+                )
+                .await?,
             );
         }
 
-        let mut resource_manager = ResourceManager::new(
-            self.config.walrus_client(),
-            ws_resources.clone(),
-            ws_resources_path.clone(),
-            self.edit_options.publish_options.max_concurrent,
-        )
-        .await?;
-        display::action(format!(
-            "Parsing the directory {} and locally computing blob IDs",
-            self.directory().to_string_lossy()
-        ));
-        let local_site_data = resource_manager.read_dir(self.directory()).await?;
-        display::done();
-        tracing::debug!(?local_site_data, "resources loaded from directory");
-
-        let site_metadata = match ws_resources.clone() {
-            Some(value) => value.metadata,
-            None => None,
-        };
-
-        let site_name = ws_resources.as_ref().and_then(|r| r.site_name.clone());
-
-        let mut site_manager = SiteManager::new(
-            self.config.clone(),
-            self.edit_options.site_id,
-            self.edit_options.blob_options.clone(),
-            self.edit_options.publish_options.walrus_options.clone(),
-            site_metadata,
-            self.edit_options.site_name.clone().or(site_name),
-            self.edit_options.publish_options.max_parallel_stores,
-        )
-        .await?;
-
-        let (response, summary) = site_manager.update_site(&local_site_data).await?;
-
-        let path_for_saving =
-            ws_resources_path.unwrap_or_else(|| self.directory().join(DEFAULT_WS_RESOURCES_FILE));
-
-        persist_site_identifier(
-            &self.edit_options.site_id,
-            &site_manager,
-            &response,
-            ws_resources,
-            &path_for_saving,
-        )?;
-
-        Ok((site_manager.active_address()?, response, summary))
+        Ok(result)
     }
-
-
-
-    /// Updates the site with the given [`Resource`].
-    ///
-    /// If the site does not exist, it is created and updated. The resources that need to be updated
-    /// or created are published to Walrus.
-    pub async fn update_site(
-        &mut self,
-        local_site_data: &SiteData,
-    ) -> Result<(SuiTransactionBlockResponse, SiteDataDiffSummary)> {
-        tracing::debug!(?self.site_id, "creating or updating site");
-        let retriable_client = self.sui_client().await?;
-        let existing_site = match &self.site_id {
-            Some(site_id) => {
-                RemoteSiteFactory::new(&retriable_client, self.config.package)
-                    .await?
-                    .get_from_chain(*site_id)
-                    .await?
-            }
-            None => SiteData::empty(),
-        };
-        tracing::debug!(?existing_site, "checked existing site");
-
-        let site_updates = local_site_data.diff(&existing_site);
-
-        let walrus_candidate_set = if self.blob_options.is_check_extend() {
-            // We need to check the status of all blobs: Return the full list of existing and added
-            // blobs as possible updates.
-            existing_site.replace_all(local_site_data)
-        } else {
-            // We only need to upload the new blobs.
-            site_updates.clone()
-        };
-        // IMPORTANT: Perform the store operations on Walrus first, to ensure zero "downtime".
-        self.select_and_store_to_walrus(&walrus_candidate_set)
-            .await?;
-
-        // Check if there are any updates to the site on-chain.
-        let result = if site_updates.has_updates() {
-            display::action("Applying the Walrus Site object updates on Sui");
-            let result = self.execute_sui_updates(&site_updates).await?;
-            display::done();
-            result
-        } else {
-            SuiTransactionBlockResponse::default()
-        };
-
-        // Extract the BlobIDs from deleted resources for Walrus cleanup
-        let blobs_to_delete: Vec<BlobId> = collect_deletable_blob_candidates(&site_updates);
-
-        if !blobs_to_delete.is_empty() {
-            self.delete_from_walrus(&blobs_to_delete).await?;
-        }
-
-        Ok((result, site_updates.summary(&self.blob_options)))
-    }
-
-*/
+}

@@ -114,6 +114,21 @@ async fn run_internal(
             publish_options,
             site_name,
         } => {
+            SiteEditor::new(context, config)
+                .with_edit_options(
+                    publish_options,
+                    None,
+                    site_name,
+                    ContinuousEditing::Once,
+                    BlobManagementOptions::no_status_check(),
+                )
+                .run()
+                .await?
+        }
+        Commands::PublishNew {
+            publish_options,
+            site_name,
+        } => {
             let builder = SitePublisherBuilder {
                 context,
                 site_name,
@@ -121,8 +136,8 @@ async fn run_internal(
                 config,
             };
             let publisher = builder.build().await?;
-            let _updates = publisher.run().await?;
-            todo!()
+            let responses = publisher.run().await?;
+            println!("responses: {}", serde_json::to_string_pretty(&responses)?);
         }
         #[allow(deprecated)]
         Commands::Update {

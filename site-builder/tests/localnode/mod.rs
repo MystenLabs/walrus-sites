@@ -24,7 +24,7 @@ use sui_types::{
 };
 use tempfile::TempDir;
 use tokio::sync::Mutex as TokioMutex;
-use walrus_sdk::client::Client as WalrusSDKClient;
+use walrus_sdk::client::WalrusNodeClient;
 use walrus_service::test_utils::{test_cluster, StorageNodeHandle, TestCluster};
 use walrus_sui::{
     client::{contract_config::ContractConfig, SuiContractClient},
@@ -36,7 +36,7 @@ use walrus_test_utils::WithTempDir;
 pub mod args_builder;
 
 pub struct WalrusSitesClusterState {
-    pub walrus_admin_client: WithTempDir<WalrusSDKClient<SuiContractClient>>,
+    pub walrus_admin_client: WithTempDir<WalrusNodeClient<SuiContractClient>>,
     pub sui_cluster_handle: Arc<TokioMutex<TestClusterHandle>>,
     pub system_context: SystemContext,
     pub walrus_cluster: TestCluster<StorageNodeHandle>,

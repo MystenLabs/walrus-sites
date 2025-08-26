@@ -19,10 +19,7 @@ use sui_types::{
 use crate::{
     site::contracts::{self, AssociatedContractStruct, StructTag},
     util::deserialize_bag_or_table,
-    walrus::{
-        output::PatchIdV1,
-        types::BlobId,
-    },
+    walrus::{output::PatchIdV1, types::BlobId},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

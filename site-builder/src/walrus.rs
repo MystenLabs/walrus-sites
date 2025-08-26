@@ -48,7 +48,20 @@ pub struct Walrus {
 
 macro_rules! create_command {
     ($self:ident, $name:ident, $($arg:expr),*) => {{
-        let json_input = $self.builder().$name($($arg),*).build().to_json()?;
+        let mut json_input = $self.builder().$name($($arg),*).build().to_json()?;
+        println!("json_input: {json_input}");
+
+        // TMP HACK
+        if json_input.contains("storeQuilt") {
+            let Some(pos) = json_input.find("]") else {
+                panic!("No blobs in storeQuilt");
+            };
+            const PATHS: &str = r#","paths":[]"#;
+            json_input.insert_str(pos + 1, PATHS);
+        }
+        println!("json_input: {json_input}");
+        // TMP HACK end
+
         let output = $self
             .base_command()
             .arg(&json_input)
@@ -255,6 +268,7 @@ impl Walrus {
     }
 }
 
+#[derive(Debug)]
 pub struct StoreQuiltArguments {
     pub store_quilt_input: StoreQuiltInput,
     pub epoch_arg: EpochArg,
@@ -272,8 +286,8 @@ pub struct StoreQuiltArguments {
 // ```
 // then we can return Vec<Box<dyn WalrusRunnable>> for the update strategies for the part of the
 // walrus commands.
+#[derive(Debug)]
 pub enum WalrusOp {
     StoreQuilt(StoreQuiltArguments),
     DryRunStoreQuilt(StoreQuiltArguments),
 }
-

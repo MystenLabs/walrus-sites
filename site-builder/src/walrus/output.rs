@@ -104,6 +104,8 @@ impl WalrusOut {
                 let first_patch = quilt_patches
                     .first()
                     .ok_or(anyhow!("Expected at least one quilt-patch."))?;
+                // TODO: If first_patch.end_index is greater than 2, we need to do a walrus call to
+                // find out what QuiltIndex.end_index is.
                 Ok(std::iter::once((
                     first_patch.identifier.as_str(),
                     (
