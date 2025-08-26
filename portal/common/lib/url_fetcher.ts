@@ -18,13 +18,14 @@ import {
     resourceNotFound,
     custom404NotFound,
 } from "./http/http_error_responses";
-import { aggregatorEndpoint } from "./aggregator";
+import { blobAggregatorEndpoint, quiltAggregatorEndpoint } from "./aggregator";
 import { toBase64 } from "@mysten/bcs";
 import { sha256 } from "./crypto";
 import { WalrusSitesRouter } from "./routing";
 import { HttpStatusCodes } from "./http/http_status_codes";
 import logger from "./logger";
 import BlocklistChecker from "./blocklist_checker";
+import { QuiltPatch } from "./quilt";
 
 /**
 * Includes all the logic for fetching the URL contents of a walrus site.
@@ -176,12 +177,22 @@ export class UrlFetcher {
 
         logger.info("Successfully fetched resource!", { fetchedResourceResult: JSON.stringify(result) });
 
+        const quilt_patch_internal_id = result.headers.get("x-wal-quilt-patch-internal-id")
+		let aggregator_endpoint: URL;
+        if (quilt_patch_internal_id) {
+        	const quilt_patch = new QuiltPatch(result.blob_id, quilt_patch_internal_id)
+         	const quilt_patch_id = quilt_patch.derive_id()
+         	logger.info("Resource is stored as a quilt patch.", { quilt_patch_id })
+        	aggregator_endpoint = quiltAggregatorEndpoint(quilt_patch_id, this.aggregatorUrl)
+        } else {
+			logger.info("Resource is stored as a blob.", { blob_id:  result.blob_id })
+        	aggregator_endpoint = blobAggregatorEndpoint(result.blob_id, this.aggregatorUrl)
+        }
+
         // We have a resource, get the range header.
         let range_header = optionalRangeToRequestHeaders(result.range);
         logger.info("Fetching blob from aggregator", {aggregatorUrl: this.aggregatorUrl, blob_id: result.blob_id})
-        const contents = await this.fetchWithRetry(
-            aggregatorEndpoint(result.blob_id, this.aggregatorUrl), { headers: range_header }
-        );
+        const contents = await this.fetchWithRetry(aggregator_endpoint, { headers: range_header });
         if (!contents.ok) {
             logger.error(
                 "Failed to fetch resource! Response from aggregator endpoint not ok.",
