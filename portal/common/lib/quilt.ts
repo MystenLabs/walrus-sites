@@ -15,6 +15,11 @@ export class QuiltPatch {
 	* which includes the version, start index, and end index bytes.
 	*/
 	public derive_id(): string {
+		// If quilt_blob_id starts with '0x', remove it.
+		const quilt_patch_internal_id = this.quilt_patch_internal_id.startsWith('0x')
+			? this.quilt_patch_internal_id.slice(2)
+			: this.quilt_patch_internal_id;
+
 		// 1 version byte + 2 start index bytes + 2 index bytes
 		const little_endian = true
 
@@ -27,7 +32,7 @@ export class QuiltPatch {
 		// Use a data view which makes it easier to work with endians.
 		const view = new DataView(buffer.buffer, buffer.byteOffset);
 
-		const quilt_patch_internal_id_buf = QuiltPatch.hexToBuffer(this.quilt_patch_internal_id)
+		const quilt_patch_internal_id_buf = QuiltPatch.hexToBuffer(quilt_patch_internal_id)
 		const internal_identifier_dv = new DataView(quilt_patch_internal_id_buf)
 		const version = internal_identifier_dv.getInt8(0)
 		const start_index = internal_identifier_dv.getInt16(1, little_endian)
