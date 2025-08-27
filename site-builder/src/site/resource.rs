@@ -4,7 +4,7 @@
 //! Functionality to read and check the files in of a website.
 
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     fmt::{self, Display},
     fs,
     io::Write,
@@ -15,16 +15,21 @@ use std::{
 use anyhow::{anyhow, Context, Result};
 use fastcrypto::hash::{HashFunction, Sha256};
 use flate2::{write::GzEncoder, Compression};
-use futures::stream::{self, StreamExt};
 use move_core_types::u256::U256;
 use regex::Regex;
 
 use super::SiteData;
 use crate::{
+    args::EpochArg,
     publish::BlobManagementOptions,
     site::{config::WSResources, content::ContentType},
     types::{HttpHeaders, SuiResource, VecMap},
-    walrus::{types::BlobId, Walrus},
+    util::str_to_base36,
+    walrus::{
+        command::{QuiltBlobInput, StoreQuiltInput},
+        types::BlobId,
+        Walrus,
+    },
 };
 
 /// The resource that is to be created or updated on Sui.
@@ -271,6 +276,15 @@ pub(crate) struct ResourceManager {
     pub max_concurrent: Option<NonZeroUsize>,
 }
 
+// Struct used only for readability of the output in the below iteration
+struct ResourceData {
+    unencoded_size: usize,
+    full_path: PathBuf,
+    resource_path: String,
+    headers: HttpHeaders,
+    blob_hash: U256,
+}
+
 impl ResourceManager {
     pub async fn new(
         walrus: Walrus,
@@ -382,6 +396,133 @@ impl ResourceManager {
         )))
     }
 
+    /// Read a resource at a path.
+    ///
+    /// Ignores empty files.
+    pub async fn read_resource_chunk(
+        &mut self,
+        full_path: &Path,
+        resource_paths: Vec<String>,
+    ) -> Result<Vec<Resource>> {
+        let (resource_data, blob_inputs): (Vec<ResourceData>, Vec<QuiltBlobInput>) = resource_paths
+            .into_iter()
+            .map(|resource_path| {
+                let full_path = full_path.join(resource_path.as_str());
+                if let Some(ws_path) = &self.ws_resources_path {
+                    if &full_path == ws_path {
+                        tracing::debug!(?full_path, "ignoring the ws-resources config file");
+                        return Ok(None);
+                    }
+                }
+                // Skip if resource matches ignore patterns/
+                if self.is_ignored(&resource_path) {
+                    tracing::debug!(?resource_path, "ignoring resource due to ignore pattern");
+                    return Ok(None);
+                }
+
+                let mut http_headers: VecMap<String, String> =
+                    ResourceManager::derive_http_headers(&self.ws_resources, &resource_path);
+                let extension = full_path
+                    .extension()
+                    .unwrap_or(
+                        full_path
+                            .file_name()
+                            .expect("the path should not terminate in `..`"),
+                    )
+                    .to_str();
+
+                // Is Content-Encoding specified? Else, add default to headers.
+                http_headers
+                    .entry("content-encoding".to_string())
+                    .or_insert(
+                        // Currently we only support this (plaintext) content encoding
+                        // so no need to parse it as we do with content-type.
+                        "identity".to_string(),
+                    );
+
+                // Read the content type.
+                let content_type = ContentType::try_from_extension(extension.ok_or_else(|| {
+                    anyhow!("Could not read file extension for {}", full_path.display())
+                })?)
+                .unwrap_or(ContentType::ApplicationOctetstream); // Default ContentType.
+
+                // If content-type not specified in ws-resources.yaml, parse it from the extension.
+                http_headers
+                    .entry("content-type".to_string())
+                    .or_insert(content_type.to_string());
+
+                let plain_content: Vec<u8> = std::fs::read(full_path.as_path())?;
+                // Hash the contents of the file - this will be contained in the site::Resource
+                // to verify the integrity of the blob when fetched from an aggregator.
+                let mut hash_function = Sha256::default();
+                hash_function.update(&plain_content);
+                let blob_hash: [u8; 32] = hash_function.finalize().digest;
+
+                // TODO(nikos): replace base to regular path
+                let quilt_blob_input = QuiltBlobInput {
+                    path: full_path.clone(),
+                    identifier: Some(str_to_base36(resource_path.as_str())?),
+                    // TODO(nikos) determine path
+                    tags: BTreeMap::new(),
+                };
+
+                Ok(Some((
+                    ResourceData {
+                        unencoded_size: plain_content.len(),
+                        full_path,
+                        resource_path,
+                        headers: HttpHeaders(http_headers),
+                        blob_hash: U256::from_le_bytes(&blob_hash),
+                    },
+                    quilt_blob_input,
+                )))
+            })
+            .collect::<Result<Vec<Option<(ResourceData, QuiltBlobInput)>>>>()?
+            .into_iter()
+            .flatten()
+            .unzip();
+
+        // Hack, unecessary extra call to dry-run to get the blob-id
+        let mut dummy_epoch_arg = EpochArg::default();
+        dummy_epoch_arg.epochs = Some(crate::args::EpochCountOrMax::default());
+        let blob_id = self
+            .walrus
+            .dry_run_store_quilt(
+                StoreQuiltInput::Blobs(blob_inputs),
+                dummy_epoch_arg,
+                false,
+                true,
+            )
+            .await
+            .context(format!(
+                "error while computing the blob id for path: {}",
+                full_path.to_string_lossy()
+            ))?
+            .quilt_blob_output
+            .blob_id;
+        Ok(resource_data
+            .into_iter()
+            .map(
+                |ResourceData {
+                     unencoded_size,
+                     full_path,
+                     resource_path,
+                     headers,
+                     blob_hash,
+                 }| {
+                    Resource::new(
+                        resource_path,
+                        full_path,
+                        headers,
+                        blob_id,
+                        blob_hash,
+                        unencoded_size,
+                    )
+                },
+            )
+            .collect())
+    }
+
     ///  Derives the HTTP headers for a resource based on the ws-resources.yaml.
     ///
     ///  Matches the path of the resource to the wildcard paths in the configuration to
@@ -434,29 +575,26 @@ impl ResourceManager {
             return Ok(SiteData::empty());
         }
 
-        let futures = resource_paths
-            .iter()
-            .map(|(full_path, _)| {
-                full_path_to_resource_path(full_path, root)
-                    .map(|resource_path| self.read_resource(full_path, resource_path))
-            })
-            .collect::<Result<Vec<_>>>()?;
+        // TODO(nikos) we need to split per MAX_FILES but also per max_size in single Blob
+        let mut resources_set = ResourceSet::empty();
+        for paths_in_quilt in resource_paths.chunks(Walrus::MAX_FILES_PER_QUILT) {
+            let rel_paths = paths_in_quilt
+                .into_iter()
+                .map(|full_path| full_path_to_resource_path(full_path, root))
+                .collect::<Result<Vec<String>>>()?;
+            let resources = self.read_resource_chunk(root, rel_paths).await?;
 
-        // Limit the amount of futures awaited concurrently.
-        let concurrency_limit = self
-            .max_concurrent
-            .map(NonZeroUsize::get)
-            .unwrap_or_else(|| resource_paths.len());
-
-        let mut stream = stream::iter(futures).buffer_unordered(concurrency_limit);
-
-        let mut resources = ResourceSet::empty();
-        while let Some(resource) = stream.next().await {
-            resources.extend(resource?);
+            resources_set.extend(resources);
         }
 
+        // Limit the amount of futures awaited concurrently.
+        // let concurrency_limit = self
+        //     .max_concurrent
+        //     .map(NonZeroUsize::get)
+        //     .unwrap_or_else(|| futures.len());
+
         Ok(SiteData::new(
-            resources,
+            resources_set,
             self.ws_resources
                 .as_ref()
                 .and_then(|config| config.routes.clone()),
@@ -469,7 +607,7 @@ impl ResourceManager {
         ))
     }
 
-    fn iter_dir(start: &Path, root: &Path) -> Result<Vec<(PathBuf, PathBuf)>> {
+    fn iter_dir(start: &Path, root: &Path) -> Result<Vec<PathBuf>> {
         let mut resources = vec![];
         let entries = fs::read_dir(start)?;
         for entry in entries.flatten() {
@@ -477,7 +615,7 @@ impl ResourceManager {
             if path.is_dir() {
                 resources.extend(Self::iter_dir(&path, root)?);
             } else {
-                resources.push((path.to_owned(), root.to_owned()));
+                resources.push(path.to_owned());
             }
         }
         Ok(resources)
@@ -495,15 +633,14 @@ fn compress(content: &[u8]) -> Result<Vec<u8>> {
     Ok(encoder.finish()?)
 }
 
-/// Converts the full path of the resource to the on-chain resource path.
+/// Converts the full path of the resource to the on-chain resource path. Does not include the
+/// beginning slash (/)
 pub(crate) fn full_path_to_resource_path(full_path: &Path, root: &Path) -> Result<String> {
     let rel_path = full_path.strip_prefix(root)?;
-    Ok(format!(
-        "/{}",
-        rel_path
-            .to_str()
-            .ok_or(anyhow!("could not process the path string: {:?}", rel_path))?
-    ))
+    Ok(rel_path
+        .to_str()
+        .ok_or(anyhow!("could not process the path string: {:?}", rel_path))?
+        .to_string())
 }
 
 #[cfg(test)]
