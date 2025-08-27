@@ -18,10 +18,12 @@ describe('derive quilt patch id from internal identifier', () => {
 		];
 
 		for (const { patch_id, base_id } of cases) {
-			const range = extract_internal_identifier(patch_id);
+			// internal identifier is extracted from the custom header x-wal-quilt-patch-internal-id
+			const internal_identifier = extract_internal_identifier(patch_id);
+			console.log(internal_identifier)
 			const patch = new QuiltPatch(
 				base_id,
-				range
+				internal_identifier
 			);
 
 			expect(
@@ -78,8 +80,8 @@ function extract_internal_identifier(patch_id: string): string {
 	const internal_id_buf = Buffer.alloc(5)
 	const dv_internal_id = new DataView(internal_id_buf.buffer, internal_id_buf.byteOffset)
 	dv_internal_id.setUint8(0, dv.getUint16(32, true));
-	dv_internal_id.setUint16(1, dv.getUint16(33, true));
-	dv_internal_id.setUint16(3, dv.getUint16(35, true));
+	dv_internal_id.setUint16(1, dv.getUint16(33, true), true);
+	dv_internal_id.setUint16(3, dv.getUint16(35, true), true);
 	const hex = bufferToHex(dv_internal_id.buffer)
 	return hex
 }
