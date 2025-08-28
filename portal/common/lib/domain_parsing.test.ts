@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from 'vitest'
-import { getDomain, getSubdomainAndPath } from './domain_parsing'
+import { _parseDomain, getDomain, getSubdomainAndPath  } from './domain_parsing'
 import { DomainDetails } from './types'
 
 const PORTAL_DOMAIN_NAME_LENGTH = 21
@@ -24,7 +24,7 @@ const getDomainTestCases: [string, string][] = [
 describe('getDomain', () => {
     getDomainTestCases.forEach(([input, expected]) => {
         test(`${input} -> ${expected}`, () => {
-            const domain = getDomain(new URL(input))
+            const domain = getDomain(new URL(input) as URL)
                 expect(domain).toEqual(expected)
         })
     })
@@ -38,7 +38,7 @@ const getDomainWithPortalNameLengthTestCases: [string, string][] = [
 describe('getDomain with portal name length', () => {
     getDomainWithPortalNameLengthTestCases.forEach(([input, expected]) => {
         test(`${input} -> ${expected}`, () => {
-            const domain = getDomain(new URL(input), PORTAL_DOMAIN_NAME_LENGTH)
+            const domain = getDomain(new URL(input) as URL, PORTAL_DOMAIN_NAME_LENGTH)
                 expect(domain).toEqual(expected)
         })
     })
@@ -71,7 +71,7 @@ describe('getSubdomainAndPath', () => {
                 subdomain: ${path.subdomain ?? "null"},
                 path: ${path.path ?? "null"}`,
                 () => {
-                    expect(getSubdomainAndPath(new URL(input))).toEqual(path);
+                    expect(getSubdomainAndPath(new URL(input) as URL)).toEqual(path);
                 });
         });
 })
@@ -91,7 +91,7 @@ describe('getSubdomainAndPath', () => {
                 path: ${path.path ?? "null"}`,
                 () => {
                     expect(getSubdomainAndPath(
-                        new URL(input), PORTAL_DOMAIN_NAME_LENGTH
+                        new URL(input) as URL, PORTAL_DOMAIN_NAME_LENGTH
                     )).toEqual(path);
                 });
         });
