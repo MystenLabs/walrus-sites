@@ -288,14 +288,6 @@ pub enum Commands {
         #[arg(short, long)]
         site_name: Option<String>,
     },
-    /// Publish a new site on Sui.
-    PublishNew {
-        #[clap(flatten)]
-        publish_options: PublishOptions,
-        /// The name of the site.
-        #[arg(short, long)]
-        site_name: Option<String>,
-    },
     /// Update an existing site.
     Update {
         #[clap(flatten)]

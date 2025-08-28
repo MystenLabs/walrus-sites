@@ -8620,6 +8620,7 @@ dependencies = [
  "toml 0.8.23",
  "tracing",
  "tracing-subscriber",
+ "walrus-core 1.31.1 (git+https://github.com/MystenLabs/walrus?rev=testnet-v1.31.1)",
  "walrus-sdk",
  "walrus-service",
  "walrus-sui",
@@ -12086,6 +12087,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "walrus-core"
+version = "1.31.1"
+source = "git+https://github.com/MystenLabs/walrus?rev=testnet-v1.31.1#5a7d1cb8b452e6bde770f095fd8d2e5692c16c4d"
+dependencies = [
+ "base64 0.22.1",
+ "bcs",
+ "enum_dispatch",
+ "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=16fa86d0dd943024a9088d46850a72ecd55b7f46)",
+ "hex",
+ "p256",
+ "rand 0.8.5",
+ "reed-solomon-simd",
+ "serde",
+ "serde_with",
+ "thiserror 2.0.12",
+ "tracing",
+]
+
+[[package]]
 name = "walrus-proc-macros"
 version = "1.31.1"
 source = "git+https://github.com/MystenLabs/walrus?tag=testnet-v1.31.1#5a7d1cb8b452e6bde770f095fd8d2e5692c16c4d"
@@ -12134,7 +12154,7 @@ dependencies = [
  "tracing",
  "url",
  "utoipa",
- "walrus-core",
+ "walrus-core 1.31.1 (git+https://github.com/MystenLabs/walrus?tag=testnet-v1.31.1)",
  "walrus-storage-node-client",
  "walrus-sui",
  "walrus-test-utils",
@@ -12226,7 +12246,7 @@ dependencies = [
  "utoipa",
  "utoipa-redoc",
  "uuid",
- "walrus-core",
+ "walrus-core 1.31.1 (git+https://github.com/MystenLabs/walrus?tag=testnet-v1.31.1)",
  "walrus-proc-macros",
  "walrus-sdk",
  "walrus-storage-node-client",
@@ -12266,7 +12286,7 @@ dependencies = [
  "tracing",
  "tracing-opentelemetry",
  "utoipa",
- "walrus-core",
+ "walrus-core 1.31.1 (git+https://github.com/MystenLabs/walrus?tag=testnet-v1.31.1)",
  "walrus-utils",
  "x509-cert",
 ]
@@ -12319,7 +12339,7 @@ dependencies = [
  "urlencoding",
  "utoipa",
  "walkdir",
- "walrus-core",
+ "walrus-core 1.31.1 (git+https://github.com/MystenLabs/walrus?tag=testnet-v1.31.1)",
  "walrus-test-utils",
  "walrus-utils",
 ]

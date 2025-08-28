@@ -8,7 +8,7 @@ use std::{
     fmt::{self, Display},
     fs,
     io::Write,
-    num::{NonZeroU16, NonZeroUsize},
+    num::NonZeroU16,
     path::{Path, PathBuf},
 };
 
@@ -27,7 +27,7 @@ use crate::{
     util::str_to_base36,
     walrus::{
         command::{QuiltBlobInput, StoreQuiltInput},
-        types::BlobId,
+        types::{BlobId, QuiltIndex, QuiltIndexV1},
         Walrus,
     },
 };
@@ -272,17 +272,8 @@ pub(crate) struct ResourceManager {
     pub ws_resources_path: Option<PathBuf>,
     /// The number of shards of the Walrus system.
     pub n_shards: NonZeroU16,
-    /// The maximum number of concurrent calls to the walrus cli for computing the blob ID.
-    pub max_concurrent: Option<NonZeroUsize>,
-}
-
-// Struct used only for readability of the output in the below iteration
-struct ResourceData {
-    unencoded_size: usize,
-    full_path: PathBuf,
-    resource_path: String,
-    headers: HttpHeaders,
-    blob_hash: U256,
+    // /// The maximum number of concurrent calls to the walrus cli for computing the blob ID.
+    // pub max_concurrent: Option<NonZeroUsize>,
 }
 
 impl ResourceManager {
@@ -290,7 +281,7 @@ impl ResourceManager {
         walrus: Walrus,
         ws_resources: Option<WSResources>,
         ws_resources_path: Option<PathBuf>,
-        max_concurrent: Option<NonZeroUsize>,
+        // max_concurrent: Option<NonZeroUsize>,
     ) -> Result<Self> {
         let n_shards = walrus.n_shards().await?;
 
@@ -313,7 +304,7 @@ impl ResourceManager {
             ws_resources,
             ws_resources_path,
             n_shards,
-            max_concurrent,
+            // max_concurrent,
         })
     }
 
@@ -404,10 +395,23 @@ impl ResourceManager {
         full_path: &Path,
         resource_paths: Vec<String>,
     ) -> Result<Vec<Resource>> {
+        // Struct used only for readability of the output in the below iteration
+        #[derive(Debug)]
+        struct ResourceData {
+            unencoded_size: usize,
+            full_path: PathBuf,
+            resource_path: String,
+            headers: HttpHeaders,
+            blob_hash: U256,
+        }
         let (resource_data, blob_inputs): (Vec<ResourceData>, Vec<QuiltBlobInput>) = resource_paths
             .into_iter()
             .map(|resource_path| {
-                let full_path = full_path.join(resource_path.as_str());
+                let full_path = full_path.join(
+                    resource_path
+                        .strip_prefix('/')
+                        .unwrap_or(resource_path.as_str()),
+                );
                 if let Some(ws_path) = &self.ws_resources_path {
                     if &full_path == ws_path {
                         tracing::debug!(?full_path, "ignoring the ws-resources config file");
@@ -417,6 +421,7 @@ impl ResourceManager {
                 // Skip if resource matches ignore patterns/
                 if self.is_ignored(&resource_path) {
                     tracing::debug!(?resource_path, "ignoring resource due to ignore pattern");
+                    println!("ignoring resource due to ignore pattern: {resource_path:#?}");
                     return Ok(None);
                 }
 
@@ -481,15 +486,18 @@ impl ResourceManager {
             .into_iter()
             .flatten()
             .unzip();
+        println!("resource_data.len(): {}", resource_data.len());
+        println!("resource_data: {resource_data:#?}");
 
         // Hack, unecessary extra call to dry-run to get the blob-id
-        let mut dummy_epoch_arg = EpochArg::default();
-        dummy_epoch_arg.epochs = Some(crate::args::EpochCountOrMax::default());
-        let blob_id = self
+        let dry_run = self
             .walrus
             .dry_run_store_quilt(
                 StoreQuiltInput::Blobs(blob_inputs),
-                dummy_epoch_arg,
+                EpochArg {
+                    epochs: Some(crate::args::EpochCountOrMax::default()),
+                    ..Default::default()
+                },
                 false,
                 true,
             )
@@ -497,19 +505,36 @@ impl ResourceManager {
             .context(format!(
                 "error while computing the blob id for path: {}",
                 full_path.to_string_lossy()
-            ))?
-            .quilt_blob_output
-            .blob_id;
+            ))?;
+
+        let blob_id = dry_run.quilt_blob_output.blob_id;
+
+        let QuiltIndex::V1(QuiltIndexV1 { quilt_patches }) = dry_run.quilt_index;
+
         Ok(resource_data
             .into_iter()
+            .zip(quilt_patches.into_iter().skip(1)) // skip quilt-index
             .map(
-                |ResourceData {
-                     unencoded_size,
-                     full_path,
-                     resource_path,
-                     headers,
-                     blob_hash,
-                 }| {
+                |(
+                    ResourceData {
+                        unencoded_size,
+                        full_path,
+                        resource_path,
+                        mut headers,
+                        blob_hash,
+                    },
+                    quilt_patch,
+                )| {
+                    const QUILT_PATCH_VERSION_1: u8 = 1;
+                    let [start0, start1] = quilt_patch.start_index.to_le_bytes();
+                    let [end0, end1] = quilt_patch.end_index.to_le_bytes();
+                    let patch_bytes = [QUILT_PATCH_VERSION_1, start0, start1, end0, end1];
+                    let patch_hex = format!("0x{}", hex::encode(patch_bytes));
+                    // TODO(nikos): Check header key
+                    const QUILT_PATCH_ID_INTERNAL_HEADER: &str = "x-wal-quilt-patch-internal-id";
+                    headers
+                        .0
+                        .insert(QUILT_PATCH_ID_INTERNAL_HEADER.to_string(), patch_hex);
                     Resource::new(
                         resource_path,
                         full_path,
@@ -570,16 +595,16 @@ impl ResourceManager {
 
     /// Recursively iterate a directory and load all [`Resources`][Resource] within.
     pub async fn read_dir(&mut self, root: &Path) -> Result<SiteData> {
-        let resource_paths = Self::iter_dir(root, root)?;
+        let resource_paths = Self::iter_dir(root)?;
         if resource_paths.is_empty() {
             return Ok(SiteData::empty());
         }
 
         // TODO(nikos) we need to split per MAX_FILES but also per max_size in single Blob
         let mut resources_set = ResourceSet::empty();
-        for paths_in_quilt in resource_paths.chunks(Walrus::MAX_FILES_PER_QUILT) {
+        for paths_in_quilt in resource_paths.chunks(Walrus::max_quilts(self.n_shards) as usize) {
             let rel_paths = paths_in_quilt
-                .into_iter()
+                .iter()
                 .map(|full_path| full_path_to_resource_path(full_path, root))
                 .collect::<Result<Vec<String>>>()?;
             let resources = self.read_resource_chunk(root, rel_paths).await?;
@@ -607,13 +632,13 @@ impl ResourceManager {
         ))
     }
 
-    fn iter_dir(start: &Path, root: &Path) -> Result<Vec<PathBuf>> {
+    fn iter_dir(start: &Path) -> Result<Vec<PathBuf>> {
         let mut resources = vec![];
         let entries = fs::read_dir(start)?;
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
-                resources.extend(Self::iter_dir(&path, root)?);
+                resources.extend(Self::iter_dir(&path)?);
             } else {
                 resources.push(path.to_owned());
             }
@@ -633,14 +658,15 @@ fn compress(content: &[u8]) -> Result<Vec<u8>> {
     Ok(encoder.finish()?)
 }
 
-/// Converts the full path of the resource to the on-chain resource path. Does not include the
-/// beginning slash (/)
+/// Converts the full path of the resource to the on-chain resource path.
 pub(crate) fn full_path_to_resource_path(full_path: &Path, root: &Path) -> Result<String> {
     let rel_path = full_path.strip_prefix(root)?;
-    Ok(rel_path
-        .to_str()
-        .ok_or(anyhow!("could not process the path string: {:?}", rel_path))?
-        .to_string())
+    Ok(format!(
+        "/{}",
+        rel_path
+            .to_str()
+            .ok_or(anyhow!("could not process the path string: {:?}", rel_path))?
+    ))
 }
 
 #[cfg(test)]

@@ -12,18 +12,14 @@ use site::{config::WSResources, manager::SiteManager, resource::ResourceManager}
 use sitemap::display_sitemap;
 use util::{id_to_base36, path_or_defaults_if_exist};
 
-use crate::publish_new::SitePublisherBuilder;
-
 pub mod args;
 mod backoff;
 pub mod config;
 mod display;
 mod preprocessor;
 mod publish;
-mod publish_new;
 mod retry_client;
 mod site;
-mod site_new;
 mod sitemap;
 mod suins;
 mod summary;
@@ -125,20 +121,6 @@ async fn run_internal(
                 .run()
                 .await?
         }
-        Commands::PublishNew {
-            publish_options,
-            site_name,
-        } => {
-            let builder = SitePublisherBuilder {
-                context,
-                site_name,
-                publish_options,
-                config,
-            };
-            let publisher = builder.build().await?;
-            let responses = publisher.run().await?;
-            println!("responses: {}", serde_json::to_string_pretty(&responses)?);
-        }
         #[allow(deprecated)]
         Commands::Update {
             publish_options,
@@ -198,7 +180,7 @@ async fn run_internal(
                 config.walrus_client(),
                 ws_res,
                 common.ws_resources.clone(),
-                None,
+                // None,
             )
             .await?;
             let resource = resource_manager

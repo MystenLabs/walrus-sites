@@ -80,8 +80,6 @@ macro_rules! create_command {
 }
 
 impl Walrus {
-    pub const MAX_FILES_PER_QUILT: usize = 666;
-
     /// Creates a new Walrus CLI controller.
     pub fn new(
         bin: String,
@@ -244,6 +242,12 @@ impl Walrus {
         let n_shards: StorageInfoOutput =
             create_command!(self, info, self.rpc_arg(), Some(InfoCommands::Storage))?;
         Ok(n_shards.n_shards)
+    }
+
+    // TODO: Theoretically we shouldn't need to do this ourselves.
+    pub fn max_quilts(n_shards: NonZeroU16) -> u16 {
+        let (_n_rows, n_cols) = walrus_core::encoding::source_symbols_for_n_shards(n_shards);
+        n_cols.get() - 1
     }
 
     fn base_command(&self) -> CliCommand {
