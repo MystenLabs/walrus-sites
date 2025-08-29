@@ -388,7 +388,7 @@ impl ResourceManager {
         )))
     }
 
-    // TODO(nikos): Needs some cleaning
+    // TODO(nikos): Needs some code-cleaning
     /// Read a resource at a path.
     ///
     /// Ignores empty files.
@@ -528,12 +528,12 @@ impl ResourceManager {
                     quilt_patch,
                 )| {
                     const QUILT_PATCH_VERSION_1: u8 = 1;
+                    const QUILT_PATCH_ID_INTERNAL_HEADER: &str = "x-wal-quilt-patch-internal-id";
+
                     let [start0, start1] = quilt_patch.start_index.to_le_bytes();
                     let [end0, end1] = quilt_patch.end_index.to_le_bytes();
                     let patch_bytes = [QUILT_PATCH_VERSION_1, start0, start1, end0, end1];
                     let patch_hex = format!("0x{}", hex::encode(patch_bytes));
-                    // TODO(nikos): Check header key
-                    const QUILT_PATCH_ID_INTERNAL_HEADER: &str = "x-wal-quilt-patch-internal-id";
                     headers
                         .0
                         .insert(QUILT_PATCH_ID_INTERNAL_HEADER.to_string(), patch_hex);
@@ -602,7 +602,9 @@ impl ResourceManager {
             return Ok(SiteData::empty());
         }
 
-        // TODO(nikos) we need to split per MAX_FILES but also per max_size in single Blob
+        // TODO(nikos): we split per max-quilts but there may be also other limits like max_size.
+        // TODO(nikos): Investigate whether indeed max_files == n_cols - 1 or if it is that one file
+        // takes more than a column, max_files becomes n_cols - 2
         let mut resources_set = ResourceSet::empty();
         for paths_in_quilt in resource_paths.chunks(Walrus::max_quilts(self.n_shards) as usize) {
             let rel_paths = paths_in_quilt
@@ -613,12 +615,6 @@ impl ResourceManager {
 
             resources_set.extend(resources);
         }
-
-        // Limit the amount of futures awaited concurrently.
-        // let concurrency_limit = self
-        //     .max_concurrent
-        //     .map(NonZeroUsize::get)
-        //     .unwrap_or_else(|| futures.len());
 
         Ok(SiteData::new(
             resources_set,

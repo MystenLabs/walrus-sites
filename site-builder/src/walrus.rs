@@ -175,8 +175,6 @@ impl Walrus {
         )
     }
 
-    // TODO(nikos): Now that we have the output as an enum, think about removing these extra
-    // functions which needed to be created because of different return-types.
     /// Issues a `dry_run_store_quilt` JSON command to the Walrus CLI, returning the parsed output.
     pub async fn dry_run_store_quilt(
         &mut self,
