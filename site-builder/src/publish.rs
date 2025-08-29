@@ -153,7 +153,7 @@ impl SiteEditor {
         let all_blobs = site
             .resources()
             .into_iter()
-            .map(|resource| (resource.info.blob_id))
+            .map(|resource| resource.info.blob_id)
             .collect::<Vec<_>>();
 
         tracing::debug!(?all_blobs, "retrieved the site for deletion");
