@@ -22,7 +22,7 @@ use crate::{
     args::EpochArg,
     walrus::{
         command::{CommonStoreOptions, StoreQuiltInput, WalrusCmdBuilder},
-        output::{DestroyOutput, QuiltStoreResult, StoreQuiltDryRunOutput, WalrusOut},
+        output::{DestroyOutput, QuiltStoreResult, StoreQuiltDryRunOutput},
     },
 };
 pub mod command;
@@ -122,28 +122,6 @@ impl Walrus {
                 share: false,
             }
         )
-    }
-
-    // TODO(nikos): Trait would fit nice here, see also comment at WalrusOp
-    pub async fn run(&mut self, op: WalrusOp) -> Result<WalrusOut> {
-        Ok(match op {
-            WalrusOp::StoreQuilt(StoreQuiltArguments {
-                store_quilt_input,
-                epoch_arg,
-                deletable,
-            }) => WalrusOut::StoreQuilt(
-                self.store_quilt(store_quilt_input, epoch_arg, false, deletable)
-                    .await?,
-            ),
-            WalrusOp::DryRunStoreQuilt(StoreQuiltArguments {
-                store_quilt_input,
-                epoch_arg,
-                deletable,
-            }) => WalrusOut::DryRunStoreQuilt(
-                self.dry_run_store_quilt(store_quilt_input, epoch_arg, false, deletable)
-                    .await?,
-            ),
-        })
     }
 
     /// Issues a `store-quilt` JSON command to the Walrus CLI, returning the parsed output.
@@ -270,28 +248,4 @@ impl Walrus {
             rpc_url: self.rpc_url.clone(),
         }
     }
-}
-
-#[derive(Debug)]
-pub struct StoreQuiltArguments {
-    pub store_quilt_input: StoreQuiltInput,
-    pub epoch_arg: EpochArg,
-    pub deletable: bool,
-}
-
-// TODO(nikos): Use WalrusOperation trait and return impl WalrusOperation for the
-// update strategies.
-// eg.
-// ```
-// impl WalrusOp for StoreQuiltArguments {
-//     type Output = QuiltStoreResult;
-//     pub fn run(self, walrus: &mut Walrus) ...
-// }
-// ```
-// then we can return Vec<Box<dyn WalrusRunnable>> for the update strategies for the part of the
-// walrus commands.
-#[derive(Debug)]
-pub enum WalrusOp {
-    StoreQuilt(StoreQuiltArguments),
-    DryRunStoreQuilt(StoreQuiltArguments),
 }

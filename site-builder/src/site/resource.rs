@@ -463,11 +463,10 @@ impl ResourceManager {
                 hash_function.update(&plain_content);
                 let blob_hash: [u8; 32] = hash_function.finalize().digest;
 
-                // TODO(nikos): replace base to regular path
+                // TODO: When walrus dep is updated to support any type of identifiers, replace base36 to regular path
                 let quilt_blob_input = QuiltBlobInput {
                     path: full_path.clone(),
                     identifier: Some(str_to_base36(resource_path.as_str())?),
-                    // TODO(nikos) determine path
                     tags: BTreeMap::new(),
                 };
 
@@ -490,6 +489,7 @@ impl ResourceManager {
         println!("resource_data: {resource_data:#?}");
 
         // Hack, unecessary extra call to dry-run to get the blob-id
+        // TODO(nikos): Test that dry-run patches returned are the same as the normal run.
         let dry_run = self
             .walrus
             .dry_run_store_quilt(
