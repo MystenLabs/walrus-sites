@@ -19,7 +19,7 @@ use sui_types::{
 use crate::{
     site::contracts::{self, AssociatedContractStruct, StructTag},
     util::deserialize_bag_or_table,
-    walrus::{output::PatchIdV1, types::BlobId},
+    walrus::types::BlobId,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -59,50 +59,6 @@ pub(crate) struct SuiResource {
     /// The blob ID of the resource.
     #[serde(serialize_with = "serialize_blob_id")]
     pub blob_id: BlobId,
-    /// The hash of the blob contents.
-    pub blob_hash: U256,
-    /// Byte ranges for the resource.
-    pub range: Option<Range>,
-}
-
-impl From<(LocalSuiResource, BlobId, PatchIdV1)> for SuiResource {
-    fn from(
-        (
-            LocalSuiResource {
-                path,
-                mut headers,
-                blob_hash,
-                range,
-            },
-            blob_id,
-            PatchIdV1(patch_bytes),
-        ): (LocalSuiResource, BlobId, PatchIdV1),
-    ) -> Self {
-        let patch_hex = format!("0x{}", hex::encode(patch_bytes));
-        // TODO(nikos): Check header key
-        const QUILT_PATCH_ID_INTERNAL_HEADER: &str = "x-quilt-internal-patch-id";
-        headers
-            .0
-            .insert(QUILT_PATCH_ID_INTERNAL_HEADER.to_string(), patch_hex);
-        SuiResource {
-            path,
-            headers,
-            blob_id,
-            blob_hash,
-            range,
-        }
-    }
-}
-
-/// Information about a resource.
-///
-/// This struct mirrors the information that is stored on chain.
-#[derive(PartialEq, Eq, Debug, Clone, PartialOrd, Ord, Serialize, Deserialize)]
-pub(crate) struct LocalSuiResource {
-    /// The relative path the resource will have on Sui.
-    pub path: String,
-    /// Response, Representation and Payload headers.
-    pub headers: HttpHeaders,
     /// The hash of the blob contents.
     pub blob_hash: U256,
     /// Byte ranges for the resource.

@@ -3,10 +3,9 @@
 
 //! The output of running commands on the Walrus CLI.
 
-use std::{num::NonZeroU16, path::PathBuf, process::Output, str::FromStr};
+use std::{num::NonZeroU16, path::PathBuf, process::Output};
 
-use anyhow::{anyhow, bail, Context, Result};
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use anyhow::{anyhow, Context, Result};
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_with::{base64::Base64, serde_as, DisplayFromStr};
 use sui_types::{base_types::ObjectID, event::EventID};
@@ -17,54 +16,8 @@ use crate::{
     walrus::types::{QuiltIndex, QuiltStoreBlob, StoredQuiltPatch},
 };
 
-const QUILT_PATCH_VERSION_1: u8 = 1;
-const QUILT_PATCH_SIZE: usize = 5;
-
 pub type Epoch = u32;
 pub type EpochCount = u32;
-
-#[derive(Clone)]
-pub struct PatchIdV1(pub [u8; QUILT_PATCH_SIZE]);
-
-impl From<(u8, u16, u16)> for PatchIdV1 {
-    fn from((version, start_index, end_index): (u8, u16, u16)) -> Self {
-        let mut bytes = [0u8; QUILT_PATCH_SIZE];
-        bytes[0] = version;
-        bytes[1..3].copy_from_slice(&start_index.to_le_bytes());
-        bytes[3..5].copy_from_slice(&end_index.to_le_bytes());
-        PatchIdV1(bytes)
-    }
-}
-
-// TODO(nikos): This might be confusing, as we give the whole QuiltID, maybe use custom function
-// instead of trait.
-impl FromStr for PatchIdV1 {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> anyhow::Result<Self> {
-        // Decode from Base64.
-        let bytes = URL_SAFE_NO_PAD.decode(s)?;
-
-        // Must have at least BlobId.LENGTH + 1 bytes (quilt_id + version).
-        if bytes.len() != BlobId::LENGTH + size_of::<PatchIdV1>() {
-            bail!(
-                "Expected {} bytes when decoding quilt-patch-id version 1.",
-                BlobId::LENGTH + size_of::<PatchIdV1>()
-            );
-        }
-
-        // Extract patch_id (bytes after the blob_id).
-        let bytes: [u8; QUILT_PATCH_SIZE] = bytes
-            [BlobId::LENGTH..BlobId::LENGTH + QUILT_PATCH_SIZE]
-            .try_into()
-            .unwrap();
-        let version = bytes[0];
-        if version != QUILT_PATCH_VERSION_1 {
-            bail!("Quilt patch version {version} is not implemented");
-        }
-        Ok(PatchIdV1(bytes))
-    }
-}
 
 /// Either an event ID or an object ID.
 #[derive(Debug, Clone, Deserialize)]

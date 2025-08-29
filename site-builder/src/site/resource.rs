@@ -308,6 +308,7 @@ impl ResourceManager {
         })
     }
 
+    // TODO(nikos): Probably remove
     /// Read a resource at a path.
     ///
     /// Ignores empty files.
@@ -387,6 +388,7 @@ impl ResourceManager {
         )))
     }
 
+    // TODO(nikos): Needs some cleaning
     /// Read a resource at a path.
     ///
     /// Ignores empty files.
