@@ -180,7 +180,6 @@ async fn run_internal(
                 config.walrus_client(),
                 ws_res,
                 common.ws_resources.clone(),
-                // None,
             )
             .await?;
             let resource = resource_manager

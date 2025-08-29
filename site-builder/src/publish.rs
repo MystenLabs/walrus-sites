@@ -252,7 +252,6 @@ impl SiteEditor<EditOptions> {
             self.config.walrus_client(),
             ws_resources.clone(),
             ws_resources_path.clone(),
-            // self.edit_options.publish_options.max_concurrent,
         )
         .await?;
         display::action(format!(

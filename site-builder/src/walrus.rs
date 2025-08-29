@@ -49,8 +49,8 @@ pub struct Walrus {
 macro_rules! create_command {
     ($self:ident, $name:ident, $($arg:expr),*) => {{
         let mut json_input = $self.builder().$name($($arg),*).build().to_json()?;
-        println!("json_input: {json_input}");
 
+        // TODO(nikos): Remove when the bug requiring paths in json input is fixed.
         // TMP HACK
         if json_input.contains("storeQuilt") {
             let Some(pos) = json_input.find("]") else {
@@ -59,7 +59,6 @@ macro_rules! create_command {
             const PATHS: &str = r#","paths":[]"#;
             json_input.insert_str(pos + 1, PATHS);
         }
-        println!("json_input: {json_input}");
         // TMP HACK end
 
         let output = $self
@@ -220,7 +219,8 @@ impl Walrus {
         Ok(n_shards.n_shards)
     }
 
-    // TODO: Theoretically we shouldn't need to do this ourselves.
+    // TODO: Theoretically we shouldn't need to do this ourselves, but I couldn't find how to get
+    // this info from walrus.
     pub fn max_quilts(n_shards: NonZeroU16) -> u16 {
         let (_n_rows, n_cols) = walrus_core::encoding::source_symbols_for_n_shards(n_shards);
         n_cols.get() - 1

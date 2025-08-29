@@ -272,8 +272,6 @@ pub(crate) struct ResourceManager {
     pub ws_resources_path: Option<PathBuf>,
     /// The number of shards of the Walrus system.
     pub n_shards: NonZeroU16,
-    // /// The maximum number of concurrent calls to the walrus cli for computing the blob ID.
-    // pub max_concurrent: Option<NonZeroUsize>,
 }
 
 impl ResourceManager {
@@ -281,7 +279,6 @@ impl ResourceManager {
         walrus: Walrus,
         ws_resources: Option<WSResources>,
         ws_resources_path: Option<PathBuf>,
-        // max_concurrent: Option<NonZeroUsize>,
     ) -> Result<Self> {
         let n_shards = walrus.n_shards().await?;
 
