@@ -42,7 +42,7 @@ export function getSubdomainAndPath(url: URL, portalNameLength?: Number): Domain
     { subdomain: "subname", path: "/index.html"}}
 */
 export function splitUrl(url: URL, portalNameLength?: Number): UrlExtract {
-    const parsed = _parseDomain(url);
+    const parsed = parseDomain(fromUrl(url.toString()));
     let domain: string | null = null;
     let subdomain: string | null = null;
     if (parsed.type === ParseResultType.Listed) {
@@ -78,15 +78,6 @@ export function splitUrl(url: URL, portalNameLength?: Number): UrlExtract {
     } as UrlExtract;
 
     return url_extract
-}
-
-/**
- * Parses the domain from a given URL and returns the parse result.
- * @param url The URL object to parse.
- * @returns The result of parsing the domain from the URL.
- */
-export function _parseDomain(url: URL): ParseResult {
-    return parseDomain(fromUrl(url.toString()));
 }
 
 /**
