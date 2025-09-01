@@ -3,7 +3,7 @@
 
 use std::{collections::BTreeSet, num::NonZeroUsize, str::FromStr, time::Duration};
 
-use anyhow::{anyhow, Context, Error, Result};
+use anyhow::{anyhow, Error, Result};
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{rpc_types::SuiTransactionBlockResponse, wallet_context::WalletContext};
 use sui_types::{
@@ -31,8 +31,6 @@ use crate::{
     types::{Metadata, MetadataOp, SiteNameOp},
     util::{get_site_id_from_response, sign_and_send_ptb},
     walrus::{
-        command::{QuiltBlobInput, StoreQuiltInput},
-        output::QuiltStoreResult,
         types::BlobId,
         Walrus,
     },
@@ -164,10 +162,10 @@ impl SiteManager {
         Ok((result, site_updates.summary(&self.blob_options)))
     }
 
+    /// Assumes quilts have been uploaded and resources have the necessary header key with patch id.
     pub async fn publish_site_with_quilts(
         &mut self,
         local_site_data: &SiteData,
-        quilt_inputs: Vec<Vec<QuiltBlobInput>>,
     ) -> Result<(SuiTransactionBlockResponse, SiteDataDiffSummary)> {
         tracing::debug!(?self.site_id, "creating or updating site");
         let retriable_client = self.sui_client().await?;
@@ -187,14 +185,6 @@ impl SiteManager {
         if self.walrus_options.dry_run {
             // TODO(nikos): Maybe move inside ResourceManager::read_dir
             todo!("Ask for permission on dry-run storage cost");
-        }
-
-        // Store quilts sequentially.
-        for quilt_file_inputs in quilt_inputs {
-            let _resp = self
-                .store_resource_quilt_to_walrus(quilt_file_inputs)
-                .await?;
-            // println!("resp: {}", serde_json::to_string_pretty(&_resp)?);
         }
 
         // Check if there are any updates to the site on-chain.
@@ -500,29 +490,29 @@ impl SiteManager {
         Ok(())
     }
 
-    async fn store_resource_quilt_to_walrus(
-        &mut self,
-        file_inputs: Vec<QuiltBlobInput>,
-    ) -> Result<QuiltStoreResult> {
-        let epoch_arg = self.walrus_options.epoch_arg.clone();
-        self
-            .walrus
-            .store_quilt(
-                StoreQuiltInput::Blobs(file_inputs.clone()),
-                epoch_arg,
-                false,
-                !self.walrus_options.permanent,
-            )
-            .await
-            .context(format!(
-                "error while storing quilt for resources: {}",
-                file_inputs
-                    .iter()
-                    .map(|inp| inp.path.to_string_lossy())
-                    .collect::<Vec<_>>()
-                    .join("\",\"")
-            ))
-    }
+    // async fn store_resource_quilt_to_walrus(
+    //     &mut self,
+    //     file_inputs: Vec<QuiltBlobInput>,
+    // ) -> Result<QuiltStoreResult> {
+    //     let epoch_arg = self.walrus_options.epoch_arg.clone();
+    //     self
+    //         .walrus
+    //         .store_quilt(
+    //             StoreQuiltInput::Blobs(file_inputs.clone()),
+    //             epoch_arg,
+    //             false,
+    //             !self.walrus_options.permanent,
+    //         )
+    //         .await
+    //         .context(format!(
+    //             "error while storing quilt for resources: {}",
+    //             file_inputs
+    //                 .iter()
+    //                 .map(|inp| inp.path.to_string_lossy())
+    //                 .collect::<Vec<_>>()
+    //                 .join("\",\"")
+    //         ))
+    // }
 
     async fn sign_and_send_ptb(
         &self,

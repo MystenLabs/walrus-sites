@@ -12,7 +12,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use fastcrypto::hash::{HashFunction, Sha256};
 use flate2::{write::GzEncoder, Compression};
 use futures::{stream, StreamExt};
@@ -28,7 +29,8 @@ use crate::{
     util::str_to_base36,
     walrus::{
         command::{QuiltBlobInput, StoreQuiltInput},
-        types::{BlobId, QuiltIndex, QuiltIndexV1},
+        output::QuiltStoreResult,
+        types::BlobId,
         Walrus,
     },
 };
@@ -392,11 +394,11 @@ impl ResourceManager {
     /// Read a resource at a path.
     ///
     /// Ignores empty files.
-    pub async fn read_resource_chunk(
+    pub async fn read_and_store_resource_chunk(
         &mut self,
         full_path: &Path,
         resource_paths: Vec<String>,
-    ) -> Result<(Vec<Resource>, Vec<QuiltBlobInput>)> {
+    ) -> Result<(Vec<Resource>, QuiltStoreResult)> {
         // Struct used only for readability of the output in the below iteration
         #[derive(Debug)]
         struct ResourceData {
@@ -490,11 +492,12 @@ impl ResourceManager {
         // println!("resource_data.len(): {}", resource_data.len());
         // println!("resource_data: {resource_data:#?}");
 
+        // TODO(nikos): Ask user-confirmation on dry-run
         // Hack, unecessary extra call to dry-run to get the blob-id
         // TODO(nikos): Test that dry-run patches returned are the same as the normal run.
-        let dry_run = self
+        let store_resp = self
             .walrus
-            .dry_run_store_quilt(
+            .store_quilt(
                 StoreQuiltInput::Blobs(blob_inputs.clone()),
                 EpochArg {
                     epochs: Some(crate::args::EpochCountOrMax::default()),
@@ -510,24 +513,16 @@ impl ResourceManager {
             ))?;
 
         println!(
-            "dry_run output: {}",
-            serde_json::to_string_pretty(&dry_run)?
+            "store_resp output: {}",
+            serde_json::to_string_pretty(&store_resp)?
         );
 
-        let blob_id = dry_run.quilt_blob_output.blob_id;
+        let blob_id = *store_resp.blob_store_result.blob_id();
+        let quilt_patches = store_resp.stored_quilt_blobs.iter();
 
-        let QuiltIndex::V1(QuiltIndexV1 { quilt_patches }) = dry_run.quilt_index;
-
-        let mut start_idx = if let Some(true) = quilt_patches.first().map(|p| p.end_index == 2) {
-            1_u16
-        } else {
-            // TODO(nikos): When first end-index is greater than two we have no way to determine
-            // where quilt-index patch stops and where first-stored-file starts.
-            todo!("Get start index");
-        };
         let resources = resource_data
             .into_iter()
-            .zip(quilt_patches.into_iter())
+            .zip(quilt_patches)
             .map(
                 |(
                     ResourceData {
@@ -541,28 +536,46 @@ impl ResourceManager {
                 )| {
                     const QUILT_PATCH_VERSION_1: u8 = 1;
                     const QUILT_PATCH_ID_INTERNAL_HEADER: &str = "x-wal-quilt-patch-internal-id";
+                    const QUILT_PATCH_SIZE: usize = 5;
+                    const QUILT_PATCH_ID_SIZE: usize = BlobId::LENGTH + QUILT_PATCH_SIZE;
 
-                    let [start0, start1] = start_idx.to_le_bytes();
-                    start_idx = quilt_patch.end_index;
-                    let [end0, end1] = quilt_patch.end_index.to_le_bytes();
-                    let patch_bytes = [QUILT_PATCH_VERSION_1, start0, start1, end0, end1];
+                    let bytes = URL_SAFE_NO_PAD.decode(quilt_patch.quilt_patch_id.as_str())?;
+
+                    // Must have at least BlobId.LENGTH + 1 bytes (quilt_id + version).
+                    if bytes.len() != QUILT_PATCH_ID_SIZE {
+                        bail!(
+                            "Expected {} bytes when decoding quilt-patch-id version 1.",
+                            QUILT_PATCH_ID_SIZE
+                        );
+                    }
+
+                    // Extract patch_id (bytes after the blob_id).
+                    let patch_bytes: [u8; QUILT_PATCH_SIZE] = bytes
+                        [BlobId::LENGTH..QUILT_PATCH_ID_SIZE]
+                        .try_into()
+                        .unwrap();
+                    let version = patch_bytes[0];
+                    if version != QUILT_PATCH_VERSION_1 {
+                        bail!("Quilt patch version {version} is not implemented");
+                    }
+
                     let patch_hex = format!("0x{}", hex::encode(patch_bytes));
                     headers
                         .0
                         .insert(QUILT_PATCH_ID_INTERNAL_HEADER.to_string(), patch_hex);
-                    Resource::new(
+                    Ok(Resource::new(
                         resource_path,
                         full_path,
                         headers,
                         blob_id,
                         blob_hash,
                         unencoded_size,
-                    )
+                    ))
                 },
             )
-            .collect();
+            .collect::<Result<Vec<_>>>()?;
 
-        Ok((resources, blob_inputs))
+        Ok((resources, store_resp))
     }
 
     ///  Derives the HTTP headers for a resource based on the ws-resources.yaml.
@@ -653,7 +666,10 @@ impl ResourceManager {
     }
 
     /// Recursively iterate a directory and load all [`Resources`][Resource] within.
-    pub async fn read_quilts_dir(&mut self, root: &Path) -> Result<(SiteData, Vec<Vec<QuiltBlobInput>>)> {
+    pub async fn read_dir_and_store_quilts(
+        &mut self,
+        root: &Path,
+    ) -> Result<(SiteData, Vec<QuiltStoreResult>)> {
         let resource_paths = Self::iter_dir(root)?;
         if resource_paths.is_empty() {
             return Ok((SiteData::empty(), vec![]));
@@ -663,16 +679,17 @@ impl ResourceManager {
         // TODO(nikos): Investigate whether indeed max_files == n_cols - 1 or if it is that one file
         // takes more than a column, max_files becomes n_cols - 2
         let mut resources_set = ResourceSet::empty();
-        let mut quilt_inputs = vec![];
+        let mut resps = vec![];
         for paths_in_quilt in resource_paths.chunks(Walrus::max_quilts(self.n_shards) as usize) {
             let rel_paths = paths_in_quilt
                 .iter()
                 .map(|full_path| full_path_to_resource_path(full_path, root))
                 .collect::<Result<Vec<String>>>()?;
-            let (resources, store_quilt_input) = self.read_resource_chunk(root, rel_paths).await?;
+            let (resources, store_quilt_input) =
+                self.read_and_store_resource_chunk(root, rel_paths).await?;
 
             resources_set.extend(resources);
-            quilt_inputs.push(store_quilt_input);
+            resps.push(store_quilt_input);
         }
 
         Ok((
@@ -688,7 +705,7 @@ impl ResourceManager {
                     .as_ref()
                     .and_then(|config| config.site_name.clone()),
             ),
-            quilt_inputs,
+            resps,
         ))
     }
 

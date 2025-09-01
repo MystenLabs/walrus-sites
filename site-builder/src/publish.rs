@@ -345,8 +345,8 @@ impl SiteEditor<EditOptions> {
             "Parsing the directory {} and locally computing Quilt IDs",
             self.directory().to_string_lossy()
         ));
-        let (local_site_data, quilt_inputs) =
-            resource_manager.read_quilts_dir(self.directory()).await?;
+        let (local_site_data, _resps) =
+            resource_manager.read_dir_and_store_quilts(self.directory()).await?;
         display::done();
         tracing::debug!(?local_site_data, "resources loaded from directory");
 
@@ -369,7 +369,7 @@ impl SiteEditor<EditOptions> {
         .await?;
 
         let (response, summary) = site_manager
-            .publish_site_with_quilts(&local_site_data, quilt_inputs)
+            .publish_site_with_quilts(&local_site_data)
             .await?;
 
         let path_for_saving =
