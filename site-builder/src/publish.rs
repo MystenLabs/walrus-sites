@@ -345,8 +345,9 @@ impl SiteEditor<EditOptions> {
             "Parsing the directory {} and locally computing Quilt IDs",
             self.directory().to_string_lossy()
         ));
-        let (local_site_data, _resps) =
-            resource_manager.read_dir_and_store_quilts(self.directory()).await?;
+        let local_site_data = resource_manager
+            .read_dir_and_store_quilts(self.directory())
+            .await?;
         display::done();
         tracing::debug!(?local_site_data, "resources loaded from directory");
 

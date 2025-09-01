@@ -29,7 +29,6 @@ use crate::{
     util::str_to_base36,
     walrus::{
         command::{QuiltBlobInput, StoreQuiltInput},
-        output::QuiltStoreResult,
         types::BlobId,
         Walrus,
     },
@@ -398,7 +397,7 @@ impl ResourceManager {
         &mut self,
         full_path: &Path,
         resource_paths: Vec<String>,
-    ) -> Result<(Vec<Resource>, QuiltStoreResult)> {
+    ) -> Result<Vec<Resource>> {
         // Struct used only for readability of the output in the below iteration
         #[derive(Debug)]
         struct ResourceData {
@@ -495,7 +494,7 @@ impl ResourceManager {
         // TODO(nikos): Ask user-confirmation on dry-run
         // Hack, unecessary extra call to dry-run to get the blob-id
         // TODO(nikos): Test that dry-run patches returned are the same as the normal run.
-        let store_resp = self
+        let mut store_resp = self
             .walrus
             .store_quilt(
                 StoreQuiltInput::Blobs(blob_inputs.clone()),
@@ -518,28 +517,32 @@ impl ResourceManager {
         );
 
         let blob_id = *store_resp.blob_store_result.blob_id();
-        let quilt_patches = store_resp.stored_quilt_blobs.iter();
+        let quilt_patches = &mut store_resp.stored_quilt_blobs;
+
+        const QUILT_PATCH_VERSION_1: u8 = 1;
+        const QUILT_PATCH_ID_INTERNAL_HEADER: &str = "x-wal-quilt-patch-internal-id";
+        const QUILT_PATCH_SIZE: usize = 5;
+        const QUILT_PATCH_ID_SIZE: usize = BlobId::LENGTH + QUILT_PATCH_SIZE;
 
         let resources = resource_data
             .into_iter()
-            .zip(quilt_patches)
             .map(
-                |(
+                |
                     ResourceData {
                         unencoded_size,
                         full_path,
                         resource_path,
                         mut headers,
                         blob_hash,
-                    },
-                    quilt_patch,
-                )| {
-                    const QUILT_PATCH_VERSION_1: u8 = 1;
-                    const QUILT_PATCH_ID_INTERNAL_HEADER: &str = "x-wal-quilt-patch-internal-id";
-                    const QUILT_PATCH_SIZE: usize = 5;
-                    const QUILT_PATCH_ID_SIZE: usize = BlobId::LENGTH + QUILT_PATCH_SIZE;
-
-                    let bytes = URL_SAFE_NO_PAD.decode(quilt_patch.quilt_patch_id.as_str())?;
+                    }
+                | {
+                    // TODO(nikos): We have already calculated this
+                    let b36 = str_to_base36(&resource_path)?;
+                    let Some(pos) = quilt_patches.iter().position(|p| p.identifier == b36) else {
+                        bail!("Resource {resource_path} exists but doesn't have a matching quilt-patch");
+                    };
+                    let patch = quilt_patches.remove(pos);
+                    let bytes = URL_SAFE_NO_PAD.decode(patch.quilt_patch_id.as_str())?;
 
                     // Must have at least BlobId.LENGTH + 1 bytes (quilt_id + version).
                     if bytes.len() != QUILT_PATCH_ID_SIZE {
@@ -575,7 +578,7 @@ impl ResourceManager {
             )
             .collect::<Result<Vec<_>>>()?;
 
-        Ok((resources, store_resp))
+        Ok(resources)
     }
 
     ///  Derives the HTTP headers for a resource based on the ws-resources.yaml.
@@ -666,46 +669,37 @@ impl ResourceManager {
     }
 
     /// Recursively iterate a directory and load all [`Resources`][Resource] within.
-    pub async fn read_dir_and_store_quilts(
-        &mut self,
-        root: &Path,
-    ) -> Result<(SiteData, Vec<QuiltStoreResult>)> {
+    pub async fn read_dir_and_store_quilts(&mut self, root: &Path) -> Result<SiteData> {
         let resource_paths = Self::iter_dir(root)?;
         if resource_paths.is_empty() {
-            return Ok((SiteData::empty(), vec![]));
+            return Ok(SiteData::empty());
         }
 
         // TODO(nikos): we split per max-quilts but there may be also other limits like max_size.
         // TODO(nikos): Investigate whether indeed max_files == n_cols - 1 or if it is that one file
         // takes more than a column, max_files becomes n_cols - 2
         let mut resources_set = ResourceSet::empty();
-        let mut resps = vec![];
         for paths_in_quilt in resource_paths.chunks(Walrus::max_quilts(self.n_shards) as usize) {
             let rel_paths = paths_in_quilt
                 .iter()
                 .map(|full_path| full_path_to_resource_path(full_path, root))
                 .collect::<Result<Vec<String>>>()?;
-            let (resources, store_quilt_input) =
-                self.read_and_store_resource_chunk(root, rel_paths).await?;
+            let resources = self.read_and_store_resource_chunk(root, rel_paths).await?;
 
             resources_set.extend(resources);
-            resps.push(store_quilt_input);
         }
 
-        Ok((
-            SiteData::new(
-                resources_set,
-                self.ws_resources
-                    .as_ref()
-                    .and_then(|config| config.routes.clone()),
-                self.ws_resources
-                    .as_ref()
-                    .and_then(|config| config.metadata.clone()),
-                self.ws_resources
-                    .as_ref()
-                    .and_then(|config| config.site_name.clone()),
-            ),
-            resps,
+        Ok(SiteData::new(
+            resources_set,
+            self.ws_resources
+                .as_ref()
+                .and_then(|config| config.routes.clone()),
+            self.ws_resources
+                .as_ref()
+                .and_then(|config| config.metadata.clone()),
+            self.ws_resources
+                .as_ref()
+                .and_then(|config| config.site_name.clone()),
         ))
     }
 

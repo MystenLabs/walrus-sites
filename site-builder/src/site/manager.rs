@@ -30,10 +30,7 @@ use crate::{
     summary::SiteDataDiffSummary,
     types::{Metadata, MetadataOp, SiteNameOp},
     util::{get_site_id_from_response, sign_and_send_ptb},
-    walrus::{
-        types::BlobId,
-        Walrus,
-    },
+    walrus::{types::BlobId, Walrus},
 };
 
 const MAX_RESOURCES_PER_PTB: usize = 200;
