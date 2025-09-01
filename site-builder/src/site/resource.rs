@@ -309,7 +309,7 @@ impl ResourceManager {
     /// Read a resource at a path.
     ///
     /// Ignores empty files.
-    pub async fn read_resource(
+    pub async fn read_single_blob_resource(
         &self,
         full_path: &Path,
         resource_path: String,

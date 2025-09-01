@@ -183,7 +183,7 @@ async fn run_internal(
             )
             .await?;
             let resource = resource_manager
-                .read_resource(&resource, path)
+                .read_single_blob_resource(&resource, path)
                 .await?
                 .ok_or(anyhow!(
                     "could not read the resource at path: {}",

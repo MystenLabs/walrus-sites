@@ -77,7 +77,7 @@ impl SiteManager {
 
     /// Perform a dry-run of Walrus store operations for the given updates
     /// and return the total storage cost that would be incurred.
-    async fn dry_run_walrus_store(
+    async fn dry_run_walrus_single_blob_store(
         &mut self,
         walrus_updates: &Vec<&ResourceOp<'_>>,
     ) -> anyhow::Result<u64> {
@@ -168,7 +168,7 @@ impl SiteManager {
 
         if !walrus_updates.is_empty() {
             if self.walrus_options.dry_run {
-                let total_storage_cost = self.dry_run_walrus_store(&walrus_updates).await?;
+                let total_storage_cost = self.dry_run_walrus_single_blob_store(&walrus_updates).await?;
                 // Before doing the actual execution, perform a dry run
                 display::action(format!(
                     "Estimated Storage Cost for this publish/update (Gas Cost Excluded): {total_storage_cost} FROST"
@@ -405,7 +405,7 @@ impl SiteManager {
 
         //Perform dry run
         if self.walrus_options.dry_run {
-            let total_storage_cost = self.dry_run_walrus_store(&walrus_ops).await?;
+            let total_storage_cost = self.dry_run_walrus_single_blob_store(&walrus_ops).await?;
             // Before doing the actual execution, perform a dry run
             display::action(format!(
                 "Estimated Storage Cost for this publish/update (Gas Cost Excluded): {total_storage_cost} FROST"
