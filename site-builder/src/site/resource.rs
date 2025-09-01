@@ -515,9 +515,16 @@ impl ResourceManager {
 
         let QuiltIndex::V1(QuiltIndexV1 { quilt_patches }) = dry_run.quilt_index;
 
+        let mut start_idx = if let Some(true) = quilt_patches.first().map(|p| p.end_index == 2) {
+            1_u16
+        } else {
+            // TODO(nikos): When first end-index is greater than two we have no way to determine
+            // where quilt-index patch stops and where first-stored-file starts.
+            todo!("Get start index");
+        };
         let resources = resource_data
             .into_iter()
-            .zip(quilt_patches.into_iter().skip(1)) // skip quilt-index
+            .zip(quilt_patches.into_iter())
             .map(
                 |(
                     ResourceData {
@@ -532,7 +539,8 @@ impl ResourceManager {
                     const QUILT_PATCH_VERSION_1: u8 = 1;
                     const QUILT_PATCH_ID_INTERNAL_HEADER: &str = "x-wal-quilt-patch-internal-id";
 
-                    let [start0, start1] = quilt_patch.start_index.to_le_bytes();
+                    let [start0, start1] = start_idx.to_le_bytes();
+                    start_idx = quilt_patch.end_index;
                     let [end0, end1] = quilt_patch.end_index.to_le_bytes();
                     let patch_bytes = [QUILT_PATCH_VERSION_1, start0, start1, end0, end1];
                     let patch_hex = format!("0x{}", hex::encode(patch_bytes));

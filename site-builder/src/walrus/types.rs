@@ -104,9 +104,6 @@ pub struct QuiltIndexV1 {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QuiltPatchV1 {
-    /// The start sliver index of the blob.
-    #[serde(skip)]
-    pub start_index: u16,
     /// The end sliver index of the blob.
     pub end_index: u16,
     /// The identifier of the blob, it can be used to locate the blob in the quilt.
