@@ -116,7 +116,6 @@ impl SiteManager {
     pub async fn update_site(
         &mut self,
         local_site_data: &SiteData,
-        quilt_inputs: Vec<Vec<QuiltBlobInput>>,
     ) -> Result<(SuiTransactionBlockResponse, SiteDataDiffSummary)> {
         tracing::debug!(?self.site_id, "creating or updating site");
         let retriable_client = self.sui_client().await?;
@@ -133,20 +132,57 @@ impl SiteManager {
 
         let site_updates = local_site_data.diff(&existing_site);
 
-        // This whole diff logic is now outdated.
-        // TODO: Update strategies
-        // let walrus_candidate_set = if self.blob_options.is_check_extend() {
-        //     // We need to check the status of all blobs: Return the full list of existing and added
-        //     // blobs as possible updates.
-        //     existing_site.replace_all(local_site_data)
-        // } else {
-        //     // We only need to upload the new blobs.
-        //     site_updates.clone()
-        // };
-
+        let walrus_candidate_set = if self.blob_options.is_check_extend() {
+            // We need to check the status of all blobs: Return the full list of existing and added
+            // blobs as possible updates.
+            existing_site.replace_all(local_site_data)
+        } else {
+            // We only need to upload the new blobs.
+            site_updates.clone()
+        };
         // IMPORTANT: Perform the store operations on Walrus first, to ensure zero "downtime".
-        // self.select_and_store_single_blob_resources_to_walrus(&walrus_candidate_set)
-        //     .await?;
+        self.select_and_store_single_blob_resources_to_walrus(&walrus_candidate_set)
+            .await?;
+
+        // Check if there are any updates to the site on-chain.
+        let result = if site_updates.has_updates() {
+            display::action("Applying the Walrus Site object updates on Sui");
+            let result = self.execute_sui_updates(&site_updates).await?;
+            display::done();
+            result
+        } else {
+            SuiTransactionBlockResponse::default()
+        };
+
+        // Extract the BlobIDs from deleted resources for Walrus cleanup
+        let blobs_to_delete: Vec<BlobId> = collect_deletable_blob_candidates(&site_updates);
+
+        if !blobs_to_delete.is_empty() {
+            self.delete_from_walrus(&blobs_to_delete).await?;
+        }
+
+        Ok((result, site_updates.summary(&self.blob_options)))
+    }
+
+    pub async fn publish_site_with_quilts(
+        &mut self,
+        local_site_data: &SiteData,
+        quilt_inputs: Vec<Vec<QuiltBlobInput>>,
+    ) -> Result<(SuiTransactionBlockResponse, SiteDataDiffSummary)> {
+        tracing::debug!(?self.site_id, "creating or updating site");
+        let retriable_client = self.sui_client().await?;
+        let existing_site = match &self.site_id {
+            Some(site_id) => {
+                RemoteSiteFactory::new(&retriable_client, self.config.package)
+                    .await?
+                    .get_from_chain(*site_id)
+                    .await?
+            }
+            None => SiteData::empty(),
+        };
+        tracing::debug!(?existing_site, "checked existing site");
+
+        let site_updates = local_site_data.diff(&existing_site);
 
         if self.walrus_options.dry_run {
             // TODO(nikos): Maybe move inside ResourceManager::read_dir

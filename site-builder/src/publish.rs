@@ -223,6 +223,18 @@ impl SiteEditor<EditOptions> {
         Ok(())
     }
 
+    pub async fn run_quilts(&self) -> Result<()> {
+        let (active_address, response, summary) = self.run_single_edit_quilts().await?;
+        print_summary(
+            &self.config,
+            &active_address,
+            &self.edit_options.site_id,
+            &response,
+            &summary,
+        )?;
+        Ok(())
+    }
+
     async fn run_single_edit(
         &self,
     ) -> Result<(SuiAddress, SuiTransactionBlockResponse, SiteDataDiffSummary)> {
@@ -252,13 +264,89 @@ impl SiteEditor<EditOptions> {
             self.config.walrus_client(),
             ws_resources.clone(),
             ws_resources_path.clone(),
+            self.edit_options.publish_options.max_concurrent,
         )
         .await?;
         display::action(format!(
             "Parsing the directory {} and locally computing blob IDs",
             self.directory().to_string_lossy()
         ));
-        let (local_site_data, quilt_inputs) = resource_manager.read_dir(self.directory()).await?;
+        let local_site_data = resource_manager.read_dir(self.directory()).await?;
+        display::done();
+        tracing::debug!(?local_site_data, "resources loaded from directory");
+
+        let site_metadata = match ws_resources.clone() {
+            Some(value) => value.metadata,
+            None => None,
+        };
+
+        let site_name = ws_resources.as_ref().and_then(|r| r.site_name.clone());
+
+        let mut site_manager = SiteManager::new(
+            self.config.clone(),
+            self.edit_options.site_id,
+            self.edit_options.blob_options.clone(),
+            self.edit_options.publish_options.walrus_options.clone(),
+            site_metadata,
+            self.edit_options.site_name.clone().or(site_name),
+            self.edit_options.publish_options.max_parallel_stores,
+        )
+        .await?;
+
+        let (response, summary) = site_manager.update_site(&local_site_data).await?;
+
+        let path_for_saving =
+            ws_resources_path.unwrap_or_else(|| self.directory().join(DEFAULT_WS_RESOURCES_FILE));
+
+        persist_site_identifier(
+            &self.edit_options.site_id,
+            &site_manager,
+            &response,
+            ws_resources,
+            &path_for_saving,
+        )?;
+
+        Ok((site_manager.active_address()?, response, summary))
+    }
+
+    async fn run_single_edit_quilts(
+        &self,
+    ) -> Result<(SuiAddress, SuiTransactionBlockResponse, SiteDataDiffSummary)> {
+        if self.edit_options.publish_options.list_directory {
+            display::action(format!("Preprocessing: {}", self.directory().display()));
+            Preprocessor::preprocess(self.directory())?;
+            display::done();
+        }
+
+        // Note: `load_ws_resources` again. We already loaded them when parsing the name.
+        let (ws_resources, ws_resources_path) = load_ws_resources(
+            self.edit_options
+                .publish_options
+                .walrus_options
+                .ws_resources
+                .as_deref(),
+            self.directory(),
+        )?;
+        if let Some(path) = ws_resources_path.as_ref() {
+            println!(
+                "Using the Walrus sites resources file: {}",
+                path.to_string_lossy()
+            );
+        }
+
+        let mut resource_manager = ResourceManager::new(
+            self.config.walrus_client(),
+            ws_resources.clone(),
+            ws_resources_path.clone(),
+            self.edit_options.publish_options.max_concurrent,
+        )
+        .await?;
+        display::action(format!(
+            "Parsing the directory {} and locally computing Quilt IDs",
+            self.directory().to_string_lossy()
+        ));
+        let (local_site_data, quilt_inputs) =
+            resource_manager.read_quilts_dir(self.directory()).await?;
         display::done();
         tracing::debug!(?local_site_data, "resources loaded from directory");
 
@@ -281,7 +369,7 @@ impl SiteEditor<EditOptions> {
         .await?;
 
         let (response, summary) = site_manager
-            .update_site(&local_site_data, quilt_inputs)
+            .publish_site_with_quilts(&local_site_data, quilt_inputs)
             .await?;
 
         let path_for_saving =

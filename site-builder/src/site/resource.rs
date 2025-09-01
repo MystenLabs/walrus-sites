@@ -8,13 +8,14 @@ use std::{
     fmt::{self, Display},
     fs,
     io::Write,
-    num::NonZeroU16,
+    num::{NonZeroU16, NonZeroUsize},
     path::{Path, PathBuf},
 };
 
 use anyhow::{anyhow, Context, Result};
 use fastcrypto::hash::{HashFunction, Sha256};
 use flate2::{write::GzEncoder, Compression};
+use futures::{stream, StreamExt};
 use move_core_types::u256::U256;
 use regex::Regex;
 
@@ -272,6 +273,8 @@ pub(crate) struct ResourceManager {
     pub ws_resources_path: Option<PathBuf>,
     /// The number of shards of the Walrus system.
     pub n_shards: NonZeroU16,
+    /// The maximum number of concurrent calls to the walrus cli for computing the blob ID.
+    pub max_concurrent: Option<NonZeroUsize>,
 }
 
 impl ResourceManager {
@@ -279,6 +282,7 @@ impl ResourceManager {
         walrus: Walrus,
         ws_resources: Option<WSResources>,
         ws_resources_path: Option<PathBuf>,
+        max_concurrent: Option<NonZeroUsize>,
     ) -> Result<Self> {
         let n_shards = walrus.n_shards().await?;
 
@@ -301,11 +305,10 @@ impl ResourceManager {
             ws_resources,
             ws_resources_path,
             n_shards,
-            // max_concurrent,
+            max_concurrent,
         })
     }
 
-    // TODO(nikos): Probably remove
     /// Read a resource at a path.
     ///
     /// Ignores empty files.
@@ -506,10 +509,10 @@ impl ResourceManager {
                 full_path.to_string_lossy()
             ))?;
 
-        // println!(
-        //     "dry_run output: {}",
-        //     serde_json::to_string_pretty(&dry_run)?
-        // );
+        println!(
+            "dry_run output: {}",
+            serde_json::to_string_pretty(&dry_run)?
+        );
 
         let blob_id = dry_run.quilt_blob_output.blob_id;
 
@@ -608,7 +611,49 @@ impl ResourceManager {
     }
 
     /// Recursively iterate a directory and load all [`Resources`][Resource] within.
-    pub async fn read_dir(&mut self, root: &Path) -> Result<(SiteData, Vec<Vec<QuiltBlobInput>>)> {
+    pub async fn read_dir(&mut self, root: &Path) -> Result<SiteData> {
+        let resource_paths = Self::iter_dir(root)?;
+        if resource_paths.is_empty() {
+            return Ok(SiteData::empty());
+        }
+
+        let futures = resource_paths
+            .iter()
+            .map(|full_path| {
+                full_path_to_resource_path(full_path, root)
+                    .map(|resource_path| self.read_single_blob_resource(full_path, resource_path))
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        // Limit the amount of futures awaited concurrently.
+        let concurrency_limit = self
+            .max_concurrent
+            .map(NonZeroUsize::get)
+            .unwrap_or_else(|| resource_paths.len());
+
+        let mut stream = stream::iter(futures).buffer_unordered(concurrency_limit);
+
+        let mut resources = ResourceSet::empty();
+        while let Some(resource) = stream.next().await {
+            resources.extend(resource?);
+        }
+
+        Ok(SiteData::new(
+            resources,
+            self.ws_resources
+                .as_ref()
+                .and_then(|config| config.routes.clone()),
+            self.ws_resources
+                .as_ref()
+                .and_then(|config| config.metadata.clone()),
+            self.ws_resources
+                .as_ref()
+                .and_then(|config| config.site_name.clone()),
+        ))
+    }
+
+    /// Recursively iterate a directory and load all [`Resources`][Resource] within.
+    pub async fn read_quilts_dir(&mut self, root: &Path) -> Result<(SiteData, Vec<Vec<QuiltBlobInput>>)> {
         let resource_paths = Self::iter_dir(root)?;
         if resource_paths.is_empty() {
             return Ok((SiteData::empty(), vec![]));

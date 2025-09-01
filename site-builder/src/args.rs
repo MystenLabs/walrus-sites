@@ -288,6 +288,14 @@ pub enum Commands {
         #[arg(short, long)]
         site_name: Option<String>,
     },
+    /// Publish a new site on Sui using Quilts
+    QuiltsPublish {
+        #[clap(flatten)]
+        publish_options: PublishOptions,
+        /// The name of the site.
+        #[arg(short, long)]
+        site_name: Option<String>,
+    },
     /// Update an existing site.
     Update {
         #[clap(flatten)]
@@ -384,9 +392,9 @@ pub struct PublishOptions {
     /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
     #[arg(long)]
     pub list_directory: bool,
-    /// Deprecated. Quilt IDs are computed sequentially.
+    // TODO: Deprecate: Quilt IDs are computed sequentially.
+    /// The maximum number of concurrent calls to the Walrus CLI for the computation of blob IDs.
     #[arg(long)]
-    #[deprecated(note = "This setting is being removed")]
     pub max_concurrent: Option<NonZeroUsize>,
     /// The maximum number of blobs that can be stored concurrently.
     ///

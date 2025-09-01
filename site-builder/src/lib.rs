@@ -121,6 +121,21 @@ async fn run_internal(
                 .run()
                 .await?
         }
+        Commands::QuiltsPublish {
+            publish_options,
+            site_name,
+        } => {
+            SiteEditor::new(context, config)
+                .with_edit_options(
+                    publish_options,
+                    None,
+                    site_name,
+                    ContinuousEditing::Once,
+                    BlobManagementOptions::no_status_check(),
+                )
+                .run_quilts()
+                .await?
+        }
         #[allow(deprecated)]
         Commands::Update {
             publish_options,
@@ -176,9 +191,13 @@ async fn run_internal(
                 .as_ref()
                 .map(WSResources::read)
                 .transpose()?;
-            let resource_manager =
-                ResourceManager::new(config.walrus_client(), ws_res, common.ws_resources.clone())
-                    .await?;
+            let resource_manager = ResourceManager::new(
+                config.walrus_client(),
+                ws_res,
+                common.ws_resources.clone(),
+                None,
+            )
+            .await?;
             let resource = resource_manager
                 .read_single_blob_resource(&resource, path)
                 .await?

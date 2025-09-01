@@ -346,7 +346,6 @@ pub struct QuiltStoreResult {
     pub stored_quilt_blobs: Vec<StoredQuiltPatch>,
 }
 
-// TODO remove serialize? It helps with debugging structs (json instead of rust format).
 /// The output of the `store-quilt --dry-run` command.
 #[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize, Serialize)]
