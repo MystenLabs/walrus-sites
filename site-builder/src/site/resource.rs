@@ -393,7 +393,7 @@ impl ResourceManager {
         &mut self,
         full_path: &Path,
         resource_paths: Vec<String>,
-    ) -> Result<Vec<Resource>> {
+    ) -> Result<(Vec<Resource>, Vec<QuiltBlobInput>)> {
         // Struct used only for readability of the output in the below iteration
         #[derive(Debug)]
         struct ResourceData {
@@ -484,15 +484,15 @@ impl ResourceManager {
             .into_iter()
             .flatten()
             .unzip();
-        println!("resource_data.len(): {}", resource_data.len());
-        println!("resource_data: {resource_data:#?}");
+        // println!("resource_data.len(): {}", resource_data.len());
+        // println!("resource_data: {resource_data:#?}");
 
         // Hack, unecessary extra call to dry-run to get the blob-id
         // TODO(nikos): Test that dry-run patches returned are the same as the normal run.
         let dry_run = self
             .walrus
             .dry_run_store_quilt(
-                StoreQuiltInput::Blobs(blob_inputs),
+                StoreQuiltInput::Blobs(blob_inputs.clone()),
                 EpochArg {
                     epochs: Some(crate::args::EpochCountOrMax::default()),
                     ..Default::default()
@@ -502,15 +502,20 @@ impl ResourceManager {
             )
             .await
             .context(format!(
-                "error while computing the blob id for path: {}",
+                "error while computing the blob id for resources in path: {}",
                 full_path.to_string_lossy()
             ))?;
+
+        // println!(
+        //     "dry_run output: {}",
+        //     serde_json::to_string_pretty(&dry_run)?
+        // );
 
         let blob_id = dry_run.quilt_blob_output.blob_id;
 
         let QuiltIndex::V1(QuiltIndexV1 { quilt_patches }) = dry_run.quilt_index;
 
-        Ok(resource_data
+        let resources = resource_data
             .into_iter()
             .zip(quilt_patches.into_iter().skip(1)) // skip quilt-index
             .map(
@@ -544,7 +549,9 @@ impl ResourceManager {
                     )
                 },
             )
-            .collect())
+            .collect();
+
+        Ok((resources, blob_inputs))
     }
 
     ///  Derives the HTTP headers for a resource based on the ws-resources.yaml.
@@ -593,37 +600,42 @@ impl ResourceManager {
     }
 
     /// Recursively iterate a directory and load all [`Resources`][Resource] within.
-    pub async fn read_dir(&mut self, root: &Path) -> Result<SiteData> {
+    pub async fn read_dir(&mut self, root: &Path) -> Result<(SiteData, Vec<Vec<QuiltBlobInput>>)> {
         let resource_paths = Self::iter_dir(root)?;
         if resource_paths.is_empty() {
-            return Ok(SiteData::empty());
+            return Ok((SiteData::empty(), vec![]));
         }
 
         // TODO(nikos): we split per max-quilts but there may be also other limits like max_size.
         // TODO(nikos): Investigate whether indeed max_files == n_cols - 1 or if it is that one file
         // takes more than a column, max_files becomes n_cols - 2
         let mut resources_set = ResourceSet::empty();
+        let mut quilt_inputs = vec![];
         for paths_in_quilt in resource_paths.chunks(Walrus::max_quilts(self.n_shards) as usize) {
             let rel_paths = paths_in_quilt
                 .iter()
                 .map(|full_path| full_path_to_resource_path(full_path, root))
                 .collect::<Result<Vec<String>>>()?;
-            let resources = self.read_resource_chunk(root, rel_paths).await?;
+            let (resources, store_quilt_input) = self.read_resource_chunk(root, rel_paths).await?;
 
             resources_set.extend(resources);
+            quilt_inputs.push(store_quilt_input);
         }
 
-        Ok(SiteData::new(
-            resources_set,
-            self.ws_resources
-                .as_ref()
-                .and_then(|config| config.routes.clone()),
-            self.ws_resources
-                .as_ref()
-                .and_then(|config| config.metadata.clone()),
-            self.ws_resources
-                .as_ref()
-                .and_then(|config| config.site_name.clone()),
+        Ok((
+            SiteData::new(
+                resources_set,
+                self.ws_resources
+                    .as_ref()
+                    .and_then(|config| config.routes.clone()),
+                self.ws_resources
+                    .as_ref()
+                    .and_then(|config| config.metadata.clone()),
+                self.ws_resources
+                    .as_ref()
+                    .and_then(|config| config.site_name.clone()),
+            ),
+            quilt_inputs,
         ))
     }
 

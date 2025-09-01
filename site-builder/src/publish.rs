@@ -258,7 +258,7 @@ impl SiteEditor<EditOptions> {
             "Parsing the directory {} and locally computing blob IDs",
             self.directory().to_string_lossy()
         ));
-        let local_site_data = resource_manager.read_dir(self.directory()).await?;
+        let (local_site_data, quilt_inputs) = resource_manager.read_dir(self.directory()).await?;
         display::done();
         tracing::debug!(?local_site_data, "resources loaded from directory");
 
@@ -280,7 +280,9 @@ impl SiteEditor<EditOptions> {
         )
         .await?;
 
-        let (response, summary) = site_manager.update_site(&local_site_data).await?;
+        let (response, summary) = site_manager
+            .update_site(&local_site_data, quilt_inputs)
+            .await?;
 
         let path_for_saving =
             ws_resources_path.unwrap_or_else(|| self.directory().join(DEFAULT_WS_RESOURCES_FILE));

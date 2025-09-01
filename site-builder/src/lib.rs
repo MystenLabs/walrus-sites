@@ -176,12 +176,9 @@ async fn run_internal(
                 .as_ref()
                 .map(WSResources::read)
                 .transpose()?;
-            let resource_manager = ResourceManager::new(
-                config.walrus_client(),
-                ws_res,
-                common.ws_resources.clone(),
-            )
-            .await?;
+            let resource_manager =
+                ResourceManager::new(config.walrus_client(), ws_res, common.ws_resources.clone())
+                    .await?;
             let resource = resource_manager
                 .read_single_blob_resource(&resource, path)
                 .await?

@@ -3,7 +3,7 @@
 
 use std::{collections::BTreeSet, num::NonZeroUsize, str::FromStr, time::Duration};
 
-use anyhow::{anyhow, Error, Result};
+use anyhow::{anyhow, Context, Error, Result};
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{rpc_types::SuiTransactionBlockResponse, wallet_context::WalletContext};
 use sui_types::{
@@ -30,7 +30,12 @@ use crate::{
     summary::SiteDataDiffSummary,
     types::{Metadata, MetadataOp, SiteNameOp},
     util::{get_site_id_from_response, sign_and_send_ptb},
-    walrus::{types::BlobId, Walrus},
+    walrus::{
+        command::{QuiltBlobInput, StoreQuiltInput},
+        output::QuiltStoreResult,
+        types::BlobId,
+        Walrus,
+    },
 };
 
 const MAX_RESOURCES_PER_PTB: usize = 200;
@@ -111,6 +116,7 @@ impl SiteManager {
     pub async fn update_site(
         &mut self,
         local_site_data: &SiteData,
+        quilt_inputs: Vec<Vec<QuiltBlobInput>>,
     ) -> Result<(SuiTransactionBlockResponse, SiteDataDiffSummary)> {
         tracing::debug!(?self.site_id, "creating or updating site");
         let retriable_client = self.sui_client().await?;
@@ -127,17 +133,33 @@ impl SiteManager {
 
         let site_updates = local_site_data.diff(&existing_site);
 
-        let walrus_candidate_set = if self.blob_options.is_check_extend() {
-            // We need to check the status of all blobs: Return the full list of existing and added
-            // blobs as possible updates.
-            existing_site.replace_all(local_site_data)
-        } else {
-            // We only need to upload the new blobs.
-            site_updates.clone()
-        };
+        // This whole diff logic is now outdated.
+        // TODO: Update strategies
+        // let walrus_candidate_set = if self.blob_options.is_check_extend() {
+        //     // We need to check the status of all blobs: Return the full list of existing and added
+        //     // blobs as possible updates.
+        //     existing_site.replace_all(local_site_data)
+        // } else {
+        //     // We only need to upload the new blobs.
+        //     site_updates.clone()
+        // };
+
         // IMPORTANT: Perform the store operations on Walrus first, to ensure zero "downtime".
-        self.select_and_store_to_walrus(&walrus_candidate_set)
-            .await?;
+        // self.select_and_store_single_blob_resources_to_walrus(&walrus_candidate_set)
+        //     .await?;
+
+        if self.walrus_options.dry_run {
+            // TODO(nikos): Maybe move inside ResourceManager::read_dir
+            todo!("Ask for permission on dry-run storage cost");
+        }
+
+        // Store quilts sequentially.
+        for quilt_file_inputs in quilt_inputs {
+            let _resp = self
+                .store_resource_quilt_to_walrus(quilt_file_inputs)
+                .await?;
+            // println!("resp: {}", serde_json::to_string_pretty(&_resp)?);
+        }
 
         // Check if there are any updates to the site on-chain.
         let result = if site_updates.has_updates() {
@@ -160,7 +182,7 @@ impl SiteManager {
     }
 
     /// Selects the necessary walrus store operations and executes them.
-    async fn select_and_store_to_walrus(
+    async fn select_and_store_single_blob_resources_to_walrus(
         &mut self,
         walrus_candidate_set: &SiteDataDiff<'_>,
     ) -> Result<()> {
@@ -168,7 +190,9 @@ impl SiteManager {
 
         if !walrus_updates.is_empty() {
             if self.walrus_options.dry_run {
-                let total_storage_cost = self.dry_run_walrus_single_blob_store(&walrus_updates).await?;
+                let total_storage_cost = self
+                    .dry_run_walrus_single_blob_store(&walrus_updates)
+                    .await?;
                 // Before doing the actual execution, perform a dry run
                 display::action(format!(
                     "Estimated Storage Cost for this publish/update (Gas Cost Excluded): {total_storage_cost} FROST"
@@ -185,13 +209,17 @@ impl SiteManager {
                     return Err(anyhow!("Update cancelled by user"));
                 }
             }
-            self.store_to_walrus(&walrus_updates).await?;
+            self.store_single_blob_resources_to_walrus(&walrus_updates)
+                .await?;
         }
         Ok(())
     }
 
     /// Publishes the resources to Walrus.
-    async fn store_to_walrus(&mut self, walrus_updates: &[&ResourceOp<'_>]) -> Result<()> {
+    async fn store_single_blob_resources_to_walrus(
+        &mut self,
+        walrus_updates: &[&ResourceOp<'_>],
+    ) -> Result<()> {
         for (idx, update_set) in walrus_updates
             .chunks(self.max_parallel_stores.get())
             .enumerate()
@@ -421,7 +449,8 @@ impl SiteManager {
                 return Err(anyhow!("Update cancelled by user"));
             }
         }
-        self.store_to_walrus(&walrus_ops).await?;
+        self.store_single_blob_resources_to_walrus(&walrus_ops)
+            .await?;
 
         // Create the PTB
         tracing::debug!("modifying the site object on chain");
@@ -433,6 +462,30 @@ impl SiteManager {
         )
         .await?;
         Ok(())
+    }
+
+    async fn store_resource_quilt_to_walrus(
+        &mut self,
+        file_inputs: Vec<QuiltBlobInput>,
+    ) -> Result<QuiltStoreResult> {
+        let epoch_arg = self.walrus_options.epoch_arg.clone();
+        self
+            .walrus
+            .store_quilt(
+                StoreQuiltInput::Blobs(file_inputs.clone()),
+                epoch_arg,
+                false,
+                !self.walrus_options.permanent,
+            )
+            .await
+            .context(format!(
+                "error while storing quilt for resources: {}",
+                file_inputs
+                    .iter()
+                    .map(|inp| inp.path.to_string_lossy())
+                    .collect::<Vec<_>>()
+                    .join("\",\"")
+            ))
     }
 
     async fn sign_and_send_ptb(
