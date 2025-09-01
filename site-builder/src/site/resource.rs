@@ -147,68 +147,6 @@ impl<'a> ResourceOp<'a> {
     }
 }
 
-/// A summary of the operations performed by the site builder.
-#[derive(Debug, Clone)]
-pub(crate) struct ResourceOpSummary {
-    operation: String,
-    path: String,
-    blob_id: BlobId,
-}
-
-impl<'a> From<&ResourceOp<'a>> for ResourceOpSummary {
-    fn from(source: &ResourceOp<'a>) -> Self {
-        let (op, info) = match source {
-            ResourceOp::Deleted(resource) => ("deleted".to_owned(), &resource.info),
-            ResourceOp::Created(resource) => ("created".to_owned(), &resource.info),
-            ResourceOp::Unchanged(resource) => ("unchanged".to_owned(), &resource.info),
-        };
-        ResourceOpSummary {
-            operation: op,
-            path: info.path.clone(),
-            blob_id: info.blob_id,
-        }
-    }
-}
-
-impl Display for ResourceOpSummary {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{} resource {} with blob ID {}",
-            self.operation, self.path, self.blob_id
-        )
-    }
-}
-
-pub(crate) struct OperationsSummary(pub Vec<ResourceOpSummary>);
-
-impl<'a> From<&Vec<ResourceOp<'a>>> for OperationsSummary {
-    fn from(source: &Vec<ResourceOp<'a>>) -> Self {
-        Self(source.iter().map(ResourceOpSummary::from).collect())
-    }
-}
-
-impl<'a> From<Vec<ResourceOp<'a>>> for OperationsSummary {
-    fn from(source: Vec<ResourceOp<'a>>) -> Self {
-        Self::from(&source)
-    }
-}
-
-impl Display for OperationsSummary {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.0.is_empty() {
-            return write!(f, "No operations need to be performed.");
-        }
-        let ops = self
-            .0
-            .iter()
-            .map(|s| format!("  - {s}"))
-            .collect::<Vec<_>>()
-            .join("\n");
-        write!(f, "Operations performed:\n{ops}")
-    }
-}
-
 /// A set of resources composing a site.
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ResourceSet {
