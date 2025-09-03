@@ -24,6 +24,7 @@ use regex::Regex;
 use super::SiteData;
 use crate::{
     args::EpochArg,
+    display,
     publish::BlobManagementOptions,
     site::{config::WSResources, content::ContentType},
     types::{HttpHeaders, SuiResource, VecMap},
@@ -722,19 +723,34 @@ impl ResourceManager {
         let chunks = resource_file_inputs
             .into_iter()
             .chunks(Walrus::max_quilts(self.n_shards) as usize);
-        // TODO: Dry-run
+        // TODO: Test Dry-run
         if dry_run {
             // similar but not exactly
-        //     let mut resources_set = ResourceSet::empty();
-        //     for chunk in &chunks {
-        //         // TODO: Not collect and recollect
-        //         let (res_data, quilt_file_inputs): (Vec<_>, Vec<_>) = chunk.unzip();
-        //         let resources = self
-        //             .store_resource_data_into_quilt(res_data, quilt_file_inputs)
-        //             .await?;
-        //         resources_set.extend(resources);
-        //     }
-                todo!("Dry run and ask for user confirmation on cost");
+            //     let mut resources_set = ResourceSet::empty();
+            let mut total_storage_cost = 0;
+            for chunk in &chunks {
+                // TODO(nikos): Not collect and recollect
+                // Here res-data and quilt-file-inputs are paired. By unzipping we lose that readable
+                // in-type information.
+                let (_, quilt_file_inputs): (Vec<_>, Vec<_>) = chunk.unzip();
+                let wal_storage_cost = self.dry_run_resource_chunk(quilt_file_inputs).await?;
+                total_storage_cost += wal_storage_cost;
+            }
+
+            display::action(format!(
+                    "Estimated Storage Cost for this publish/update (Gas Cost Excluded): {total_storage_cost} FROST"
+                ));
+
+            // Add user confirmation prompt.
+            display::action("Waiting for user confirmation...");
+            if !dialoguer::Confirm::new()
+                .with_prompt("Do you want to proceed with these updates?")
+                .default(true)
+                .interact()?
+            {
+                display::error("Update cancelled by user");
+                return Err(anyhow!("Update cancelled by user"));
+            }
         }
 
         // TODO(nikos): we split per max-quilts but there may be also other limits like max_size.
@@ -743,7 +759,7 @@ impl ResourceManager {
         let mut resources_set = ResourceSet::empty();
         for chunk in &chunks {
             // TODO(nikos): Not collect and recollect.
-            // here res-data and quilt-file-inputs are paired. By unzipping we lose that readable
+            // Here res-data and quilt-file-inputs are paired. By unzipping we lose that readable
             // in-type information.
             let (res_data, quilt_file_inputs): (Vec<_>, Vec<_>) = chunk.unzip();
             let resources = self
