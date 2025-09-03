@@ -254,7 +254,7 @@ impl SiteEditor<EditOptions> {
         display::done();
         tracing::debug!(?local_site_data, "resources loaded from directory");
 
-        let (response, summary) = site_manager.update_site(&local_site_data).await?;
+        let (response, summary) = site_manager.update_site(&local_site_data, true).await?;
 
         self.persist_site_identifier(resource_manager, &site_manager, &response)?;
 
@@ -279,10 +279,10 @@ impl SiteEditor<EditOptions> {
             .read_dir_and_store_quilts(self.directory(), dry_run)
             .await?;
         display::done();
-        tracing::debug!(?local_site_data, "resources loaded from directory");
+        tracing::debug!(?local_site_data, "resources loaded and stored from directory");
 
         let (response, summary) = site_manager
-            .publish_site_with_quilts(&local_site_data)
+            .update_site(&local_site_data, false)
             .await?;
 
         self.persist_site_identifier(resource_manager, &site_manager, &response)?;
