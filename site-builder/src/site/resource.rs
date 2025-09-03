@@ -708,6 +708,7 @@ impl ResourceManager {
         root: &Path,
         dry_run: bool,
     ) -> Result<SiteData> {
+        // TODO: deduplicate
         let resource_paths = Self::iter_dir(root)?;
         if resource_paths.is_empty() {
             return Ok(SiteData::empty());
@@ -757,6 +758,7 @@ impl ResourceManager {
             resources_set.extend(resources);
         }
 
+        // TODO(nikos): deduplicate
         Ok(SiteData::new(
             resources_set,
             self.ws_resources

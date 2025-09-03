@@ -12,17 +12,14 @@ use localnode::{
     TestSetup,
 };
 
-// Important: For tests to pass, the system they are running on need to have walrus installed.
 #[tokio::test]
 async fn publish_snake() -> anyhow::Result<()> {
-    let mut cluster = TestSetup::start_local_test_cluster().await?;
+    let cluster = TestSetup::start_local_test_cluster().await?;
     let directory = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
         .join("examples")
         .join("snake");
-    println!("active_address: {}", cluster.wallet.inner.active_address()?);
-    println!("FN URL: {}", cluster.wallet.inner.get_rpc_url()?);
 
     let og_ws_resources = directory.join("ws-resources.json");
     // Create a temp file copy so the original doesn't get mutated during the test.
@@ -43,27 +40,17 @@ async fn publish_snake() -> anyhow::Result<()> {
         .build()?;
     site_builder::run(args).await?;
 
-    // use tokio::io::{self, AsyncBufReadExt, BufReader};
-    // println!("Press Enter to continue...");
-    // BufReader::new(io::stdin())
-    //     .read_line(&mut String::new())
-    //     .await
-    //     .unwrap();
-    // println!("Key pressed!");
     Ok(())
 }
 
-// Important: For tests to pass, the system they are running on need to have walrus installed.
 #[tokio::test]
 async fn quilts_publish_snake() -> anyhow::Result<()> {
-    let mut cluster = TestSetup::start_local_test_cluster().await?;
+    let cluster = TestSetup::start_local_test_cluster().await?;
     let directory = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
         .join("examples")
         .join("snake");
-    println!("active_address: {}", cluster.wallet.inner.active_address()?);
-    println!("FN URL: {}", cluster.wallet.inner.get_rpc_url()?);
 
     let og_ws_resources = directory.join("ws-resources.json");
     // Create a temp file copy so the original doesn't get mutated during the test.
@@ -84,12 +71,5 @@ async fn quilts_publish_snake() -> anyhow::Result<()> {
         .build()?;
     site_builder::run(args).await?;
 
-    // use tokio::io::{self, AsyncBufReadExt, BufReader};
-    // println!("Press Enter to continue...");
-    // BufReader::new(io::stdin())
-    //     .read_line(&mut String::new())
-    //     .await
-    //     .unwrap();
-    // println!("Key pressed!");
     Ok(())
 }

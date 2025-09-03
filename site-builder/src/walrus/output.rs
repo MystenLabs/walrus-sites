@@ -337,7 +337,7 @@ pub struct StorageInfoOutput {
 }
 
 /// Result when attempting to store a quilt.
-#[derive(Deserialize, Debug, Serialize)] // TODO Remove serialize?
+#[derive(Deserialize, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QuiltStoreResult {
     /// The result of storing the quilt data as a blob.

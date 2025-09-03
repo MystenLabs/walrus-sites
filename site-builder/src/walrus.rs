@@ -78,6 +78,7 @@ macro_rules! create_command {
     }};
 }
 
+// TODO: command-pub-fns inconsistent argument ordering, probably use `force` last as deprecated
 impl Walrus {
     pub const QUILT_PATCH_VERSION_1: u8 = 1;
     pub const QUILT_PATCH_SIZE: usize = 5;
@@ -182,7 +183,6 @@ impl Walrus {
         &mut self,
         store_quilt_input: StoreQuiltInput,
         epoch_arg: EpochArg,
-        // TODO: Make it match dry_run_store, force last
         force: bool,
         deletable: bool,
     ) -> Result<StoreQuiltDryRunOutput> {
