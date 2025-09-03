@@ -159,6 +159,7 @@ impl SiteManager {
         Ok((result, site_updates.summary(&self.blob_options)))
     }
 
+    // TODO(nikos): deduplicate
     /// Assumes quilts have been uploaded and resources have the necessary header key with patch id.
     pub async fn publish_site_with_quilts(
         &mut self,
@@ -481,30 +482,6 @@ impl SiteManager {
         .await?;
         Ok(())
     }
-
-    // async fn store_resource_quilt_to_walrus(
-    //     &mut self,
-    //     file_inputs: Vec<QuiltBlobInput>,
-    // ) -> Result<QuiltStoreResult> {
-    //     let epoch_arg = self.walrus_options.epoch_arg.clone();
-    //     self
-    //         .walrus
-    //         .store_quilt(
-    //             StoreQuiltInput::Blobs(file_inputs.clone()),
-    //             epoch_arg,
-    //             false,
-    //             !self.walrus_options.permanent,
-    //         )
-    //         .await
-    //         .context(format!(
-    //             "error while storing quilt for resources: {}",
-    //             file_inputs
-    //                 .iter()
-    //                 .map(|inp| inp.path.to_string_lossy())
-    //                 .collect::<Vec<_>>()
-    //                 .join("\",\"")
-    //         ))
-    // }
 
     async fn sign_and_send_ptb(
         &self,
