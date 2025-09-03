@@ -225,7 +225,9 @@ impl Walrus {
 
     // TODO: Theoretically we shouldn't need to do this ourselves, but I couldn't find how to get
     // this info from walrus.
-    pub fn max_quilts(n_shards: NonZeroU16) -> u16 {
+    // TODO: Is this correct? My guess is that if a file is very large, it should take up 2 of the
+    // spaces returned here
+    pub fn max_slots_in_quilt(n_shards: NonZeroU16) -> u16 {
         let (_n_rows, n_cols) = walrus_core::encoding::source_symbols_for_n_shards(n_shards);
         n_cols.get() - 1
     }

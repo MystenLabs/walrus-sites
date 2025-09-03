@@ -722,7 +722,10 @@ impl ResourceManager {
 
         let chunks = resource_file_inputs
             .into_iter()
-            .chunks(Walrus::max_quilts(self.n_shards) as usize);
+            // TODO(nikos): we split per max-quilts but there may be also other limits like max_size.
+            // TODO(nikos): Investigate whether indeed max_files == n_cols - 1 or if it is that one file
+            // takes more than a column, max_files becomes n_cols - 2
+            .chunks(Walrus::max_slots_in_quilt(self.n_shards) as usize);
         // TODO: Test Dry-run
         if dry_run {
             let mut total_storage_cost = 0;
@@ -748,9 +751,6 @@ impl ResourceManager {
             }
         }
 
-        // TODO(nikos): we split per max-quilts but there may be also other limits like max_size.
-        // TODO(nikos): Investigate whether indeed max_files == n_cols - 1 or if it is that one file
-        // takes more than a column, max_files becomes n_cols - 2
         let mut resources_set = ResourceSet::empty();
         for chunk in &chunks {
             let resources = self.store_resource_chunk_into_quilt(chunk).await?;
