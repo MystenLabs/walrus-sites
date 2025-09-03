@@ -20,6 +20,7 @@ use futures::{stream, StreamExt};
 use itertools::Itertools;
 use move_core_types::u256::U256;
 use regex::Regex;
+use tracing::debug;
 
 use super::SiteData;
 use crate::{
@@ -546,8 +547,8 @@ impl ResourceManager {
                     .join(", ")
             ))?;
 
-        println!(
-            "store_resp output: {}",
+        debug!(
+            "quilt store output: {}",
             serde_json::to_string_pretty(&store_resp)?
         );
 
