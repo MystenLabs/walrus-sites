@@ -688,18 +688,7 @@ impl ResourceManager {
             resources.extend(resource?);
         }
 
-        Ok(SiteData::new(
-            resources,
-            self.ws_resources
-                .as_ref()
-                .and_then(|config| config.routes.clone()),
-            self.ws_resources
-                .as_ref()
-                .and_then(|config| config.metadata.clone()),
-            self.ws_resources
-                .as_ref()
-                .and_then(|config| config.site_name.clone()),
-        ))
+        Ok(self.to_site_data(resources))
     }
 
     /// Recursively iterate a directory and load all [`Resources`][Resource] within.
@@ -708,7 +697,6 @@ impl ResourceManager {
         root: &Path,
         dry_run: bool,
     ) -> Result<SiteData> {
-        // TODO: deduplicate
         let resource_paths = Self::iter_dir(root)?;
         if resource_paths.is_empty() {
             return Ok(SiteData::empty());
@@ -758,19 +746,7 @@ impl ResourceManager {
             resources_set.extend(resources);
         }
 
-        // TODO(nikos): deduplicate
-        Ok(SiteData::new(
-            resources_set,
-            self.ws_resources
-                .as_ref()
-                .and_then(|config| config.routes.clone()),
-            self.ws_resources
-                .as_ref()
-                .and_then(|config| config.metadata.clone()),
-            self.ws_resources
-                .as_ref()
-                .and_then(|config| config.site_name.clone()),
-        ))
+        Ok(self.to_site_data(resources_set))
     }
 
     fn iter_dir(start: &Path) -> Result<Vec<PathBuf>> {
@@ -785,6 +761,21 @@ impl ResourceManager {
             }
         }
         Ok(resources)
+    }
+
+    fn to_site_data(&self, set: ResourceSet) -> SiteData {
+        SiteData::new(
+            set,
+            self.ws_resources
+                .as_ref()
+                .and_then(|config| config.routes.clone()),
+            self.ws_resources
+                .as_ref()
+                .and_then(|config| config.metadata.clone()),
+            self.ws_resources
+                .as_ref()
+                .and_then(|config| config.site_name.clone()),
+        )
     }
 }
 
