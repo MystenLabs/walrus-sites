@@ -256,23 +256,11 @@ impl SiteEditor<EditOptions> {
 
         let (response, summary) = site_manager.update_site(&local_site_data).await?;
 
-        // TODO: Deduplicate
-        let path_for_saving = resource_manager
-            .ws_resources_path
-            .unwrap_or_else(|| self.directory().join(DEFAULT_WS_RESOURCES_FILE));
-
-        persist_site_identifier(
-            &self.edit_options.site_id,
-            &site_manager,
-            &response,
-            resource_manager.ws_resources,
-            &path_for_saving,
-        )?;
+        self.persist_site_identifier(resource_manager, &site_manager, &response)?;
 
         Ok((site_manager.active_address()?, response, summary))
     }
 
-    // TODO(nikos): Deduplicate
     async fn run_single_edit_quilts(
         &self,
     ) -> Result<(SuiAddress, SuiTransactionBlockResponse, SiteDataDiffSummary)> {
@@ -297,18 +285,7 @@ impl SiteEditor<EditOptions> {
             .publish_site_with_quilts(&local_site_data)
             .await?;
 
-        // TODO: Deduplicate
-        let path_for_saving = resource_manager
-            .ws_resources_path
-            .unwrap_or_else(|| self.directory().join(DEFAULT_WS_RESOURCES_FILE));
-
-        persist_site_identifier(
-            &self.edit_options.site_id,
-            &site_manager,
-            &response,
-            resource_manager.ws_resources,
-            &path_for_saving,
-        )?;
+        self.persist_site_identifier(resource_manager, &site_manager, &response)?;
 
         Ok((site_manager.active_address()?, response, summary))
     }
@@ -393,6 +370,26 @@ impl SiteEditor<EditOptions> {
                 Err(e) => println!("Watch error!: {e}"),
             }
         }
+    }
+
+    fn persist_site_identifier(
+        &self,
+        resource_manager: ResourceManager,
+        site_manager: &SiteManager,
+        response: &SuiTransactionBlockResponse,
+    ) -> Result<()> {
+        // TODO: Deduplicate
+        let path_for_saving = resource_manager
+            .ws_resources_path
+            .unwrap_or_else(|| self.directory().join(DEFAULT_WS_RESOURCES_FILE));
+
+        persist_site_identifier(
+            &self.edit_options.site_id,
+            site_manager,
+            response,
+            resource_manager.ws_resources,
+            &path_for_saving,
+        )
     }
 }
 
@@ -480,7 +477,7 @@ fn persist_site_identifier(
     site_id: &Option<ObjectID>,
     site_manager: &SiteManager,
     response: &SuiTransactionBlockResponse,
-    ws_resources: Option<WSResources>,
+    ws_resources: Option<WSResources>, // TODO: theoretically we should only need a ref.
     path: &Path,
 ) -> Result<()> {
     match site_id {
