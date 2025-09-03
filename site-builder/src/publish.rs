@@ -11,9 +11,7 @@ use std::{
 use anyhow::{anyhow, Result};
 use notify::{RecursiveMode, Watcher};
 use sui_sdk::rpc_types::{
-    SuiExecutionStatus,
-    SuiTransactionBlockEffects,
-    SuiTransactionBlockResponse,
+    SuiExecutionStatus, SuiTransactionBlockEffects, SuiTransactionBlockResponse,
 };
 use sui_types::{
     base_types::{ObjectID, SuiAddress},
@@ -28,20 +26,13 @@ use crate::{
     preprocessor::Preprocessor,
     retry_client::RetriableSuiClient,
     site::{
-        builder::SitePtb,
-        config::WSResources,
-        manager::SiteManager,
-        resource::ResourceManager,
-        RemoteSiteFactory,
-        SITE_MODULE,
+        builder::SitePtb, config::WSResources, manager::SiteManager, resource::ResourceManager,
+        RemoteSiteFactory, SITE_MODULE,
     },
     summary::{SiteDataDiffSummary, Summarizable},
     util::{
-        get_site_id_from_response,
-        id_to_base36,
-        path_or_defaults_if_exist,
-        persist_site_id_and_name,
-        sign_and_send_ptb,
+        get_site_id_from_response, id_to_base36, path_or_defaults_if_exist,
+        persist_site_id_and_name, sign_and_send_ptb,
     },
 };
 
@@ -361,7 +352,7 @@ fn print_summary(
                     .effects
                     .as_ref()
                     .ok_or(anyhow::anyhow!("response did not contain effects"))?,
-            );
+            )?;
             println!("Created new site! \nNew site object ID: {id}");
             id
         }
@@ -434,7 +425,7 @@ fn persist_site_identifier(
                 .as_ref()
                 .ok_or_else(|| anyhow!("Transaction effects not found"))?;
 
-            let new_site_object_id = get_site_id_from_response(active_address, tx_effects);
+            let new_site_object_id = get_site_id_from_response(active_address, tx_effects)?;
 
             tracing::info!(
                 "New site published. New ObjectID ({}) will be persisted in ws-resources.json.",

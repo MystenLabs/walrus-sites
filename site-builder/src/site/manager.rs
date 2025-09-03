@@ -5,7 +5,10 @@ use std::{collections::BTreeSet, num::NonZeroUsize, str::FromStr, time::Duration
 
 use anyhow::{anyhow, Error, Result};
 use sui_keys::keystore::AccountKeystore;
-use sui_sdk::{rpc_types::SuiTransactionBlockResponse, wallet_context::WalletContext};
+use sui_sdk::{
+    rpc_types::{SuiExecutionStatus, SuiTransactionBlockEffects, SuiTransactionBlockResponse},
+    wallet_context::WalletContext,
+};
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
     transaction::{CallArg, ProgrammableTransaction},
@@ -15,10 +18,7 @@ use sui_types::{
 use super::{
     builder::SitePtb,
     resource::{Resource, ResourceOp},
-    RemoteSiteFactory,
-    SiteData,
-    SiteDataDiff,
-    SITE_MODULE,
+    RemoteSiteFactory, SiteData, SiteDataDiff, SITE_MODULE,
 };
 use crate::{
     args::WalrusStoreOptions,
@@ -142,9 +142,9 @@ impl SiteManager {
         // Check if there are any updates to the site on-chain.
         let result = if site_updates.has_updates() {
             display::action("Applying the Walrus Site object updates on Sui");
-            let result = self.execute_sui_updates(&site_updates).await?;
-            display::done();
-            result
+            self.execute_sui_updates(&site_updates)
+                .await
+                .inspect(|_| display::done())?
         } else {
             SuiTransactionBlockResponse::default()
         };
@@ -345,6 +345,13 @@ impl SiteManager {
             .sign_and_send_ptb(ptb.finish(), self.gas_coin_ref().await?, &retry_client)
             .await?;
 
+        // Check explicitly for execution failures.
+        if let Some(SuiTransactionBlockEffects::V1(effects)) = result.effects.as_ref() {
+            if let SuiExecutionStatus::Failure { error } = &effects.status {
+                anyhow::bail!("site ptb failed with error: {error}");
+            }
+        }
+
         let site_object_id = match &self.site_id {
             Some(site_id) => *site_id,
             None => {
@@ -352,7 +359,7 @@ impl SiteManager {
                     .effects
                     .as_ref()
                     .ok_or(anyhow!("the result did not have effects"))?;
-                get_site_id_from_response(self.active_address()?, resp)
+                get_site_id_from_response(self.active_address()?, resp)?
             }
         };
 
