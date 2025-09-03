@@ -392,7 +392,6 @@ pub struct PublishOptions {
     /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
     #[arg(long)]
     pub list_directory: bool,
-    // TODO: Deprecate: Quilt IDs are computed sequentially.
     /// The maximum number of concurrent calls to the Walrus CLI for the computation of blob IDs.
     #[arg(long)]
     pub max_concurrent: Option<NonZeroUsize>,
