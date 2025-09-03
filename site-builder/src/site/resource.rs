@@ -518,14 +518,14 @@ impl ResourceManager {
 
     // Extracts Blob-id and Quilt-patch-id from the walrus store response, in order to combine
     // it with ResourceData to return Resources
-    async fn store_resource_data_into_quilt(
+    async fn store_resource_chunk_into_quilt(
         &mut self,
-        resource_data: Vec<ResourceData>,
-        quilt_blob_inputs: Vec<QuiltBlobInput>,
+        res_data_and_quilt_files: impl Iterator<Item = (ResourceData, QuiltBlobInput)>,
     ) -> Result<Vec<Resource>> {
         // println!("resource_data.len(): {}", resource_data.len());
         // println!("resource_data: {resource_data:#?}");
 
+        let (resource_data, quilt_blob_inputs): (Vec<_>, Vec<_>) = res_data_and_quilt_files.unzip();
         let mut store_resp = self
             .walrus
             .store_quilt(
@@ -725,13 +725,8 @@ impl ResourceManager {
             .chunks(Walrus::max_quilts(self.n_shards) as usize);
         // TODO: Test Dry-run
         if dry_run {
-            // similar but not exactly
-            //     let mut resources_set = ResourceSet::empty();
             let mut total_storage_cost = 0;
             for chunk in &chunks {
-                // TODO(nikos): Not collect and recollect
-                // Here res-data and quilt-file-inputs are paired. By unzipping we lose that readable
-                // in-type information.
                 let (_, quilt_file_inputs): (Vec<_>, Vec<_>) = chunk.unzip();
                 let wal_storage_cost = self.dry_run_resource_chunk(quilt_file_inputs).await?;
                 total_storage_cost += wal_storage_cost;
@@ -758,13 +753,7 @@ impl ResourceManager {
         // takes more than a column, max_files becomes n_cols - 2
         let mut resources_set = ResourceSet::empty();
         for chunk in &chunks {
-            // TODO(nikos): Not collect and recollect.
-            // Here res-data and quilt-file-inputs are paired. By unzipping we lose that readable
-            // in-type information.
-            let (res_data, quilt_file_inputs): (Vec<_>, Vec<_>) = chunk.unzip();
-            let resources = self
-                .store_resource_data_into_quilt(res_data, quilt_file_inputs)
-                .await?;
+            let resources = self.store_resource_chunk_into_quilt(chunk).await?;
             resources_set.extend(resources);
         }
 
