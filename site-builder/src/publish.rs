@@ -279,11 +279,12 @@ impl SiteEditor<EditOptions> {
             .read_dir_and_store_quilts(self.directory(), dry_run)
             .await?;
         display::done();
-        tracing::debug!(?local_site_data, "resources loaded and stored from directory");
+        tracing::debug!(
+            ?local_site_data,
+            "resources loaded and stored from directory"
+        );
 
-        let (response, summary) = site_manager
-            .update_site(&local_site_data, false)
-            .await?;
+        let (response, summary) = site_manager.update_site(&local_site_data, false).await?;
 
         self.persist_site_identifier(resource_manager, &site_manager, &response)?;
 
