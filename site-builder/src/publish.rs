@@ -345,8 +345,9 @@ impl SiteEditor<EditOptions> {
             "Parsing the directory {} and locally computing Quilt IDs",
             self.directory().to_string_lossy()
         ));
+        let dry_run = self.edit_options.publish_options.walrus_options.dry_run;
         let local_site_data = resource_manager
-            .read_dir_and_store_quilts(self.directory())
+            .read_dir_and_store_quilts(self.directory(), dry_run)
             .await?;
         display::done();
         tracing::debug!(?local_site_data, "resources loaded from directory");

@@ -179,11 +179,6 @@ impl SiteManager {
 
         let site_updates = local_site_data.diff(&existing_site);
 
-        if self.walrus_options.dry_run {
-            // TODO(nikos): Maybe move inside ResourceManager::read_dir
-            todo!("Ask for permission on dry-run storage cost");
-        }
-
         // Check if there are any updates to the site on-chain.
         let result = if site_updates.has_updates() {
             display::action("Applying the Walrus Site object updates on Sui");

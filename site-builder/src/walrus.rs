@@ -79,6 +79,9 @@ macro_rules! create_command {
 }
 
 impl Walrus {
+    pub const QUILT_PATCH_VERSION_1: u8 = 1;
+    pub const QUILT_PATCH_SIZE: usize = 5;
+    pub const QUILT_PATCH_ID_SIZE: usize = BlobId::LENGTH + Walrus::QUILT_PATCH_SIZE;
     /// Creates a new Walrus CLI controller.
     pub fn new(
         bin: String,
