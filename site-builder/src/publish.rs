@@ -361,7 +361,7 @@ fn print_summary(
                     .effects
                     .as_ref()
                     .ok_or(anyhow::anyhow!("response did not contain effects"))?,
-            );
+            )?;
             println!("Created new site! \nNew site object ID: {id}");
             id
         }
@@ -434,7 +434,7 @@ fn persist_site_identifier(
                 .as_ref()
                 .ok_or_else(|| anyhow!("Transaction effects not found"))?;
 
-            let new_site_object_id = get_site_id_from_response(active_address, tx_effects);
+            let new_site_object_id = get_site_id_from_response(active_address, tx_effects)?;
 
             tracing::info!(
                 "New site published. New ObjectID ({}) will be persisted in ws-resources.json.",

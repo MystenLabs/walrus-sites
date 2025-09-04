@@ -33,7 +33,7 @@ const SITES_CONFIG_NAME: &str = "./sites-config.yaml";
 pub async fn run(args: Args) -> anyhow::Result<()> {
     run_internal(args)
         .await
-        .inspect_err(|_| display::error("Error during execution"))
+        .inspect_err(|err| display::error(format!("Error during execution: {err}")))
 }
 
 // `Args` can currently only live in `main`, as it needs the `VERSION` constant which is created
