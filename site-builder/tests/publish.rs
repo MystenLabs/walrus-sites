@@ -28,7 +28,7 @@ async fn publish_snake() -> anyhow::Result<()> {
     fs::copy(&og_ws_resources, &temp_ws_resources)?;
 
     let args = ArgsBuilder::default()
-        .with_config(Some(cluster.sites_config.inner.1))
+        .with_config(Some(cluster.sites_config_path().to_owned()))
         .with_command(Commands::Publish {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory)
@@ -39,6 +39,13 @@ async fn publish_snake() -> anyhow::Result<()> {
         })
         .build()?;
     site_builder::run(args).await?;
+
+    let site = cluster.last_site_created().await?;
+    println!("site_id: {site:#?}");
+    println!(
+        "fields: {:#?}",
+        cluster.site_resources(*site.id.object_id()).await?
+    );
 
     Ok(())
 }
@@ -59,7 +66,7 @@ async fn quilts_publish_snake() -> anyhow::Result<()> {
     fs::copy(&og_ws_resources, &temp_ws_resources)?;
 
     let args = ArgsBuilder::default()
-        .with_config(Some(cluster.sites_config.inner.1))
+        .with_config(Some(cluster.sites_config_path().to_owned()))
         .with_command(Commands::QuiltsPublish {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory)

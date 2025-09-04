@@ -1,17 +1,32 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{fs::File, path::PathBuf, sync::Arc};
+use std::{
+    fs::File,
+    path::{Path, PathBuf},
+    str::FromStr,
+    sync::Arc,
+};
 
 use anyhow::{anyhow, bail};
-use site_builder::{args::GeneralArgs, config::Config as SitesConfig};
+use move_core_types::language_storage::StructTag;
+use site_builder::{
+    args::GeneralArgs,
+    config::Config as SitesConfig,
+    contracts,
+    types::{ResourceDynamicField, SiteFields, SuiResource},
+};
 use sui_move_build::BuildConfig;
 use sui_sdk::{
     rpc_types::{
         ObjectChange,
+        SuiData,
         SuiExecutionStatus,
+        SuiObjectDataOptions,
         SuiTransactionBlockEffectsAPI,
         SuiTransactionBlockResponseOptions,
+        SuiTransactionBlockResponseQuery,
+        TransactionFilter,
     },
     SuiClient,
     SuiClientBuilder,
@@ -21,6 +36,7 @@ use sui_types::{
     programmable_transaction_builder::ProgrammableTransactionBuilder,
     quorum_driver_types::ExecuteTransactionRequestType,
     transaction::TransactionData,
+    Identifier,
 };
 use tempfile::TempDir;
 use tokio::sync::Mutex as TokioMutex;
@@ -93,6 +109,113 @@ impl TestSetup {
             walrus_config,
             walrus_sites_package_id,
         })
+    }
+
+    pub fn sites_config_path(&self) -> &Path {
+        self.sites_config.inner.1.as_path()
+    }
+
+    pub async fn last_site_created(&self) -> anyhow::Result<SiteFields> {
+        let resp = self
+            .client
+            .read_api()
+            .query_transaction_blocks(
+                SuiTransactionBlockResponseQuery::new_with_filter(
+                    TransactionFilter::MoveFunction {
+                        package: self.walrus_sites_package_id,
+                        module: Some("site".to_string()),
+                        function: Some("new_site".to_string()),
+                    },
+                ),
+                None,
+                Some(1),
+                true,
+            )
+            .await?;
+
+        let first = resp
+            .data
+            .first()
+            .ok_or(anyhow!("No create site transaction found"))?;
+        let resp = self
+            .client
+            .read_api()
+            .get_transaction_with_options(
+                first.digest,
+                SuiTransactionBlockResponseOptions::new().with_object_changes(),
+            )
+            .await?;
+
+        let site_id = resp
+            .object_changes
+            .as_ref()
+            .expect("expected object_changes")
+            .iter()
+            .find_map(|chng| match chng {
+                ObjectChange::Created {
+                    object_type,
+                    object_id,
+                    ..
+                } if *object_type
+                    == StructTag {
+                        address: self.walrus_sites_package_id.into(),
+                        module: Identifier::from_str("site").unwrap(),
+                        name: Identifier::from_str("Site").unwrap(),
+                        type_params: vec![],
+                    } =>
+                {
+                    Some(*object_id)
+                }
+                _ => None,
+            })
+            .ok_or(anyhow!("Could not find site"))?;
+
+        contracts::get_sui_object(&self.client, site_id).await
+    }
+
+    pub async fn site_resources(&self, site_id: ObjectID) -> anyhow::Result<Vec<SuiResource>> {
+        // TODO paginate
+        let dfs = self
+            .client
+            .read_api()
+            .get_dynamic_fields(site_id, None, None)
+            .await?;
+        let ids = dfs
+            .data
+            .into_iter()
+            .map(|df| df.object_id)
+            .collect::<Vec<ObjectID>>();
+
+        let resource_fields = self
+            .client
+            .read_api()
+            .multi_get_object_with_options(ids, SuiObjectDataOptions::new().with_bcs().with_type())
+            .await?; // with_type?
+
+        Ok(resource_fields
+            .into_iter()
+            .map(|df| {
+                let Some(obj_bcs) = df.data.unwrap().bcs.unwrap().try_into_move() else {
+                    return Ok(None);
+                };
+                if !obj_bcs
+                    .type_
+                    .type_params
+                    .first()
+                    .unwrap()
+                    .to_canonical_string(false)
+                    .ends_with("::site::ResourcePath")
+                {
+                    return Ok(None);
+                };
+                Ok(Some(
+                    bcs::from_bytes::<ResourceDynamicField>(&obj_bcs.bcs_bytes)?.value,
+                ))
+            })
+            .collect::<anyhow::Result<Vec<Option<SuiResource>>>>()?
+            .into_iter()
+            .flatten()
+            .collect::<Vec<SuiResource>>())
     }
 }
 

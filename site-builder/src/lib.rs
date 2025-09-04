@@ -20,10 +20,15 @@ mod preprocessor;
 mod publish;
 mod retry_client;
 mod site;
+// TODO: This can be a standalone crate, helping integration testing and other projects using our
+// contract.
+pub use site::contracts;
 mod sitemap;
 mod suins;
 mod summary;
-mod types;
+// TODO: This can be a standalone crate, helping integration testing and other projects using our
+// contract.
+pub mod types;
 mod util;
 mod walrus;
 
