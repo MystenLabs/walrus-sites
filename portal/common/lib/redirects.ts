@@ -25,7 +25,6 @@ export function redirectToPortalURLResponse(
  * Redirects to the aggregator URL.
  */
 export function redirectToAggregatorUrlResponse(
-    scope: URL,
     blobId: string,
     aggregatorUrl: string,
 ): Response {
@@ -65,7 +64,7 @@ function makeRedirectResponse(url: string): Response {
  * Returns the url for the Portal, given a subdomain and a path.
  */
 function getPortalUrl(path: DomainDetails, scope: string, portalDomainNameLength?: number): string {
-    const scopeUrl = new URL(scope);
+    const scopeUrl = new URL(scope) as URL;
     const portalDomain = getDomain(scopeUrl, portalDomainNameLength);
     let portString = "";
     if (scopeUrl.port) {
