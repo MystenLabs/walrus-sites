@@ -15,7 +15,6 @@ export class QuiltPatch {
 	* which includes the version, start index, and end index bytes.
 	*/
 	public derive_id(): string {
-		// If quilt_blob_id starts with '0x', remove it.
 		const quilt_patch_internal_id = this.quilt_patch_internal_id.startsWith('0x')
 			? this.quilt_patch_internal_id.slice(2)
 			: this.quilt_patch_internal_id;
