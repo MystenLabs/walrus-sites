@@ -3,7 +3,7 @@
 
 import { DomainDetails } from "./types/index";
 import { getDomain } from "./domain_parsing";
-import { aggregatorEndpoint } from "./aggregator";
+import { blobAggregatorEndpoint } from "./aggregator";
 import { SuiObjectResponse } from "@mysten/sui/client";
 import logger from "./logger";
 
@@ -11,7 +11,9 @@ import logger from "./logger";
  * Redirects to the portal URL.
  */
 export function redirectToPortalURLResponse(
-    scope: URL, path: DomainDetails, portalDomainNameLength?: number
+    scope: URL,
+    path: DomainDetails,
+    portalDomainNameLength?: number,
 ): Response {
     // Redirect to the walrus site for the specified domain and path
     const redirectUrl = getPortalUrl(path, scope.href, portalDomainNameLength);
@@ -22,9 +24,12 @@ export function redirectToPortalURLResponse(
 /**
  * Redirects to the aggregator URL.
  */
-export function redirectToAggregatorUrlResponse(scope: URL, blobId: string, aggregatorUrl: string): Response {
+export function redirectToAggregatorUrlResponse(
+    blobId: string,
+    aggregatorUrl: string,
+): Response {
     // Redirect to the walrus site for the specified domain and path
-    const redirectUrl = aggregatorEndpoint(blobId, aggregatorUrl);
+    const redirectUrl = blobAggregatorEndpoint(blobId, aggregatorUrl);
     logger.info("Redirecting to the Walrus Blob link", { redirectUrl: redirectUrl });
     return makeRedirectResponse(redirectUrl.href);
 }
@@ -33,7 +38,9 @@ export function redirectToAggregatorUrlResponse(scope: URL, blobId: string, aggr
  * Checks if the object has a redirect in its Display representation.
  */
 export function checkRedirect(object: SuiObjectResponse): string | null {
-	logger.info("Checking if the request should be redirected (existing Display object)", {objectId: object.data.objectId})
+    logger.info("Checking if the request should be redirected (existing Display object)", {
+        objectId: object.data.objectId,
+    });
     if (object.data && object.data.display) {
         let display = object.data.display;
         // Check if "walrus site address" is set in the display field.
@@ -56,11 +63,8 @@ function makeRedirectResponse(url: string): Response {
 /**
  * Returns the url for the Portal, given a subdomain and a path.
  */
-function getPortalUrl(path: DomainDetails,
-    scope: string,
-    portalDomainNameLength?: number
-): string {
-    const scopeUrl = new URL(scope);
+function getPortalUrl(path: DomainDetails, scope: string, portalDomainNameLength?: number): string {
+    const scopeUrl = new URL(scope) as URL;
     const portalDomain = getDomain(scopeUrl, portalDomainNameLength);
     let portString = "";
     if (scopeUrl.port) {
