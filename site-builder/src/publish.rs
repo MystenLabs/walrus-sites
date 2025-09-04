@@ -464,7 +464,7 @@ fn print_summary(
 /// # Arguments
 ///
 /// * `site_id` - A reference to the `SiteIdentifier` which provides the object id if existing site,
-///     or the site_name if a new site
+///   or the site_name if a new site
 /// * `site_manager` - A reference to the `SiteManager` which provides access to the active address.
 /// * `response` - The transaction response containing the effects used to extract the new site ID.
 /// * `ws_resources` - The current workspace resources to be updated and saved.
