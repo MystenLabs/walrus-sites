@@ -33,7 +33,7 @@ const redirectToPortalURLTestCases: [string, DomainDetails, string][] = [
 describe("redirectToPortalURLResponse", () => {
     redirectToPortalURLTestCases.forEach(([input, path, expected]) => {
         test(`${input} with subdomain: ${path.subdomain} and path: ${path.path} -> ${expected}`, () => {
-            const scope = new URL(input);
+            const scope = new URL(input) as URL;
             const response = redirectToPortalURLResponse(scope, path);
             expect(response.status).toBe(302);
             expect(response.headers.get("Location")).toBe(expected);
@@ -62,8 +62,7 @@ const redirectToAggregatorUrlTestCases: [string, string, string][] = [
 describe("redirectToAggregatorUrlResponse", () => {
     redirectToAggregatorUrlTestCases.forEach(([input, blobId, expected]) => {
         test(`${input} with blobId: ${blobId} -> ${expected}`, () => {
-            const scope = new URL(input);
-            const response = redirectToAggregatorUrlResponse(scope, blobId, mockAggregatorUrl);
+            const response = redirectToAggregatorUrlResponse(blobId, mockAggregatorUrl);
             expect(response.status).toBe(302);
             expect(response.headers.get("Location")).toBe(expected);
         });
