@@ -11,7 +11,7 @@ export function blobAggregatorEndpoint(blob_id: string, aggregatorUrl: string): 
     if (aggregatorUrl.endsWith("/")) {
         throw new Error("Aggregator URL must not end with a slash.");
     }
-    return new URL(`${aggregatorUrl}/v1/blobs/${encodeURIComponent(blob_id)}`) as unknown as URL;
+    return new URL(`${aggregatorUrl}/v1/blobs/${encodeURIComponent(blob_id)}`) as URL;
 }
 
 /**
@@ -26,5 +26,5 @@ export function quiltAggregatorEndpoint(quilt_patch_id: string, aggregatorUrl: s
     }
     return new URL(
         `${aggregatorUrl}/v1/blobs/by-quilt-patch-id/${encodeURIComponent(quilt_patch_id)}`,
-    ) as unknown as URL;
+    ) as URL;
 }
