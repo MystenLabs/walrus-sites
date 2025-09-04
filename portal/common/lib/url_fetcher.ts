@@ -5,7 +5,7 @@ import {
     DomainDetails,
     isResource,
     optionalRangeToHeaders as optionalRangeToRequestHeaders,
-	Routes,
+    Routes,
 } from "./types/index";
 import { subdomainToObjectId, HEXtoBase36 } from "./objectId_operations";
 import { SuiNSResolver } from "./suins";
@@ -50,7 +50,7 @@ export class UrlFetcher {
         resolvedObjectId: string | null,
         blocklistChecker?: BlocklistChecker
     ): Promise<Response> {
-    	logger.info("Resolving the subdomain to an object ID and retrieving its resources", { subdomain: parsedUrl.subdomain, path: parsedUrl.path });
+        logger.info("Resolving the subdomain to an object ID and retrieving its resources", { subdomain: parsedUrl.subdomain, path: parsedUrl.path });
         if (!resolvedObjectId) {
             const resolveObjectResult = await this.resolveObjectId(parsedUrl);
             const isObjectId = typeof resolveObjectResult == "string";
@@ -125,22 +125,22 @@ export class UrlFetcher {
     async resolveObjectId(
         parsedUrl: DomainDetails,
     ): Promise<string | Response> {
-   		logger.info("Resolving the subdomain to an object ID", { subdomain: parsedUrl.subdomain });
+        logger.info("Resolving the subdomain to an object ID", { subdomain: parsedUrl.subdomain });
 
-    	// Resolve to an objectId using a hard-coded subdomain.
-    	const hardCodedObjectId = this.suinsResolver.hardcodedSubdomains(parsedUrl.subdomain);
-		if (hardCodedObjectId) return hardCodedObjectId;
+        // Resolve to an objectId using a hard-coded subdomain.
+        const hardCodedObjectId = this.suinsResolver.hardcodedSubdomains(parsedUrl.subdomain);
+        if (hardCodedObjectId) return hardCodedObjectId;
 
         // If b36 subdomains are supported, resolve them by converting them to a hex object id.
-		const isSuiNSDomain = parsedUrl.subdomain.includes(".");
-		const isb36Domain = !isSuiNSDomain;
+        const isSuiNSDomain = parsedUrl.subdomain.includes(".");
+        const isb36Domain = !isSuiNSDomain;
         if (this.b36DomainResolutionSupport && isb36Domain) {
             // Try to convert the subdomain to an object ID NOTE: This effectively _disables_ any SuiNs
             // name that is the base36 encoding of an object ID (i.e., a 32-byte string). This is
             // desirable, prevents people from getting suins names that are the base36 encoding the
             // object ID of a target site (with the goal of hijacking non-suins queries).
-			const resolvedB36toHex = subdomainToObjectId(parsedUrl.subdomain);
-			if (resolvedB36toHex) return resolvedB36toHex;
+            const resolvedB36toHex = subdomainToObjectId(parsedUrl.subdomain);
+            if (resolvedB36toHex) return resolvedB36toHex;
         }
 
         // Resolve the SuiNS domain to an object id.
@@ -154,7 +154,7 @@ export class UrlFetcher {
             return noObjectIdFound();
         } catch {
             logger.error(
-            	"Unable to reach the full node during suins domain resolution",
+                "Unable to reach the full node during suins domain resolution",
                 { subdomain: parsedUrl.subdomain }
             );
             return fullNodeFail();
@@ -178,15 +178,15 @@ export class UrlFetcher {
         logger.info("Successfully fetched resource!", { fetchedResourceResult: JSON.stringify(result) });
 
         const quilt_patch_internal_id = result.headers.get("x-wal-quilt-patch-internal-id")
-		let aggregator_endpoint: URL;
+        let aggregator_endpoint: URL;
         if (quilt_patch_internal_id) {
-        	const quilt_patch = new QuiltPatch(result.blob_id, quilt_patch_internal_id)
-         	const quilt_patch_id = quilt_patch.derive_id()
-         	logger.info("Resource is stored as a quilt patch.", { quilt_patch_id })
-        	aggregator_endpoint = quiltAggregatorEndpoint(quilt_patch_id, this.aggregatorUrl)
+            const quilt_patch = new QuiltPatch(result.blob_id, quilt_patch_internal_id)
+            const quilt_patch_id = quilt_patch.derive_id()
+            logger.info("Resource is stored as a quilt patch.", { quilt_patch_id })
+            aggregator_endpoint = quiltAggregatorEndpoint(quilt_patch_id, this.aggregatorUrl)
         } else {
-			logger.info("Resource is stored as a blob.", { blob_id:  result.blob_id })
-        	aggregator_endpoint = blobAggregatorEndpoint(result.blob_id, this.aggregatorUrl)
+            logger.info("Resource is stored as a blob.", { blob_id:  result.blob_id })
+            aggregator_endpoint = blobAggregatorEndpoint(result.blob_id, this.aggregatorUrl)
         }
 
         // We have a resource, get the range header.
@@ -271,7 +271,7 @@ export class UrlFetcher {
                     totalAttempts: retries + 1,
                     error: error instanceof Error ? error.message : error,
                 });
-				lastError = error;
+                lastError = error;
             }
 
             // Wait before retrying
