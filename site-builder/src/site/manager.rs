@@ -18,7 +18,10 @@ use sui_types::{
 use super::{
     builder::SitePtb,
     resource::{Resource, ResourceOp},
-    RemoteSiteFactory, SiteData, SiteDataDiff, SITE_MODULE,
+    RemoteSiteFactory,
+    SiteData,
+    SiteDataDiff,
+    SITE_MODULE,
 };
 use crate::{
     args::WalrusStoreOptions,
