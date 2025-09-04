@@ -71,7 +71,7 @@ self.addEventListener("fetch", async (event) => {
     // This will only work for service-worker portals.
     const walrusPath = getBlobIdLink(url);
     if (walrusPath) {
-        event.respondWith(redirectToAggregatorUrlResponse(scope, walrusPath, aggregatorUrl));
+        event.respondWith(redirectToAggregatorUrlResponse(walrusPath, aggregatorUrl));
         return;
     }
 
