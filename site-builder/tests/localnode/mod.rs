@@ -40,7 +40,15 @@ use sui_types::{
 };
 use tempfile::TempDir;
 use tokio::sync::Mutex as TokioMutex;
-use walrus_sdk::client::WalrusNodeClient;
+use walrus_sdk::{
+    client::WalrusNodeClient,
+    core::{
+        encoding::{quilt_encoding::QuiltStoreBlob, Primary},
+        BlobId,
+        QuiltPatchId,
+    },
+    error::ClientResult,
+};
 use walrus_service::test_utils::{test_cluster, StorageNodeHandle, TestCluster};
 use walrus_sui::{
     client::{contract_config::ContractConfig, SuiContractClient},
@@ -113,6 +121,26 @@ impl TestSetup {
 
     pub fn sites_config_path(&self) -> &Path {
         self.sites_config.inner.1.as_path()
+    }
+
+    pub async fn read_blob(&self, blob_id: &BlobId) -> ClientResult<Vec<u8>> {
+        self.cluster_state
+            .walrus_admin_client
+            .inner
+            .read_blob::<Primary>(blob_id)
+            .await
+    }
+
+    pub async fn read_quilt_patches<'a>(
+        &self,
+        quilt_ids: &[QuiltPatchId],
+    ) -> ClientResult<Vec<QuiltStoreBlob<'a>>> {
+        self.cluster_state
+            .walrus_admin_client
+            .inner
+            .quilt_client()
+            .get_blobs_by_ids(quilt_ids)
+            .await
     }
 
     pub async fn last_site_created(&self) -> anyhow::Result<SiteFields> {
