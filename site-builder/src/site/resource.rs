@@ -325,14 +325,11 @@ impl ResourceManager {
         })
     }
 
-    /// Read a resource at a path.
-    ///
-    /// Ignores empty files.
-    pub async fn read_single_blob_resource(
+    fn read_local_resource(
         &self,
         full_path: &Path,
         resource_path: String,
-    ) -> Result<Option<Resource>> {
+    ) -> Result<Option<ResourceData>> {
         if let Some(ws_path) = &self.ws_resources_path {
             if full_path == ws_path {
                 tracing::debug!(?full_path, "ignoring the ws-resources config file");
@@ -379,6 +376,41 @@ impl ResourceManager {
             .or_insert(content_type.to_string());
 
         let plain_content: Vec<u8> = std::fs::read(full_path)?;
+
+        // Hash the contents of the file - this will be contained in the site::Resource
+        // to verify the integrity of the blob when fetched from an aggregator.
+        let mut hash_function = Sha256::default();
+        hash_function.update(&plain_content);
+        let blob_hash: [u8; 32] = hash_function.finalize().digest;
+
+        Ok(Some(ResourceData {
+            unencoded_size: plain_content.len(),
+            resource_path,
+            full_path: full_path.to_owned(),
+            headers: HttpHeaders(http_headers),
+            blob_hash: U256::from_le_bytes(&blob_hash),
+        }))
+    }
+
+    /// Read a resource at a path.
+    ///
+    /// Ignores empty files.
+    pub async fn read_single_blob_resource(
+        &self,
+        full_path: &Path,
+        resource_path: String,
+    ) -> Result<Option<Resource>> {
+        let Some(ResourceData {
+            unencoded_size,
+            full_path,
+            resource_path,
+            headers,
+            blob_hash,
+        }) = self.read_local_resource(full_path, resource_path)?
+        else {
+            return Ok(None);
+        };
+
         let output = self
             .walrus
             .blob_id(full_path.to_owned(), Some(self.n_shards))
@@ -388,19 +420,13 @@ impl ResourceManager {
                 full_path.to_string_lossy()
             ))?;
 
-        // Hash the contents of the file - this will be contained in the site::Resource
-        // to verify the integrity of the blob when fetched from an aggregator.
-        let mut hash_function = Sha256::default();
-        hash_function.update(&plain_content);
-        let blob_hash: [u8; 32] = hash_function.finalize().digest;
-
         Ok(Some(Resource::new(
             resource_path,
-            full_path.to_owned(),
-            HttpHeaders(http_headers),
+            full_path,
+            headers,
             output.blob_id,
-            U256::from_le_bytes(&blob_hash),
-            plain_content.len(),
+            blob_hash,
+            unencoded_size,
         )))
     }
 
@@ -440,74 +466,18 @@ impl ResourceManager {
                         .strip_prefix('/')
                         .unwrap_or(resource_path.as_str()),
                 );
-                if let Some(ws_path) = &self.ws_resources_path {
-                    if &full_path == ws_path {
-                        tracing::debug!(?full_path, "ignoring the ws-resources config file");
-                        return Ok(None);
-                    }
-                }
-                // Skip if resource matches ignore patterns/
-                if self.is_ignored(&resource_path) {
-                    tracing::debug!(?resource_path, "ignoring resource due to ignore pattern");
-                    println!("ignoring resource due to ignore pattern: {resource_path:#?}");
+
+                let identifier = Some(str_to_base36(resource_path.as_str())?);
+                let Some(res_data) = self.read_local_resource(&full_path, resource_path)? else {
                     return Ok(None);
-                }
-
-                let mut http_headers: VecMap<String, String> =
-                    ResourceManager::derive_http_headers(&self.ws_resources, &resource_path);
-                let extension = full_path
-                    .extension()
-                    .unwrap_or(
-                        full_path
-                            .file_name()
-                            .expect("the path should not terminate in `..`"),
-                    )
-                    .to_str();
-
-                // Is Content-Encoding specified? Else, add default to headers.
-                http_headers
-                    .entry("content-encoding".to_string())
-                    .or_insert(
-                        // Currently we only support this (plaintext) content encoding
-                        // so no need to parse it as we do with content-type.
-                        "identity".to_string(),
-                    );
-
-                // Read the content type.
-                let content_type = ContentType::try_from_extension(extension.ok_or_else(|| {
-                    anyhow!("Could not read file extension for {}", full_path.display())
-                })?)
-                .unwrap_or(ContentType::ApplicationOctetstream); // Default ContentType.
-
-                // If content-type not specified in ws-resources.yaml, parse it from the extension.
-                http_headers
-                    .entry("content-type".to_string())
-                    .or_insert(content_type.to_string());
-
-                let plain_content: Vec<u8> = std::fs::read(full_path.as_path())?;
-                // Hash the contents of the file - this will be contained in the site::Resource
-                // to verify the integrity of the blob when fetched from an aggregator.
-                let mut hash_function = Sha256::default();
-                hash_function.update(&plain_content);
-                let blob_hash: [u8; 32] = hash_function.finalize().digest;
-
+                };
                 // TODO: When walrus dep is updated to support any type of identifiers, replace base36 to regular path
                 let quilt_blob_input = QuiltBlobInput {
                     path: full_path.clone(),
-                    identifier: Some(str_to_base36(resource_path.as_str())?),
+                    identifier,
                     tags: BTreeMap::new(),
                 };
-
-                Ok(Some((
-                    ResourceData {
-                        unencoded_size: plain_content.len(),
-                        full_path,
-                        resource_path,
-                        headers: HttpHeaders(http_headers),
-                        blob_hash: U256::from_le_bytes(&blob_hash),
-                    },
-                    quilt_blob_input,
-                )))
+                Ok(Some((res_data, quilt_blob_input)))
             })
             .collect::<Result<Vec<Option<(ResourceData, QuiltBlobInput)>>>>()?
             .into_iter()
