@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from 'vitest'
-import { _parseDomain } from './domain_parsing'
 import { vi } from 'vitest'
 
 vi.mock('parse-domain', () => ({
