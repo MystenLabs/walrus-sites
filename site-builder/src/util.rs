@@ -12,6 +12,7 @@ use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{
     rpc_types::{
         Page,
+        SuiExecutionStatus,
         SuiObjectDataOptions,
         SuiRawData,
         SuiTransactionBlockEffects,
@@ -117,12 +118,11 @@ pub fn id_to_base36(id: &ObjectID) -> Result<String> {
 
 /// Get the object id of the site that was published in the transaction.
 ///
-/// # Panics
-///
-/// Panics if the created site object ID cannot be found in the transaction effects.
+/// Fails if the created site object ID cannot be found in the transaction effects.
 /// This can happen if, for example, no object owned by the provided `address` was created
 /// in the transaction, or if the transaction did not result in the expected object creation
-/// structure that this function relies on.
+/// structure that this function relies on. Can also fail if the transaction itself failed (not
+/// enough gas, etc.)
 pub fn get_site_id_from_response(
     address: SuiAddress,
     effects: &SuiTransactionBlockEffects,
@@ -132,6 +132,9 @@ pub fn get_site_id_from_response(
         ?effects,
         "getting the object ID of the created Walrus site."
     );
+    if let SuiExecutionStatus::Failure { error } = &effects.status() {
+        anyhow::bail!("site ptb failed with error: {error}");
+    }
     Ok(effects
         .created()
         .iter()

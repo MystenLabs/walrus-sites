@@ -6,7 +6,11 @@ use std::{collections::BTreeSet, num::NonZeroUsize, str::FromStr, time::Duration
 use anyhow::{anyhow, Error, Result};
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{
-    rpc_types::{SuiExecutionStatus, SuiTransactionBlockEffects, SuiTransactionBlockResponse},
+    rpc_types::{
+        SuiExecutionStatus,
+        SuiTransactionBlockEffectsAPI as _,
+        SuiTransactionBlockResponse,
+    },
     wallet_context::WalletContext,
 };
 use sui_types::{
@@ -349,10 +353,10 @@ impl SiteManager {
             .await?;
 
         // Check explicitly for execution failures.
-        if let Some(SuiTransactionBlockEffects::V1(effects)) = result.effects.as_ref() {
-            if let SuiExecutionStatus::Failure { error } = &effects.status {
-                anyhow::bail!("site ptb failed with error: {error}");
-            }
+        if let Some(SuiExecutionStatus::Failure { error }) =
+            result.effects.as_ref().map(|e| e.status())
+        {
+            anyhow::bail!("site ptb failed with error: {error}");
         }
 
         let site_object_id = match &self.site_id {
