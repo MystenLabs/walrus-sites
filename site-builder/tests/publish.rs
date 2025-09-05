@@ -134,7 +134,7 @@ async fn publish_quilts_lots_of_files() -> anyhow::Result<()> {
     let temp_dir = tempfile::tempdir()?;
     // Generate 100 files: 1.html, 2.html, ..., 100.html
     (0..N_FILES_IN_SITE).try_for_each(|i| {
-        let file_path = temp_dir.path().join(format!("{i}.htlm"));
+        let file_path = temp_dir.path().join(format!("{i}.html"));
         let mut file = File::create(file_path)?;
         writeln!(file, "<html><body><h1>File {i}</h1></body></html>")?;
         Ok::<(), anyhow::Error>(())
