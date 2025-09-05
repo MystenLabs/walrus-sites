@@ -3,6 +3,9 @@
 
 use std::{fs, path::PathBuf};
 
+use fastcrypto::hash::{HashFunction, Sha256};
+use hex::FromHex;
+use move_core_types::u256::U256;
 use site_builder::args::{Commands, EpochCountOrMax};
 
 #[allow(dead_code)]
@@ -11,6 +14,7 @@ use localnode::{
     args_builder::{ArgsBuilder, PublishOptionsBuilder},
     TestSetup,
 };
+use walrus_sdk::core::{BlobId, QuiltPatchId};
 
 #[tokio::test]
 async fn publish_snake() -> anyhow::Result<()> {
@@ -41,11 +45,16 @@ async fn publish_snake() -> anyhow::Result<()> {
     site_builder::run(args).await?;
 
     let site = cluster.last_site_created().await?;
-    println!("site_id: {site:#?}");
-    println!(
-        "fields: {:#?}",
-        cluster.site_resources(*site.id.object_id()).await?
-    );
+    let resources = cluster.site_resources(*site.id.object_id()).await?;
+
+    assert_eq!(resources.len(), 5);
+    for resource in resources {
+        let data = cluster.read_blob(&BlobId(resource.blob_id.0)).await?;
+        let mut hash_function = Sha256::default();
+        hash_function.update(&data);
+        let resource_hash: [u8; 32] = hash_function.finalize().digest;
+        assert_eq!(resource.blob_hash, U256::from_le_bytes(&resource_hash));
+    }
 
     Ok(())
 }
@@ -77,6 +86,30 @@ async fn quilts_publish_snake() -> anyhow::Result<()> {
         })
         .build()?;
     site_builder::run(args).await?;
+
+    let site = cluster.last_site_created().await?;
+    let resources = cluster.site_resources(*site.id.object_id()).await?;
+
+    assert_eq!(resources.len(), 5);
+    for resource in resources {
+        let blob_id = BlobId(resource.blob_id.0);
+        let patch_id = resource.headers.0.get("x-wal-quilt-patch-internal-id");
+        assert!(patch_id.is_some());
+        let patch_id_bytes =
+            Vec::from_hex(patch_id.unwrap().trim_start_matches("0x")).expect("Invalid hex");
+        let res = cluster
+            .read_quilt_patches(&[QuiltPatchId {
+                patch_id_bytes,
+                quilt_id: blob_id,
+            }])
+            .await?;
+        assert_eq!(res.len(), 1);
+
+        let mut hash_function = Sha256::default();
+        hash_function.update(res[0].data());
+        let resource_hash: [u8; 32] = hash_function.finalize().digest;
+        assert_eq!(resource.blob_hash, U256::from_le_bytes(&resource_hash));
+    }
 
     Ok(())
 }
