@@ -356,7 +356,10 @@ impl SiteManager {
         if let Some(SuiExecutionStatus::Failure { error }) =
             result.effects.as_ref().map(|e| e.status())
         {
-            anyhow::bail!("site ptb failed with error: {error}");
+            anyhow::bail!(
+                "site ptb failed with error: {error} [tx_digest={}]",
+                result.digest
+            );
         }
 
         let site_object_id = match &self.site_id {
@@ -384,9 +387,17 @@ impl SiteManager {
             let mut ptb = ptb.with_call_arg(&call_arg)?;
             ptb.add_resource_operations(&updates.resource_ops[start..end])?;
 
-            let _result = self
+            let resource_result = self
                 .sign_and_send_ptb(ptb.finish(), self.gas_coin_ref().await?, &retry_client)
                 .await?;
+            if let Some(SuiExecutionStatus::Failure { error }) =
+                resource_result.effects.as_ref().map(|e| e.status())
+            {
+                anyhow::bail!(
+                    "resource ptb failed with error: {error} [tx_digest={}]",
+                    resource_result.digest
+                );
+            }
         }
 
         Ok(result)
