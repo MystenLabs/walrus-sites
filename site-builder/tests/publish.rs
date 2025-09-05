@@ -76,7 +76,7 @@ async fn quilts_publish_snake() -> anyhow::Result<()> {
 
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::QuiltsPublish {
+        .with_command(Commands::PublishQuilts {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory)
                 .with_ws_resources(Some(temp_ws_resources))

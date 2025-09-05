@@ -126,7 +126,7 @@ async fn run_internal(
                 .run()
                 .await?
         }
-        Commands::QuiltsPublish {
+        Commands::PublishQuilts {
             publish_options,
             site_name,
         } => {
