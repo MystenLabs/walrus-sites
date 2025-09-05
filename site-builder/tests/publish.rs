@@ -4,7 +4,8 @@
 use std::{
     fs::{self, File},
     io::Write,
-    path::{Path, PathBuf}, time::Instant,
+    path::{Path, PathBuf},
+    time::Instant,
 };
 
 use fastcrypto::hash::{HashFunction, Sha256};
