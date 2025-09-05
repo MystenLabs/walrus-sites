@@ -143,6 +143,19 @@ impl TestSetup {
             .await
     }
 
+    pub async fn read_quilt_patches_by_identifiers<'a>(
+        &self,
+        blob_id: &BlobId,
+        file_identifiers: &[&str],
+    ) -> ClientResult<Vec<QuiltStoreBlob<'a>>> {
+        self.cluster_state
+            .walrus_admin_client
+            .inner
+            .quilt_client()
+            .get_blobs_by_identifiers(blob_id, file_identifiers)
+            .await
+    }
+
     pub async fn last_site_created(&self) -> anyhow::Result<SiteFields> {
         let resp = self
             .client
@@ -202,48 +215,61 @@ impl TestSetup {
     }
 
     pub async fn site_resources(&self, site_id: ObjectID) -> anyhow::Result<Vec<SuiResource>> {
-        // TODO paginate
-        let dfs = self
-            .client
-            .read_api()
-            .get_dynamic_fields(site_id, None, None)
-            .await?;
-        let ids = dfs
-            .data
-            .into_iter()
-            .map(|df| df.object_id)
-            .collect::<Vec<ObjectID>>();
+        let mut resources = vec![];
+        let mut has_next = true;
+        let mut cursor = None;
+        while has_next {
+            let dfs = self
+                .client
+                .read_api()
+                .get_dynamic_fields(site_id, cursor, None)
+                .await?;
+            has_next = dfs.has_next_page;
+            cursor = dfs.next_cursor;
 
-        let resource_fields = self
-            .client
-            .read_api()
-            .multi_get_object_with_options(ids, SuiObjectDataOptions::new().with_bcs().with_type())
-            .await?; // with_type?
+            let ids = dfs
+                .data
+                .into_iter()
+                .map(|df| df.object_id)
+                .collect::<Vec<ObjectID>>();
 
-        Ok(resource_fields
-            .into_iter()
-            .map(|df| {
-                let Some(obj_bcs) = df.data.unwrap().bcs.unwrap().try_into_move() else {
-                    return Ok(None);
-                };
-                if !obj_bcs
-                    .type_
-                    .type_params
-                    .first()
-                    .unwrap()
-                    .to_canonical_string(false)
-                    .ends_with("::site::ResourcePath")
-                {
-                    return Ok(None);
-                };
-                Ok(Some(
-                    bcs::from_bytes::<ResourceDynamicField>(&obj_bcs.bcs_bytes)?.value,
-                ))
-            })
-            .collect::<anyhow::Result<Vec<Option<SuiResource>>>>()?
-            .into_iter()
-            .flatten()
-            .collect::<Vec<SuiResource>>())
+            // TODO: Check if we need to limit more here.
+            let resource_fields = self
+                .client
+                .read_api()
+                .multi_get_object_with_options(
+                    ids,
+                    SuiObjectDataOptions::new().with_bcs().with_type(),
+                )
+                .await?; // with_type?
+
+            let mut resources_chunk = resource_fields
+                .into_iter()
+                .map(|df| {
+                    let Some(obj_bcs) = df.data.unwrap().bcs.unwrap().try_into_move() else {
+                        return Ok(None);
+                    };
+                    if !obj_bcs
+                        .type_
+                        .type_params
+                        .first()
+                        .unwrap()
+                        .to_canonical_string(false)
+                        .ends_with("::site::ResourcePath")
+                    {
+                        return Ok(None);
+                    };
+                    Ok(Some(
+                        bcs::from_bytes::<ResourceDynamicField>(&obj_bcs.bcs_bytes)?.value,
+                    ))
+                })
+                .collect::<anyhow::Result<Vec<Option<SuiResource>>>>()?
+                .into_iter()
+                .flatten()
+                .collect::<Vec<SuiResource>>();
+            resources.append(&mut resources_chunk);
+        }
+        Ok(resources)
     }
 }
 
