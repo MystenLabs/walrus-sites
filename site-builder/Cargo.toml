@@ -7,7 +7,6 @@ license = "Apache-2.0"
 
 [features]
 quilts = []
-full = ["quilts"]
 
 [dependencies]
 anyhow = "1.0.86"
