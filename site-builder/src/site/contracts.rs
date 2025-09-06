@@ -140,8 +140,7 @@ impl fmt::Display for StructTag<'_> {
     }
 }
 
-#[allow(dead_code)]
-pub(crate) async fn get_sui_object<U>(sui_client: &SuiClient, object_id: ObjectID) -> Result<U>
+pub async fn get_sui_object<U>(sui_client: &SuiClient, object_id: ObjectID) -> Result<U>
 where
     U: AssociatedContractStruct,
 {
@@ -164,9 +163,7 @@ where
     })
 }
 
-pub(crate) fn get_sui_object_from_object_response<U>(
-    object_response: &SuiObjectResponse,
-) -> Result<U>
+pub fn get_sui_object_from_object_response<U>(object_response: &SuiObjectResponse) -> Result<U>
 where
     U: AssociatedContractStruct,
 {

@@ -51,7 +51,7 @@ impl AssociatedContractStruct for SuiResourcePath {
 ///
 /// This struct mirrors the information that is stored on chain.
 #[derive(PartialEq, Eq, Debug, Clone, PartialOrd, Ord, Serialize, Deserialize)]
-pub(crate) struct SuiResource {
+pub struct SuiResource {
     /// The relative path the resource will have on Sui.
     pub path: String,
     /// Response, Representation and Payload headers.

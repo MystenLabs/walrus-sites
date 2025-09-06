@@ -288,6 +288,15 @@ pub enum Commands {
         #[arg(short, long)]
         site_name: Option<String>,
     },
+    /// Publish a new site on Sui using Quilts
+    #[cfg(feature = "quilts")]
+    PublishQuilts {
+        #[clap(flatten)]
+        publish_options: PublishOptions,
+        /// The name of the site.
+        #[arg(short, long)]
+        site_name: Option<String>,
+    },
     /// Update an existing site.
     Update {
         #[clap(flatten)]
@@ -512,6 +521,9 @@ impl EpochCountOrMax {
 
 pub mod default {
     use std::num::NonZeroUsize;
+
+    pub const DEFAULT_SITE_NAME: &str = "My Walrus Site";
+    pub const DEFAULT_WS_RESOURCES_FILE: &str = "ws-resources.json";
 
     pub fn walrus_binary() -> Option<String> {
         Some("walrus".to_owned())

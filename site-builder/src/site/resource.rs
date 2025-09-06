@@ -4,7 +4,7 @@
 //! Functionality to read and check the files in of a website.
 
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     fmt::{self, Display},
     fs,
     io::Write,
@@ -12,19 +12,29 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use fastcrypto::hash::{HashFunction, Sha256};
 use flate2::{write::GzEncoder, Compression};
-use futures::stream::{self, StreamExt};
+use futures::{stream, StreamExt};
+use itertools::Itertools;
 use move_core_types::u256::U256;
 use regex::Regex;
+use tracing::debug;
 
 use super::SiteData;
 use crate::{
+    args::EpochArg,
+    display,
     publish::BlobManagementOptions,
     site::{config::WSResources, content::ContentType},
     types::{HttpHeaders, SuiResource, VecMap},
-    walrus::{types::BlobId, Walrus},
+    util::str_to_base36,
+    walrus::{
+        command::{QuiltBlobInput, StoreQuiltInput},
+        types::BlobId,
+        Walrus,
+    },
 };
 
 /// The resource that is to be created or updated on Sui.
@@ -66,6 +76,8 @@ impl From<SuiResource> for Resource {
 }
 
 impl Resource {
+    pub const QUILT_PATCH_ID_INTERNAL_HEADER: &str = "x-wal-quilt-patch-internal-id";
+
     pub fn new(
         resource_path: String,
         full_path: PathBuf,
@@ -256,6 +268,16 @@ impl Display for ResourceSet {
     }
 }
 
+// Struct used for grouping resource local data.
+#[derive(Debug)]
+struct ResourceData {
+    unencoded_size: usize,
+    full_path: PathBuf,
+    resource_path: String,
+    headers: HttpHeaders,
+    blob_hash: U256,
+}
+
 /// Loads and manages the set of resources composing the site.
 #[derive(Debug)]
 pub(crate) struct ResourceManager {
@@ -303,14 +325,11 @@ impl ResourceManager {
         })
     }
 
-    /// Read a resource at a path.
-    ///
-    /// Ignores empty files.
-    pub async fn read_resource(
+    fn read_local_resource(
         &self,
         full_path: &Path,
         resource_path: String,
-    ) -> Result<Option<Resource>> {
+    ) -> Result<Option<ResourceData>> {
         if let Some(ws_path) = &self.ws_resources_path {
             if full_path == ws_path {
                 tracing::debug!(?full_path, "ignoring the ws-resources config file");
@@ -357,6 +376,41 @@ impl ResourceManager {
             .or_insert(content_type.to_string());
 
         let plain_content: Vec<u8> = std::fs::read(full_path)?;
+
+        // Hash the contents of the file - this will be contained in the site::Resource
+        // to verify the integrity of the blob when fetched from an aggregator.
+        let mut hash_function = Sha256::default();
+        hash_function.update(&plain_content);
+        let blob_hash: [u8; 32] = hash_function.finalize().digest;
+
+        Ok(Some(ResourceData {
+            unencoded_size: plain_content.len(),
+            resource_path,
+            full_path: full_path.to_owned(),
+            headers: HttpHeaders(http_headers),
+            blob_hash: U256::from_le_bytes(&blob_hash),
+        }))
+    }
+
+    /// Read a resource at a path.
+    ///
+    /// Ignores empty files.
+    pub async fn read_single_blob_resource(
+        &self,
+        full_path: &Path,
+        resource_path: String,
+    ) -> Result<Option<Resource>> {
+        let Some(ResourceData {
+            unencoded_size,
+            full_path,
+            resource_path,
+            headers,
+            blob_hash,
+        }) = self.read_local_resource(full_path, resource_path)?
+        else {
+            return Ok(None);
+        };
+
         let output = self
             .walrus
             .blob_id(full_path.to_owned(), Some(self.n_shards))
@@ -366,19 +420,13 @@ impl ResourceManager {
                 full_path.to_string_lossy()
             ))?;
 
-        // Hash the contents of the file - this will be contained in the site::Resource
-        // to verify the integrity of the blob when fetched from an aggregator.
-        let mut hash_function = Sha256::default();
-        hash_function.update(&plain_content);
-        let blob_hash: [u8; 32] = hash_function.finalize().digest;
-
         Ok(Some(Resource::new(
             resource_path,
-            full_path.to_owned(),
-            HttpHeaders(http_headers),
+            full_path,
+            headers,
             output.blob_id,
-            U256::from_le_bytes(&blob_hash),
-            plain_content.len(),
+            blob_hash,
+            unencoded_size,
         )))
     }
 
@@ -401,6 +449,162 @@ impl ResourceManager {
                     .map(|(_, header_map)| header_map.0.clone())
             })
             .unwrap_or_default()
+    }
+
+    /// Filters resource_paths, and prepares their ResourceData, while also grouping them into a
+    /// single Quilt.
+    fn prepare_local_resources(
+        &mut self,
+        full_path: &Path,
+        resource_paths: Vec<String>,
+    ) -> Result<Vec<(ResourceData, QuiltBlobInput)>> {
+        let res = resource_paths
+            .into_iter()
+            .map(|resource_path| {
+                let full_path = full_path.join(
+                    resource_path
+                        .strip_prefix('/')
+                        .unwrap_or(resource_path.as_str()),
+                );
+
+                let identifier = Some(str_to_base36(resource_path.as_str())?);
+                let Some(res_data) = self.read_local_resource(&full_path, resource_path)? else {
+                    return Ok(None);
+                };
+                // TODO: When walrus dep is updated to support any type of identifiers, replace base36 to regular path
+                let quilt_blob_input = QuiltBlobInput {
+                    path: full_path.clone(),
+                    identifier,
+                    tags: BTreeMap::new(),
+                };
+                Ok(Some((res_data, quilt_blob_input)))
+            })
+            .collect::<Result<Vec<Option<(ResourceData, QuiltBlobInput)>>>>()?
+            .into_iter()
+            .flatten()
+            .collect();
+
+        Ok(res)
+    }
+
+    // Extracts Blob-id and Quilt-patch-id from the walrus store response, in order to combine
+    // it with ResourceData to return Resources
+    async fn store_resource_chunk_into_quilt(
+        &mut self,
+        res_data_and_quilt_files: impl Iterator<Item = (ResourceData, QuiltBlobInput)>,
+    ) -> Result<Vec<Resource>> {
+        // println!("resource_data.len(): {}", resource_data.len());
+        // println!("resource_data: {resource_data:#?}");
+
+        let (resource_data, quilt_blob_inputs): (Vec<_>, Vec<_>) = res_data_and_quilt_files.unzip();
+        let mut store_resp = self
+            .walrus
+            .store_quilt(
+                StoreQuiltInput::Blobs(quilt_blob_inputs.clone()),
+                EpochArg {
+                    epochs: Some(crate::args::EpochCountOrMax::default()),
+                    ..Default::default()
+                },
+                false,
+                true,
+            )
+            .await
+            .context(format!(
+                "error while storing the quilt for resources: {}",
+                quilt_blob_inputs
+                    .iter()
+                    .map(|f| f.path.display())
+                    .join(", ")
+            ))?;
+
+        debug!(
+            "quilt store output: {}",
+            serde_json::to_string_pretty(&store_resp)?
+        );
+
+        let blob_id = *store_resp.blob_store_result.blob_id();
+        let quilt_patches = &mut store_resp.stored_quilt_blobs;
+
+        resource_data
+            .into_iter()
+            .map(
+                |
+                    ResourceData {
+                        unencoded_size,
+                        full_path,
+                        resource_path,
+                        mut headers,
+                        blob_hash,
+                    }
+                | {
+                    // TODO(nikos): We have already calculated this
+                    let b36 = str_to_base36(&resource_path)?;
+                    // Walrus store does not maintain the order the files were passed
+                    let Some(pos) = quilt_patches.iter().position(|p| p.identifier == b36) else {
+                        bail!("Resource {resource_path} exists but doesn't have a matching quilt-patch");
+                    };
+                    let patch = quilt_patches.swap_remove(pos);
+                    let bytes = URL_SAFE_NO_PAD.decode(patch.quilt_patch_id.as_str())?;
+
+                    // Must have at least BlobId.LENGTH + 1 bytes (quilt_id + version).
+                    if bytes.len() != Walrus::QUILT_PATCH_ID_SIZE {
+                        bail!(
+                            "Expected {} bytes when decoding quilt-patch-id version 1.",
+                            Walrus::QUILT_PATCH_ID_SIZE
+                        );
+                    }
+
+                    // Extract patch_id (bytes after the blob_id).
+                    let patch_bytes: [u8; Walrus::QUILT_PATCH_SIZE] = bytes
+                        [BlobId::LENGTH..Walrus::QUILT_PATCH_ID_SIZE]
+                        .try_into()
+                        .unwrap();
+                    let version = patch_bytes[0];
+                    if version != Walrus::QUILT_PATCH_VERSION_1 {
+                        bail!("Quilt patch version {version} is not implemented");
+                    }
+
+                    let patch_hex = format!("0x{}", hex::encode(patch_bytes));
+                    headers
+                        .0
+                        .insert(Resource::QUILT_PATCH_ID_INTERNAL_HEADER.to_string(), patch_hex);
+                    Ok(Resource::new(
+                        resource_path,
+                        full_path,
+                        headers,
+                        blob_id,
+                        blob_hash,
+                        unencoded_size,
+                    ))
+                },
+            )
+            .collect::<Result<Vec<_>>>()
+    }
+
+    async fn dry_run_resource_chunk(
+        &mut self,
+        quilt_blob_inputs: Vec<QuiltBlobInput>,
+    ) -> Result<u64> {
+        let store_resp = self
+            .walrus
+            .dry_run_store_quilt(
+                StoreQuiltInput::Blobs(quilt_blob_inputs.clone()),
+                EpochArg {
+                    epochs: Some(crate::args::EpochCountOrMax::default()),
+                    ..Default::default()
+                },
+                false,
+                true,
+            )
+            .await
+            .context(format!(
+                "error while computing the blob id for resources in path: {}",
+                quilt_blob_inputs
+                    .iter()
+                    .map(|f| f.path.display())
+                    .join(", ")
+            ))?;
+        Ok(store_resp.quilt_blob_output.storage_cost)
     }
 
     /// Matches a pattern to a resource path.
@@ -429,16 +633,16 @@ impl ResourceManager {
 
     /// Recursively iterate a directory and load all [`Resources`][Resource] within.
     pub async fn read_dir(&mut self, root: &Path) -> Result<SiteData> {
-        let resource_paths = Self::iter_dir(root, root)?;
+        let resource_paths = Self::iter_dir(root)?;
         if resource_paths.is_empty() {
             return Ok(SiteData::empty());
         }
 
         let futures = resource_paths
             .iter()
-            .map(|(full_path, _)| {
+            .map(|full_path| {
                 full_path_to_resource_path(full_path, root)
-                    .map(|resource_path| self.read_resource(full_path, resource_path))
+                    .map(|resource_path| self.read_single_blob_resource(full_path, resource_path))
             })
             .collect::<Result<Vec<_>>>()?;
 
@@ -455,8 +659,84 @@ impl ResourceManager {
             resources.extend(resource?);
         }
 
-        Ok(SiteData::new(
-            resources,
+        Ok(self.to_site_data(resources))
+    }
+
+    /// Recursively iterate a directory and load all [`Resources`][Resource] within.
+    pub async fn read_dir_and_store_quilts(
+        &mut self,
+        root: &Path,
+        dry_run: bool,
+    ) -> Result<SiteData> {
+        let resource_paths = Self::iter_dir(root)?;
+        if resource_paths.is_empty() {
+            return Ok(SiteData::empty());
+        }
+
+        let rel_paths = resource_paths
+            .iter()
+            .map(|full_path| full_path_to_resource_path(full_path, root))
+            .collect::<Result<Vec<String>>>()?;
+
+        let resource_file_inputs = self.prepare_local_resources(root, rel_paths)?;
+
+        let chunks = resource_file_inputs
+            .into_iter()
+            // TODO(nikos): we split per max-quilts but there may be also other limits like max_size.
+            // TODO(nikos): Investigate whether indeed max_files == n_cols - 1 or if it is that one file
+            // takes more than a column, max_files becomes n_cols - 2
+            .chunks(Walrus::max_slots_in_quilt(self.n_shards) as usize);
+        // TODO: Test Dry-run
+        if dry_run {
+            let mut total_storage_cost = 0;
+            for chunk in &chunks {
+                let (_, quilt_file_inputs): (Vec<_>, Vec<_>) = chunk.unzip();
+                let wal_storage_cost = self.dry_run_resource_chunk(quilt_file_inputs).await?;
+                total_storage_cost += wal_storage_cost;
+            }
+
+            display::action(format!(
+                    "Estimated Storage Cost for this publish/update (Gas Cost Excluded): {total_storage_cost} FROST"
+                ));
+
+            // Add user confirmation prompt.
+            display::action("Waiting for user confirmation...");
+            if !dialoguer::Confirm::new()
+                .with_prompt("Do you want to proceed with these updates?")
+                .default(true)
+                .interact()?
+            {
+                display::error("Update cancelled by user");
+                return Err(anyhow!("Update cancelled by user"));
+            }
+        }
+
+        let mut resources_set = ResourceSet::empty();
+        for chunk in &chunks {
+            let resources = self.store_resource_chunk_into_quilt(chunk).await?;
+            resources_set.extend(resources);
+        }
+
+        Ok(self.to_site_data(resources_set))
+    }
+
+    fn iter_dir(start: &Path) -> Result<Vec<PathBuf>> {
+        let mut resources = vec![];
+        let entries = fs::read_dir(start)?;
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                resources.extend(Self::iter_dir(&path)?);
+            } else {
+                resources.push(path.to_owned());
+            }
+        }
+        Ok(resources)
+    }
+
+    fn to_site_data(&self, set: ResourceSet) -> SiteData {
+        SiteData::new(
+            set,
             self.ws_resources
                 .as_ref()
                 .and_then(|config| config.routes.clone()),
@@ -466,21 +746,7 @@ impl ResourceManager {
             self.ws_resources
                 .as_ref()
                 .and_then(|config| config.site_name.clone()),
-        ))
-    }
-
-    fn iter_dir(start: &Path, root: &Path) -> Result<Vec<(PathBuf, PathBuf)>> {
-        let mut resources = vec![];
-        let entries = fs::read_dir(start)?;
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                resources.extend(Self::iter_dir(&path, root)?);
-            } else {
-                resources.push((path.to_owned(), root.to_owned()));
-            }
-        }
-        Ok(resources)
+        )
     }
 }
 

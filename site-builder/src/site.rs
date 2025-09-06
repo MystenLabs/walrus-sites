@@ -203,6 +203,7 @@ impl RemoteSiteFactory<'_> {
         let resource_path_tag = self.resource_path_tag()?;
 
         // Chunking ensures that we do not make too many requests at once.
+        // TODO: multi_get_objects?
         let futures = dynamic_fields.chunks(DF_REQ_BATCH_SIZE).map(|chunk| {
             try_join_all(
                 chunk
