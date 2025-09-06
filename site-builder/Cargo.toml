@@ -5,6 +5,10 @@ edition = "2021"
 license = "Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+quilts = []
+full = ["quilts"]
+
 [dependencies]
 anyhow = "1.0.86"
 base64 = "0.22.1"

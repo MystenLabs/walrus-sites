@@ -126,6 +126,7 @@ async fn run_internal(
                 .run()
                 .await?
         }
+        #[cfg(feature = "quilts")]
         Commands::PublishQuilts {
             publish_options,
             site_name,

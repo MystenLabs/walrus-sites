@@ -1,15 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{
-    fs::{self, File},
-    io::Write,
-    path::{Path, PathBuf},
-    time::Instant,
-};
+use std::{fs, path::PathBuf};
 
 use fastcrypto::hash::{HashFunction, Sha256};
-use hex::FromHex;
 use move_core_types::u256::U256;
 use site_builder::args::{Commands, EpochCountOrMax};
 
@@ -19,7 +13,14 @@ use localnode::{
     args_builder::{ArgsBuilder, PublishOptionsBuilder},
     TestSetup,
 };
-use walrus_sdk::core::{BlobId, QuiltPatchId};
+use walrus_sdk::core::BlobId;
+#[cfg(feature = "quilts")]
+use {
+    hex::FromHex,
+    std::{fs::File, io::Write, path::Path, time::Instant},
+
+    walrus_sdk::core::QuiltPatchId,
+};
 
 #[tokio::test]
 async fn publish_snake() -> anyhow::Result<()> {
@@ -66,6 +67,7 @@ async fn publish_snake() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "quilts")]
 #[tokio::test]
 async fn quilts_publish_snake() -> anyhow::Result<()> {
     const SNAKE_FILES_UPLOAD_FILES: usize = 4;
@@ -124,6 +126,7 @@ async fn quilts_publish_snake() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "quilts")]
 #[tokio::test]
 #[ignore]
 async fn publish_quilts_lots_of_files() -> anyhow::Result<()> {

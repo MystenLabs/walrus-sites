@@ -289,6 +289,7 @@ pub enum Commands {
         site_name: Option<String>,
     },
     /// Publish a new site on Sui using Quilts
+    #[cfg(feature = "quilts")]
     PublishQuilts {
         #[clap(flatten)]
         publish_options: PublishOptions,
