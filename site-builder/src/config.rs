@@ -73,8 +73,16 @@ impl Config {
         path: impl AsRef<Path>,
         context: Option<&str>,
     ) -> Result<(Self, Option<String>)> {
-        let multi_config =
-            serde_yaml::from_str::<MultiConfig>(&std::fs::read_to_string(path.as_ref())?)?;
+        let config_content = std::fs::read_to_string(path.as_ref())
+            .map_err(|e| anyhow!(
+                "could not read site builder config file '{}': {e}",
+                path.as_ref().display()
+            ))?;
+        let multi_config = serde_yaml::from_str::<MultiConfig>(&config_content)
+            .map_err(|e| anyhow!(
+                "could not parse site builder config file '{}': {e}",
+                path.as_ref().display()
+            ))?;
 
         match multi_config {
             MultiConfig::SingletonConfig(config) => {
@@ -97,7 +105,11 @@ impl Config {
                 Ok((
                     contexts
                         .remove(context)
-                        .ok_or_else(|| anyhow!("could not find the context: {}", context))?,
+                        .ok_or_else(|| anyhow!(
+                            "could not find the context '{}' in site builder config file '{}'",
+                            context,
+                            path.as_ref().display()
+                        ))?,
                     Some(context.to_owned()),
                 ))
             }
