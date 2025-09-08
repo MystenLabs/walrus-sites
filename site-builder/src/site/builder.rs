@@ -316,7 +316,7 @@ impl SitePtb<Argument> {
         )
     }
 
-    pub fn update_name(&mut self, name: &String) -> Result<()> {
+    pub fn update_name(&mut self, name: &str) -> Result<()> {
         tracing::debug!(name=%name, "new Move call: updating site name");
         let name_input = self.pt_builder.input(pure_call_arg(&name.to_owned())?)?;
         self.add_programmable_move_call(

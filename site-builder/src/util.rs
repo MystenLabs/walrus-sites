@@ -85,15 +85,13 @@ where
     Ok(iterators.into_iter().flatten())
 }
 
-/// Convert the hex representation of an object id to base36.
-pub fn id_to_base36(id: &ObjectID) -> Result<String> {
+pub fn bytes_to_base36(source: &[u8]) -> Result<String> {
     const BASE36: &[u8] = "0123456789abcdefghijklmnopqrstuvwxyz".as_bytes();
-    let source = id.into_bytes();
     let base = BASE36.len();
     let size = source.len() * 2;
     let mut encoding = vec![0; size];
     let mut high = size - 1;
-    for digit in &source {
+    for digit in source {
         let mut carry = *digit as usize;
         let mut it = size - 1;
         while it > high || carry != 0 {
@@ -114,6 +112,15 @@ pub fn id_to_base36(id: &ObjectID) -> Result<String> {
     .unwrap()
     .to_owned();
     Ok(string)
+}
+
+pub fn str_to_base36(input: &str) -> Result<String> {
+    bytes_to_base36(input.as_bytes())
+}
+
+/// Convert the hex representation of an object id to base36.
+pub fn id_to_base36(id: &ObjectID) -> Result<String> {
+    bytes_to_base36(&id.into_bytes())
 }
 
 /// Get the object id of the site that was published in the transaction.

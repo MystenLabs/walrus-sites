@@ -20,7 +20,10 @@ use tokio::process::Command as CliCommand;
 use self::types::BlobId;
 use crate::{
     args::EpochArg,
-    walrus::{command::WalrusCmdBuilder, output::DestroyOutput},
+    walrus::{
+        command::{CommonStoreOptions, StoreQuiltInput, WalrusCmdBuilder},
+        output::{DestroyOutput, QuiltStoreResult, StoreQuiltDryRunOutput},
+    },
 };
 pub mod command;
 pub mod output;
@@ -45,7 +48,19 @@ pub struct Walrus {
 
 macro_rules! create_command {
     ($self:ident, $name:ident, $($arg:expr),*) => {{
-        let json_input = $self.builder().$name($($arg),*).build().to_json()?;
+        let mut json_input = $self.builder().$name($($arg),*).build().to_json()?;
+
+        // TODO(nikos): Remove when the bug requiring paths in json input is fixed.
+        // TMP HACK
+        if json_input.contains("storeQuilt") {
+            let Some(pos) = json_input.find("]") else {
+                panic!("No blobs in storeQuilt");
+            };
+            const PATHS: &str = r#","paths":[]"#;
+            json_input.insert_str(pos + 1, PATHS);
+        }
+        // TMP HACK end
+
         let output = $self
             .base_command()
             .arg(&json_input)
@@ -63,7 +78,11 @@ macro_rules! create_command {
     }};
 }
 
+// TODO: command-pub-fns inconsistent argument ordering, probably use `force` last as deprecated
 impl Walrus {
+    pub const QUILT_PATCH_VERSION_1: u8 = 1;
+    pub const QUILT_PATCH_SIZE: usize = 5;
+    pub const QUILT_PATCH_ID_SIZE: usize = BlobId::LENGTH + Walrus::QUILT_PATCH_SIZE;
     /// Creates a new Walrus CLI controller.
     pub fn new(
         bin: String,
@@ -93,7 +112,42 @@ impl Walrus {
         force: bool,
         deletable: bool,
     ) -> Result<StoreOutput> {
-        create_command!(self, store, files, epoch_arg, force, deletable, false)
+        create_command!(
+            self,
+            store,
+            files,
+            CommonStoreOptions {
+                epoch_arg,
+                dry_run: false,
+                force,
+                ignore_resources: false,
+                deletable,
+                share: false,
+            }
+        )
+    }
+
+    /// Issues a `store-quilt` JSON command to the Walrus CLI, returning the parsed output.
+    pub async fn store_quilt(
+        &mut self,
+        store_quilt_input: StoreQuiltInput,
+        epoch_arg: EpochArg,
+        force: bool,
+        deletable: bool,
+    ) -> Result<QuiltStoreResult> {
+        create_command!(
+            self,
+            store_quilt,
+            store_quilt_input,
+            CommonStoreOptions {
+                epoch_arg,
+                dry_run: false,
+                force,
+                ignore_resources: false,
+                deletable,
+                share: false,
+            }
+        )
     }
 
     /// Issues a `delete` JSON command to the Walrus CLI, returning the parsed output.
@@ -109,7 +163,42 @@ impl Walrus {
         deletable: bool,
         force: bool,
     ) -> Result<Vec<DryRunOutput>> {
-        create_command!(self, store, vec![file], epoch_arg, force, deletable, true)
+        create_command!(
+            self,
+            store,
+            vec![file],
+            CommonStoreOptions {
+                epoch_arg,
+                dry_run: true,
+                force,
+                ignore_resources: false,
+                deletable,
+                share: false,
+            }
+        )
+    }
+
+    /// Issues a `dry_run_store_quilt` JSON command to the Walrus CLI, returning the parsed output.
+    pub async fn dry_run_store_quilt(
+        &mut self,
+        store_quilt_input: StoreQuiltInput,
+        epoch_arg: EpochArg,
+        force: bool,
+        deletable: bool,
+    ) -> Result<StoreQuiltDryRunOutput> {
+        create_command!(
+            self,
+            store_quilt,
+            store_quilt_input,
+            CommonStoreOptions {
+                epoch_arg,
+                dry_run: true,
+                force,
+                ignore_resources: false,
+                deletable,
+                share: false,
+            }
+        )
     }
 
     /// Issues a `read` JSON command to the Walrus CLI, returning the parsed output.
@@ -132,6 +221,15 @@ impl Walrus {
         let n_shards: StorageInfoOutput =
             create_command!(self, info, self.rpc_arg(), Some(InfoCommands::Storage))?;
         Ok(n_shards.n_shards)
+    }
+
+    // TODO: Theoretically we shouldn't need to do this ourselves, but I couldn't find how to get
+    // this info from walrus.
+    // TODO: Is this correct? My guess is that if a file is very large, it should take up 2 of the
+    // spaces returned here
+    pub fn max_slots_in_quilt(n_shards: NonZeroU16) -> u16 {
+        let (_n_rows, n_cols) = walrus_core::encoding::source_symbols_for_n_shards(n_shards);
+        n_cols.get() - 1
     }
 
     fn base_command(&self) -> CliCommand {

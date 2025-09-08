@@ -5,11 +5,14 @@ edition = "2021"
 license = "Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+quilts-experimental = []
+
 [dependencies]
 anyhow = "1.0.86"
 base64 = "0.22.1"
 bcs = "0.1.6"
-bin-version = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.49.1" }
+bin-version = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.54.0" }
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4.5.7", features = ["derive"] }
 crossterm = "0.27.0"
@@ -17,9 +20,11 @@ dialoguer = "0.11.0"
 fastcrypto = { git = "https://github.com/MystenLabs/fastcrypto" }
 flate2 = "1.0.30"
 futures = "0.3.30"
+hex = "0.4.3"
 home = "0.5.9"
 humantime = "2.2.0"
-move-core-types = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.49.1" }
+itertools = "0.14.0"
+move-core-types = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.54.0" }
 notify = "6.1.1"
 prettytable = "0.10.0"
 rand = "0.8.5"
@@ -28,20 +33,21 @@ serde = { version = "1.0.203", features = ["derive"] }
 serde_json = "1.0.117"
 serde_with = { version = "3.8.1", features = ["base64"] }
 serde_yaml = "0.9"
-shared-crypto = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.49.1" }
-sui-keys = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.49.1" }
-sui-sdk = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.49.1" }
-sui-types = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.49.1" }
+shared-crypto = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.54.0" }
+sui-keys = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.54.0" }
+sui-sdk = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.54.0" }
+sui-types = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.54.0" }
 thiserror = "1.0.61"
-tokio = { version = "1.38.1", features = ["rt", "rt-multi-thread", "macros", "process"] }
+tokio = { version = "1.46.1", features = ["rt", "rt-multi-thread", "macros", "process"] }
 toml = "0.8.14"
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
+walrus-core = { git = "https://github.com/MystenLabs/walrus", rev = "testnet-v1.31.1" }
 
 [dev-dependencies]
-sui-move-build = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.49.1" }
-tempfile = "=3.19.0"
-walrus-sdk = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.26.2" }
-walrus-service = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.26.2", features = ["test-utils"] }
-walrus-sui = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.26.2" }
-walrus-test-utils = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.26.2" }
+sui-move-build = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.54.0" }
+tempfile = "3.20.0"
+walrus-sdk = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.31.1" }
+walrus-service = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.31.1", features = ["test-utils"] }
+walrus-sui = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.31.1" }
+walrus-test-utils = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.31.1" }

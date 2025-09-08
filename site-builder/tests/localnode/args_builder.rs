@@ -4,6 +4,7 @@
 use std::path::PathBuf;
 
 use site_builder::args::{Args, Commands, GeneralArgs};
+use sui_types::base_types::{ObjectID, SuiAddress};
 use thiserror::Error;
 
 pub mod publish_options_builder;
@@ -58,8 +59,48 @@ impl ArgsBuilder {
         self
     }
 
-    pub fn with_general(mut self, general: GeneralArgs) -> Self {
-        self.general = general;
+    pub fn with_rpc_url(mut self, rpc_url: Option<String>) -> Self {
+        self.general.rpc_url = rpc_url;
+        self
+    }
+
+    pub fn with_wallet(mut self, wallet: Option<PathBuf>) -> Self {
+        self.general.wallet = wallet;
+        self
+    }
+
+    pub fn with_wallet_env(mut self, wallet_env: Option<String>) -> Self {
+        self.general.wallet_env = wallet_env;
+        self
+    }
+
+    pub fn with_wallet_address(mut self, wallet_address: Option<SuiAddress>) -> Self {
+        self.general.wallet_address = wallet_address;
+        self
+    }
+
+    pub fn with_walrus_context(mut self, walrus_context: Option<String>) -> Self {
+        self.general.walrus_context = walrus_context;
+        self
+    }
+
+    pub fn with_walrus_binary(mut self, walrus_binary: String) -> Self {
+        self.general.walrus_binary = Some(walrus_binary);
+        self
+    }
+
+    pub fn with_walrus_config(mut self, walrus_config: Option<PathBuf>) -> Self {
+        self.general.walrus_config = walrus_config;
+        self
+    }
+
+    pub fn with_walrus_package(mut self, walrus_package: Option<ObjectID>) -> Self {
+        self.general.walrus_package = walrus_package;
+        self
+    }
+
+    pub fn with_gas_budget(mut self, gas_budget: u64) -> Self {
+        self.general.gas_budget = Some(gas_budget);
         self
     }
 

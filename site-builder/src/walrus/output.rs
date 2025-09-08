@@ -6,18 +6,21 @@
 use std::{num::NonZeroU16, path::PathBuf, process::Output};
 
 use anyhow::{anyhow, Context, Result};
-use serde::{de::DeserializeOwned, Deserialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_with::{base64::Base64, serde_as, DisplayFromStr};
 use sui_types::{base_types::ObjectID, event::EventID};
 
 use super::types::BlobId;
-use crate::site::contracts::{self, AssociatedContractStruct, StructTag};
+use crate::{
+    site::contracts::{self, AssociatedContractStruct, StructTag},
+    walrus::types::{QuiltIndex, QuiltStoreBlob, StoredQuiltPatch},
+};
 
 pub type Epoch = u32;
 pub type EpochCount = u32;
 
 /// Either an event ID or an object ID.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[allow(unused)]
 pub enum EventOrObjectId {
@@ -28,7 +31,7 @@ pub enum EventOrObjectId {
 }
 
 /// The operation performed on blob and storage resources to register a blob.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", rename_all_fields = "camelCase")]
 #[allow(unused)]
 pub enum RegisterBlobOp {
@@ -58,7 +61,7 @@ pub enum RegisterBlobOp {
 
 /// Result when attempting to store a blob.
 #[serde_as]
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", rename_all_fields = "camelCase")]
 #[allow(unused)]
 pub enum BlobStoreResult {
@@ -123,7 +126,7 @@ pub struct BlobStoreResultWithPath {
 }
 
 /// Supported Walrus encoding types.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Deserialize)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Deserialize, Serialize)]
 #[repr(u8)]
 pub enum EncodingType {
     /// Original RedStuff encoding using the RaptorQ erasure code.
@@ -133,7 +136,7 @@ pub enum EncodingType {
 }
 
 /// Sui object for storage resources.
-#[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StorageResource {
     /// Object ID of the Sui object.
@@ -152,7 +155,7 @@ pub struct StorageResource {
 // NOTE: Need two struct definitions for the blob to deserialize both from B64 and BCS. Will be
 // TODO: Remove once the Walrus SDK is available.
 #[serde_as]
-#[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Blob {
     /// Object ID of the Sui object.
@@ -211,7 +214,7 @@ pub struct StoreOutput(pub Vec<BlobStoreResultWithPath>);
 
 // The output of the `store --dry-run` command.
 #[serde_as]
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[allow(unused)]
 #[serde(rename_all = "camelCase")]
 pub struct DryRunOutput {
@@ -328,9 +331,41 @@ pub struct DeletableCounts {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[allow(dead_code)]
-pub(crate) struct StorageInfoOutput {
+pub struct StorageInfoOutput {
     pub(crate) n_shards: NonZeroU16,
     pub(crate) n_nodes: usize,
+}
+
+/// Result when attempting to store a quilt.
+#[derive(Deserialize, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QuiltStoreResult {
+    /// The result of storing the quilt data as a blob.
+    pub blob_store_result: BlobStoreResult,
+    /// The structure of the quilt.
+    pub stored_quilt_blobs: Vec<StoredQuiltPatch>,
+}
+
+/// The output of the `store-quilt --dry-run` command.
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StoreQuiltDryRunOutput {
+    pub(crate) quilt_blob_output: DryRunOutput,
+    pub(crate) quilt_index: QuiltIndex,
+}
+
+/// The output of the `read-quilt` command.
+#[allow(dead_code)]
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReadQuiltOutput {
+    /// The output directory path.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub out: Option<PathBuf>,
+    /// The retrieved blobs.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub retrieved_blobs: Vec<QuiltStoreBlob<'static>>,
 }
 
 pub fn try_from_output<T: DeserializeOwned>(output: Output) -> Result<T> {

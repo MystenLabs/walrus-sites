@@ -288,6 +288,15 @@ pub enum Commands {
         #[arg(short, long)]
         site_name: Option<String>,
     },
+    /// Publish a new site on Sui using Quilts
+    #[cfg(feature = "quilts-experimental")]
+    PublishQuilts {
+        #[clap(flatten)]
+        publish_options: PublishOptions,
+        /// The name of the site.
+        #[arg(short, long)]
+        site_name: Option<String>,
+    },
     /// Update an existing site.
     Update {
         #[clap(flatten)]
@@ -427,7 +436,7 @@ pub struct WalrusStoreOptions {
 }
 
 /// The number of epochs to store the blob for.
-#[derive(Parser, Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Parser, Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[command(group(
     ArgGroup::new("epoch_arg")
         .args(&["epochs", "earliest_expiry_time", "end_epoch"])
@@ -512,6 +521,9 @@ impl EpochCountOrMax {
 
 pub mod default {
     use std::num::NonZeroUsize;
+
+    pub const DEFAULT_SITE_NAME: &str = "My Walrus Site";
+    pub const DEFAULT_WS_RESOURCES_FILE: &str = "ws-resources.json";
 
     pub fn walrus_binary() -> Option<String> {
         Some("walrus".to_owned())
