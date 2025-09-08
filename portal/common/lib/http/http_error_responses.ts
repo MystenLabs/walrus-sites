@@ -26,7 +26,7 @@ export function custom404NotFound(): Response {
     return Response404(
         "Oops!",
         "Page not found. We can’t seem to find the page you’re looking for.",
-        template_404_fallback_if_missing,
+        template_404_fallback_if_missing.toString(),
     );
 }
 
@@ -47,7 +47,7 @@ export function genericError(): Response {
     )
 }
 
-function Response404(message: string, secondaryMessage?: string, template: string = template_404): Response {
+function Response404(message: string, secondaryMessage?: string, template: string = template_404.toString()): Response {
     const interpolated = template
         .replace("${message}", message)
         .replace("${secondaryMessage}", secondaryMessage ?? '')
@@ -72,7 +72,7 @@ export function bringYourOwnDomainDoesNotSupportSubdomainsYet(attemptedSite: Str
 * the blob hash (checksum).
 */
 export function generateHashErrorResponse(): Response {
-    return new Response(hash_mismatch, {
+    return new Response(hash_mismatch.toString(), {
         status: HttpStatusCodes.UNPROCESSABLE_CONTENT,
         headers: {
             "Content-Type": "text/html"
