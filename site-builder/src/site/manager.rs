@@ -159,15 +159,16 @@ impl SiteManager {
         // Check if there are any updates to the site on-chain.
         let result = if site_updates.has_updates() {
             display::action("Applying the Walrus Site object updates on Sui");
-            self.execute_sui_updates(&site_updates,
-                    if using_quilts {
-                        MAX_RESOURCES_PER_PTB_QUILTS
-                    } else {
-                        MAX_RESOURCES_PER_PTB
-                    },
+            self.execute_sui_updates(
+                &site_updates,
+                if using_quilts {
+                    MAX_RESOURCES_PER_PTB_QUILTS
+                } else {
+                    MAX_RESOURCES_PER_PTB
+                },
             )
-                .await
-                .inspect(|_| display::done())?
+            .await
+            .inspect(|_| display::done())?
         } else {
             SuiTransactionBlockResponse::default()
         };
