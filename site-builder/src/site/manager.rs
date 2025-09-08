@@ -40,7 +40,11 @@ use crate::{
     walrus::{types::BlobId, Walrus},
 };
 
+// TODO: This is not correct, because depending on the resource headers given, the number of
+// move-calls in 1 ptb number is dynamic.
 const MAX_RESOURCES_PER_PTB: usize = 200;
+const MAX_RESOURCES_PER_PTB_QUILTS: usize = 170; // +1 header per resource
+
 const OS_ERROR_DELAY: Duration = Duration::from_secs(1);
 const MAX_RETRIES: u32 = 10;
 
@@ -84,7 +88,7 @@ impl SiteManager {
 
     /// Perform a dry-run of Walrus store operations for the given updates
     /// and return the total storage cost that would be incurred.
-    async fn dry_run_walrus_store(
+    async fn dry_run_walrus_single_blob_store(
         &mut self,
         walrus_updates: &Vec<&ResourceOp<'_>>,
     ) -> anyhow::Result<u64> {
@@ -118,7 +122,11 @@ impl SiteManager {
     pub async fn update_site(
         &mut self,
         local_site_data: &SiteData,
+        // Currently Quilts implementation, needs to store Quilt in advance, in order to get the
+        // full resource needed to save on Sui. We use this to skip storing also as blobs.
+        store_new_blobs: bool,
     ) -> Result<(SuiTransactionBlockResponse, SiteDataDiffSummary)> {
+        let using_quilts = !store_new_blobs;
         tracing::debug!(?self.site_id, "creating or updating site");
         let retriable_client = self.sui_client().await?;
         let existing_site = match &self.site_id {
@@ -134,22 +142,30 @@ impl SiteManager {
 
         let site_updates = local_site_data.diff(&existing_site);
 
-        let walrus_candidate_set = if self.blob_options.is_check_extend() {
-            // We need to check the status of all blobs: Return the full list of existing and added
-            // blobs as possible updates.
-            existing_site.replace_all(local_site_data)
-        } else {
-            // We only need to upload the new blobs.
-            site_updates.clone()
-        };
-        // IMPORTANT: Perform the store operations on Walrus first, to ensure zero "downtime".
-        self.select_and_store_to_walrus(&walrus_candidate_set)
-            .await?;
+        if store_new_blobs {
+            let walrus_candidate_set = if self.blob_options.is_check_extend() {
+                // We need to check the status of all blobs: Return the full list of existing and added
+                // blobs as possible updates.
+                existing_site.replace_all(local_site_data)
+            } else {
+                // We only need to upload the new blobs.
+                site_updates.clone()
+            };
+            // IMPORTANT: Perform the store operations on Walrus first, to ensure zero "downtime".
+            self.select_and_store_single_blob_resources_to_walrus(&walrus_candidate_set)
+                .await?;
+        }
 
         // Check if there are any updates to the site on-chain.
         let result = if site_updates.has_updates() {
             display::action("Applying the Walrus Site object updates on Sui");
-            self.execute_sui_updates(&site_updates)
+            self.execute_sui_updates(&site_updates,
+                    if using_quilts {
+                        MAX_RESOURCES_PER_PTB_QUILTS
+                    } else {
+                        MAX_RESOURCES_PER_PTB
+                    },
+            )
                 .await
                 .inspect(|_| display::done())?
         } else {
@@ -167,7 +183,7 @@ impl SiteManager {
     }
 
     /// Selects the necessary walrus store operations and executes them.
-    async fn select_and_store_to_walrus(
+    async fn select_and_store_single_blob_resources_to_walrus(
         &mut self,
         walrus_candidate_set: &SiteDataDiff<'_>,
     ) -> Result<()> {
@@ -175,7 +191,9 @@ impl SiteManager {
 
         if !walrus_updates.is_empty() {
             if self.walrus_options.dry_run {
-                let total_storage_cost = self.dry_run_walrus_store(&walrus_updates).await?;
+                let total_storage_cost = self
+                    .dry_run_walrus_single_blob_store(&walrus_updates)
+                    .await?;
                 // Before doing the actual execution, perform a dry run
                 display::action(format!(
                     "Estimated Storage Cost for this publish/update (Gas Cost Excluded): {total_storage_cost} FROST"
@@ -192,13 +210,17 @@ impl SiteManager {
                     return Err(anyhow!("Update cancelled by user"));
                 }
             }
-            self.store_to_walrus(&walrus_updates).await?;
+            self.store_single_blob_resources_to_walrus(&walrus_updates)
+                .await?;
         }
         Ok(())
     }
 
     /// Publishes the resources to Walrus.
-    async fn store_to_walrus(&mut self, walrus_updates: &[&ResourceOp<'_>]) -> Result<()> {
+    async fn store_single_blob_resources_to_walrus(
+        &mut self,
+        walrus_updates: &[&ResourceOp<'_>],
+    ) -> Result<()> {
         for (idx, update_set) in walrus_updates
             .chunks(self.max_parallel_stores.get())
             .enumerate()
@@ -298,6 +320,7 @@ impl SiteManager {
     async fn execute_sui_updates(
         &self,
         updates: &SiteDataDiff<'_>,
+        max_resources_per_ptb: usize,
     ) -> Result<SuiTransactionBlockResponse> {
         tracing::debug!(
             address=?self.active_address()?,
@@ -331,9 +354,9 @@ impl SiteManager {
             ptb.update_name(site_name)?;
         }
 
-        // Publish the first MAX_RESOURCES_PER_PTB resources, or all resources if there are fewer
+        // Publish the first max_resources_per_ptb resources, or all resources if there are fewer
         // than that.
-        let mut end = MAX_RESOURCES_PER_PTB.min(updates.resource_ops.len());
+        let mut end = max_resources_per_ptb.min(updates.resource_ops.len());
         tracing::debug!(
             total_ops = updates.resource_ops.len(),
             end,
@@ -376,7 +399,7 @@ impl SiteManager {
         // Keep iterating to load resources.
         while end < updates.resource_ops.len() {
             let start = end;
-            end = (end + MAX_RESOURCES_PER_PTB).min(updates.resource_ops.len());
+            end = (end + max_resources_per_ptb).min(updates.resource_ops.len());
             tracing::debug!(%start, %end, "preparing and committing the next PTB");
 
             let ptb = SitePtb::new(
@@ -430,7 +453,7 @@ impl SiteManager {
 
         //Perform dry run
         if self.walrus_options.dry_run {
-            let total_storage_cost = self.dry_run_walrus_store(&walrus_ops).await?;
+            let total_storage_cost = self.dry_run_walrus_single_blob_store(&walrus_ops).await?;
             // Before doing the actual execution, perform a dry run
             display::action(format!(
                 "Estimated Storage Cost for this publish/update (Gas Cost Excluded): {total_storage_cost} FROST"
@@ -446,7 +469,8 @@ impl SiteManager {
                 return Err(anyhow!("Update cancelled by user"));
             }
         }
-        self.store_to_walrus(&walrus_ops).await?;
+        self.store_single_blob_resources_to_walrus(&walrus_ops)
+            .await?;
 
         // Create the PTB
         tracing::debug!("modifying the site object on chain");

@@ -20,10 +20,15 @@ mod preprocessor;
 mod publish;
 mod retry_client;
 mod site;
+// TODO: This can be a standalone crate, helping integration testing and other projects using our
+// contract.
+pub use site::contracts;
 mod sitemap;
 mod suins;
 mod summary;
-mod types;
+// TODO: This can be a standalone crate, helping integration testing and other projects using our
+// contract.
+pub mod types;
 mod util;
 mod walrus;
 
@@ -121,6 +126,22 @@ async fn run_internal(
                 .run()
                 .await?
         }
+        #[cfg(feature = "quilts")]
+        Commands::PublishQuilts {
+            publish_options,
+            site_name,
+        } => {
+            SiteEditor::new(context, config)
+                .with_edit_options(
+                    publish_options,
+                    None,
+                    site_name,
+                    ContinuousEditing::Once,
+                    BlobManagementOptions::no_status_check(),
+                )
+                .run_quilts()
+                .await?
+        }
         #[allow(deprecated)]
         Commands::Update {
             publish_options,
@@ -184,7 +205,7 @@ async fn run_internal(
             )
             .await?;
             let resource = resource_manager
-                .read_resource(&resource, path)
+                .read_single_blob_resource(&resource, path)
                 .await?
                 .ok_or(anyhow!(
                     "could not read the resource at path: {}",

@@ -3,7 +3,10 @@
 
 use std::{fs, path::PathBuf};
 
+use fastcrypto::hash::{HashFunction, Sha256};
+use move_core_types::u256::U256;
 use site_builder::args::{Commands, EpochCountOrMax};
+use walrus_sdk::core::BlobId;
 
 #[allow(dead_code)]
 mod localnode;
@@ -12,9 +15,9 @@ use localnode::{
     TestSetup,
 };
 
-// Important: For tests to pass, the system they are running on need to have walrus installed.
 #[tokio::test]
 async fn publish_snake() -> anyhow::Result<()> {
+    const SNAKE_FILES_UPLOAD_FILES: usize = 4;
     let cluster = TestSetup::start_local_test_cluster().await?;
     let directory = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -29,7 +32,7 @@ async fn publish_snake() -> anyhow::Result<()> {
     fs::copy(&og_ws_resources, &temp_ws_resources)?;
 
     let args = ArgsBuilder::default()
-        .with_config(Some(cluster.sites_config.inner.1))
+        .with_config(Some(cluster.sites_config_path().to_owned()))
         .with_command(Commands::Publish {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory)
@@ -40,6 +43,19 @@ async fn publish_snake() -> anyhow::Result<()> {
         })
         .build()?;
     site_builder::run(args).await?;
+
+    let site = cluster.last_site_created().await?;
+    let resources = cluster.site_resources(*site.id.object_id()).await?;
+
+    assert_eq!(resources.len(), SNAKE_FILES_UPLOAD_FILES + 1); // +1 because we use a temp
+                                                               // ws-resources
+    for resource in resources {
+        let data = cluster.read_blob(&BlobId(resource.blob_id.0)).await?;
+        let mut hash_function = Sha256::default();
+        hash_function.update(&data);
+        let resource_hash: [u8; 32] = hash_function.finalize().digest;
+        assert_eq!(resource.blob_hash, U256::from_le_bytes(&resource_hash));
+    }
 
     Ok(())
 }
