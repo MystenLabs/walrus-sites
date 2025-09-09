@@ -1,27 +1,27 @@
 {
     "dependencies": {
-        "@mysten/bcs": "^1.1.0",
+        "@mysten/bcs": "^1.7.0",
         "@mysten/sui": "1.18.1",
         "@mysten/suins": "^0.6.3",
-        "base-x": "^4.0.0",
+        "@opentelemetry/api": "^1.9.0",
+        "@opentelemetry/exporter-prometheus": "^0.200.0",
+        "@opentelemetry/sdk-metrics": "^2.1.0",
+        "@vitest/coverage-v8": "^3.2.4",
+        "base-x": "^4.0.1",
+        "https-browserify": "^1.0.0",
         "pako": "^2.1.0",
         "parse-domain": "8.2.2",
-        "vite": "^5.4.12",
-        "@opentelemetry/api": "^1.9.0",
-        "@opentelemetry/sdk-metrics": "^2.0.0",
-        "@opentelemetry/exporter-prometheus": "^0.200.0",
-        "@vitest/coverage-v8": "^3.2.4",
-        "stream-http": "^3.2.0",
-        "https-browserify": "^1.0.0",
         "stream-browserify": "^3.0.0",
-        "url": "^0.11.0",
-        "util": "^0.12.5"
+        "stream-http": "^3.2.0",
+        "url": "^0.11.4",
+        "util": "^0.12.5",
+        "vite": "^5.4.20",
+        "vitest": "^3.2.4"
     },
     "devDependencies": {
-        "@types/bun": "^1.2.5",
-        "@types/pako": "^2.0.3",
-        "vite-plugin-html": "^3.2.2",
-        "vitest": "^2.1.3"
+        "@types/bun": "^1.2.21",
+        "@types/pako": "^2.0.4",
+        "vite-plugin-html": "^3.2.2"
     },
     "name": "common",
     "description": "A common library that is shared among the portal implementations.",
