@@ -211,13 +211,12 @@ async fn run_internal(
                     "could not read the resource at path: {}",
                     resource.display()
                 ))?;
-            // TODO: make when upload configurable.
             let mut site_manager = SiteManager::new(
                 config,
                 Some(site_object),
                 BlobManagementOptions::no_status_check(),
                 common,
-                None, // TODO: update the site metadata.
+                None,
                 None,
                 NonZeroUsize::new(1).expect("non-zero"),
             )

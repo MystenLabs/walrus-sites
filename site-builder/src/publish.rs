@@ -379,7 +379,6 @@ impl SiteEditor<EditOptions> {
         site_manager: &SiteManager,
         response: &SuiTransactionBlockResponse,
     ) -> Result<()> {
-        // TODO: Deduplicate
         let path_for_saving = resource_manager
             .ws_resources_path
             .unwrap_or_else(|| self.directory().join(DEFAULT_WS_RESOURCES_FILE));
