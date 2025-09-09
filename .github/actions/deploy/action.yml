@@ -110,14 +110,16 @@ runs:
             DIST_PATH: ${{ inputs.DIST }}
             WS_RESOURCES_PATH: ${{ inputs.WS_RESOURCES }}
             CHECK_EXTEND: ${{ inputs.CHECK_EXTEND }}
+            EPOCHS: ${{ inputs.EPOCHS }}
+            SUI_NETWORK: ${{ inputs.SUI_NETWORK }}
           run: |
             ARGS=(
-              --context "${{ inputs.SUI_NETWORK }}"
+              --context "$SUI_NETWORK"
               --config sites-config.yaml
             )
             ARGS+=(
               deploy "$DIST_PATH"
-              --epochs "${{ inputs.EPOCHS }}"
+              --epochs "$EPOCHS"
             )
             if [[ -n "$WS_RESOURCES_PATH" ]]; then
               ARGS+=(--ws-resources "$WS_RESOURCES_PATH")
