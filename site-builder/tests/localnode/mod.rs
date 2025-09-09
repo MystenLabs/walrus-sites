@@ -236,10 +236,7 @@ impl TestSetup {
             let resource_fields = self
                 .client
                 .read_api()
-                .multi_get_object_with_options(
-                    ids,
-                    SuiObjectDataOptions::new().with_bcs(),
-                )
+                .multi_get_object_with_options(ids, SuiObjectDataOptions::new().with_bcs())
                 .await?;
 
             let mut resources_chunk = resource_fields
