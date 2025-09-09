@@ -17,12 +17,12 @@ import {
     generateHashErrorResponse,
     resourceNotFound,
     custom404NotFound,
-} from "../http/http_error_responses";
+} from "../src/http/http_error_responses";
 import { blobAggregatorEndpoint, quiltAggregatorEndpoint } from "./aggregator";
 import { toBase64 } from "@mysten/bcs";
 import { sha256 } from "./crypto";
 import { WalrusSitesRouter } from "./routing";
-import { HttpStatusCodes } from "../http/http_status_codes";
+import { HttpStatusCodes } from "./http/http_status_codes";
 import logger from "./logger";
 import BlocklistChecker from "./blocklist_checker";
 import { QuiltPatch } from "./quilt";
