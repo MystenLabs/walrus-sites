@@ -25,6 +25,9 @@ jobs:
         run: |
           ls -lh portal/common/coverage/
           head -20 portal/common/coverage/lcov.info
+      - name: Fix lcov.info relative paths to match the project root
+        run: |
+          sed -i 's|SF:../lib/src/|SF:portal/common/lib/src/|g' portal/common/coverage/lcov.info
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@2500896589ef8f7247069a56136f8dc177c27ccf # v5.2.0
         env:
