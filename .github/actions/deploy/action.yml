@@ -114,7 +114,7 @@ runs:
             auth_methods=0
             needs_derivation="false"
             key_string=""
-            
+
             # Check Address + Keystore method
             if [[ -n "$SUI_ADDRESS" && -n "$SUI_KEYSTORE" ]]; then
               auth_methods=$((auth_methods + 1))
@@ -123,7 +123,7 @@ runs:
               echo "❌ ERROR: Both SUI_ADDRESS and SUI_KEYSTORE must be provided together"
               exit 1
             fi
-            
+
             # Check Bech32 Private Key method
             if [[ -n "$SUI_BECH32_PRIVATE_KEY" ]]; then
               auth_methods=$((auth_methods + 1))
@@ -131,7 +131,7 @@ runs:
               key_string="$SUI_BECH32_PRIVATE_KEY"
               echo "✓ Using SUI_BECH32_PRIVATE_KEY authentication"
             fi
-            
+
             # Check Secret Phrase method
             if [[ -n "$SUI_SECRET_PHRASE" ]]; then
               auth_methods=$((auth_methods + 1))
@@ -139,7 +139,7 @@ runs:
               key_string="$SUI_SECRET_PHRASE"
               echo "✓ Using SUI_SECRET_PHRASE authentication"
             fi
-            
+
             # Validate exactly one authentication method is provided
             if [[ $auth_methods -eq 0 ]]; then
               echo "❌ ERROR: Must provide one of the following Sui account setup methods:"
@@ -152,7 +152,7 @@ runs:
               echo "  Provided: $auth_methods methods"
               exit 1
             fi
-            
+
             # Set outputs for subsequent steps
             echo "needs_derivation=$needs_derivation" >> "$GITHUB_OUTPUT"
             echo "key_string=$key_string" >> "$GITHUB_OUTPUT"
@@ -162,18 +162,20 @@ runs:
         - name: Install Suiup
           if: steps.sui_auth_method.outputs.needs_derivation == 'true'
           shell: bash
+          env:
+            SUI_NETWORK: ${{ inputs.SUI_NETWORK }}
           run: |
             echo "📦 Installing suiup to manage Sui CLI tools..."
             curl -sSf https://raw.githubusercontent.com/MystenLabs/suiup/main/install.sh | bash
-            
+
             # Verify installation works
             suiup --version
             echo "✅ Suiup installed successfully"
-            
+
             # Install Sui CLI for the specified network
-            echo "📥 Installing Sui CLI for ${{ inputs.SUI_NETWORK }} network..."
-            suiup install sui@${{ inputs.SUI_NETWORK }} -y
-            
+            echo "📥 Installing Sui CLI for $SUI_NETWORK network..."
+            suiup install "sui@$SUI_NETWORK" -y
+
             # Verify Sui CLI installation
             sui --version
             echo "✅ Sui CLI installed successfully"
@@ -190,16 +192,16 @@ runs:
           run: |
             if [[ "$NEEDS_DERIVATION" == "true" ]]; then
               echo "🔑 Deriving Sui Ed25519 account from provided credentials..."
-              
+
               # Import the key using sui keytool with Ed25519 scheme
               import_result=$(sui keytool import "$KEY_STRING" ed25519 --json)
-              
+
               # Extract address from the JSON result
               sui_address=$(echo "$import_result" | jq -r '.suiAddress')
-              
+
               # Get the keystore content (this will be in ~/.sui/sui_config/sui.keystore)
               keystore_content=$(cat ~/.sui/sui_config/sui.keystore)
-              
+
               echo "✅ Sui account derived successfully"
               echo "📍 Address: $sui_address"
             else
@@ -207,10 +209,10 @@ runs:
               sui_address="$INPUT_SUI_ADDRESS"
               keystore_content="$INPUT_SUI_KEYSTORE"
             fi
-            
+
             # Output the final values for subsequent steps
             echo "sui_address=$sui_address" >> "$GITHUB_OUTPUT"
-            
+
             # Remove newlines from keystore content for safe single-line output
             keystore_oneline=$(echo "$keystore_content" | tr -d '\n\r')
             echo "sui_keystore=$keystore_oneline" >> "$GITHUB_OUTPUT"
@@ -233,7 +235,7 @@ runs:
             echo "walrus_config<<$EOF" >> "$GITHUB_OUTPUT"
             echo "$CONFIG_CONTENT" >> "$GITHUB_OUTPUT"
             echo "$EOF" >> "$GITHUB_OUTPUT"
-            
+
         # This step sets up the Sui and Walrus environment using a dedicated GitHub Action. It
         # installs the necessary tools, like the `walrus` and `site-builder` binaries.
         - name: Setup Walrus
