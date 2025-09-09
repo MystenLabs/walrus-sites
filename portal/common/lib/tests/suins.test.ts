@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { SuiNSResolver } from './suins';
-import { RPCSelector } from './rpc_selector';
-import { NameRecord } from './types';
+import { SuiNSResolver } from '../src/suins';
+import { RPCSelector } from '../src/rpc_selector';
+import { NameRecord } from '../src/types';
 
 describe('resolveSuiNsAddress', () => {
     const rpcSelector = new RPCSelector(process.env.RPC_URL_LIST!.split(','), "testnet")

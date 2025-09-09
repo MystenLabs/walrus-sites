@@ -3,8 +3,8 @@
 
 // Import necessary functions and types
 import { describe, expect, test } from "vitest";
-import { redirectToPortalURLResponse, redirectToAggregatorUrlResponse } from "./redirects";
-import { DomainDetails } from "./types/index";
+import { redirectToPortalURLResponse, redirectToAggregatorUrlResponse } from "../src/redirects";
+import { DomainDetails } from "../src/types/index";
 
 const mockAggregatorUrl = "https://aggregator.walrus-testnet.walrus.space";
 const redirectToPortalURLTestCases: [string, DomainDetails, string][] = [

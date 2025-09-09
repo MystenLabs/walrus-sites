@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "vitest";
-import { getDomain, getSubdomainAndPath } from "./domain_parsing";
-import { DomainDetails } from "./types";
+import { getDomain, getSubdomainAndPath } from "../src/domain_parsing";
+import { DomainDetails } from "../src/types";
 
 const PORTAL_DOMAIN_NAME_LENGTH = 21;
 

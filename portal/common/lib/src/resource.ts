@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { HttpStatusCodes } from "./http/http_status_codes";
+import { HttpStatusCodes } from "../http/http_status_codes";
 import { SuiObjectData, SuiObjectResponse } from "@mysten/sui/client";
 import { Resource, VersionedResource } from "./types";
 import { MAX_REDIRECT_DEPTH } from "./constants";

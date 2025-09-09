@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from 'vitest';
-import { base64UrlSafeEncode } from './url_safe_base64';
+import { base64UrlSafeEncode } from '../src/url_safe_base64';
 
 // Test cases for base64UrlSafeEncode
 const base64UrlSafeEncodeTestCases: [Uint8Array, string][] = [

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, it, expect } from "vitest";
-import { QuiltPatch } from "./quilt";
+import { QuiltPatch } from "../src/quilt";
 
 describe("derive quilt patch id from internal identifier", () => {
 	it("happy path", () => {
