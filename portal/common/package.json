@@ -27,6 +27,7 @@
     "main": "index.js",
     "scripts": {
         "test": "vitest",
-        "bench": "vitest bench"
+        "bench": "vitest bench",
+        "coverage": "vitest run --coverage"
     }
 }
