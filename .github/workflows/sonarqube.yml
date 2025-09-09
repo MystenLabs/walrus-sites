@@ -21,6 +21,10 @@ jobs:
         run: |
           bun install
           bun run coverage
+      - name: Debug lcov
+        run: |
+          ls -lh portal/common/coverage/
+          head -20 portal/common/coverage/lcov.info
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@2500896589ef8f7247069a56136f8dc177c27ccf # v5.2.0
         env:
