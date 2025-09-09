@@ -20,7 +20,7 @@ jobs:
         working-directory: portal/common
         run: |
           bun install
-          bun run coverage`
+          bun run coverage
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@2500896589ef8f7247069a56136f8dc177c27ccf # v5.2.0
         env:
