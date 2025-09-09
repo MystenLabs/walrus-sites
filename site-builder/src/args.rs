@@ -335,6 +335,19 @@ pub enum Commands {
         #[arg(long)]
         check_extend: bool,
     },
+    /// Update an existing site.
+    UpdateQuilts {
+        #[clap(flatten)]
+        publish_options: PublishOptions,
+        /// The object ID of a partially published site to be completed.
+        object_id: ObjectID,
+        /// Watch the site directory for changes and automatically redeploy when files are modified.
+        ///
+        /// When enabled, the command will continuously monitor the site directory and trigger a
+        /// redepoloyment whenever changes are detected, allowing for rapid development iteration.
+        #[arg(short, long)]
+        watch: bool,
+    },
     /// Convert an object ID in hex format to the equivalent Base36 format.
     ///
     /// This command may be useful to browse a site, given it object ID.
