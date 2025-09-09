@@ -32,7 +32,7 @@ module.exports = {
     },
     resolve: {
         alias: {
-            "@lib": path.resolve(__dirname, "../common/lib"),
+            "@lib": path.resolve(__dirname, "../common/lib/src"),
             "@static": path.resolve(__dirname, "./static"),
         },
         extensions: [".ts", ".js", ".html"],

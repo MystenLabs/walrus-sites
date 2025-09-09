@@ -12,7 +12,7 @@
     "baseUrl": "./",
       "paths": {
         "@static/*": ["static/*"],
-        "@lib/*": ["../common/lib/*"]
+        "@lib/*": ["../common/lib/src/*"]
     }
   },
   "baseUrl": "./",
@@ -21,7 +21,7 @@
   "skipLibCheck": true,
   "include": [
     "src/**/*",
-    "../common/**/*"
+    "../common/lib/src/**/*"
 , "static", "static"  ],
   "exclude": [
     "node_modules",

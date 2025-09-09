@@ -8,7 +8,7 @@
     "lib": ["esnext"],
     "baseUrl": "./",
     "paths": {
-      "@lib/*": ["lib/*"],
+      "@lib/*": ["lib/src/*"],
       "@static/*": ["static/*"]
     }
   },
