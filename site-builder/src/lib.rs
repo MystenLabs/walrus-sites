@@ -20,6 +20,7 @@ mod preprocessor;
 mod publish;
 mod retry_client;
 mod site;
+pub use site::config as site_config;
 // TODO: This can be a standalone crate, helping integration testing and other projects using our
 // contract.
 pub use site::contracts;
@@ -170,6 +171,27 @@ async fn run_internal(
                     },
                 )
                 .run()
+                .await?
+        }
+        Commands::UpdateQuilts {
+            publish_options,
+            object_id,
+            watch,
+        } => {
+            SiteEditor::new(context, config)
+                .with_edit_options(
+                    publish_options,
+                    Some(object_id),
+                    None,
+                    ContinuousEditing::from_watch_flag(watch),
+                    // Check the extension if either `check_extend` is true or `force` is true.
+                    // This is for backwards compatibility.
+                    // TODO: Remove once the `force` flag is deprecated.
+                    BlobManagementOptions {
+                        check_extend: false,
+                    },
+                )
+                .run_quilts()
                 .await?
         }
         // Add a path to be watched. All files and directories at that path and
