@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { base64UrlSafeEncode } from "./url_safe_base64";
+import { base64UrlSafeEncode } from "@lib/url_safe_base64";
 
 export class QuiltPatch {
 	constructor(

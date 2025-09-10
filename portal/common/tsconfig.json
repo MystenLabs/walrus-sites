@@ -12,9 +12,9 @@
       "@templates/*": ["html_templates/*"]
     }
   },
-  "rootDir": "src",
+  "rootDir": "lib/src",
   "outDir": "dist",
   "skipLibCheck": true,
-  "include": ["lib/**/*"],
+  "include": ["lib/src/**/*", "lib/tests/**/*"],
   "exclude": ["node_modules", "dist"]
 }

@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from 'vitest';
-import { getObjectIdLink, getBlobIdLink } from '../src/links';
-import { DomainDetails } from '../src/types';
+import { getObjectIdLink, getBlobIdLink } from '@lib/links';
+import { DomainDetails } from '@lib/types';
 
 const getObjectIdLinkTestCases: [string, DomainDetails | null][] = [
     ["https://example.suiobj.invalid/resource/path", { subdomain: "example", path: "/resource/path" }],

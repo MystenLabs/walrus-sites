@@ -1,12 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { WalrusSitesRouter } from "../src/routing";
+import { WalrusSitesRouter } from "@lib/routing";
 import { test, expect, describe, vi, beforeEach } from "vitest";
-import { RPCSelector } from "../src/rpc_selector";
-import { UrlFetcher } from "../src/url_fetcher";
-import { ResourceFetcher } from "../src/resource";
-import { SuiNSResolver } from "../src/suins";
+import { RPCSelector } from "@lib/rpc_selector";
+import { UrlFetcher } from "@lib/url_fetcher";
+import { ResourceFetcher } from "@lib/resource";
+import { SuiNSResolver } from "@lib/suins";
 
 const snakeSiteObjectId = "0x7a95e4be3948415b852fb287d455166a276d7a52f1a567b4a26b6b5e9c753158";
 const rpcSelector = new RPCSelector(process.env.RPC_URL_LIST!.split(","), "testnet");

@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { SuiObjectResponse } from "@mysten/sui/client";
-import { Routes } from "./types";
-import { DynamicFieldStruct, RoutesStruct } from "./bcs_data_parsing";
+import { Routes } from "@lib/types";
+import { DynamicFieldStruct, RoutesStruct } from "@lib/bcs_data_parsing";
 import { bcs, fromBase64 } from "@mysten/bcs";
-import logger from "./logger";
-import { RPCSelector } from "./rpc_selector";
+import logger from "@lib/logger";
+import { RPCSelector } from "@lib/rpc_selector";
 import { deriveDynamicFieldID } from "@mysten/sui/utils";
-import { instrumentationFacade } from "./instrumentation";
+import { instrumentationFacade } from "@lib/instrumentation";
 
 /**
  * The WalrusSiteRouter class is responsible for handling the routing logic for published

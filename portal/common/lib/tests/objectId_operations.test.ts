@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from 'vitest';
-import { subdomainToObjectId, HEXtoBase36, Base36toHex } from '../src/objectId_operations';
+import { subdomainToObjectId, HEXtoBase36, Base36toHex } from '@lib/objectId_operations';
 
 // Test cases for subdomainToObjectId
 const subdomainToObjectIdTestCases: [string, string | null][] = [

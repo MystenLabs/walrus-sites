@@ -1,8 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { DomainDetails } from "./types";
-import logger from "./logger";
+import { DomainDetails } from "@lib/types";
+import logger from "@lib/logger";
 
 /**
  * Checks if there is a link to a sui resource in the path.

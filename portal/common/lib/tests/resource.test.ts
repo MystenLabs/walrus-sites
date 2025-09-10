@@ -3,10 +3,10 @@
 
 // Import necessary functions and types
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { ResourceFetcher } from "../src/resource";
-import { RPCSelector } from "../src/rpc_selector";
-import { HttpStatusCodes } from "../src/http/http_status_codes";
-import { checkRedirect } from "../src/redirects";
+import { ResourceFetcher } from "@lib/resource";
+import { RPCSelector } from "@lib/rpc_selector";
+import { HttpStatusCodes } from "@lib/http/http_status_codes";
+import { checkRedirect } from "@lib/redirects";
 import { fromBase64 } from "@mysten/bcs";
 import { SuiObjectResponse } from "@mysten/sui/client";
 

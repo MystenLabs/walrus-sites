@@ -5,11 +5,10 @@ import {
     DomainDetails,
     isResource,
     optionalRangeToHeaders as optionalRangeToRequestHeaders,
-    Routes,
-} from "./types/index";
-import { subdomainToObjectId, HEXtoBase36 } from "./objectId_operations";
-import { SuiNSResolver } from "./suins";
-import { ResourceFetcher } from "./resource";
+} from "@lib/types/index";
+import { subdomainToObjectId } from "@lib/objectId_operations";
+import { SuiNSResolver } from "@lib/suins";
+import { ResourceFetcher } from "@lib/resource";
 import {
     siteNotFound,
     noObjectIdFound,
@@ -17,15 +16,15 @@ import {
     generateHashErrorResponse,
     resourceNotFound,
     custom404NotFound,
-} from "../src/http/http_error_responses";
-import { blobAggregatorEndpoint, quiltAggregatorEndpoint } from "./aggregator";
+} from "@lib/http/http_error_responses";
+import { blobAggregatorEndpoint, quiltAggregatorEndpoint } from "@lib/aggregator";
 import { toBase64 } from "@mysten/bcs";
-import { sha256 } from "./crypto";
-import { WalrusSitesRouter } from "./routing";
-import { HttpStatusCodes } from "./http/http_status_codes";
-import logger from "./logger";
-import BlocklistChecker from "./blocklist_checker";
-import { QuiltPatch } from "./quilt";
+import { sha256 } from "@lib/crypto";
+import { WalrusSitesRouter } from "@lib/routing";
+import { HttpStatusCodes } from "@lib/http/http_status_codes";
+import logger from "@lib/logger";
+import BlocklistChecker from "@lib/blocklist_checker";
+import { QuiltPatch } from "@lib/quilt";
 
 /**
 * Includes all the logic for fetching the URL contents of a walrus site.
