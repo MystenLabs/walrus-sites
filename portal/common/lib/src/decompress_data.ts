@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Inflate } from 'pako';
-import logger from './logger';
+import logger from '@lib/logger';
 
 /**
 * Decompresses the contents of the buffer according to the content encoding.

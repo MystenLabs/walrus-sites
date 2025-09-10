@@ -1,11 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { DomainDetails } from "./types/index";
-import { getDomain } from "./domain_parsing";
-import { blobAggregatorEndpoint } from "./aggregator";
+import { DomainDetails } from "@lib/types/index";
+import { getDomain } from "@lib/domain_parsing";
+import { blobAggregatorEndpoint } from "@lib/aggregator";
 import { SuiObjectResponse } from "@mysten/sui/client";
-import logger from "./logger";
+import logger from "@lib/logger";
 
 /**
  * Redirects to the portal URL.

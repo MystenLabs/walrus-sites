@@ -4,7 +4,7 @@
 import { MeterProvider } from "@opentelemetry/sdk-metrics"
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus"
 import { Attributes, Counter, Meter, Histogram } from "@opentelemetry/api"
-import logger from "./logger"
+import logger from "@lib/logger"
 
 /**
  * Prometheus' instrumentation manager for minting backend.

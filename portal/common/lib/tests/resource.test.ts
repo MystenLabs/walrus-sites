@@ -3,10 +3,10 @@
 
 // Import necessary functions and types
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { ResourceFetcher } from "./resource";
-import { RPCSelector } from "./rpc_selector";
-import { HttpStatusCodes } from "./http/http_status_codes";
-import { checkRedirect } from "./redirects";
+import { ResourceFetcher } from "@lib/resource";
+import { RPCSelector } from "@lib/rpc_selector";
+import { HttpStatusCodes } from "@lib/http/http_status_codes";
+import { checkRedirect } from "@lib/redirects";
 import { fromBase64 } from "@mysten/bcs";
 import { SuiObjectResponse } from "@mysten/sui/client";
 
@@ -16,7 +16,7 @@ vi.mock("@mysten/sui/utils", () => ({
 }))
 
 // Mock checkRedirect
-vi.mock("./redirects", () => ({
+vi.mock("../src/redirects", () => ({
     checkRedirect: vi.fn(),
 }));
 
@@ -29,8 +29,8 @@ vi.mock("@mysten/bcs", async () => {
     };
 });
 
-vi.mock("./bcs_data_parsing", async (importOriginal) => {
-    const actual = (await importOriginal()) as typeof import("./bcs_data_parsing");
+vi.mock("../src/bcs_data_parsing", async (importOriginal) => {
+    const actual = (await importOriginal()) as typeof import("../src/bcs_data_parsing");
     return {
         ...actual,
         DynamicFieldStruct: vi.fn(() => ({

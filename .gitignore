@@ -18,3 +18,4 @@ env/
 *.log
 temp-landing-page/
 .env*.local
+**/coverage

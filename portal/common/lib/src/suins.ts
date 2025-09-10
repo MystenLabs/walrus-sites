@@ -1,10 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-import { SITE_NAMES } from "./constants";
-import { RPCSelector } from "./rpc_selector";
-import logger from "./logger";
-import { NameRecord } from "./types";
-import { instrumentationFacade } from "./instrumentation";
+import { SITE_NAMES } from "@lib/constants";
+import { RPCSelector } from "@lib/rpc_selector";
+import logger from "@lib/logger";
+import { NameRecord } from "@lib/types";
+import { instrumentationFacade } from "@lib/instrumentation";
 
 export class SuiNSResolver {
     constructor(private rpcSelector: RPCSelector) {}

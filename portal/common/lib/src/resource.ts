@@ -1,11 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { HttpStatusCodes } from "./http/http_status_codes";
+import { HttpStatusCodes } from "@lib/http/http_status_codes";
 import { SuiObjectData, SuiObjectResponse } from "@mysten/sui/client";
-import { Resource, VersionedResource } from "./types";
-import { MAX_REDIRECT_DEPTH } from "./constants";
-import { checkRedirect } from "./redirects";
+import { Resource, VersionedResource } from "@lib/types";
+import { MAX_REDIRECT_DEPTH } from "@lib/constants";
+import { checkRedirect } from "@lib/redirects";
 import { fromBase64 } from "@mysten/bcs";
 import { ResourcePathStruct, DynamicFieldStruct, ResourceStruct } from "./bcs_data_parsing";
 import { deriveDynamicFieldID } from "@mysten/sui/utils";

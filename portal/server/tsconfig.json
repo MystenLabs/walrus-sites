@@ -20,9 +20,9 @@
         ],
         "baseUrl": "./",
         "paths": {
-            "@lib/*": ["../common/lib/*"]
+            "@lib/*": ["../common/lib/src/*"]
         },
-        "types": ["../common/lib/custom.d.ts", "@types/bun"]
+        "types": ["../common/lib/src/custom.d.ts", "@types/bun"]
     },
     "include": ["**/*.ts", "**/*.tsx"],
     "exclude": ["node_modules"]

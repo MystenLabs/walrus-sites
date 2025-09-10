@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test, describe } from "vitest";
-import { decompressData, streamInflate } from "./decompress_data";
+import { decompressData, streamInflate } from "@lib/decompress_data";
 import * as Pako from "pako";
 
 const mockContent = "Hello, Walrus!";

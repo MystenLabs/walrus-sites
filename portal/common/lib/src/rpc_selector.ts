@@ -9,8 +9,8 @@ import {
     SuiObjectResponse,
 } from "@mysten/sui/client";
 import { SuinsClient } from "@mysten/suins";
-import logger from "./logger";
-import { NameRecord, Network } from "./types";
+import logger from "@lib/logger";
+import { NameRecord, Network } from "@lib/types";
 
 interface RPCSelectorInterface {
     getObject(input: GetObjectParams): Promise<SuiObjectResponse>;

@@ -1,35 +1,40 @@
 {
-  "compilerOptions": {
-    "target": "esnext",
-    "module": "esnext",
-    "moduleResolution": "node",
-    "allowSyntheticDefaultImports": true,
-    "lib": [
-      "esnext",
-      "webworker",
-      "dom"
-    ],
-    "baseUrl": "./",
-      "paths": {
-        "@static/*": ["static/*"],
-        "@lib/*": ["../common/lib/*"]
-    }
-  },
-  "baseUrl": "./",
-  "rootDir": "src",
-  "outDir": "dist",
-  "skipLibCheck": true,
-  "include": [
-    "src/**/*",
-    "../common/**/*"
-, "static", "static"  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-  ],
-  "references": [
-      {
-          "path": "../common/tsconfig.json"
-      }
-  ]
+	"compilerOptions": {
+		"target": "esnext",
+		"module": "esnext",
+		"moduleResolution": "node",
+		"allowSyntheticDefaultImports": true,
+		"lib": [
+			"esnext",
+			"webworker",
+			"dom"
+		],
+		"baseUrl": "./",
+		"paths": {
+			"@lib/*": [
+				"../common/lib/src/*"
+			],
+			"@templates/*": [
+				"../common/html_templates/*"
+			]
+		}
+	},
+	"baseUrl": "./",
+	"rootDir": "src",
+	"outDir": "dist",
+	"skipLibCheck": true,
+	"include": [
+		"src/**/*",
+		"../common/lib/src/**/*",
+		"../common/html_templates/*",
+	],
+	"exclude": [
+		"node_modules",
+		"dist",
+	],
+	"references": [
+		{
+			"path": "../common/tsconfig.json"
+		}
+	]
 }

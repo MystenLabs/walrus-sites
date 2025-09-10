@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, it, expect } from 'vitest';
-import { blobAggregatorEndpoint, quiltAggregatorEndpoint } from './aggregator';
+import { blobAggregatorEndpoint, quiltAggregatorEndpoint } from '@lib/aggregator';
 
 describe('blobAggregatorEndpoint', () => {
     it('builds the correct URL without trailing slash on base', () => {

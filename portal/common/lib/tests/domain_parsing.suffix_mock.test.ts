@@ -3,7 +3,7 @@
 
 import { describe, expect, test } from 'vitest'
 import { vi, beforeEach } from 'vitest'
-import { splitUrl } from './domain_parsing'
+import { splitUrl } from '@lib/domain_parsing'
 
 /**
  * Make sure that splitURL supports both cases where `wal.app` is both included and not included

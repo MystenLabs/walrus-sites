@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { parseDomain, ParseResultType, fromUrl } from "parse-domain";
-import { UrlExtract, DomainDetails } from "./types/index";
+import { UrlExtract, DomainDetails } from "@lib/types/index";
 
 /**
  * Returns the domain (e.g. "example.com") of the given URL.
