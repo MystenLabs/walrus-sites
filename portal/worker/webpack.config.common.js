@@ -33,7 +33,7 @@ module.exports = {
     resolve: {
         alias: {
             "@lib": path.resolve(__dirname, "../common/lib/src"),
-            "@static": path.resolve(__dirname, "./static"),
+            "@templates": path.resolve(__dirname, "../common/html_templates"),
         },
         extensions: [".ts", ".js", ".html"],
         fallback: {

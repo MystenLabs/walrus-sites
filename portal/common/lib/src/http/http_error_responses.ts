@@ -1,10 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import template_404 from "../../../html_templates/404-page.template.html" with { type: "text" }
-import hash_mismatch from "../../../html_templates/hash-mismatch.html" with { type: "text" }
-import { HttpStatusCodes } from "./http_status_codes"
-import template_404_fallback_if_missing from "../../../html_templates/404-page-callback-if-missing.template.html" with { type: "text" };
+import template_404 from "@templates/404-page.template.html" with { type: "text" }
+import hash_mismatch from "@templates/hash-mismatch.html" with { type: "text" }
+import { HttpStatusCodes } from "@lib/http/http_status_codes"
+import template_404_fallback_if_missing from "@templates/404-page-callback-if-missing.template.html" with { type: "text" };
 
 const mainNotFoundErrorMessage = "Well, this is awkward." //You have reached the end of the internet, please turn back!"
 

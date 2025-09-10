@@ -9,7 +9,7 @@
     "baseUrl": "./",
     "paths": {
       "@lib/*": ["lib/src/*"],
-      "@static/*": ["static/*"]
+      "@templates/*": ["html_templates/*"]
     }
   },
   "rootDir": "src",
