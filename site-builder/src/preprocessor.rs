@@ -10,27 +10,27 @@ use std::path::{Path, PathBuf};
 use anyhow::Result;
 
 use crate::site::resource::full_path_to_resource_path;
+use crate::util::is_ignored;
 
 pub struct Preprocessor;
 
 impl Preprocessor {
-    pub fn iter_dir(path: &Path) -> Result<Vec<DirNode>> {
+    pub fn iter_dir(path: &Path, root: &Path, file_patterns_to_ignore: &Option<Vec<String>>) -> Result<Vec<DirNode>> {
         let mut nodes = vec![];
         debug_assert!(path.is_dir());
         let items = std::fs::read_dir(path)?;
         let mut cur_node = DirNode::new(path.to_path_buf());
         for item in items.flatten() {
             let item_path = item.path();
-            // Ignore index files.
-            if item_path
-                .file_name()
-                .is_some_and(|name| name == "index.html")
-            {
+            let resource_path = full_path_to_resource_path(&item_path, root)
+                .unwrap_or_else(|_| item_path.to_string_lossy().to_string());
+            
+            if Self::should_ignore_item(&item_path, &resource_path, file_patterns_to_ignore) {
                 continue;
             }
             cur_node.contents.push(item_path.to_path_buf());
             if item_path.is_dir() {
-                let sub_nodes = Self::iter_dir(&item_path)?;
+                let sub_nodes = Self::iter_dir(&item_path, root, file_patterns_to_ignore)?;
                 nodes.extend(sub_nodes);
             }
         }
@@ -38,8 +38,35 @@ impl Preprocessor {
         Ok(nodes)
     }
 
-    pub fn preprocess(path: &Path) -> Result<()> {
-        for node in Self::iter_dir(path)? {
+    /// Determines if an item should be ignored based on ignore patterns
+    fn should_ignore_item(
+        item_path: &Path,
+        resource_path: &str,
+        file_patterns_to_ignore: &Option<Vec<String>>
+    ) -> bool {
+        // Ignore index.html (because that's how you navigate the list-directory).
+        // and ignore the `ws-resources.json` since we don't upload that anyways.
+        if item_path
+            .file_name()
+            .is_some_and(|name| name == "index.html" || name == "ws-resources.json")
+        {
+            return true;
+        }
+
+        // Check against ignore patterns
+        let file_ignored = is_ignored(file_patterns_to_ignore, resource_path);
+        
+        // For directories, also check with trailing slash
+        if item_path.is_dir() {
+            let dir_resource_path = format!("{}/", resource_path);
+            file_ignored || is_ignored(file_patterns_to_ignore, &dir_resource_path)
+        } else {
+            file_ignored
+        }
+    }
+
+    pub fn preprocess(path: &Path, file_patterns_to_ignore: &Option<Vec<String>>) -> Result<()> {
+        for node in Self::iter_dir(path, path, file_patterns_to_ignore)? {
             node.write_index(path)?;
         }
         Ok(())

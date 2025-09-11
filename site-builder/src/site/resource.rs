@@ -11,6 +11,7 @@ use std::{
     num::{NonZeroU16, NonZeroUsize},
     path::{Path, PathBuf},
 };
+use crate::util::{is_ignored, is_pattern_match};
 
 use anyhow::{anyhow, bail, Context, Result};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
@@ -19,7 +20,6 @@ use flate2::{write::GzEncoder, Compression};
 use futures::{stream, StreamExt};
 use itertools::Itertools;
 use move_core_types::u256::U256;
-use regex::Regex;
 use tracing::debug;
 
 use super::SiteData;
@@ -338,9 +338,11 @@ impl ResourceManager {
         }
 
         // Skip if resource matches ignore patterns/
-        if self.is_ignored(&resource_path) {
-            tracing::debug!(?resource_path, "ignoring resource due to ignore pattern");
-            return Ok(None);
+        if let Some(ws_resources) = &self.ws_resources {
+	        if is_ignored(&ws_resources.ignore, &resource_path) {
+	            tracing::debug!(?resource_path, "ignoring resource due to ignore pattern");
+	            return Ok(None);
+	        }
         }
 
         let mut http_headers: VecMap<String, String> =
@@ -444,7 +446,7 @@ impl ResourceManager {
             .and_then(|headers| {
                 headers
                     .iter()
-                    .filter(|(path, _)| Self::is_pattern_match(path, resource_path))
+                    .filter(|(path, _)| is_pattern_match(path, resource_path))
                     .max_by_key(|(path, _)| path.split('/').count())
                     .map(|(_, header_map)| header_map.0.clone())
             })
@@ -607,30 +609,6 @@ impl ResourceManager {
         Ok(store_resp.quilt_blob_output.storage_cost)
     }
 
-    /// Matches a pattern to a resource path.
-    ///
-    /// The pattern can contain a wildcard `*` which matches any sequence of characters.
-    /// e.g. `/foo/*` will match `/foo/bar` and `/foo/bar/baz`.
-    fn is_pattern_match(pattern: &str, resource_path: &str) -> bool {
-        let path_regex = pattern.replace('*', ".*");
-        Regex::new(&path_regex)
-            .map(|re| re.is_match(resource_path))
-            .unwrap_or(false)
-    }
-
-    /// Returns true if the resource_path matches any of the ignore patterns.
-    fn is_ignored(&self, resource_path: &str) -> bool {
-        if let Some(ws_resources) = &self.ws_resources {
-            if let Some(ignore_patterns) = &ws_resources.ignore {
-                // Find the longest matching pattern
-                return ignore_patterns
-                    .iter()
-                    .any(|pattern| Self::is_pattern_match(pattern, resource_path));
-            }
-        }
-        false
-    }
-
     /// Recursively iterate a directory and load all [`Resources`][Resource] within.
     pub async fn read_dir(&mut self, root: &Path) -> Result<SiteData> {
         let resource_paths = Self::iter_dir(root)?;
@@ -778,59 +756,6 @@ mod tests {
 
     use super::{HttpHeaders, ResourceManager};
     use crate::site::config::WSResources;
-
-    struct PatternMatchTestCase {
-        pattern: &'static str,
-        path: &'static str,
-        expected: bool,
-    }
-
-    #[test]
-    fn test_is_pattern_match() {
-        let tests = vec![
-            PatternMatchTestCase {
-                pattern: "/*.txt",
-                path: "/file.txt",
-                expected: true,
-            },
-            PatternMatchTestCase {
-                pattern: "*.txt",
-                path: "/file.doc",
-                expected: false,
-            },
-            PatternMatchTestCase {
-                pattern: "/test/*",
-                path: "/test/file",
-                expected: true,
-            },
-            PatternMatchTestCase {
-                pattern: "/test/*",
-                path: "/test/file.extension",
-                expected: true,
-            },
-            PatternMatchTestCase {
-                pattern: "/test/*",
-                path: "/test/foo.bar.extension",
-                expected: true,
-            },
-            PatternMatchTestCase {
-                pattern: "/test/*",
-                path: "/test/foo-bar_baz.extension",
-                expected: true,
-            },
-            PatternMatchTestCase {
-                pattern: "[invalid",
-                path: "/file",
-                expected: false,
-            },
-        ];
-        for t in tests {
-            assert_eq!(
-                ResourceManager::is_pattern_match(t.pattern, t.path),
-                t.expected
-            );
-        }
-    }
 
     #[test]
     fn test_derive_http_headers() {

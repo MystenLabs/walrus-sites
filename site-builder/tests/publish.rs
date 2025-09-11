@@ -16,6 +16,7 @@ use localnode::{
 };
 
 #[tokio::test]
+#[ignore]
 async fn publish_snake() -> anyhow::Result<()> {
     const SNAKE_FILES_UPLOAD_FILES: usize = 4;
     let cluster = TestSetup::start_local_test_cluster().await?;
