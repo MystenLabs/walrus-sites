@@ -37,9 +37,13 @@ async fn quilts_update_snake() -> anyhow::Result<()> {
     helpers::copy_dir(directory.as_path(), temp_dir.path())?;
     let directory = temp_dir.path().to_path_buf();
     let ws_resources_path = directory.join("ws-resources.json");
-    let mut ws_resources_init: WSResources = serde_json::from_reader(File::open(ws_resources_path.as_path())?)?;
+    let mut ws_resources_init: WSResources =
+        serde_json::from_reader(File::open(ws_resources_path.as_path())?)?;
     ws_resources_init.object_id = None;
-    serde_json::to_writer_pretty(File::create(ws_resources_path.as_path())?, &ws_resources_init)?;
+    serde_json::to_writer_pretty(
+        File::create(ws_resources_path.as_path())?,
+        &ws_resources_init,
+    )?;
 
     println!("FN: {}", cluster.wallet.inner.get_rpc_url()?);
     println!("address: {}", cluster.wallet.inner.active_address()?);
@@ -76,7 +80,6 @@ async fn quilts_update_snake() -> anyhow::Result<()> {
                 .with_epoch_count_or_max(EpochCountOrMax::Max)
                 .build()?,
             object_id: site_id,
-            watch: false,
         })
         .build()?;
     site_builder::run(update_args).await?;
