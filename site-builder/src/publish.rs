@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeSet, HashSet},
     num::NonZeroUsize,
     path::{Path, PathBuf},
     sync::mpsc::channel,
@@ -150,11 +150,14 @@ impl SiteEditor {
         .get_from_chain(site_id)
         .await?;
 
-        let all_blobs = site
+        let all_blobs: Vec<_> = site
             .resources()
             .into_iter()
             .map(|resource| resource.info.blob_id)
-            .collect::<Vec<_>>();
+            // Collect first to a hash-set to keep unique blob-ids.
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
 
         tracing::debug!(?all_blobs, "retrieved the site for deletion");
 
