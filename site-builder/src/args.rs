@@ -357,11 +357,11 @@ pub enum Commands {
     /// Preprocess the directory, creating and linking index files.
     /// This command allows to publish directories as sites. Warning: Rewrites all `index.html`
     /// files.
-    ListDirectory { 
-	    path: PathBuf, 
-	    /// Common configurations.
-	    #[clap(flatten)]
-	    common: WalrusStoreOptions,
+    ListDirectory {
+        path: PathBuf,
+        /// Common configurations.
+        #[clap(flatten)]
+        common: WalrusStoreOptions,
     },
     /// Completely destroys the site at the given object id.
     ///
