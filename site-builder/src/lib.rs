@@ -183,9 +183,6 @@ async fn run_internal(
                     Some(object_id),
                     None,
                     ContinuousEditing::Once,
-                    // Check the extension if either `check_extend` is true or `force` is true.
-                    // This is for backwards compatibility.
-                    // TODO: Remove once the `force` flag is deprecated.
                     BlobManagementOptions {
                         check_extend: false,
                     },
