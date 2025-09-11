@@ -25,7 +25,7 @@ mod helpers;
 
 #[tokio::test]
 async fn quilts_update_snake() -> anyhow::Result<()> {
-    let mut cluster = TestSetup::start_local_test_cluster().await?;
+    let cluster = TestSetup::start_local_test_cluster().await?;
     let directory = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
@@ -44,9 +44,6 @@ async fn quilts_update_snake() -> anyhow::Result<()> {
         File::create(ws_resources_path.as_path())?,
         &ws_resources_init,
     )?;
-
-    println!("FN: {}", cluster.wallet.inner.get_rpc_url()?);
-    println!("address: {}", cluster.wallet.inner.active_address()?);
 
     let publish_args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
@@ -83,9 +80,6 @@ async fn quilts_update_snake() -> anyhow::Result<()> {
         })
         .build()?;
     site_builder::run(update_args).await?;
-
-    let mut reader = tokio::io::BufReader::new(tokio::io::stdin());
-    tokio::io::AsyncBufReadExt::read_line(&mut reader, &mut String::new()).await?;
 
     Ok(())
 }

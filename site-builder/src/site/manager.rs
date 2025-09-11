@@ -166,7 +166,7 @@ impl SiteManager {
             display::action("Applying the Walrus Site object updates on Sui");
             self.execute_sui_updates(
                 &site_updates,
-                if store_blobs {
+                if using_quilts {
                     MAX_RESOURCES_PER_PTB_QUILTS
                 } else {
                     MAX_RESOURCES_PER_PTB
