@@ -233,15 +233,11 @@ impl TestSetup {
                 .map(|df| df.object_id)
                 .collect::<Vec<ObjectID>>();
 
-            // TODO: Check if we need to limit more here.
             let resource_fields = self
                 .client
                 .read_api()
-                .multi_get_object_with_options(
-                    ids,
-                    SuiObjectDataOptions::new().with_bcs().with_type(),
-                )
-                .await?; // with_type?
+                .multi_get_object_with_options(ids, SuiObjectDataOptions::new().with_bcs())
+                .await?;
 
             let mut resources_chunk = resource_fields
                 .into_iter()
