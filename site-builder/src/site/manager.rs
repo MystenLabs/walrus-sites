@@ -1,7 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::BTreeSet, num::NonZeroUsize, str::FromStr, time::Duration};
+use std::{
+    collections::{BTreeSet, HashSet},
+    num::NonZeroUsize,
+    str::FromStr,
+    time::Duration,
+};
 
 use anyhow::{anyhow, Error, Result};
 use sui_keys::keystore::AccountKeystore;
@@ -570,5 +575,8 @@ fn collect_deletable_blob_candidates(site_updates: &SiteDataDiff) -> Vec<BlobId>
             ResourceOp::Deleted(resource) => Some(resource.info.blob_id),
             _ => None,
         })
+        // Collect first to a hash-set to keep unique blob-ids.
+        .collect::<HashSet<_>>()
+        .into_iter()
         .collect()
 }
