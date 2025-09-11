@@ -48,18 +48,7 @@ pub struct Walrus {
 
 macro_rules! create_command {
     ($self:ident, $name:ident, $($arg:expr),*) => {{
-        let mut json_input = $self.builder().$name($($arg),*).build().to_json()?;
-
-        // TODO(nikos): Remove when the bug requiring paths in json input is fixed.
-        // TMP HACK
-        if json_input.contains("storeQuilt") {
-            let Some(pos) = json_input.find("]") else {
-                panic!("No blobs in storeQuilt");
-            };
-            const PATHS: &str = r#","paths":[]"#;
-            json_input.insert_str(pos + 1, PATHS);
-        }
-        // TMP HACK end
+        let json_input = $self.builder().$name($($arg),*).build().to_json()?;
 
         let output = $self
             .base_command()

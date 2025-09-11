@@ -50,7 +50,7 @@ pub async fn sign_and_send_ptb(
         gas_budget,
         gas_price,
     );
-    let transaction = wallet.sign_transaction(&transaction);
+    let transaction = wallet.sign_transaction(&transaction).await;
     retry_client.execute_transaction(transaction).await
 }
 
