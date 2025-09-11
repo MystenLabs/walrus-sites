@@ -9,13 +9,16 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::site::resource::full_path_to_resource_path;
-use crate::util::is_ignored;
+use crate::{site::resource::full_path_to_resource_path, util::is_ignored};
 
 pub struct Preprocessor;
 
 impl Preprocessor {
-    pub fn iter_dir(path: &Path, root: &Path, file_patterns_to_ignore: &Option<Vec<String>>) -> Result<Vec<DirNode>> {
+    pub fn iter_dir(
+        path: &Path,
+        root: &Path,
+        file_patterns_to_ignore: &Option<Vec<String>>,
+    ) -> Result<Vec<DirNode>> {
         let mut nodes = vec![];
         debug_assert!(path.is_dir());
         let items = std::fs::read_dir(path)?;
@@ -24,7 +27,7 @@ impl Preprocessor {
             let item_path = item.path();
             let resource_path = full_path_to_resource_path(&item_path, root)
                 .unwrap_or_else(|_| item_path.to_string_lossy().to_string());
-            
+
             if Self::should_ignore_item(&item_path, &resource_path, file_patterns_to_ignore) {
                 continue;
             }
@@ -42,7 +45,7 @@ impl Preprocessor {
     fn should_ignore_item(
         item_path: &Path,
         resource_path: &str,
-        file_patterns_to_ignore: &Option<Vec<String>>
+        file_patterns_to_ignore: &Option<Vec<String>>,
     ) -> bool {
         // Ignore index.html (because that's how you navigate the list-directory).
         // and ignore the `ws-resources.json` since we don't upload that anyways.
@@ -55,7 +58,7 @@ impl Preprocessor {
 
         // Check against ignore patterns
         let file_ignored = is_ignored(file_patterns_to_ignore, resource_path);
-        
+
         // For directories, also check with trailing slash
         if item_path.is_dir() {
             let dir_resource_path = format!("{}/", resource_path);

@@ -11,7 +11,6 @@ use std::{
     num::{NonZeroU16, NonZeroUsize},
     path::{Path, PathBuf},
 };
-use crate::util::{is_ignored, is_pattern_match};
 
 use anyhow::{anyhow, bail, Context, Result};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
@@ -29,7 +28,7 @@ use crate::{
     publish::BlobManagementOptions,
     site::{config::WSResources, content::ContentType},
     types::{HttpHeaders, SuiResource, VecMap},
-    util::str_to_base36,
+    util::{is_ignored, is_pattern_match, str_to_base36},
     walrus::{
         command::{QuiltBlobInput, StoreQuiltInput},
         types::BlobId,
@@ -339,10 +338,10 @@ impl ResourceManager {
 
         // Skip if resource matches ignore patterns/
         if let Some(ws_resources) = &self.ws_resources {
-	        if is_ignored(&ws_resources.ignore, &resource_path) {
-	            tracing::debug!(?resource_path, "ignoring resource due to ignore pattern");
-	            return Ok(None);
-	        }
+            if is_ignored(&ws_resources.ignore, &resource_path) {
+                tracing::debug!(?resource_path, "ignoring resource due to ignore pattern");
+                return Ok(None);
+            }
         }
 
         let mut http_headers: VecMap<String, String> =

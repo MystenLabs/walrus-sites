@@ -179,20 +179,20 @@ async fn run_internal(
         }
         Commands::Convert { object_id } => println!("{}", id_to_base36(&object_id)?),
         Commands::ListDirectory { path, common } => {
-	        let ws_res = common
-	            .ws_resources
-	            .clone()
-	            .as_ref()
-	            .map(WSResources::read)
-	            .transpose()?;
-			match ws_res {
-				Some(ws_res) => {
-					Preprocessor::preprocess(path.as_path(), &ws_res.ignore)?;
-				}
-				None => {
-					Preprocessor::preprocess(path.as_path(), &None)?;
-				}
-			}
+            let ws_res = common
+                .ws_resources
+                .clone()
+                .as_ref()
+                .map(WSResources::read)
+                .transpose()?;
+            match ws_res {
+                Some(ws_res) => {
+                    Preprocessor::preprocess(path.as_path(), &ws_res.ignore)?;
+                }
+                None => {
+                    Preprocessor::preprocess(path.as_path(), &None)?;
+                }
+            }
         }
         Commands::Destroy { object } => {
             let site_editor = SiteEditor::new(context, config);
