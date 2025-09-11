@@ -176,14 +176,13 @@ async fn run_internal(
         Commands::UpdateQuilts {
             publish_options,
             object_id,
-            watch,
         } => {
             SiteEditor::new(context, config)
                 .with_edit_options(
                     publish_options,
                     Some(object_id),
                     None,
-                    ContinuousEditing::from_watch_flag(watch),
+                    ContinuousEditing::Once,
                     // Check the extension if either `check_extend` is true or `force` is true.
                     // This is for backwards compatibility.
                     // TODO: Remove once the `force` flag is deprecated.
