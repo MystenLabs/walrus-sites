@@ -4,6 +4,7 @@ use std::{
     path::{Path, PathBuf},
     str,
 };
+use glob::Pattern;
 
 use anyhow::{anyhow, bail, Context, Result};
 use futures::Future;
@@ -333,6 +334,27 @@ pub fn persist_site_id_and_name(
 
     display::done();
     Ok(ws_resources_to_save)
+}
+
+/// Matches a pattern to a resource path.
+///
+/// The pattern can contain a wildcard `*` which matches any sequence of characters.
+/// e.g. `/foo/*` will match `/foo/bar` and `/foo/bar/baz`.
+pub fn is_pattern_match(pattern: &str, resource_path: &str) -> bool {
+	    Pattern::new(pattern)
+	        .map(|pattern| pattern.matches(resource_path))
+	        .unwrap_or(false)
+}
+
+/// Returns true if the resource_path matches any of the ignore patterns.
+pub fn is_ignored(file_patterns_to_ignore: &Option<Vec<String>>, resource_path: &str) -> bool {
+    if let Some(ignore_patterns) = &file_patterns_to_ignore {
+        // Find the longest matching pattern
+        return ignore_patterns
+            .iter()
+            .any(|pattern| is_pattern_match(pattern, resource_path));
+    }
+    false
 }
 
 /// Fetches the staking object by its ID and the current walrus package ID.

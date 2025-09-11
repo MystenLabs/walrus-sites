@@ -238,18 +238,24 @@ impl SiteEditor<EditOptions> {
     async fn run_single_edit(
         &self,
     ) -> Result<(SuiAddress, SuiTransactionBlockResponse, SiteDataDiffSummary)> {
-        if self.edit_options.publish_options.list_directory {
+	    let (mut resource_manager, mut site_manager) = self.create_managers().await?;
+	    display::action(format!(
+	        "Parsing the directory {} and locally computing blob IDs",
+	        self.directory().to_string_lossy()
+	    ));
+	    if self.edit_options.publish_options.list_directory {
             display::action(format!("Preprocessing: {}", self.directory().display()));
-            Preprocessor::preprocess(self.directory())?;
+            match &resource_manager.ws_resources {
+                Some(ws_resources) => {
+                    Preprocessor::preprocess(self.directory(), &ws_resources.ignore)?;
+                }
+                None => {
+                    Preprocessor::preprocess(self.directory(), &None)?;
+                }
+            }
             display::done();
         }
-
-        let (mut resource_manager, mut site_manager) = self.create_managers().await?;
-
-        display::action(format!(
-            "Parsing the directory {} and locally computing blob IDs",
-            self.directory().to_string_lossy()
-        ));
+        
         let local_site_data = resource_manager.read_dir(self.directory()).await?;
         display::done();
         tracing::debug!(?local_site_data, "resources loaded from directory");
