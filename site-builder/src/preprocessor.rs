@@ -61,7 +61,7 @@ impl Preprocessor {
 
         // For directories, also check with trailing slash
         if item_path.is_dir() {
-            let dir_resource_path = resource_path.to_string();
+            let dir_resource_path = format!("{resource_path}/");
             file_ignored || is_ignored(file_patterns_to_ignore, &dir_resource_path)
         } else {
             file_ignored
