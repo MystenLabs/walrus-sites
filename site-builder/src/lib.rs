@@ -178,8 +178,25 @@ async fn run_internal(
             display_sitemap(site_to_map, selected_context, config).await?;
         }
         Commands::Convert { object_id } => println!("{}", id_to_base36(&object_id)?),
-        Commands::ListDirectory { path } => {
-            Preprocessor::preprocess(path.as_path())?;
+        Commands::ListDirectory { path, common } => {
+            let ws_res = common
+                .ws_resources
+                .clone()
+                .as_ref()
+                .map(WSResources::read)
+                .transpose()?;
+            match ws_res {
+                Some(ws_res) => {
+                    Preprocessor::preprocess(path.as_path(), &ws_res.ignore)?;
+                }
+                None => {
+                    Preprocessor::preprocess(path.as_path(), &None)?;
+                }
+            }
+            display::header(format!(
+                "Successfully preprocessed the {} directory!",
+                path.display()
+            ));
         }
         Commands::Destroy { object } => {
             let site_editor = SiteEditor::new(context, config);
