@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::{site::resource::full_path_to_resource_path, util::is_ignored};
+use crate::{display, site::resource::full_path_to_resource_path, util::is_ignored};
 
 pub struct Preprocessor;
 

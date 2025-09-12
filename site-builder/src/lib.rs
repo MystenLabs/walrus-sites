@@ -193,6 +193,10 @@ async fn run_internal(
                     Preprocessor::preprocess(path.as_path(), &None)?;
                 }
             }
+            display::header(format!(
+                "Successfully preprocessed the {} directory!",
+                path.display()
+            ));
         }
         Commands::Destroy { object } => {
             let site_editor = SiteEditor::new(context, config);
