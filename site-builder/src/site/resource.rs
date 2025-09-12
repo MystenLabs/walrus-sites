@@ -160,7 +160,7 @@ impl<'a> ResourceOp<'a> {
 
 /// A set of resources composing a site.
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ResourceSet {
+pub struct ResourceSet {
     pub inner: BTreeSet<Resource>,
 }
 
