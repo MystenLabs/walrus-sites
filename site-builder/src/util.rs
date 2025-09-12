@@ -12,13 +12,8 @@ use serde::{Deserialize, Deserializer};
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{
     rpc_types::{
-        Page,
-        SuiExecutionStatus,
-        SuiObjectDataOptions,
-        SuiRawData,
-        SuiTransactionBlockEffects,
-        SuiTransactionBlockEffectsAPI,
-        SuiTransactionBlockResponse,
+        Page, SuiExecutionStatus, SuiObjectDataOptions, SuiRawData, SuiTransactionBlockEffects,
+        SuiTransactionBlockEffectsAPI, SuiTransactionBlockResponse,
     },
     wallet_context::WalletContext,
 };
