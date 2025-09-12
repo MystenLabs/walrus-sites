@@ -27,7 +27,7 @@ fn test_is_ignored() {
     assert_eq!(
         is_ignored(&ws_resources.ignore, "/foo/nested/bar.txt"),
         true
-    );
+    )
 }
 
 #[test]
