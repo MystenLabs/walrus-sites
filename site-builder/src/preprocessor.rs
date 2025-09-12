@@ -56,10 +56,7 @@ impl Preprocessor {
             return true;
         }
 
-        let mut ignore_iter = file_patterns_to_ignore
-            .into_iter()
-            .flatten()
-            .map(String::as_str);
+        let mut ignore_iter = file_patterns_to_ignore.iter().flatten().map(String::as_str);
         // Check against ignore patterns
         let file_ignored = is_ignored(&mut ignore_iter, resource_path);
 
