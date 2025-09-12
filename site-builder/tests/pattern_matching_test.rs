@@ -24,7 +24,15 @@ fn test_is_ignored() {
     let ws_resources: WSResources =
         serde_json::from_str(&ignore_data).expect("parsing should succeed");
     assert!(ws_resources.ignore.is_some());
-    assert!(is_ignored(&ws_resources.ignore, "/foo/nested/bar.txt"));
+    assert!(is_ignored(
+        ws_resources
+            .ignore
+            .as_deref()
+            .into_iter()
+            .flatten()
+            .map(String::as_str),
+        "/foo/nested/bar.txt"
+    ));
 }
 
 #[test]

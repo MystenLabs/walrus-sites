@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::{display, site::resource::full_path_to_resource_path, util::is_ignored};
+use crate::{site::resource::full_path_to_resource_path, util::is_ignored};
 
 pub struct Preprocessor;
 
@@ -56,13 +56,17 @@ impl Preprocessor {
             return true;
         }
 
+        let mut ignore_iter = file_patterns_to_ignore
+            .into_iter()
+            .flatten()
+            .map(String::as_str);
         // Check against ignore patterns
-        let file_ignored = is_ignored(file_patterns_to_ignore, resource_path);
+        let file_ignored = is_ignored(&mut ignore_iter, resource_path);
 
         // For directories, also check with trailing slash
         if item_path.is_dir() {
             let dir_resource_path = format!("{resource_path}/");
-            file_ignored || is_ignored(file_patterns_to_ignore, &dir_resource_path)
+            file_ignored || is_ignored(&mut ignore_iter, &dir_resource_path)
         } else {
             file_ignored
         }

@@ -9,6 +9,7 @@ use std::{
     fs,
     io::Write,
     num::{NonZeroU16, NonZeroUsize},
+    ops::Deref,
     path::{Path, PathBuf},
 };
 
@@ -338,7 +339,13 @@ impl ResourceManager {
 
         // Skip if resource matches ignore patterns/
         if let Some(ws_resources) = &self.ws_resources {
-            if is_ignored(&ws_resources.ignore, &resource_path) {
+            let mut ignore_iter = ws_resources
+                .ignore
+                .as_deref()
+                .into_iter()
+                .flatten()
+                .map(String::as_str);
+            if is_ignored(&mut ignore_iter, &resource_path) {
                 tracing::debug!(?resource_path, "ignoring resource due to ignore pattern");
                 return Ok(None);
             }
