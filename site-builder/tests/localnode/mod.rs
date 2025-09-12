@@ -318,7 +318,7 @@ async fn publish_walrus_sites(
         gas_price,
     );
 
-    let signed_tx = publisher.sign_transaction(&tx_data);
+    let signed_tx = publisher.sign_transaction(&tx_data).await;
     let resp = sui_client
         .quorum_driver_api()
         .execute_transaction_block(
