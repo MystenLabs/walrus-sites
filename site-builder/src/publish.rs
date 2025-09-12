@@ -69,7 +69,7 @@ impl ContinuousEditing {
 
 /// Options for the management of Walrus blobs.
 #[derive(Debug, Clone)]
-pub(crate) struct BlobManagementOptions {
+pub struct BlobManagementOptions {
     /// Forces a check of the expiration of all blobs, and extension if necessary.
     pub(crate) check_extend: bool,
 }
