@@ -335,6 +335,13 @@ pub enum Commands {
         #[arg(long)]
         check_extend: bool,
     },
+    /// Update an existing site.
+    UpdateQuilts {
+        #[clap(flatten)]
+        publish_options: PublishOptions,
+        /// The object ID of a partially published site to be completed.
+        object_id: ObjectID,
+    },
     /// Convert an object ID in hex format to the equivalent Base36 format.
     ///
     /// This command may be useful to browse a site, given it object ID.
