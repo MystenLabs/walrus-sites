@@ -9,9 +9,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use chrono::{DateTime, Duration, NaiveDate};
 use prettytable::{
     format::{self, FormatBuilder},
-    row,
-    Cell,
-    Table,
+    row, Cell, Table,
 };
 use sui_types::base_types::{ObjectID, SuiAddress};
 

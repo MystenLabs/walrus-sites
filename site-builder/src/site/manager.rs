@@ -7,9 +7,7 @@ use anyhow::{anyhow, Error, Result};
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{
     rpc_types::{
-        SuiExecutionStatus,
-        SuiTransactionBlockEffectsAPI as _,
-        SuiTransactionBlockResponse,
+        SuiExecutionStatus, SuiTransactionBlockEffectsAPI as _, SuiTransactionBlockResponse,
     },
     wallet_context::WalletContext,
 };
@@ -22,10 +20,7 @@ use sui_types::{
 use super::{
     builder::SitePtb,
     resource::{Resource, ResourceOp},
-    RemoteSiteFactory,
-    SiteData,
-    SiteDataDiff,
-    SITE_MODULE,
+    RemoteSiteFactory, SiteData, SiteDataDiff, SITE_MODULE,
 };
 use crate::{
     args::WalrusStoreOptions,
