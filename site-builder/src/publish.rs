@@ -253,6 +253,10 @@ impl SiteEditor<EditOptions> {
                     Preprocessor::preprocess(self.directory(), &None)?;
                 }
             }
+            display::action(format!(
+                "Successfully preprocessed the {} directory!",
+                self.directory().display()
+            ));
             display::done();
         }
 
