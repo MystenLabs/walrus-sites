@@ -366,14 +366,11 @@ pub fn is_pattern_match(pattern: &str, resource_path: &str) -> bool {
 }
 
 /// Checks if a resource path matches any of the provided ignore patterns.
-pub fn is_ignored(file_patterns_to_ignore: &Option<Vec<String>>, resource_path: &str) -> bool {
-    if let Some(ignore_patterns) = &file_patterns_to_ignore {
-        // Find the longest matching pattern
-        return ignore_patterns
-            .iter()
-            .any(|pattern| is_pattern_match(pattern, resource_path));
-    }
-    false
+pub fn is_ignored<'a>(
+    mut ignore_patterns: impl Iterator<Item = &'a str>,
+    resource_path: &str,
+) -> bool {
+    ignore_patterns.any(|pattern| is_pattern_match(pattern, resource_path))
 }
 
 /// Fetches the staking object by its ID and the current walrus package ID.
