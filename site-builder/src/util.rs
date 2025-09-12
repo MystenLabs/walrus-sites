@@ -12,8 +12,13 @@ use serde::{Deserialize, Deserializer};
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{
     rpc_types::{
-        Page, SuiExecutionStatus, SuiObjectDataOptions, SuiRawData, SuiTransactionBlockEffects,
-        SuiTransactionBlockEffectsAPI, SuiTransactionBlockResponse,
+        Page,
+        SuiExecutionStatus,
+        SuiObjectDataOptions,
+        SuiRawData,
+        SuiTransactionBlockEffects,
+        SuiTransactionBlockEffectsAPI,
+        SuiTransactionBlockResponse,
     },
     wallet_context::WalletContext,
 };
@@ -350,15 +355,6 @@ pub fn persist_site_id_and_name(
 /// # Returns
 /// Returns `true` if the resource path matches the pattern, `false` otherwise.
 /// If the pattern is invalid, returns `false`.
-///
-/// # Examples
-/// ```
-/// # use your_crate::is_pattern_match; // Replace with actual crate name
-/// assert!(is_pattern_match("/foo/*", "/foo/bar"));
-/// assert!(is_pattern_match("/foo/*", "/foo/bar/baz"));
-/// assert!(is_pattern_match("*.txt", "document.txt"));
-/// assert!(!is_pattern_match("/foo/*", "/bar/baz"));
-/// ```
 pub fn is_pattern_match(pattern: &str, resource_path: &str) -> bool {
     Pattern::new(pattern)
         .map(|pattern| pattern.matches(resource_path))

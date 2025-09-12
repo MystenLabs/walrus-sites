@@ -9,7 +9,6 @@ use std::{
     fs,
     io::Write,
     num::{NonZeroU16, NonZeroUsize},
-    ops::Deref,
     path::{Path, PathBuf},
 };
 

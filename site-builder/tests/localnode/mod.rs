@@ -19,15 +19,24 @@ use site_builder::{
 use sui_move_build::BuildConfig;
 use sui_sdk::{
     rpc_types::{
-        ObjectChange, SuiData, SuiExecutionStatus, SuiObjectDataOptions,
-        SuiTransactionBlockEffectsAPI, SuiTransactionBlockResponseOptions,
-        SuiTransactionBlockResponseQuery, TransactionFilter,
+        ObjectChange,
+        SuiData,
+        SuiExecutionStatus,
+        SuiObjectDataOptions,
+        SuiTransactionBlockEffectsAPI,
+        SuiTransactionBlockResponseOptions,
+        SuiTransactionBlockResponseQuery,
+        TransactionFilter,
     },
-    SuiClient, SuiClientBuilder,
+    SuiClient,
+    SuiClientBuilder,
 };
 use sui_types::{
-    base_types::ObjectID, programmable_transaction_builder::ProgrammableTransactionBuilder,
-    quorum_driver_types::ExecuteTransactionRequestType, transaction::TransactionData, Identifier,
+    base_types::ObjectID,
+    programmable_transaction_builder::ProgrammableTransactionBuilder,
+    quorum_driver_types::ExecuteTransactionRequestType,
+    transaction::TransactionData,
+    Identifier,
 };
 use tempfile::TempDir;
 use tokio::sync::Mutex as TokioMutex;
@@ -35,7 +44,8 @@ use walrus_sdk::{
     client::WalrusNodeClient,
     core::{
         encoding::{quilt_encoding::QuiltStoreBlob, Primary},
-        BlobId, QuiltPatchId,
+        BlobId,
+        QuiltPatchId,
     },
     error::ClientResult,
 };

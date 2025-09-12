@@ -17,7 +17,9 @@ use sui_sdk::wallet_context::WalletContext;
 use sui_types::base_types::{ObjectID, SuiAddress};
 
 use crate::{
-    retry_client::RetriableSuiClient, suins::SuiNsClient, util::load_wallet_context,
+    retry_client::RetriableSuiClient,
+    suins::SuiNsClient,
+    util::load_wallet_context,
     walrus::output::EpochCount,
 };
 
