@@ -443,7 +443,7 @@ fn print_summary(
         );
     } else {
         println!(
-            r#"⚠️  No public testnet portal is available (the https://wal.app portal is only available for mainnet).
+            r#"⚠️ https://wal.app only supports sites deployed on mainnet.
      To browse your testnet site, you have two options:
      1. Run a portal locally on your machine: http://{base36_id}.localhost:3000
      2. Self-host a portal: http://{base36_id}.yourdomain.com:3000
