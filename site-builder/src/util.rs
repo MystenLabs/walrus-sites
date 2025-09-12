@@ -336,17 +336,41 @@ pub fn persist_site_id_and_name(
     Ok(ws_resources_to_save)
 }
 
-/// Matches a pattern to a resource path.
+/// Matches a resource path against a glob pattern.
 ///
-/// The pattern can contain a wildcard `*` which matches any sequence of characters.
-/// e.g. `/foo/*` will match `/foo/bar` and `/foo/bar/baz`.
+/// This function uses glob pattern matching to determine if a resource path matches
+/// the given pattern. Glob patterns support wildcard characters for flexible matching.
+///
+/// # Glob Pattern Syntax
+/// - `*` matches zero or more characters (excluding path separators in some contexts)
+/// - `?` matches exactly one character
+/// - `[abc]` matches any character within the brackets
+/// - `[a-z]` matches any character in the specified range
+/// - `**` matches zero or more directories (when used as a path component)
+///
+/// # Arguments
+/// * `pattern` - The glob pattern to match against
+/// * `resource_path` - The resource path to test
+///
+/// # Returns
+/// Returns `true` if the resource path matches the pattern, `false` otherwise.
+/// If the pattern is invalid, returns `false`.
+///
+/// # Examples
+/// ```
+/// # use your_crate::is_pattern_match; // Replace with actual crate name
+/// assert!(is_pattern_match("/foo/*", "/foo/bar"));
+/// assert!(is_pattern_match("/foo/*", "/foo/bar/baz"));
+/// assert!(is_pattern_match("*.txt", "document.txt"));
+/// assert!(!is_pattern_match("/foo/*", "/bar/baz"));
+/// ```
 pub fn is_pattern_match(pattern: &str, resource_path: &str) -> bool {
     Pattern::new(pattern)
         .map(|pattern| pattern.matches(resource_path))
         .unwrap_or(false)
 }
 
-/// Returns true if the resource_path matches any of the ignore patterns.
+/// Checks if a resource path matches any of the provided ignore patterns.
 pub fn is_ignored(file_patterns_to_ignore: &Option<Vec<String>>, resource_path: &str) -> bool {
     if let Some(ignore_patterns) = &file_patterns_to_ignore {
         // Find the longest matching pattern

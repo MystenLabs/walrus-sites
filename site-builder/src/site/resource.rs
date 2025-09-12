@@ -44,7 +44,7 @@ use crate::{
 /// [`Resource`] objects are always compared on their `info` field
 /// ([`SuiResource`]), and never on their `unencoded_size` or `full_path`.
 #[derive(PartialEq, Eq, Debug, Clone)]
-pub(crate) struct Resource {
+pub struct Resource {
     pub info: SuiResource,
     /// The unencoded length of the resource.
     pub unencoded_size: usize,
