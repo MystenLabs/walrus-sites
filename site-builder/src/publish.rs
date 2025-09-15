@@ -245,14 +245,13 @@ impl SiteEditor<EditOptions> {
         ));
         if self.edit_options.publish_options.list_directory {
             display::action(format!("Preprocessing: {}", self.directory().display()));
-            match &resource_manager.ws_resources {
-                Some(ws_resources) => {
-                    Preprocessor::preprocess(self.directory(), &ws_resources.ignore)?;
-                }
-                None => {
-                    Preprocessor::preprocess(self.directory(), &None)?;
-                }
-            }
+            let _ = Preprocessor::preprocess(
+                self.directory(),
+                &resource_manager
+                    .ws_resources
+                    .as_ref()
+                    .and_then(|ws| ws.ignore.clone()),
+            );
             display::action(format!(
                 "Successfully preprocessed the {} directory!",
                 self.directory().display()
