@@ -178,13 +178,9 @@ async fn run_internal(
             display_sitemap(site_to_map, selected_context, config).await?;
         }
         Commands::Convert { object_id } => println!("{}", id_to_base36(&object_id)?),
-        Commands::ListDirectory { path, common } => {
-            let ws_res = common
-                .ws_resources
-                .clone()
-                .as_ref()
-                .map(WSResources::read)
-                .transpose()?;
+        Commands::ListDirectory { path, ws_resources } => {
+            let (ws_resources_opt, _) = load_ws_resources(ws_resources.as_deref(), &path)?;
+            let ws_res = ws_resources_opt;
             match ws_res {
                 Some(ws_res) => {
                     Preprocessor::preprocess(path.as_path(), &ws_res.ignore)?;

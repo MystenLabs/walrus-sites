@@ -359,9 +359,10 @@ pub enum Commands {
     /// files.
     ListDirectory {
         path: PathBuf,
-        /// Common configurations.
-        #[clap(flatten)]
-        common: WalrusStoreOptions,
+        /// Path to the `ws-resources.json` file.
+        /// Tip: Use the `ignore` field in `ws-resources.json` to exclude files and 
+        /// directories from list-directory output.
+        ws_resources: Option<PathBuf>,
     },
     /// Completely destroys the site at the given object id.
     ///
