@@ -443,14 +443,15 @@ fn print_summary(
         );
     } else {
         println!(
-            r#"⚠️ https://wal.app only supports sites deployed on mainnet.
-     To browse your testnet site, you have two options:
-     1. Run a portal locally on your machine: http://{base36_id}.localhost:3000
-     2. Self-host a portal: http://{base36_id}.yourdomain.com:3000
+            r#"⚠️ wal.app only supports sites deployed on mainnet.
+     To browse your testnet site, you need to self-host a portal:
+     1. For local development: http://{base36_id}.localhost:3000
+     2. For public sharing: http://{base36_id}.yourdomain.com:3000
 
      📖 Setup instructions: https://docs.wal.app/walrus-sites/portal.html#running-the-portal-locally
 
-     💡 Tip: You may also bring your own domain: https://docs.wal.app/walrus-sites/bring-your-own-domain.html"#,
+     💡 Tip: You may also bring your own domain (https://docs.wal.app/walrus-sites/bring-your-own-domain.html)
+            or find third-party hosted testnet portals."#,
             base36_id = id_to_base36(&object_id)?
         );
     }
