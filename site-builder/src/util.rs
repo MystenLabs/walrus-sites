@@ -358,7 +358,7 @@ pub fn persist_site_id_and_name(
 pub fn is_pattern_match(pattern: &str, resource_path: &str) -> bool {
     Pattern::new(pattern)
         .map(|pattern| pattern.matches(resource_path))
-        .unwrap_or(false)
+        .expect("Invalid glob pattern.")
 }
 
 /// Checks if a resource path matches any of the provided ignore patterns.
