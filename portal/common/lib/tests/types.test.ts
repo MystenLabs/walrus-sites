@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { isResource, optionalRangeToHeaders, Range } from "@lib/types/index";
+import { isResource, isVersionedResource, optionalRangeToHeaders, Range } from "@lib/types/index";
 import { describe, it, expect } from "vitest";
 
 describe("happy paths of optionalRangeToHeaders should", () => {
@@ -72,6 +72,40 @@ describe("isResource", () => {
 			"blob_id": "9Jws-C9zE99FwWex6dsVbpaaaaaIk7Ko7No-8mKfgRk",
 			"blob_hash": 123,
 			"range": null,
+		})).toBeFalsy()
+	})
+})
+
+describe("isVersionedResource", () => {
+	it("should return true when it's definitely a resource AND versioned!", () => {
+		expect(isVersionedResource({
+			"path": "index.html",
+			"headers": { "cache-control": "public, max-age=86400" },
+			"blob_id": "9Jws-C9zE99FwWex6dsVbpaaaaaIk7Ko7No-8mKfgRk",
+			"blob_hash": "O1NaFqZZkVOp+2hJfbf6s+a02JHMiJh7q0DZ+Dyp8og",
+			"range": null,
+			"version": 1,
+			"objectId": "0xf7060e42698c5124afba30354abc845c97d3a841df887b2b6b68f4b689f863bd"
+		})).toBeTruthy()
+	})
+	it("should return false when version is missing!", () => {
+		expect(isVersionedResource({
+			"path": "index.html",
+			"headers": { "cache-control": "public, max-age=86400" },
+			"blob_id": "9Jws-C9zE99FwWex6dsVbpaaaaaIk7Ko7No-8mKfgRk",
+			"blob_hash": "O1NaFqZZkVOp+2hJfbf6s+a02JHMiJh7q0DZ+Dyp8og",
+			"range": null,
+			"objectId": "0xf7060e42698c5124afba30354abc845c97d3a841df887b2b6b68f4b689f863bd"
+		})).toBeFalsy()
+	})
+	it("should return false when objectId is missing!", () => {
+		expect(isVersionedResource({
+			"path": "index.html",
+			"headers": { "cache-control": "public, max-age=86400" },
+			"blob_id": "9Jws-C9zE99FwWex6dsVbpaaaaaIk7Ko7No-8mKfgRk",
+			"blob_hash": "O1NaFqZZkVOp+2hJfbf6s+a02JHMiJh7q0DZ+Dyp8og",
+			"range": null,
+			"version": 1,
 		})).toBeFalsy()
 	})
 })
