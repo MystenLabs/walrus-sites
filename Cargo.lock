@@ -8646,6 +8646,7 @@ dependencies = [
  "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto)",
  "flate2",
  "futures",
+ "glob",
  "hex",
  "home",
  "humantime",

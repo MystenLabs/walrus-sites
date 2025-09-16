@@ -364,7 +364,13 @@ pub enum Commands {
     /// Preprocess the directory, creating and linking index files.
     /// This command allows to publish directories as sites. Warning: Rewrites all `index.html`
     /// files.
-    ListDirectory { path: PathBuf },
+    ListDirectory {
+        path: PathBuf,
+        /// Path to the `ws-resources.json` file.
+        /// Tip: Use the `ignore` field in `ws-resources.json` to exclude files and
+        /// directories from list-directory output.
+        ws_resources: Option<PathBuf>,
+    },
     /// Completely destroys the site at the given object id.
     ///
     /// Removes all resources and routes, and destroys the site, returning the Sui storage rebate to

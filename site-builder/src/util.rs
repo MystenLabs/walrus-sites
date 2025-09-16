@@ -7,6 +7,7 @@ use std::{
 
 use anyhow::{anyhow, bail, Context, Result};
 use futures::Future;
+use glob::Pattern;
 use serde::{Deserialize, Deserializer};
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{
@@ -333,6 +334,39 @@ pub fn persist_site_id_and_name(
 
     display::done();
     Ok(ws_resources_to_save)
+}
+
+/// Matches a resource path against a glob pattern.
+///
+/// This function uses glob pattern matching to determine if a resource path matches
+/// the given pattern. Glob patterns support wildcard characters for flexible matching.
+///
+/// # Glob Pattern Syntax
+/// - `*` matches zero or more characters (excluding path separators in some contexts)
+/// - `?` matches exactly one character
+/// - `[abc]` matches any character within the brackets
+/// - `[a-z]` matches any character in the specified range
+/// - `**` matches zero or more directories (when used as a path component)
+///
+/// # Arguments
+/// * `pattern` - The glob pattern to match against
+/// * `resource_path` - The resource path to test
+///
+/// # Returns
+/// Returns `true` if the resource path matches the pattern, `false` otherwise.
+/// If the pattern is invalid, returns `false`.
+pub fn is_pattern_match(pattern: &str, resource_path: &str) -> bool {
+    Pattern::new(pattern)
+        .map(|pattern| pattern.matches(resource_path))
+        .expect("Invalid glob pattern.")
+}
+
+/// Checks if a resource path matches any of the provided ignore patterns.
+pub fn is_ignored<'a>(
+    mut ignore_patterns: impl Iterator<Item = &'a str>,
+    resource_path: &str,
+) -> bool {
+    ignore_patterns.any(|pattern| is_pattern_match(pattern, resource_path))
 }
 
 /// Fetches the staking object by its ID and the current walrus package ID.

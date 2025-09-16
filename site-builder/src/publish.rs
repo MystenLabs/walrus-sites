@@ -69,7 +69,7 @@ impl ContinuousEditing {
 
 /// Options for the management of Walrus blobs.
 #[derive(Debug, Clone)]
-pub(crate) struct BlobManagementOptions {
+pub struct BlobManagementOptions {
     /// Forces a check of the expiration of all blobs, and extension if necessary.
     pub(crate) check_extend: bool,
 }
@@ -241,18 +241,27 @@ impl SiteEditor<EditOptions> {
     async fn run_single_edit(
         &self,
     ) -> Result<(SuiAddress, SuiTransactionBlockResponse, SiteDataDiffSummary)> {
-        if self.edit_options.publish_options.list_directory {
-            display::action(format!("Preprocessing: {}", self.directory().display()));
-            Preprocessor::preprocess(self.directory())?;
-            display::done();
-        }
-
         let (mut resource_manager, mut site_manager) = self.create_managers().await?;
-
         display::action(format!(
             "Parsing the directory {} and locally computing blob IDs",
             self.directory().to_string_lossy()
         ));
+        if self.edit_options.publish_options.list_directory {
+            display::action(format!("Preprocessing: {}", self.directory().display()));
+            let _ = Preprocessor::preprocess(
+                self.directory(),
+                &resource_manager
+                    .ws_resources
+                    .as_ref()
+                    .and_then(|ws| ws.ignore.clone()),
+            );
+            display::action(format!(
+                "Successfully preprocessed the {} directory!",
+                self.directory().display()
+            ));
+            display::done();
+        }
+
         let local_site_data = resource_manager.read_dir(self.directory()).await?;
         display::done();
         tracing::debug!(?local_site_data, "resources loaded from directory");

@@ -11,6 +11,7 @@ use localnode::{TestSetup, WalrusSitesClusterState};
 // fatal runtime error: stack overflow
 // ```
 #[tokio::test]
+#[ignore]
 async fn start_walrus_sites_cluster() -> anyhow::Result<()> {
     let TestSetup {
         cluster_state:

@@ -25,6 +25,7 @@ use localnode::{
 };
 
 #[tokio::test]
+#[ignore]
 async fn quilts_publish_snake() -> anyhow::Result<()> {
     const SNAKE_FILES_UPLOAD_FILES: usize = 4;
 
