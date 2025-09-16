@@ -1,7 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::BTreeSet, num::NonZeroUsize, str::FromStr, time::Duration};
+use std::{
+    collections::{BTreeSet, HashSet},
+    num::NonZeroUsize,
+    str::FromStr,
+    time::Duration,
+};
 
 use anyhow::{anyhow, Error, Result};
 use sui_keys::keystore::AccountKeystore;
@@ -124,9 +129,8 @@ impl SiteManager {
         local_site_data: &SiteData,
         // Currently Quilts implementation, needs to store Quilt in advance, in order to get the
         // full resource needed to save on Sui. We use this to skip storing also as blobs.
-        store_new_blobs: bool,
+        using_quilts: bool,
     ) -> Result<(SuiTransactionBlockResponse, SiteDataDiffSummary)> {
-        let using_quilts = !store_new_blobs;
         tracing::debug!(?self.site_id, "creating or updating site");
         let retriable_client = self.sui_client().await?;
         let existing_site = match &self.site_id {
@@ -142,7 +146,8 @@ impl SiteManager {
 
         let site_updates = local_site_data.diff(&existing_site);
 
-        if store_new_blobs {
+        let store_blobs = !using_quilts;
+        if store_blobs {
             let walrus_candidate_set = if self.blob_options.is_check_extend() {
                 // We need to check the status of all blobs: Return the full list of existing and added
                 // blobs as possible updates.
@@ -570,5 +575,8 @@ fn collect_deletable_blob_candidates(site_updates: &SiteDataDiff) -> Vec<BlobId>
             ResourceOp::Deleted(resource) => Some(resource.info.blob_id),
             _ => None,
         })
+        // Collect first to a hash-set to keep unique blob-ids.
+        .collect::<HashSet<_>>()
+        .into_iter()
         .collect()
 }
