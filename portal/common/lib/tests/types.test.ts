@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { isResource, isVersionedResource, optionalRangeToHeaders, Range } from "@lib/types/index";
+import { isResource, isVersionedResource, optionalRangeToHeaders, Range, isRoutes } from "@lib/types/index";
 import { describe, it, expect } from "vitest";
 
 describe("happy paths of optionalRangeToHeaders should", () => {
@@ -107,5 +107,42 @@ describe("isVersionedResource", () => {
 			"range": null,
 			"version": 1,
 		})).toBeFalsy()
+	})
+})
+
+describe("isRoutes", () => {
+	it("should return true when it's definitely a routes object", () => {
+		expect(isRoutes({
+			"routes_list": new Map([
+				["/index.html", { path: "/index.html" }],
+				["/about", { path: "/about" }]
+			])
+		})).toBeTruthy()
+	})
+	it("should return false when routes_list is missing", () => {
+		expect(isRoutes({
+			"other_property": "value"
+		})).toBeFalsy()
+	})
+	it("should return false when routes_list is not a Map", () => {
+		expect(isRoutes({
+			"routes_list": {}
+		})).toBeFalsy()
+	})
+	it("should return false when routes_list is an array", () => {
+		expect(isRoutes({
+			"routes_list": []
+		})).toBeFalsy()
+	})
+	it("should return false when routes_list is a string", () => {
+		expect(isRoutes({
+			"routes_list": "not a map"
+		})).toBeFalsy()
+	})
+	it("should return false when obj is null", () => {
+		expect(isRoutes(null)).toBeFalsy()
+	})
+	it("should return false when obj is undefined", () => {
+		expect(isRoutes(undefined)).toBeFalsy()
 	})
 })
