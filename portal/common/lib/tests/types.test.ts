@@ -1,29 +1,77 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { optionalRangeToHeaders, Range } from "@lib/types/index";
+import { isResource, optionalRangeToHeaders, Range } from "@lib/types/index";
 import { describe, it, expect } from "vitest";
 
 describe("happy paths of optionalRangeToHeaders should", () => {
-    it.each([
-        [{ start: 0, end: 10 }, "bytes=0-10"],
-        [{ start: null, end: 10 }, "bytes=-10"],
-        [{ start: 10, end: null }, "bytes=10-"],
-        [null, undefined],
-    ])('convert range %o into "%s"', (range, expected) => {
-        expect(optionalRangeToHeaders(range as Range).range).toBe(expected);
-    });
+	it.each([
+		[{ start: 0, end: 10 }, "bytes=0-10"],
+		[{ start: null, end: 10 }, "bytes=-10"],
+		[{ start: 10, end: null }, "bytes=10-"],
+		[null, undefined],
+	])('convert range %o into "%s"', (range, expected) => {
+		expect(optionalRangeToHeaders(range as Range).range).toBe(expected);
+	});
 });
 
 describe("cases where optionalRangeToHeaders should", () => {
-    it.each([
-        [null, null],
-        [null, -1],
-        [-1, null],
-        [2, 1]
-    ])('throw error when start = %s and end = %s "', (start, end) => {
-        expect(() => optionalRangeToHeaders({ start, end } as Range)).toThrowError(
-            `Invalid range: start=${start} end=${end}`,
-        );
-    });
+	it.each([
+		[null, null],
+		[null, -1],
+		[-1, null],
+		[2, 1]
+	])('throw error when start = %s and end = %s "', (start, end) => {
+		expect(() => optionalRangeToHeaders({ start, end } as Range)).toThrowError(
+			`Invalid range: start=${start} end=${end}`,
+		);
+	});
 });
+
+describe("isResource", () => {
+	it("should return true when it's definitely a resource", () => {
+		expect(isResource({
+			"path": "index.html",
+			"headers": { "cache-control": "public, max-age=86400" },
+			"blob_id": "9Jws-C9zE99FwWex6dsVbpaaaaaIk7Ko7No-8mKfgRk",
+			"blob_hash": "O1NaFqZZkVOp+2hJfbf6s+a02JHMiJh7q0DZ+Dyp8og",
+			"range": null,
+		})).toBeTruthy()
+	})
+	it("should return false when path is a number", () => {
+		expect(isResource({
+			"path": 123,
+			"headers": { "cache-control": "public, max-age=86400" },
+			"blob_id": "9Jws-C9zE99FwWex6dsVbpaaaaaIk7Ko7No-8mKfgRk",
+			"blob_hash": "O1NaFqZZkVOp+2hJfbf6s+a02JHMiJh7q0DZ+Dyp8og",
+			"range": null,
+		})).toBeFalsy()
+	})
+	it("should return false when blob_id is a number", () => {
+		expect(isResource({
+			"path": "index.html",
+			"headers": { "cache-control": "public, max-age=86400" },
+			"blob_id": 123,
+			"blob_hash": "O1NaFqZZkVOp+2hJfbf6s+a02JHMiJh7q0DZ+Dyp8og",
+			"range": null,
+		})).toBeFalsy()
+	})
+	it("should return false when headers is not an object", () => {
+		expect(isResource({
+			"path": "index.html",
+			"headers": "not an object",
+			"blob_id": "9Jws-C9zE99FwWex6dsVbpaaaaaIk7Ko7No-8mKfgRk",
+			"blob_hash": "O1NaFqZZkVOp+2hJfbf6s+a02JHMiJh7q0DZ+Dyp8og",
+			"range": null,
+		})).toBeFalsy()
+	})
+	it("should return false when blob_hash is not a string", () => {
+		expect(isResource({
+			"path": "index.html",
+			"headers": { "cache-control": "public, max-age=86400" },
+			"blob_id": "9Jws-C9zE99FwWex6dsVbpaaaaaIk7Ko7No-8mKfgRk",
+			"blob_hash": 123,
+			"range": null,
+		})).toBeFalsy()
+	})
+})
