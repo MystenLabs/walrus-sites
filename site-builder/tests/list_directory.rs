@@ -84,7 +84,7 @@ async fn publish_snake_with_list_directory() -> anyhow::Result<()> {
 #[tokio::test]
 #[ignore]
 async fn preprocess_the_snake_example_with_list_directory_no_publish() -> anyhow::Result<()> {
-    // let cluster = TestSetup::start_local_test_cluster().await?;
+    let cluster = TestSetup::start_local_test_cluster().await?;
     let directory = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
@@ -98,7 +98,7 @@ async fn preprocess_the_snake_example_with_list_directory_no_publish() -> anyhow
     fs::copy(&og_ws_resources, &temp_ws_resources)?;
 
     let args = ArgsBuilder::default()
-        // .with_config(Some(cluster.sites_config_path().to_owned()))
+        .with_config(Some(cluster.sites_config_path().to_owned()))
         .with_command(Commands::ListDirectory {
             path: directory.clone(),
             ws_resources: Some(temp_ws_resources),
