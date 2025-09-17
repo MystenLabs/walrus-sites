@@ -399,6 +399,38 @@ pub async fn get_staking_object(
     })
 }
 
+/// Decodes a hexadecimal string (with "0x" prefix) into a vector of bytes.
+///
+/// # Arguments
+/// * `hex_str` - A string slice containing the hexadecimal representation, prefixed with "0x".
+///
+/// # Returns
+/// Returns a `Result` containing the decoded bytes as a `Vec<u8>` on success,
+/// or a `String` error message on failure.
+pub fn decode_hex(hex_str: &str) -> Result<Vec<u8>, std::string::String> {
+    hex::decode(&hex_str[2..]).map_err(|e| format!("Failed to decode hex: {e}"))
+}
+
+#[cfg(test)]
+mod decode_hex_tests {
+    use super::decode_hex;
+
+    #[test]
+    fn test_decode_hex_happy_path() {
+        let hex_str = "0x48656c6c6f"; // "Hello"
+        let result = decode_hex(hex_str);
+        assert_eq!(result.unwrap(), b"Hello");
+    }
+
+    #[test]
+    fn test_decode_hex_expected_failure() {
+        let hex_str = "0xZZZZZZ";
+        let result = decode_hex(hex_str);
+        assert!(result.is_err());
+        assert!(result.err().unwrap().contains("Failed to decode hex"));
+    }
+}
+
 #[tracing::instrument(err, skip_all)]
 pub(crate) fn deserialize_bag_or_table<'de, D>(deserializer: D) -> Result<ObjectID, D::Error>
 where
