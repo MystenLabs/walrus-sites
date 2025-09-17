@@ -60,9 +60,9 @@ function isRangeValid(range: Range): boolean {
  */
 function rangeToHttpHeader(range: Range): string {
     if (!isRangeValid(range)) {
-        throw new Error(`Invalid range: start ${range.start} end ${range.end}`);
+        throw new Error(`Invalid range: start=${range.start} end=${range.end}`);
     }
-    return `bytes=${range.start || ""}-${range.end || ""}`;
+    return `bytes=${range.start ?? ""}-${range.end ?? ""}`;
 }
 
 export function optionalRangeToHeaders(range: Range | null): { [key: string]: string } {
