@@ -14,7 +14,6 @@ use prettytable::{
     Table,
 };
 use sui_types::base_types::{ObjectID, SuiAddress};
-use walrus_core::{BlobId as BlobIdOriginal, QuiltPatchId};
 
 use crate::{
     args::ObjectIdOrName,
@@ -23,7 +22,7 @@ use crate::{
     retry_client::RetriableSuiClient,
     site::{RemoteSiteFactory, SiteData},
     types::Staking,
-    util::{decode_hex, get_staking_object, type_origin_map_for_package},
+    util::{get_staking_object, parse_quilt_patch_id, type_origin_map_for_package},
     walrus::{output::SuiBlob, types::BlobId},
 };
 
@@ -120,19 +119,7 @@ impl SiteMapTable {
             let info = &resource.info;
             let blob_object_id = owned_blobs.get(&info.blob_id).map(|blob| blob.id);
 
-            // TODO(alex): refactor - put this in a separate util function (e.g. parse quilt_patch_id)
-            let quilt_id = BlobIdOriginal::try_from(&info.blob_id.0[..BlobIdOriginal::LENGTH])
-                .expect("Not valid blob ID");
-            let quilt_patch_id =
-                info.headers
-                    .get("x-wal-quilt-patch-internal-id")
-                    .map(|patch_id_bytes| {
-                        QuiltPatchId::new(
-                            quilt_id,
-                            decode_hex(patch_id_bytes).expect("Invalid patch id"),
-                        )
-                    });
-
+            let quilt_patch_id = parse_quilt_patch_id(&info.blob_id, &info.headers);
             let expiration = owned_blobs.get(&info.blob_id).and_then(|blob| {
                 let end_epoch = blob.storage.end_epoch as u64;
                 let epoch_offset = end_epoch.saturating_sub(1);

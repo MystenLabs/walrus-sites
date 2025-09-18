@@ -3,12 +3,12 @@
 
 //! Summaries of the run results.
 
-use walrus_core::{BlobId as BlobIdOriginal, QuiltPatchId};
+use walrus_core::QuiltPatchId;
 
 use crate::{
     site::{resource::ResourceOp, SiteDataDiff},
     types::RouteOps,
-    util::decode_hex,
+    util::parse_quilt_patch_id,
     walrus::types::BlobId,
 };
 
@@ -31,17 +31,7 @@ impl From<&ResourceOp<'_>> for ResourceOpSummary {
             ResourceOp::Created(resource) => ("created".to_owned(), &resource.info),
             ResourceOp::Unchanged(resource) => ("unchanged".to_owned(), &resource.info),
         };
-        let quilt_id = BlobIdOriginal::try_from(&info.blob_id.0[..BlobIdOriginal::LENGTH])
-            .expect("Not valid blob ID");
-        let quilt_patch_id =
-            info.headers
-                .get("x-wal-quilt-patch-internal-id")
-                .map(|patch_id_bytes| {
-                    QuiltPatchId::new(
-                        quilt_id,
-                        decode_hex(patch_id_bytes).expect("Invalid patch id"),
-                    )
-                });
+        let quilt_patch_id = parse_quilt_patch_id(&info.blob_id, &info.headers);
         ResourceOpSummary {
             operation,
             path: info.path.clone(),

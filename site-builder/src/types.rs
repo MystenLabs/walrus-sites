@@ -11,7 +11,7 @@ use std::{
 };
 
 use move_core_types::u256::U256;
-use serde::{de::DeserializeOwned, Deserialize, Serialize, Serializer};
+use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer};
 use sui_types::{
     base_types::{ObjectID, SuiAddress},
     id::UID,
