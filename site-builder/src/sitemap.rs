@@ -14,6 +14,7 @@ use prettytable::{
     Table,
 };
 use sui_types::base_types::{ObjectID, SuiAddress};
+use walrus_core::{BlobId as BlobIdOriginal, QuiltPatchId};
 
 use crate::{
     args::ObjectIdOrName,
@@ -22,7 +23,7 @@ use crate::{
     retry_client::RetriableSuiClient,
     site::{RemoteSiteFactory, SiteData},
     types::Staking,
-    util::{get_staking_object, type_origin_map_for_package},
+    util::{decode_hex, get_staking_object, type_origin_map_for_package},
     walrus::{output::SuiBlob, types::BlobId},
 };
 
@@ -101,7 +102,7 @@ async fn get_site_resources_and_blobs(
     Ok((site, owned_blobs))
 }
 
-struct SiteMapTable(Vec<(String, BlobId, Option<ObjectID>, Option<NaiveDate>)>);
+struct SiteMapTable(Vec<(String, String, Option<ObjectID>, Option<NaiveDate>)>);
 
 impl SiteMapTable {
     fn new(
@@ -119,6 +120,19 @@ impl SiteMapTable {
             let info = &resource.info;
             let blob_object_id = owned_blobs.get(&info.blob_id).map(|blob| blob.id);
 
+            // TODO(alex): refactor - put this in a separate util function (e.g. parse quilt_patch_id)
+            let quilt_id = BlobIdOriginal::try_from(&info.blob_id.0[..BlobIdOriginal::LENGTH])
+                .expect("Not valid blob ID");
+            let quilt_patch_id =
+                info.headers
+                    .get("x-wal-quilt-patch-internal-id")
+                    .map(|patch_id_bytes| {
+                        QuiltPatchId::new(
+                            quilt_id,
+                            decode_hex(patch_id_bytes).expect("Invalid patch id"),
+                        )
+                    });
+
             let expiration = owned_blobs.get(&info.blob_id).and_then(|blob| {
                 let end_epoch = blob.storage.end_epoch as u64;
                 let epoch_offset = end_epoch.saturating_sub(1);
@@ -135,7 +149,21 @@ impl SiteMapTable {
                 )
             });
 
-            data.push((info.path.clone(), info.blob_id, blob_object_id, expiration));
+            if let Some(quilt_patch_id) = quilt_patch_id {
+                data.push((
+                    info.path.clone(),
+                    quilt_patch_id.to_string(),
+                    blob_object_id,
+                    expiration,
+                ));
+            } else {
+                data.push((
+                    info.path.clone(),
+                    info.blob_id.to_string(),
+                    blob_object_id,
+                    expiration,
+                ));
+            }
         });
 
         Self(data)
@@ -159,7 +187,7 @@ impl SiteMapTable {
 
         let mut titles = row![
             b->"Resource path",
-            b->"Blob ID",
+            b->"Blob / Quilt Patch ID",
         ];
         let has_blob_id = self
             .0
