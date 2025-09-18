@@ -6,6 +6,7 @@ use std::{
     borrow::Borrow,
     collections::{btree_map, BTreeMap},
     num::NonZeroU16,
+    ops::Deref,
     str::FromStr,
 };
 
@@ -174,6 +175,13 @@ where
 /// The representation of the HTTP headers.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct HttpHeaders(pub VecMap<String, String>);
+impl Deref for HttpHeaders {
+    type Target = VecMap<String, String>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 /// The routes of a site.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -3,9 +3,12 @@
 
 //! Summaries of the run results.
 
+use walrus_core::{BlobId as BlobIdOriginal, QuiltPatchId};
+
 use crate::{
     site::{resource::ResourceOp, SiteDataDiff},
     types::RouteOps,
+    util::decode_hex,
     walrus::types::BlobId,
 };
 
@@ -18,6 +21,7 @@ pub struct ResourceOpSummary {
     operation: String,
     path: String,
     blob_id: BlobId,
+    quilt_patch_id: Option<QuiltPatchId>,
 }
 
 impl From<&ResourceOp<'_>> for ResourceOpSummary {
@@ -27,20 +31,38 @@ impl From<&ResourceOp<'_>> for ResourceOpSummary {
             ResourceOp::Created(resource) => ("created".to_owned(), &resource.info),
             ResourceOp::Unchanged(resource) => ("unchanged".to_owned(), &resource.info),
         };
+        let quilt_id = BlobIdOriginal::try_from(&info.blob_id.0[..BlobIdOriginal::LENGTH])
+            .expect("Not valid blob ID");
+        let quilt_patch_id =
+            info.headers
+                .get("x-wal-quilt-patch-internal-id")
+                .map(|patch_id_bytes| {
+                    QuiltPatchId::new(
+                        quilt_id,
+                        decode_hex(patch_id_bytes).expect("Invalid patch id"),
+                    )
+                });
         ResourceOpSummary {
             operation,
             path: info.path.clone(),
             blob_id: info.blob_id,
+            quilt_patch_id,
         }
     }
 }
 
 impl Summarizable for ResourceOpSummary {
     fn to_summary(&self) -> String {
-        format!(
-            "{} resource {} with blob ID {}",
-            self.operation, self.path, self.blob_id
-        )
+        match &self.quilt_patch_id {
+            Some(quilt_patch_id) => format!(
+                "{} resource {} with quilt patch ID {}",
+                self.operation, self.path, quilt_patch_id
+            ),
+            None => format!(
+                "{} resource {} with blob ID {}",
+                self.operation, self.path, self.blob_id
+            ),
+        }
     }
 }
 
@@ -100,6 +122,7 @@ impl Summarizable for SiteDataDiffSummary {
         let resource_str = if !self.resource_ops.is_empty() {
             format!(
                 "Resource operations performed:\n{}",
+                // Update this so that if it's a quilt, use the quilt patch id
                 self.resource_ops.to_summary()
             )
         } else {
