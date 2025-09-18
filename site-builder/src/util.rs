@@ -475,7 +475,6 @@ mod parse_quilt_patch_id_tests {
     }
 }
 
-
 #[cfg(test)]
 mod decode_hex_tests {
     use super::decode_hex;

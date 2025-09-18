@@ -3,13 +3,12 @@
 
 //! Summaries of the run results.
 
-use walrus_core::{BlobId as BlobIdOriginal, QuiltPatchId};
+use walrus_core::QuiltPatchId;
 
 use crate::{
     site::{resource::ResourceOp, SiteDataDiff},
     types::RouteOps,
     util::parse_quilt_patch_id,
-    util::decode_hex,
     walrus::types::BlobId,
 };
 
