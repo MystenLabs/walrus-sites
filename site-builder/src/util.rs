@@ -442,6 +442,40 @@ pub fn parse_quilt_patch_id(
 }
 
 #[cfg(test)]
+mod parse_quilt_patch_id_tests {
+    use std::str::FromStr;
+
+    use super::parse_quilt_patch_id;
+    use crate::{
+        types::{HttpHeaders, VecMap},
+        walrus::types::BlobId,
+    };
+
+    #[test]
+    /// The values of this test were retrieved by publishing a site as a quilt, and then
+    /// inspecting the index.html resource. This way we know exactly what behaviour to expect.
+    fn test_parse_quilt_patch_id_happy() {
+        // examples/snake/index.html Quilt/Blob ID
+        let blob_id = BlobId::from_str("Jqz2KSMu18pygjkC-WVEQqtUZRo18-cuf_566VZSxVo")
+            .expect("Invalid blob ID.");
+        let mut resource_headers: VecMap<String, String> = VecMap::new();
+        // Supposing we published examples/snake/index.html as a quilt patch, we add the
+        // hex encoded internal quilt patch identifier in the headers.
+        resource_headers.insert(
+            "x-wal-quilt-patch-internal-id".to_string(),
+            "0x010c001900".to_string(),
+        );
+        assert!(
+            parse_quilt_patch_id(&blob_id, &HttpHeaders(resource_headers))
+                // Compare that the resulting quilt patch ID is the b64 encoded blobID + internal patch ID
+                .is_some_and(
+                    |x| x.to_string() == "Jqz2KSMu18pygjkC-WVEQqtUZRo18-cuf_566VZSxVoBDAAZAA"
+                )
+        );
+    }
+}
+
+#[cfg(test)]
 mod decode_hex_tests {
     use super::decode_hex;
 
