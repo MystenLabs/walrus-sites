@@ -119,7 +119,6 @@ impl SiteMapTable {
             let info = &resource.info;
             let blob_object_id = owned_blobs.get(&info.blob_id).map(|blob| blob.id);
 
-            let quilt_patch_id = parse_quilt_patch_id(&info.blob_id, &info.headers);
             let expiration = owned_blobs.get(&info.blob_id).and_then(|blob| {
                 let end_epoch = blob.storage.end_epoch as u64;
                 let epoch_offset = end_epoch.saturating_sub(1);
@@ -136,7 +135,7 @@ impl SiteMapTable {
                 )
             });
 
-            if let Some(quilt_patch_id) = quilt_patch_id {
+            if let Some(quilt_patch_id) = parse_quilt_patch_id(&info.blob_id, &info.headers) {
                 data.push((
                     info.path.clone(),
                     quilt_patch_id.to_string(),
