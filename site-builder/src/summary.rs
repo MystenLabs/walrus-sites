@@ -112,7 +112,6 @@ impl Summarizable for SiteDataDiffSummary {
         let resource_str = if !self.resource_ops.is_empty() {
             format!(
                 "Resource operations performed:\n{}",
-                // Update this so that if it's a quilt, use the quilt patch id
                 self.resource_ops.to_summary()
             )
         } else {
