@@ -22,7 +22,7 @@ use crate::{
     retry_client::RetriableSuiClient,
     site::{RemoteSiteFactory, SiteData},
     types::Staking,
-    util::{get_staking_object, type_origin_map_for_package},
+    util::{get_staking_object, parse_quilt_patch_id, type_origin_map_for_package},
     walrus::{output::SuiBlob, types::BlobId},
 };
 
@@ -101,7 +101,7 @@ async fn get_site_resources_and_blobs(
     Ok((site, owned_blobs))
 }
 
-struct SiteMapTable(Vec<(String, BlobId, Option<ObjectID>, Option<NaiveDate>)>);
+struct SiteMapTable(Vec<(String, String, Option<ObjectID>, Option<NaiveDate>)>);
 
 impl SiteMapTable {
     fn new(
@@ -135,7 +135,21 @@ impl SiteMapTable {
                 )
             });
 
-            data.push((info.path.clone(), info.blob_id, blob_object_id, expiration));
+            if let Some(quilt_patch_id) = parse_quilt_patch_id(&info.blob_id, &info.headers) {
+                data.push((
+                    info.path.clone(),
+                    quilt_patch_id.to_string(),
+                    blob_object_id,
+                    expiration,
+                ));
+            } else {
+                data.push((
+                    info.path.clone(),
+                    info.blob_id.to_string(),
+                    blob_object_id,
+                    expiration,
+                ));
+            }
         });
 
         Self(data)
@@ -159,7 +173,7 @@ impl SiteMapTable {
 
         let mut titles = row![
             b->"Resource path",
-            b->"Blob ID",
+            b->"Blob / Quilt Patch ID",
         ];
         let has_blob_id = self
             .0
