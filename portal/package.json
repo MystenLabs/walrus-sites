@@ -3,8 +3,8 @@
   "description": "Central point of the walrus-sites portal workspace.",
   "workspaces": [
     "common",
-	"worker",
-	"server"
+    "worker",
+    "server"
   ],
   "keywords": ["walrus", "sui", "sui-ns", "sites"],
   "author": "Mysten Labs",
