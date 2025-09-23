@@ -5,7 +5,6 @@ use anyhow::Result;
 use serde::Serialize;
 use sui_types::{
     base_types::{ObjectID, SuiAddress},
-    programmable_transaction_builder::ProgrammableTransactionBuilder,
     transaction::{Argument, CallArg, ProgrammableTransaction},
     Identifier,
     TypeTag,
@@ -17,12 +16,26 @@ use super::{
     RouteOps,
 };
 use crate::{
-    site::contracts,
+    site::{builder::counted_pt_builder::CountedPTBuilder, contracts},
     types::{Metadata, Range},
 };
 
+mod counted_pt_builder;
+
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum SitePtbBuilderError {
+    #[error("Exceeded maximum number of move-calls ({0}) in Transaction")]
+    TooManyMoveCalls(u16),
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
+}
+
+pub type SitePtbBuilderResult<T> = Result<T, SitePtbBuilderError>;
+
 pub struct SitePtb<T = ()> {
-    pt_builder: ProgrammableTransactionBuilder,
+    pt_builder: CountedPTBuilder,
     site_argument: T,
     package: ObjectID,
     module: Identifier,
@@ -31,9 +44,9 @@ pub struct SitePtb<T = ()> {
 /// A PTB to update a site.
 impl SitePtb {
     pub fn new(package: ObjectID, module: Identifier) -> Result<Self> {
-        let pt_builder = ProgrammableTransactionBuilder::new();
+        // TODO: Remove result
         Ok(SitePtb {
-            pt_builder,
+            pt_builder: CountedPTBuilder::default(),
             site_argument: (),
             package,
             module,
@@ -51,6 +64,7 @@ impl SitePtb {
     }
 
     pub fn with_arg(self, site_arg: Argument) -> Result<SitePtb<Argument>> {
+        // TODO: Remove Result
         Ok(SitePtb {
             pt_builder: self.pt_builder,
             site_argument: site_arg,
@@ -72,26 +86,30 @@ impl SitePtb {
 
 impl<T> SitePtb<T> {
     /// Transfer argument to address
-    fn transfer_arg(&mut self, recipient: SuiAddress, arg: Argument) {
-        self.pt_builder.transfer_arg(recipient, arg);
+    fn transfer_arg(&mut self, recipient: SuiAddress, arg: Argument) -> SitePtbBuilderResult<()> {
+        self.pt_builder.transfer_arg(recipient, arg)
     }
 
     /// Move call to create a new Walrus site.
-    pub fn create_site(&mut self, site_name: &str, metadata: Option<Metadata>) -> Result<Argument> {
+    pub fn create_site(
+        &mut self,
+        site_name: &str,
+        metadata: Option<Metadata>,
+    ) -> SitePtbBuilderResult<Argument> {
         tracing::debug!(site=%site_name, "new Move call: creating site");
         let name_arg = self.pt_builder.input(pure_call_arg(&site_name)?)?;
         let metadata_arg = match metadata {
             Some(metadata) => self.new_metadata(metadata),
             None => self.new_metadata(Metadata::default()),
-        };
-        Ok(self.add_programmable_move_call(
+        }?;
+        self.add_programmable_move_call(
             contracts::site::new_site.identifier(),
             vec![],
             vec![name_arg, metadata_arg],
-        ))
+        )
     }
 
-    fn new_metadata(&mut self, metadata: Metadata) -> Argument {
+    fn new_metadata(&mut self, metadata: Metadata) -> SitePtbBuilderResult<Argument> {
         let defaults = Metadata::default();
         let args = [
             metadata.link.or(defaults.link),
@@ -101,8 +119,8 @@ impl<T> SitePtb<T> {
             metadata.creator.or(defaults.creator),
         ]
         .into_iter()
-        .map(|val| self.pt_builder.pure(val).unwrap())
-        .collect::<Vec<_>>();
+        .map(|val| self.pt_builder.pure(val))
+        .collect::<anyhow::Result<Vec<_>>>()?;
 
         self.pt_builder.programmable_move_call(
             self.package,
@@ -118,7 +136,7 @@ impl<T> SitePtb<T> {
         function: Identifier,
         type_arguments: Vec<TypeTag>,
         call_args: Vec<Argument>,
-    ) -> Argument {
+    ) -> SitePtbBuilderResult<Argument> {
         self.pt_builder.programmable_move_call(
             self.package,
             self.module.clone(),
@@ -163,34 +181,37 @@ impl SitePtb<Argument> {
         Ok(())
     }
 
-    pub fn with_update_metadata(mut self, metadata: Metadata) -> Result<SitePtb<Argument>> {
-        let metadata = self.new_metadata(metadata);
+    pub fn with_update_metadata(
+        mut self,
+        metadata: Metadata,
+    ) -> SitePtbBuilderResult<SitePtb<Argument>> {
+        let metadata = self.new_metadata(metadata)?;
         self.add_programmable_move_call(
             contracts::site::update_metadata.identifier(),
             vec![],
             vec![self.site_argument, metadata],
-        );
+        )?;
         Ok(self)
     }
 
-    pub fn transfer_site(&mut self, recipient: SuiAddress) {
-        self.transfer_arg(recipient, self.site_argument);
+    pub fn transfer_site(&mut self, recipient: SuiAddress) -> SitePtbBuilderResult<()> {
+        self.transfer_arg(recipient, self.site_argument)
     }
 
     /// Adds the move calls to remove a resource from the site, if the resource exists.
-    pub fn remove_resource_if_exists(&mut self, resource: &Resource) -> Result<()> {
+    pub fn remove_resource_if_exists(&mut self, resource: &Resource) -> SitePtbBuilderResult<()> {
         tracing::debug!(resource=%resource.info.path, "new Move call: removing resource");
         let path_input = self.pt_builder.input(pure_call_arg(&resource.info.path)?)?;
         self.add_programmable_move_call(
             contracts::site::remove_resource_if_exists.identifier(),
             vec![],
             vec![self.site_argument, path_input],
-        );
+        )?;
         Ok(())
     }
 
     /// Adds the move calls to create and add a resource to the site, with the specified headers.
-    pub fn add_resource(&mut self, resource: &Resource) -> Result<()> {
+    pub fn add_resource(&mut self, resource: &Resource) -> SitePtbBuilderResult<()> {
         tracing::debug!(resource=%resource.info.path, "new Move call: adding resource");
         let new_resource_arg = self.create_resource(resource)?;
 
@@ -204,26 +225,29 @@ impl SitePtb<Argument> {
             contracts::site::add_resource.identifier(),
             vec![],
             vec![self.site_argument, new_resource_arg],
-        );
+        )?;
 
         Ok(())
     }
 
     /// Removes all dynamic fields and then burns the site.
-    pub fn destroy<'a>(&mut self, resources: impl IntoIterator<Item = &'a Resource>) -> Result<()> {
+    pub fn destroy<'a>(
+        &mut self,
+        resources: impl IntoIterator<Item = &'a Resource>,
+    ) -> SitePtbBuilderResult<()> {
         self.remove_routes()?;
         for resource in resources {
             self.remove_resource_if_exists(resource)?;
         }
 
-        self.burn();
+        self.burn()?;
         Ok(())
     }
 
     /// Adds the move calls to create a resource.
     ///
     /// Returns the [`Argument`] for the newly-created resource.
-    fn create_resource(&mut self, resource: &Resource) -> Result<Argument> {
+    fn create_resource(&mut self, resource: &Resource) -> SitePtbBuilderResult<Argument> {
         let new_range_arg = self.create_range(&resource.info.range)?;
 
         let mut inputs = [
@@ -237,14 +261,10 @@ impl SitePtb<Argument> {
 
         inputs.push(new_range_arg);
 
-        Ok(self.add_programmable_move_call(
-            contracts::site::new_resource.identifier(),
-            vec![],
-            inputs,
-        ))
+        self.add_programmable_move_call(contracts::site::new_resource.identifier(), vec![], inputs)
     }
 
-    fn create_range(&mut self, range: &Option<Range>) -> Result<Argument> {
+    fn create_range(&mut self, range: &Option<Range>) -> SitePtbBuilderResult<Argument> {
         let inputs = [
             pure_call_arg(&range.as_ref().and_then(|r| r.start))?,
             pure_call_arg(&range.as_ref().and_then(|r| r.end))?,
@@ -253,15 +273,20 @@ impl SitePtb<Argument> {
         .map(|arg| self.pt_builder.input(arg))
         .collect::<Result<Vec<_>>>()?;
 
-        Ok(self.add_programmable_move_call(
+        self.add_programmable_move_call(
             contracts::site::new_range_option.identifier(),
             vec![],
             inputs,
-        ))
+        )
     }
 
     /// Adds the header to the given resource argument.
-    fn add_header(&mut self, resource_arg: Argument, name: &str, value: &str) -> Result<()> {
+    fn add_header(
+        &mut self,
+        resource_arg: Argument,
+        name: &str,
+        value: &str,
+    ) -> SitePtbBuilderResult<()> {
         self.add_key_value_to_argument(contracts::site::add_header, resource_arg, name, value)
     }
 
@@ -272,41 +297,41 @@ impl SitePtb<Argument> {
         arg: Argument,
         key: &str,
         value: &str,
-    ) -> Result<()> {
+    ) -> SitePtbBuilderResult<()> {
         let name_input = self.pt_builder.input(pure_call_arg(&key.to_owned())?)?;
         let value_input = self.pt_builder.input(pure_call_arg(&value.to_owned())?)?;
         self.add_programmable_move_call(
             fn_name.identifier(),
             vec![],
             vec![arg, name_input, value_input],
-        );
+        )?;
         Ok(())
     }
 
     // Routes
 
     /// Adds the move calls to create a new routes object.
-    fn create_routes(&mut self) -> Result<()> {
+    fn create_routes(&mut self) -> SitePtbBuilderResult<()> {
         self.add_programmable_move_call(
             contracts::site::create_routes.identifier(),
             vec![],
             vec![self.site_argument],
-        );
+        )?;
         Ok(())
     }
 
     /// Adds the move calls to remove the routes object.
-    fn remove_routes(&mut self) -> Result<()> {
+    fn remove_routes(&mut self) -> SitePtbBuilderResult<()> {
         self.add_programmable_move_call(
             contracts::site::remove_all_routes_if_exist.identifier(),
             vec![],
             vec![self.site_argument],
-        );
+        )?;
         Ok(())
     }
 
     /// Adds the move calls add a route to the routes object.
-    fn add_route(&mut self, name: &str, value: &str) -> Result<()> {
+    fn add_route(&mut self, name: &str, value: &str) -> SitePtbBuilderResult<()> {
         tracing::debug!(name=%name, value=%value, "new Move call: adding route");
         self.add_key_value_to_argument(
             contracts::site::insert_route,
@@ -316,24 +341,25 @@ impl SitePtb<Argument> {
         )
     }
 
-    pub fn update_name(&mut self, name: &str) -> Result<()> {
+    pub fn update_name(&mut self, name: &str) -> SitePtbBuilderResult<()> {
         tracing::debug!(name=%name, "new Move call: updating site name");
         let name_input = self.pt_builder.input(pure_call_arg(&name.to_owned())?)?;
         self.add_programmable_move_call(
             contracts::site::update_name.identifier(),
             vec![],
             vec![self.site_argument, name_input],
-        );
+        )?;
         Ok(())
     }
 
     /// Burns the site.
-    fn burn(&mut self) {
+    fn burn(&mut self) -> SitePtbBuilderResult<()> {
         self.add_programmable_move_call(
             contracts::site::burn.identifier(),
             vec![],
             vec![self.site_argument],
-        );
+        )?;
+        Ok(())
     }
 }
 
