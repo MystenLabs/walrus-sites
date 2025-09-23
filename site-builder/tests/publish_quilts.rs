@@ -4,9 +4,9 @@
 #![cfg(feature = "quilts-experimental")]
 
 use std::{
-    fs,
-    fs::File,
-    io::Write,
+    collections::BTreeMap,
+    fs::{self, File},
+    io::{BufWriter, Write},
     path::{Path, PathBuf},
     time::Instant,
 };
@@ -14,7 +14,11 @@ use std::{
 use fastcrypto::hash::{HashFunction, Sha256};
 use hex::FromHex;
 use move_core_types::u256::U256;
-use site_builder::args::{Commands, EpochCountOrMax};
+use site_builder::{
+    args::{Commands, EpochCountOrMax},
+    site_config::WSResources,
+    types::{HttpHeaders, VecMap},
+};
 use walrus_sdk::core::{BlobId, QuiltPatchId};
 
 #[allow(dead_code)]
@@ -150,6 +154,78 @@ async fn publish_quilts_lots_of_files() -> anyhow::Result<()> {
         );
     }
     println!("Fetching took {:#?}", fetching_start.elapsed());
+
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore]
+async fn publish_quilts_a_lot_of_headers() -> anyhow::Result<()> {
+    const N_FILES_IN_SITE: usize = 10;
+    const EXTRA_HEADERS_PER_HTML: usize = 100;
+
+    let cluster = TestSetup::start_local_test_cluster().await?;
+
+    // Create a fake site
+    let site_temp_dir = tempfile::tempdir()?;
+    // Generate 100 files: 1.html, 2.html, ..., 100.html
+    (0..N_FILES_IN_SITE).try_for_each(|i| {
+        let file_path = site_temp_dir.path().join(format!("{i}.html"));
+        let mut file = File::create(file_path)?;
+        writeln!(file, "<html><body><h1>File {i}</h1></body></html>")?;
+        Ok::<(), anyhow::Error>(())
+    })?;
+
+    // Create a ws-resources with a lot of headers per .html file.
+    let headers = BTreeMap::<String, HttpHeaders>::from([(
+        "*.html".to_string(),
+        HttpHeaders(VecMap(
+            (0..EXTRA_HEADERS_PER_HTML)
+                .map(|i| {
+                    (
+                        format!("custom_header_key_{i:02}"),
+                        format!("custom_header_value_{i:02}"),
+                    )
+                })
+                .collect(),
+        )),
+    )]);
+    let ws_resources = WSResources {
+        headers: Some(headers),
+        ..Default::default()
+    };
+
+    let ws_temp_dir = tempfile::tempdir()?;
+    let temp_ws_resources = ws_temp_dir.path().join("ws-resources.json");
+    let file = File::create(&temp_ws_resources)?;
+    serde_json::to_writer_pretty(BufWriter::new(file), &ws_resources)?;
+
+    // ws_resources.headers.
+    let args = ArgsBuilder::default()
+        .with_config(Some(cluster.sites_config_path().to_owned()))
+        .with_command(Commands::PublishQuilts {
+            publish_options: PublishOptionsBuilder::default()
+                .with_directory(site_temp_dir.path().to_owned())
+                .with_ws_resources(Some(temp_ws_resources))
+                .with_epoch_count_or_max(EpochCountOrMax::Max)
+                .build()?,
+            site_name: None,
+        })
+        .with_gas_budget(50_000_000_000)
+        .build()?;
+
+    site_builder::run(args).await?;
+
+    let site = cluster.last_site_created().await?;
+    let resources = cluster.site_resources(*site.id.object_id()).await?;
+    assert_eq!(resources.len(), N_FILES_IN_SITE);
+
+    resources.into_iter().for_each(|r| {
+        assert_eq!(
+            r.headers.len(),
+            EXTRA_HEADERS_PER_HTML + 3 /* content-encoding + content-type + quilt-patch-id */
+        )
+    });
 
     Ok(())
 }
