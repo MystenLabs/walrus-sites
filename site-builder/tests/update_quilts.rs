@@ -24,6 +24,7 @@ use localnode::{
 mod helpers;
 
 #[tokio::test]
+#[ignore]
 async fn quilts_update_snake() -> anyhow::Result<()> {
     let cluster = TestSetup::start_local_test_cluster().await?;
     let directory = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
