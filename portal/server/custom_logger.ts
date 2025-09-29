@@ -42,7 +42,7 @@ export async function setupTapelog() {
 	logger.setErrorPredicate((...args: any[]) => {
 		// If args contains only one element, pass undefined as structured data
 		const message = args[0];
-		tapeLogger.error(message, getPropertiesWithContext(), logger.context);
+		tapeLogger.error(message, getPropertiesWithContext(...args), logger.context);
 	});
 }
 
