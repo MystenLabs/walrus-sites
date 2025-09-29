@@ -16,7 +16,7 @@ use super::{
     RouteOps,
 };
 use crate::{
-    site::{builder::counted_pt_builder::CountedPTBuilder, contracts},
+    site::{builder::counted_pt_builder::CountedPtbBuilder, contracts},
     types::{Metadata, Range},
 };
 
@@ -35,7 +35,7 @@ pub enum SitePtbBuilderError {
 pub type SitePtbBuilderResult<T> = Result<T, SitePtbBuilderError>;
 
 pub struct SitePtb<T = ()> {
-    pt_builder: CountedPTBuilder,
+    pt_builder: CountedPtbBuilder,
     site_argument: T,
     package: ObjectID,
     module: Identifier,
@@ -46,7 +46,7 @@ impl SitePtb {
     pub fn new(package: ObjectID, module: Identifier) -> Result<Self> {
         // TODO: Remove result
         Ok(SitePtb {
-            pt_builder: CountedPTBuilder::default(),
+            pt_builder: CountedPtbBuilder::default(),
             site_argument: (),
             package,
             module,

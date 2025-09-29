@@ -13,12 +13,12 @@ use sui_types::{
 use super::SitePtbBuilderError;
 
 #[derive(Default)]
-pub struct CountedPTBuilder {
+pub struct CountedPtbBuilder {
     pt_builder: ProgrammableTransactionBuilder,
     move_call_counter: u16,
 }
 
-impl CountedPTBuilder {
+impl CountedPtbBuilder {
     // TODO: Maybe we can pass this as {const N} in order for the user of the struct to be able to
     // decide how many calls they want to include before erroring.
     // TODO: There are probably more limits to look out for (eg. max inputs).
