@@ -437,6 +437,27 @@ impl ResourceManager {
         )))
     }
 
+    ///  Derives the HTTP headers for a resource based on the ws-resources.yaml.
+    ///
+    ///  Matches the path of the resource to the wildcard paths in the configuration to
+    ///  determine the headers to be added to the HTTP response.
+    pub fn derive_http_headers(
+        ws_resources: &Option<WSResources>,
+        resource_path: &str,
+    ) -> VecMap<String, String> {
+        ws_resources
+            .as_ref()
+            .and_then(|config| config.headers.as_ref())
+            .and_then(|headers| {
+                headers
+                    .iter()
+                    .filter(|(path, _)| is_pattern_match(path, resource_path))
+                    .max_by_key(|(path, _)| path.split('/').count())
+                    .map(|(_, header_map)| header_map.0.clone())
+            })
+            .unwrap_or_default()
+    }
+
     /// Filters resource_paths, and prepares their ResourceData, while also grouping them into a
     /// single Quilt.
     fn prepare_local_resources(
@@ -723,30 +744,6 @@ impl ResourceManager {
                 .as_ref()
                 .and_then(|config| config.site_name.clone()),
         )
-    }
-}
-
-// Static methods that don't depend on the generic parameter
-impl ResourceManager {
-    ///  Derives the HTTP headers for a resource based on the ws-resources.yaml.
-    ///
-    ///  Matches the path of the resource to the wildcard paths in the configuration to
-    ///  determine the headers to be added to the HTTP response.
-    pub fn derive_http_headers(
-        ws_resources: &Option<WSResources>,
-        resource_path: &str,
-    ) -> VecMap<String, String> {
-        ws_resources
-            .as_ref()
-            .and_then(|config| config.headers.as_ref())
-            .and_then(|headers| {
-                headers
-                    .iter()
-                    .filter(|(path, _)| is_pattern_match(path, resource_path))
-                    .max_by_key(|(path, _)| path.split('/').count())
-                    .map(|(_, header_map)| header_map.0.clone())
-            })
-            .unwrap_or_default()
     }
 }
 
