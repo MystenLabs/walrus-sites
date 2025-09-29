@@ -60,3 +60,5 @@ async fn publish_snake() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+// TODO: Integration tests with a lot of routes.

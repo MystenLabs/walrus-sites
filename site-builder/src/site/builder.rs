@@ -1,7 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::collections::btree_map;
+
 use anyhow::Result;
+use counted_pt_builder::CountedPtbBuilder;
+pub use counted_pt_builder::PTB_MAX_MOVE_CALLS;
 use serde::Serialize;
 use sui_types::{
     base_types::{ObjectID, SuiAddress},
@@ -9,21 +13,20 @@ use sui_types::{
     Identifier,
     TypeTag,
 };
+use thiserror::Error;
 
 use super::{
     contracts::FunctionTag,
     resource::{Resource, ResourceOp},
-    RouteOps,
 };
 use crate::{
-    site::{builder::counted_pt_builder::CountedPtbBuilder, contracts},
+    site::contracts,
     types::{Metadata, Range},
 };
 
 mod counted_pt_builder;
 
-use thiserror::Error;
-
+/// Error type to differentiate max-move-calls limit reached from other unexpected `anyhow` errors.
 #[derive(Debug, Error)]
 pub enum SitePtbBuilderError {
     #[error("Exceeded maximum number of move-calls ({0}) in Transaction")]
@@ -34,26 +37,29 @@ pub enum SitePtbBuilderError {
 
 pub type SitePtbBuilderResult<T> = Result<T, SitePtbBuilderError>;
 
-pub struct SitePtb<T = ()> {
-    pt_builder: CountedPtbBuilder,
+pub struct SitePtb<T = (), const MAX_MOVE_CALLS: u16 = PTB_MAX_MOVE_CALLS> {
+    pt_builder: CountedPtbBuilder<MAX_MOVE_CALLS>,
     site_argument: T,
     package: ObjectID,
     module: Identifier,
 }
 
 /// A PTB to update a site.
-impl SitePtb {
+impl<const MAX_MOVE_CALLS: u16> SitePtb<(), MAX_MOVE_CALLS> {
     pub fn new(package: ObjectID, module: Identifier) -> Result<Self> {
         // TODO: Remove result
         Ok(SitePtb {
-            pt_builder: CountedPtbBuilder::default(),
+            pt_builder: CountedPtbBuilder::<MAX_MOVE_CALLS>::default(),
             site_argument: (),
             package,
             module,
         })
     }
 
-    pub fn with_call_arg(mut self, site_arg: &CallArg) -> Result<SitePtb<Argument>> {
+    pub fn with_call_arg(
+        mut self,
+        site_arg: &CallArg,
+    ) -> Result<SitePtb<Argument, MAX_MOVE_CALLS>> {
         let site_argument = self.pt_builder.input(site_arg.clone())?;
         Ok(SitePtb {
             pt_builder: self.pt_builder,
@@ -63,7 +69,7 @@ impl SitePtb {
         })
     }
 
-    pub fn with_arg(self, site_arg: Argument) -> Result<SitePtb<Argument>> {
+    pub fn with_arg(self, site_arg: Argument) -> Result<SitePtb<Argument, MAX_MOVE_CALLS>> {
         // TODO: Remove Result
         Ok(SitePtb {
             pt_builder: self.pt_builder,
@@ -78,13 +84,13 @@ impl SitePtb {
         mut self,
         site_name: &str,
         metadata: Option<Metadata>,
-    ) -> Result<SitePtb<Argument>> {
+    ) -> Result<SitePtb<Argument, MAX_MOVE_CALLS>> {
         let argument = self.create_site(site_name, metadata)?;
         self.with_arg(argument)
     }
 }
 
-impl<T> SitePtb<T> {
+impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
     /// Transfer argument to address
     fn transfer_arg(&mut self, recipient: SuiAddress, arg: Argument) -> SitePtbBuilderResult<()> {
         self.pt_builder.transfer_arg(recipient, arg)
@@ -150,33 +156,47 @@ impl<T> SitePtb<T> {
     pub fn finish(self) -> ProgrammableTransaction {
         self.pt_builder.finish()
     }
+
+    pub fn with_max_move_calls<const NEW_MAX: u16>(self) -> SitePtb<T, NEW_MAX> {
+        let Self {
+            pt_builder,
+            site_argument,
+            package,
+            module,
+        } = self;
+        SitePtb {
+            pt_builder: pt_builder.with_max_move_calls::<NEW_MAX>(),
+            site_argument,
+            package,
+            module,
+        }
+    }
 }
 
-impl SitePtb<Argument> {
+impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
     pub fn add_resource_operations<'a>(
         &mut self,
-        calls: impl IntoIterator<Item = &'a ResourceOp<'a>>,
-    ) -> Result<()> {
-        for call in calls {
+        calls: &mut std::iter::Peekable<impl Iterator<Item = &'a ResourceOp<'a>>>,
+    ) -> SitePtbBuilderResult<()> {
+        while let Some(call) = calls.peek() {
             match call {
                 ResourceOp::Deleted(resource) => self.remove_resource_if_exists(resource)?,
                 ResourceOp::Created(resource) => self.add_resource(resource)?,
                 ResourceOp::Unchanged(_) => (),
             }
+            calls.next();
         }
         Ok(())
     }
 
     /// Adds move calls to update the routes on the object.
-    pub fn add_route_operations(&mut self, route_ops: &RouteOps) -> Result<()> {
-        if let RouteOps::Replace(new_routes) = route_ops {
-            self.remove_routes()?;
-            if !new_routes.is_empty() {
-                self.create_routes()?;
-                for (name, value) in new_routes.0.iter() {
-                    self.add_route(name, value)?;
-                }
-            }
+    pub fn add_route_operations(
+        &mut self,
+        new_routes_iter: &mut std::iter::Peekable<btree_map::Iter<String, String>>,
+    ) -> SitePtbBuilderResult<()> {
+        while let Some((name, value)) = new_routes_iter.peek() {
+            self.add_route(name, value)?;
+            new_routes_iter.next();
         }
         Ok(())
     }
@@ -184,7 +204,7 @@ impl SitePtb<Argument> {
     pub fn with_update_metadata(
         mut self,
         metadata: Metadata,
-    ) -> SitePtbBuilderResult<SitePtb<Argument>> {
+    ) -> SitePtbBuilderResult<SitePtb<Argument, MAX_MOVE_CALLS>> {
         let metadata = self.new_metadata(metadata)?;
         self.add_programmable_move_call(
             contracts::site::update_metadata.identifier(),
@@ -212,6 +232,17 @@ impl SitePtb<Argument> {
 
     /// Adds the move calls to create and add a resource to the site, with the specified headers.
     pub fn add_resource(&mut self, resource: &Resource) -> SitePtbBuilderResult<()> {
+        // TODO: After all it seems that we need these data here anyway. NewType pattern didn't save
+        // us.
+        // In theory we could stop mid-headers and continue with the headers, but this needs extra
+        // granularity on the Diff-operations in resources.
+        // TODO: Check other places that move-calls should be committed atomically.
+        let move_calls_needed = resource.info.headers.len() + 2; // create resource + add df
+        if move_calls_needed + self.pt_builder.count() as usize > MAX_MOVE_CALLS as usize {
+            println!("Escaped before creating resource here");
+            return Err(SitePtbBuilderError::TooManyMoveCalls(MAX_MOVE_CALLS));
+        }
+
         tracing::debug!(resource=%resource.info.path, "new Move call: adding resource");
         let new_resource_arg = self.create_resource(resource)?;
 
@@ -311,7 +342,8 @@ impl SitePtb<Argument> {
     // Routes
 
     /// Adds the move calls to create a new routes object.
-    fn create_routes(&mut self) -> SitePtbBuilderResult<()> {
+    // TODO: Remove pub and move logic here
+    pub fn create_routes(&mut self) -> SitePtbBuilderResult<()> {
         self.add_programmable_move_call(
             contracts::site::create_routes.identifier(),
             vec![],
@@ -321,7 +353,8 @@ impl SitePtb<Argument> {
     }
 
     /// Adds the move calls to remove the routes object.
-    fn remove_routes(&mut self) -> SitePtbBuilderResult<()> {
+    // TODO: Remove pub and move logic here
+    pub fn remove_routes(&mut self) -> SitePtbBuilderResult<()> {
         self.add_programmable_move_call(
             contracts::site::remove_all_routes_if_exist.identifier(),
             vec![],

@@ -12,18 +12,17 @@ use sui_types::{
 
 use super::SitePtbBuilderError;
 
+pub const PTB_MAX_MOVE_CALLS: u16 = 1024;
+
+/// A simple wrapper over ProgrammableTransactionBuilder which counts move-calls in Transaction in
+/// order to error explicitly if exceeded. Used by SitePtb.
 #[derive(Default)]
-pub struct CountedPtbBuilder {
+pub struct CountedPtbBuilder<const MAX_MOVE_CALLS: u16 = PTB_MAX_MOVE_CALLS> {
     pt_builder: ProgrammableTransactionBuilder,
     move_call_counter: u16,
 }
 
-impl CountedPtbBuilder {
-    // TODO: Maybe we can pass this as {const N} in order for the user of the struct to be able to
-    // decide how many calls they want to include before erroring.
-    // TODO: There are probably more limits to look out for (eg. max inputs).
-    const MAX_MOVE_CALLS: u16 = 1024;
-
+impl<const MAX_MOVE_CALLS: u16> CountedPtbBuilder<MAX_MOVE_CALLS> {
     pub fn finish(self) -> ProgrammableTransaction {
         self.pt_builder.finish()
     }
@@ -64,9 +63,26 @@ impl CountedPtbBuilder {
         ))
     }
 
+    pub fn with_max_move_calls<const NEW_MAX: u16>(self) -> CountedPtbBuilder<NEW_MAX> {
+        // TODO: const-assert NEW_MAX < 1024
+
+        let Self {
+            pt_builder,
+            move_call_counter,
+        } = self;
+        CountedPtbBuilder::<{ NEW_MAX }> {
+            pt_builder,
+            move_call_counter,
+        }
+    }
+
+    pub fn count(&self) -> u16 {
+        self.move_call_counter
+    }
+
     fn increment_counter(&mut self) -> Result<(), SitePtbBuilderError> {
-        if self.move_call_counter >= Self::MAX_MOVE_CALLS {
-            return Err(SitePtbBuilderError::TooManyMoveCalls(Self::MAX_MOVE_CALLS));
+        if self.move_call_counter > MAX_MOVE_CALLS {
+            return Err(SitePtbBuilderError::TooManyMoveCalls(MAX_MOVE_CALLS));
         }
         self.move_call_counter += 1;
         Ok(())
