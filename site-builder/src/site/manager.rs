@@ -143,8 +143,28 @@ impl SiteManager {
             None => SiteData::empty(),
         };
         tracing::debug!(?existing_site, "checked existing site");
+        tracing::debug!(
+            "Local site data has {} resources",
+            local_site_data.resources.inner.len()
+        );
+        tracing::debug!(
+            "Existing site has {} resources",
+            existing_site.resources.inner.len()
+        );
 
         let site_updates = local_site_data.diff(&existing_site);
+        tracing::debug!(
+            "Diff produced {} resource operations",
+            site_updates.resource_ops.len()
+        );
+        tracing::debug!(
+            "site_updates.has_updates() = {}",
+            site_updates.has_updates()
+        );
+
+        for (idx, op) in site_updates.resource_ops.iter().enumerate() {
+            tracing::debug!("  Resource op {}: {:?}", idx + 1, op);
+        }
 
         let store_blobs = !using_quilts;
         if store_blobs {

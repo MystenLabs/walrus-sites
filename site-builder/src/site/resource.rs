@@ -5,7 +5,7 @@
 
 use std::{
     collections::{BTreeMap, BTreeSet},
-    fmt::{self, Display},
+    fmt::{self, Debug, Display},
     fs,
     io::Write,
     num::{NonZeroU16, NonZeroUsize},
@@ -268,7 +268,7 @@ impl Display for ResourceSet {
 }
 
 // Struct used for grouping resource local data.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ResourceData {
     unencoded_size: usize,
     full_path: PathBuf,
@@ -435,27 +435,6 @@ impl ResourceManager {
             blob_hash,
             unencoded_size,
         )))
-    }
-
-    ///  Derives the HTTP headers for a resource based on the ws-resources.yaml.
-    ///
-    ///  Matches the path of the resource to the wildcard paths in the configuration to
-    ///  determine the headers to be added to the HTTP response.
-    pub fn derive_http_headers(
-        ws_resources: &Option<WSResources>,
-        resource_path: &str,
-    ) -> VecMap<String, String> {
-        ws_resources
-            .as_ref()
-            .and_then(|config| config.headers.as_ref())
-            .and_then(|headers| {
-                headers
-                    .iter()
-                    .filter(|(path, _)| is_pattern_match(path, resource_path))
-                    .max_by_key(|(path, _)| path.split('/').count())
-                    .map(|(_, header_map)| header_map.0.clone())
-            })
-            .unwrap_or_default()
     }
 
     /// Filters resource_paths, and prepares their ResourceData, while also grouping them into a
@@ -663,17 +642,21 @@ impl ResourceManager {
 
         let resource_file_inputs = self.prepare_local_resources(root, rel_paths)?;
 
-        let chunks = resource_file_inputs
+        let chunks: Vec<Vec<(ResourceData, QuiltBlobInput)>> = resource_file_inputs
             .into_iter()
             // TODO(nikos): we split per max-quilts but there may be also other limits like max_size.
             // TODO(nikos): Investigate whether indeed max_files == n_cols - 1 or if it is that one file
             // takes more than a column, max_files becomes n_cols - 2
-            .chunks(Walrus::max_slots_in_quilt(self.n_shards) as usize);
+            .chunks(Walrus::max_slots_in_quilt(self.n_shards) as usize)
+            .into_iter()
+            .map(|chunk| chunk.collect())
+            .collect();
         // TODO: Test Dry-run
         if dry_run {
             let mut total_storage_cost = 0;
             for chunk in &chunks {
-                let (_, quilt_file_inputs): (Vec<_>, Vec<_>) = chunk.unzip();
+                let quilt_file_inputs: Vec<_> =
+                    chunk.iter().map(|(_, input)| input.clone()).collect();
                 let wal_storage_cost = self.dry_run_resource_chunk(quilt_file_inputs).await?;
                 total_storage_cost += wal_storage_cost;
             }
@@ -695,12 +678,22 @@ impl ResourceManager {
         }
 
         let mut resources_set = ResourceSet::empty();
+        tracing::debug!("Processing chunks for quilt storage");
+
         for chunk in &chunks {
-            let resources = self.store_resource_chunk_into_quilt(chunk).await?;
+            let resources = self
+                .store_resource_chunk_into_quilt(chunk.iter().cloned())
+                .await?;
+            tracing::debug!("Chunk returned {} resources", resources.len());
             resources_set.extend(resources);
         }
 
-        Ok(self.to_site_data(resources_set))
+        let site_data = self.to_site_data(resources_set.clone());
+        tracing::debug!(
+            "Final site data created with {} resources",
+            site_data.resources.inner.len()
+        );
+        Ok(site_data)
     }
 
     fn iter_dir(start: &Path) -> Result<Vec<PathBuf>> {
@@ -730,6 +723,30 @@ impl ResourceManager {
                 .as_ref()
                 .and_then(|config| config.site_name.clone()),
         )
+    }
+}
+
+// Static methods that don't depend on the generic parameter
+impl ResourceManager {
+    ///  Derives the HTTP headers for a resource based on the ws-resources.yaml.
+    ///
+    ///  Matches the path of the resource to the wildcard paths in the configuration to
+    ///  determine the headers to be added to the HTTP response.
+    pub fn derive_http_headers(
+        ws_resources: &Option<WSResources>,
+        resource_path: &str,
+    ) -> VecMap<String, String> {
+        ws_resources
+            .as_ref()
+            .and_then(|config| config.headers.as_ref())
+            .and_then(|headers| {
+                headers
+                    .iter()
+                    .filter(|(path, _)| is_pattern_match(path, resource_path))
+                    .max_by_key(|(path, _)| path.split('/').count())
+                    .map(|(_, header_map)| header_map.0.clone())
+            })
+            .unwrap_or_default()
     }
 }
 
