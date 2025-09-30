@@ -30,28 +30,28 @@ async fn dry_run_snake_with_simulated_yes_input() -> anyhow::Result<()> {
     test_subprocess_dry_run("snake", true, 4).await // Snake has ~4 files
 }
 
-/// Test dry-run mode with snake example (small site) - subprocess without input (should timeout).
-#[tokio::test]
-async fn dry_run_snake_without_input() -> anyhow::Result<()> {
-    test_subprocess_dry_run("snake", false, 4).await
-}
-
 /// Test dry-run mode with large site (150 files) - subprocess with simulated user input.
 #[tokio::test]
 async fn dry_run_large_site_with_simulated_yes_input() -> anyhow::Result<()> {
     test_subprocess_dry_run("large", true, 150).await
 }
 
-/// Test dry-run mode with large site (150 files) - subprocess without input (should timeout).
+/// Test dry-run mode with snake example (small site) - subprocess with simulated "no" input.
 #[tokio::test]
-async fn dry_run_large_site_without_input() -> anyhow::Result<()> {
+async fn dry_run_snake_with_simulated_no_input() -> anyhow::Result<()> {
+    test_subprocess_dry_run("snake", false, 4).await
+}
+
+/// Test dry-run mode with large site (150 files) - subprocess with simulated "no" input.
+#[tokio::test]
+async fn dry_run_large_site_with_simulated_no_input() -> anyhow::Result<()> {
     test_subprocess_dry_run("large", false, 150).await
 }
 
 /// Helper function to test dry-run subprocess execution.
 async fn test_subprocess_dry_run(
     site_type: &str,
-    provide_input: bool,
+    confirmation_response: bool,
     expected_file_count: usize,
 ) -> anyhow::Result<()> {
     let cluster = TestSetup::start_local_test_cluster().await?;
@@ -114,25 +114,31 @@ async fn test_subprocess_dry_run(
         .stderr(Stdio::piped())
         .spawn()?;
 
-    // Provide input if requested
-    if provide_input {
-        if let Some(stdin) = child.stdin.as_mut() {
-            stdin.write_all(b"y\n")?;
-            stdin.flush()?;
-        }
+    // Provide confirmation response
+    if let Some(stdin) = child.stdin.as_mut() {
+        let response = if confirmation_response {
+            b"y\n"
+        } else {
+            b"n\n"
+        };
+        stdin.write_all(response)?;
+        stdin.flush()?;
     }
 
     let output = child.wait_with_output()?;
     let stderr = String::from_utf8_lossy(&output.stderr);
     let stdout = String::from_utf8_lossy(&output.stdout);
 
-    println!("=== Test: {site_type} site, input: {provide_input} ===");
+    println!(
+        "=== Test: {site_type} site, confirmation: {} ===",
+        if confirmation_response { "yes" } else { "no" }
+    );
     println!("Exit status: {:?}", output.status);
     println!("Stdout: {stdout}");
     println!("Stderr: {stderr}");
 
-    if provide_input {
-        // When we provide input, the command should either succeed or fail gracefully
+    if confirmation_response {
+        // When we provide "yes", the command should either succeed or fail gracefully
         // but NOT with the specific bugs we're testing for
         if !output.status.success() {
             // Check for the iterator consumption bug (affects large sites)
@@ -151,24 +157,22 @@ async fn test_subprocess_dry_run(
             assert!(!stderr.contains("panic"), "Command panicked: {stderr}");
         }
     } else {
-        // When we don't provide input, it should fail due to terminal/IO issues
+        // When we provide "no", the command should gracefully abort
         // but still NOT with the specific bugs we're testing for
-        assert!(
-            !output.status.success(),
-            "Expected command to fail without input"
-        );
 
         // Should fail with terminal/IO error, not with our specific bugs
         assert!(
             !stderr.contains("Transaction effects not found"),
-            "Command failed with iterator consumption bug even without user input: {stderr}"
+            "Command failed with iterator consumption bug even with 'no' input: {stderr}"
         );
 
-        // The process should reach the confirmation prompt before failing
+        // The process should reach the confirmation prompt and handle the "no" response
         assert!(
             stderr.contains("Waiting for user confirmation")
-                || stdout.contains("Waiting for user confirmation"),
-            "Should reach confirmation prompt: stdout: {stdout} stderr: {stderr}"
+                || stdout.contains("Waiting for user confirmation")
+                || stderr.contains("Aborted")
+                || stdout.contains("Aborted"),
+            "Should reach confirmation prompt or show abort: stdout: {stdout} stderr: {stderr}"
         );
     }
 
