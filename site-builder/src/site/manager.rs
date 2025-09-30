@@ -374,11 +374,6 @@ impl SiteManager {
             bail!(e);
         }
 
-        // TODO: Deduplication
-        let mut all_operations_executed =
-            resources_iter.peek().is_none() && routes_iter.peek().is_none();
-        println!("all_operations_executed: {all_operations_executed}");
-
         if self.needs_transfer() {
             ptb = ptb.with_max_move_calls(); // Update to actual max.
             ptb.transfer_site(self.active_address()?)?;
@@ -393,7 +388,7 @@ impl SiteManager {
         if let Some(SuiExecutionStatus::Failure { error }) =
             result.effects.as_ref().map(|e| e.status())
         {
-            anyhow::bail!(
+            bail!(
                 "site ptb failed with error: {error} [tx_digest={}]",
                 result.digest
             );
@@ -410,18 +405,15 @@ impl SiteManager {
             }
         };
 
-        // Keep iterating to load resources.
-        while !all_operations_executed {
+        // Keep iterating to load all resources and routes.
+        while resources_iter.peek().is_some() || routes_iter.peek().is_some() {
             let ptb: SitePtb<(), { PTB_MAX_MOVE_CALLS }> = SitePtb::new(
                 self.config.package,
                 Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
             )?;
             let call_arg: CallArg = self.wallet.get_object_ref(site_object_id).await?.into();
             let mut ptb = ptb.with_call_arg(&call_arg)?;
-            println!(
-                "resources_iter.clone().peekable().peek().is_some() = {}",
-                resources_iter.clone().peekable().peek().is_some()
-            );
+
             let res = ptb.add_resource_operations(&mut resources_iter);
             if let Err(SitePtbBuilderError::Other(e)) = res {
                 bail!(e);
@@ -430,9 +422,6 @@ impl SiteManager {
             if let Err(SitePtbBuilderError::Other(e)) = res {
                 bail!(e);
             }
-
-            all_operations_executed =
-                resources_iter.peek().is_none() && routes_iter.peek().is_none();
 
             let resource_result = self
                 .sign_and_send_ptb(ptb.finish(), self.gas_coin_ref().await?, &retry_client)
