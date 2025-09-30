@@ -7,13 +7,14 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{self, Debug, Display},
     fs,
-    io::Write,
+    io::{stdin, stdout, Write},
     num::{NonZeroU16, NonZeroUsize},
     path::{Path, PathBuf},
 };
 
 use anyhow::{anyhow, bail, Context, Result};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use dialoguer::console::Term;
 use fastcrypto::hash::{HashFunction, Sha256};
 use flate2::{write::GzEncoder, Compression};
 use futures::{stream, StreamExt};
@@ -688,10 +689,11 @@ impl ResourceManager {
 
             // Add user confirmation prompt.
             display::action("Waiting for user confirmation...");
+            let term = Term::read_write_pair(stdin(), stdout());
             if !dialoguer::Confirm::new()
                 .with_prompt("Do you want to proceed with these updates?")
                 .default(true)
-                .interact()?
+                .interact_on(&term)?
             {
                 display::error("Update cancelled by user");
                 return Err(anyhow!("Update cancelled by user"));
