@@ -3,14 +3,12 @@
 
 use std::{
     collections::{BTreeSet, HashSet},
-    io::{stdin, stdout},
     num::NonZeroUsize,
     str::FromStr,
     time::Duration,
 };
 
 use anyhow::{anyhow, Error, Result};
-use dialoguer::console::Term;
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{
     rpc_types::{
@@ -225,14 +223,21 @@ impl SiteManager {
 
                 // Add user confirmation prompt.
                 display::action("Waiting for user confirmation...");
-                let term = Term::read_write_pair(stdin(), stdout());
-                if !dialoguer::Confirm::new()
-                    .with_prompt("Do you want to proceed with these updates?")
-                    .default(true)
-                    .interact_on(&term)?
+                #[cfg(not(feature = "_testing-dry-run"))]
                 {
-                    display::error("Update cancelled by user");
-                    return Err(anyhow!("Update cancelled by user"));
+                    if !dialoguer::Confirm::new()
+                        .with_prompt("Do you want to proceed with these updates?")
+                        .default(true)
+                        .interact()?
+                    {
+                        display::error("Update cancelled by user");
+                        return Err(anyhow!("Update cancelled by user"));
+                    }
+                }
+                #[cfg(feature = "_testing-dry-run")]
+                {
+                    // In tests, automatically proceed without prompting
+                    println!("Test mode: automatically proceeding with updates");
                 }
             }
             self.store_single_blob_resources_to_walrus(&walrus_updates)
@@ -485,14 +490,21 @@ impl SiteManager {
             ));
             // Add user confirmation prompt.
             display::action("Waiting for user confirmation...");
-            let term = Term::read_write_pair(stdin(), stdout());
-            if !dialoguer::Confirm::new()
-                .with_prompt("Do you want to proceed with these updates?")
-                .default(true)
-                .interact_on(&term)?
+            #[cfg(not(feature = "_testing-dry-run"))]
             {
-                display::error("Update cancelled by user");
-                return Err(anyhow!("Update cancelled by user"));
+                if !dialoguer::Confirm::new()
+                    .with_prompt("Do you want to proceed with these updates?")
+                    .default(true)
+                    .interact()?
+                {
+                    display::error("Update cancelled by user");
+                    return Err(anyhow!("Update cancelled by user"));
+                }
+            }
+            #[cfg(feature = "_testing-dry-run")]
+            {
+                // In tests, automatically proceed without prompting
+                println!("Test mode: automatically proceeding with updates");
             }
         }
         self.store_single_blob_resources_to_walrus(&walrus_ops)

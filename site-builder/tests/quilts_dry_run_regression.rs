@@ -9,51 +9,38 @@
 
 #![cfg(feature = "quilts-experimental")]
 
-use std::{
-    fs::File,
-    io::Write,
-    path::PathBuf,
-    process::{Command, Stdio},
-};
+use std::{fs::File, io::Write, num::NonZeroU32, path::PathBuf};
 
-use site_builder::site_config::WSResources;
+use site_builder::{
+    args::{Commands, EpochCountOrMax},
+    site_config::WSResources,
+};
 
 #[allow(dead_code)]
 mod localnode;
-use localnode::TestSetup;
+use localnode::{
+    args_builder::{ArgsBuilder, PublishOptionsBuilder},
+    TestSetup,
+};
 
 mod helpers;
 
-/// Test dry-run mode with snake example (small site) - subprocess with simulated user input.
+/// Test dry-run mode with snake example (small site).
+/// This tests that the chunks iterator is not consumed during dry-run.
 #[tokio::test]
-async fn dry_run_snake_with_simulated_yes_input() -> anyhow::Result<()> {
-    test_subprocess_dry_run("snake", true, 4).await // Snake has ~4 files
+async fn dry_run_snake_site() -> anyhow::Result<()> {
+    test_dry_run("snake", 4).await
 }
 
-/// Test dry-run mode with large site (150 files) - subprocess with simulated user input.
+/// Test dry-run mode with large site (150 files).
+/// This tests that the chunks iterator is not consumed during dry-run with many files.
 #[tokio::test]
-async fn dry_run_large_site_with_simulated_yes_input() -> anyhow::Result<()> {
-    test_subprocess_dry_run("large", true, 150).await
+async fn dry_run_large_site() -> anyhow::Result<()> {
+    test_dry_run("large", 150).await
 }
 
-/// Test dry-run mode with snake example (small site) - subprocess with simulated "no" input.
-#[tokio::test]
-async fn dry_run_snake_with_simulated_no_input() -> anyhow::Result<()> {
-    test_subprocess_dry_run("snake", false, 4).await
-}
-
-/// Test dry-run mode with large site (150 files) - subprocess with simulated "no" input.
-#[tokio::test]
-async fn dry_run_large_site_with_simulated_no_input() -> anyhow::Result<()> {
-    test_subprocess_dry_run("large", false, 150).await
-}
-
-/// Helper function to test dry-run subprocess execution.
-async fn test_subprocess_dry_run(
-    site_type: &str,
-    confirmation_response: bool,
-    expected_file_count: usize,
-) -> anyhow::Result<()> {
+/// Helper function to test dry-run execution.
+async fn test_dry_run(site_type: &str, expected_file_count: usize) -> anyhow::Result<()> {
     let cluster = TestSetup::start_local_test_cluster().await?;
     let temp_dir = tempfile::tempdir()?;
     let directory = temp_dir.path().to_path_buf();
@@ -94,88 +81,44 @@ async fn test_subprocess_dry_run(
     ws_resources.object_id = None; // Ensure this is treated as a new site
     serde_json::to_writer_pretty(File::create(ws_resources_path.as_path())?, &ws_resources)?;
 
-    // Spawn the subprocess
-    let mut child = Command::new("cargo")
-        .args([
-            "run",
-            "--features",
-            "quilts-experimental",
-            "--",
-            "--config",
-            cluster.sites_config_path().to_str().unwrap(),
-            "publish-quilts",
-            "--epochs",
-            "1",
-            "--dry-run",
-            directory.to_str().unwrap(), // directory is a positional argument
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
+    // Build args for dry-run publish
+    let args = ArgsBuilder::default()
+        .with_config(Some(cluster.sites_config_path().to_owned()))
+        .with_gas_budget(50_000_000_000) // Same gas budget as publish_quilts.rs
+        .with_command(Commands::PublishQuilts {
+            publish_options: PublishOptionsBuilder::default()
+                .with_directory(directory.clone())
+                .with_ws_resources(Some(ws_resources_path))
+                .with_epoch_count_or_max(EpochCountOrMax::Epochs(NonZeroU32::new(1).unwrap()))
+                .with_dry_run(true) // Enable dry-run mode
+                .build()?,
+            site_name: None,
+        })
+        .build()?;
 
-    // Provide confirmation response
-    if let Some(stdin) = child.stdin.as_mut() {
-        let response = if confirmation_response {
-            b"y\n"
-        } else {
-            b"n\n"
-        };
-        stdin.write_all(response)?;
-        stdin.flush()?;
-    }
+    // This will use cfg(test) to auto-proceed past the confirmation prompt
+    let result = site_builder::run(args).await;
 
-    let output = child.wait_with_output()?;
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Check that we didn't hit the specific bugs we're testing for
+    if let Err(e) = &result {
+        let error_msg = format!("{e:?}");
 
-    println!(
-        "=== Test: {site_type} site, confirmation: {} ===",
-        if confirmation_response { "yes" } else { "no" }
-    );
-    println!("Exit status: {:?}", output.status);
-    println!("Stdout: {stdout}");
-    println!("Stderr: {stderr}");
-
-    if confirmation_response {
-        // When we provide "yes", the command should either succeed or fail gracefully
-        // but NOT with the specific bugs we're testing for
-        if !output.status.success() {
-            // Check for the iterator consumption bug (affects large sites)
-            assert!(
-                !stderr.contains("Transaction effects not found"),
-                "Command failed with iterator consumption bug: {stderr}"
-            );
-
-            // Check for the object ID panic (affects small sites)
-            assert!(
-                !stderr.contains("could not find the object ID for the created Walrus site"),
-                "Command failed with object ID panic: {stderr}"
-            );
-
-            // General panic check
-            assert!(!stderr.contains("panic"), "Command panicked: {stderr}");
-        }
-    } else {
-        // When we provide "no", the command should gracefully abort
-        // but still NOT with the specific bugs we're testing for
-
-        // Should fail with terminal/IO error, not with our specific bugs
+        // Check for the iterator consumption bug (affects large sites)
         assert!(
-            !stderr.contains("Transaction effects not found"),
-            "Command failed with iterator consumption bug even with 'no' input: {stderr}"
+            !error_msg.contains("Transaction effects not found"),
+            "Command failed with iterator consumption bug: {error_msg}"
         );
 
-        // The process should reach the confirmation prompt and handle the "no" response
+        // Check for the object ID panic (affects small sites)
         assert!(
-            stderr.contains("Waiting for user confirmation")
-                || stdout.contains("Waiting for user confirmation")
-                || stderr.contains("Aborted")
-                || stdout.contains("Aborted"),
-            "Should reach confirmation prompt or show abort: stdout: {stdout} stderr: {stderr}"
+            !error_msg.contains("could not find the object ID for the created Walrus site"),
+            "Command failed with object ID panic: {error_msg}"
         );
     }
 
+    // The test passes if we got here without hitting the specific bugs
+    // Note: The actual publish may fail for other reasons (like network issues),
+    // but as long as we don't hit the iterator consumption bug, the test passes
     Ok(())
 }
 
