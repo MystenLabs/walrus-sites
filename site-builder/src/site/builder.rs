@@ -4,11 +4,10 @@
 use std::collections::btree_map;
 
 use anyhow::Result;
-use counted_pt_builder::CountedPtbBuilder;
-pub use counted_pt_builder::PTB_MAX_MOVE_CALLS;
 use serde::Serialize;
 use sui_types::{
     base_types::{ObjectID, SuiAddress},
+    programmable_transaction_builder::ProgrammableTransactionBuilder,
     transaction::{Argument, CallArg, ProgrammableTransaction},
     Identifier,
     TypeTag,
@@ -24,7 +23,7 @@ use crate::{
     types::{Metadata, Range},
 };
 
-mod counted_pt_builder;
+pub const PTB_MAX_MOVE_CALLS: u16 = 1024;
 
 /// Error type to differentiate max-move-calls limit reached from other unexpected `anyhow` errors.
 #[derive(Debug, Error)]
@@ -38,7 +37,8 @@ pub enum SitePtbBuilderError {
 pub type SitePtbBuilderResult<T> = Result<T, SitePtbBuilderError>;
 
 pub struct SitePtb<T = (), const MAX_MOVE_CALLS: u16 = PTB_MAX_MOVE_CALLS> {
-    pt_builder: CountedPtbBuilder<MAX_MOVE_CALLS>,
+    pt_builder: ProgrammableTransactionBuilder,
+    move_call_counter: u16,
     site_argument: T,
     package: ObjectID,
     module: Identifier,
@@ -48,34 +48,49 @@ pub struct SitePtb<T = (), const MAX_MOVE_CALLS: u16 = PTB_MAX_MOVE_CALLS> {
 impl<const MAX_MOVE_CALLS: u16> SitePtb<(), MAX_MOVE_CALLS> {
     pub fn new(package: ObjectID, module: Identifier) -> Result<Self> {
         // TODO: Remove result
+        let pt_builder = ProgrammableTransactionBuilder::new();
         Ok(SitePtb {
-            pt_builder: CountedPtbBuilder::<MAX_MOVE_CALLS>::default(),
+            pt_builder,
+            move_call_counter: 0,
             site_argument: (),
             package,
             module,
         })
     }
 
-    pub fn with_call_arg(
-        mut self,
-        site_arg: &CallArg,
-    ) -> Result<SitePtb<Argument, MAX_MOVE_CALLS>> {
-        let site_argument = self.pt_builder.input(site_arg.clone())?;
+    pub fn with_call_arg(self, site_arg: &CallArg) -> Result<SitePtb<Argument, MAX_MOVE_CALLS>> {
+        let Self {
+            mut pt_builder,
+            move_call_counter,
+            package,
+            module,
+            ..
+        } = self;
+        let site_argument = pt_builder.input(site_arg.clone())?;
         Ok(SitePtb {
-            pt_builder: self.pt_builder,
+            pt_builder,
+            move_call_counter,
             site_argument,
-            package: self.package,
-            module: self.module,
+            package,
+            module,
         })
     }
 
-    pub fn with_arg(self, site_arg: Argument) -> Result<SitePtb<Argument, MAX_MOVE_CALLS>> {
+    pub fn with_arg(self, site_argument: Argument) -> Result<SitePtb<Argument, MAX_MOVE_CALLS>> {
+        let Self {
+            pt_builder,
+            move_call_counter,
+            package,
+            module,
+            ..
+        } = self;
         // TODO: Remove Result
         Ok(SitePtb {
-            pt_builder: self.pt_builder,
-            site_argument: site_arg,
-            package: self.package,
-            module: self.module,
+            pt_builder,
+            move_call_counter,
+            site_argument,
+            package,
+            module,
         })
     }
 
@@ -93,7 +108,9 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<(), MAX_MOVE_CALLS> {
 impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
     /// Transfer argument to address
     fn transfer_arg(&mut self, recipient: SuiAddress, arg: Argument) -> SitePtbBuilderResult<()> {
-        self.pt_builder.transfer_arg(recipient, arg)
+        self.increment_counter()?;
+        self.pt_builder.transfer_arg(recipient, arg);
+        Ok(())
     }
 
     /// Move call to create a new Walrus site.
@@ -103,6 +120,9 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
         metadata: Option<Metadata>,
     ) -> SitePtbBuilderResult<Argument> {
         tracing::debug!(site=%site_name, "new Move call: creating site");
+        // Needs metadata and site calls to happen atomically, one cannot happen without the other.
+        self.check_counter_in_advance(2)?; // create metadata + site
+
         let name_arg = self.pt_builder.input(pure_call_arg(&site_name)?)?;
         let metadata_arg = match metadata {
             Some(metadata) => self.new_metadata(metadata),
@@ -128,28 +148,30 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
         .map(|val| self.pt_builder.pure(val))
         .collect::<anyhow::Result<Vec<_>>>()?;
 
-        self.pt_builder.programmable_move_call(
+        self.increment_counter()?;
+        Ok(self.pt_builder.programmable_move_call(
             self.package,
             Identifier::new("metadata").unwrap(),
             Identifier::new("new_metadata").unwrap(),
             vec![],
             args,
-        )
+        ))
     }
 
-    pub fn add_programmable_move_call(
+    fn add_programmable_move_call(
         &mut self,
         function: Identifier,
         type_arguments: Vec<TypeTag>,
         call_args: Vec<Argument>,
     ) -> SitePtbBuilderResult<Argument> {
-        self.pt_builder.programmable_move_call(
+        self.increment_counter()?;
+        Ok(self.pt_builder.programmable_move_call(
             self.package,
             self.module.clone(),
             function,
             type_arguments,
             call_args,
-        )
+        ))
     }
 
     /// Concludes the creation of the PTB.
@@ -160,16 +182,38 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
     pub fn with_max_move_calls<const NEW_MAX: u16>(self) -> SitePtb<T, NEW_MAX> {
         let Self {
             pt_builder,
+            move_call_counter,
             site_argument,
             package,
             module,
         } = self;
         SitePtb {
-            pt_builder: pt_builder.with_max_move_calls::<NEW_MAX>(),
+            pt_builder,
+            move_call_counter,
             site_argument,
             package,
             module,
         }
+    }
+
+    fn check_counter_in_advance(
+        &self,
+        move_calls_needed: usize,
+    ) -> Result<(), SitePtbBuilderError> {
+        match move_calls_needed + self.move_call_counter as usize {
+            c if c > MAX_MOVE_CALLS as usize => {
+                Err(SitePtbBuilderError::TooManyMoveCalls(MAX_MOVE_CALLS))
+            }
+            _ => Ok(()),
+        }
+    }
+
+    fn increment_counter(&mut self) -> Result<(), SitePtbBuilderError> {
+        if self.move_call_counter > MAX_MOVE_CALLS {
+            return Err(SitePtbBuilderError::TooManyMoveCalls(MAX_MOVE_CALLS));
+        }
+        self.move_call_counter += 1;
+        Ok(())
     }
 }
 
@@ -232,16 +276,10 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
 
     /// Adds the move calls to create and add a resource to the site, with the specified headers.
     pub fn add_resource(&mut self, resource: &Resource) -> SitePtbBuilderResult<()> {
-        // TODO: After all it seems that we need these data here anyway. NewType pattern didn't save
-        // us.
-        // In theory we could stop mid-headers and continue with the headers, but this needs extra
-        // granularity on the Diff-operations in resources.
-        // TODO: Check other places that move-calls should be committed atomically.
+        // Header insertions in resource can currently happen only atomically. We need to be
+        // certain that the `for header` loop will end without exceeding max-move-calls.
         let move_calls_needed = resource.info.headers.len() + 2; // create resource + add df
-        if move_calls_needed + self.pt_builder.count() as usize > MAX_MOVE_CALLS as usize {
-            println!("Escaped before creating resource here");
-            return Err(SitePtbBuilderError::TooManyMoveCalls(MAX_MOVE_CALLS));
-        }
+        self.check_counter_in_advance(move_calls_needed)?;
 
         tracing::debug!(resource=%resource.info.path, "new Move call: adding resource");
         let new_resource_arg = self.create_resource(resource)?;
