@@ -143,24 +143,8 @@ impl SiteManager {
             None => SiteData::empty(),
         };
         tracing::debug!(?existing_site, "checked existing site");
-        tracing::debug!(
-            "Local site data has {} resources",
-            local_site_data.resources.inner.len()
-        );
-        tracing::debug!(
-            "Existing site has {} resources",
-            existing_site.resources.inner.len()
-        );
 
         let site_updates = local_site_data.diff(&existing_site);
-        tracing::debug!(
-            "Diff produced {} resource operations",
-            site_updates.resource_ops.len()
-        );
-        tracing::debug!(
-            "site_updates.has_updates() = {}",
-            site_updates.has_updates()
-        );
 
         let store_blobs = !using_quilts;
         if store_blobs {
@@ -223,21 +207,13 @@ impl SiteManager {
 
                 // Add user confirmation prompt.
                 display::action("Waiting for user confirmation...");
-                #[cfg(not(feature = "_testing-dry-run"))]
+                if !dialoguer::Confirm::new()
+                    .with_prompt("Do you want to proceed with these updates?")
+                    .default(true)
+                    .interact()?
                 {
-                    if !dialoguer::Confirm::new()
-                        .with_prompt("Do you want to proceed with these updates?")
-                        .default(true)
-                        .interact()?
-                    {
-                        display::error("Update cancelled by user");
-                        return Err(anyhow!("Update cancelled by user"));
-                    }
-                }
-                #[cfg(feature = "_testing-dry-run")]
-                {
-                    // In tests, automatically proceed without prompting
-                    println!("Test mode: automatically proceeding with updates");
+                    display::error("Update cancelled by user");
+                    return Err(anyhow!("Update cancelled by user"));
                 }
             }
             self.store_single_blob_resources_to_walrus(&walrus_updates)
@@ -490,21 +466,13 @@ impl SiteManager {
             ));
             // Add user confirmation prompt.
             display::action("Waiting for user confirmation...");
-            #[cfg(not(feature = "_testing-dry-run"))]
+            if !dialoguer::Confirm::new()
+                .with_prompt("Do you want to proceed with these updates?")
+                .default(true)
+                .interact()?
             {
-                if !dialoguer::Confirm::new()
-                    .with_prompt("Do you want to proceed with these updates?")
-                    .default(true)
-                    .interact()?
-                {
-                    display::error("Update cancelled by user");
-                    return Err(anyhow!("Update cancelled by user"));
-                }
-            }
-            #[cfg(feature = "_testing-dry-run")]
-            {
-                // In tests, automatically proceed without prompting
-                println!("Test mode: automatically proceeding with updates");
+                display::error("Update cancelled by user");
+                return Err(anyhow!("Update cancelled by user"));
             }
         }
         self.store_single_blob_resources_to_walrus(&walrus_ops)
