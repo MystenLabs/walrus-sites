@@ -39,7 +39,7 @@ use crate::{
     display,
     publish::BlobManagementOptions,
     retry_client::RetriableSuiClient,
-    site::builder::{SitePtbBuilderError, PTB_MAX_MOVE_CALLS},
+    site::builder::{SitePtbBuilderResultExt, PTB_MAX_MOVE_CALLS},
     summary::SiteDataDiffSummary,
     types::{Metadata, MetadataOp, RouteOps, SiteNameOp},
     util::{get_site_id_from_response, sign_and_send_ptb},
@@ -352,10 +352,10 @@ impl SiteManager {
         }
 
         let mut resources_iter = updates.resource_ops.iter().peekable();
-        let res = ptb.add_resource_operations(&mut resources_iter);
-        if let Err(SitePtbBuilderError::Other(e)) = res {
-            bail!(e);
-        }
+        let res = ptb
+            .add_resource_operations(&mut resources_iter)
+            .ok_if_limit_reached()?;
+
         // Update ptb limit to add routes. Keep 1 operation for transfer.
         let mut ptb = ptb.with_max_move_calls::<1023>();
 
@@ -368,12 +368,9 @@ impl SiteManager {
             }
             routes_iter = new_routes.0.iter().peekable();
         }
-        let res = ptb.add_route_operations(&mut routes_iter);
-        // TODO: Maybe it makes most sense to differentiate these errors somehow else.
-        // Or create a convenience function.
-        if let Err(SitePtbBuilderError::Other(e)) = res {
-            bail!(e);
-        }
+        let res = ptb
+            .add_route_operations(&mut routes_iter)
+            .ok_if_limit_reached()?;
 
         if self.needs_transfer() {
             ptb = ptb.with_max_move_calls(); // Update to actual max.
@@ -415,14 +412,10 @@ impl SiteManager {
             let call_arg: CallArg = self.wallet.get_object_ref(site_object_id).await?.into();
             let mut ptb = ptb.with_call_arg(&call_arg)?;
 
-            let res = ptb.add_resource_operations(&mut resources_iter);
-            if let Err(SitePtbBuilderError::Other(e)) = res {
-                bail!(e);
-            }
-            let res = ptb.add_route_operations(&mut routes_iter);
-            if let Err(SitePtbBuilderError::Other(e)) = res {
-                bail!(e);
-            }
+            ptb.add_resource_operations(&mut resources_iter)
+                .ok_if_limit_reached()?;
+            ptb.add_route_operations(&mut routes_iter)
+                .ok_if_limit_reached()?;
 
             let resource_result = self
                 .sign_and_send_ptb(ptb.finish(), self.gas_coin_ref().await?, &retry_client)

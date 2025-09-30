@@ -35,6 +35,20 @@ pub enum SitePtbBuilderError {
 }
 
 pub type SitePtbBuilderResult<T> = Result<T, SitePtbBuilderError>;
+pub trait SitePtbBuilderResultExt<T> {
+    /// Ignores `TooManyMoveCalls` errors, propagates `Other` errors
+    fn ok_if_limit_reached(self) -> Result<Option<T>>;
+}
+
+impl<T> SitePtbBuilderResultExt<T> for SitePtbBuilderResult<T> {
+    fn ok_if_limit_reached(self) -> Result<Option<T>> {
+        match self {
+            Ok(val) => Ok(Some(val)),
+            Err(SitePtbBuilderError::TooManyMoveCalls(_)) => Ok(None),
+            Err(SitePtbBuilderError::Other(e)) => Err(e),
+        }
+    }
+}
 
 pub struct SitePtb<T = (), const MAX_MOVE_CALLS: u16 = PTB_MAX_MOVE_CALLS> {
     pt_builder: ProgrammableTransactionBuilder,
@@ -199,14 +213,9 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
         }
     }
 
-    fn check_counter_in_advance(
-        &self,
-        move_calls_needed: usize,
-    ) -> Result<(), SitePtbBuilderError> {
-        match move_calls_needed + self.move_call_counter as usize {
-            c if c > MAX_MOVE_CALLS as usize => {
-                Err(SitePtbBuilderError::TooManyMoveCalls(MAX_MOVE_CALLS))
-            }
+    fn check_counter_in_advance(&self, move_calls_needed: u16) -> Result<(), SitePtbBuilderError> {
+        match move_calls_needed + self.move_call_counter {
+            c if c > MAX_MOVE_CALLS => Err(SitePtbBuilderError::TooManyMoveCalls(MAX_MOVE_CALLS)),
             _ => Ok(()),
         }
     }
@@ -281,7 +290,17 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
     pub fn add_resource(&mut self, resource: &Resource) -> SitePtbBuilderResult<()> {
         // Header insertions in resource can currently happen only atomically. We need to be
         // certain that the `for header` loop will end without exceeding max-move-calls.
-        let move_calls_needed = resource.info.headers.len() + 2; // create resource + add df
+        let headers_count = resource.info.headers.len() as u16;
+        let move_calls_needed = headers_count + 2; // create resource + add df
+        if move_calls_needed > PTB_MAX_MOVE_CALLS {
+            // We would need to half-store a resource at the end of the PTB, and use:
+            // `@walrus/sites::site::{remove_resource -> add_header x n -> add_resource}` in the
+            // next PTBs
+            return Err(anyhow::anyhow!(
+                "Cannot handle these many ({headers_count}) headers in resource"
+            )
+            .into());
+        };
         self.check_counter_in_advance(move_calls_needed)?;
 
         tracing::debug!(resource=%resource.info.path, "new Move call: adding resource");
