@@ -269,7 +269,7 @@ impl Display for ResourceSet {
 }
 
 // Struct used for grouping resource local data.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct ResourceData {
     unencoded_size: usize,
     full_path: PathBuf,
@@ -664,6 +664,8 @@ impl ResourceManager {
 
         let resource_file_inputs = self.prepare_local_resources(root, rel_paths)?;
 
+        // Collect chunks once - needed because we iterate twice (dry-run + actual storage).
+        // This avoids cloning ResourceData; we only clone QuiltBlobInput during dry-run.
         let chunks: Vec<Vec<(ResourceData, QuiltBlobInput)>> = resource_file_inputs
             .into_iter()
             // TODO(nikos): we split per max-quilts but there may be also other limits like max_size.
@@ -673,6 +675,7 @@ impl ResourceManager {
             .into_iter()
             .map(|chunk| chunk.collect())
             .collect();
+
         // TODO: Test Dry-run
         if dry_run {
             let mut total_storage_cost = 0;
@@ -703,20 +706,18 @@ impl ResourceManager {
         let mut resources_set = ResourceSet::empty();
         tracing::debug!("Processing chunks for quilt storage");
 
-        for chunk in &chunks {
+        for chunk in chunks {
             let resources = self
-                .store_resource_chunk_into_quilt(chunk.iter().cloned())
+                .store_resource_chunk_into_quilt(chunk.into_iter())
                 .await?;
-            tracing::debug!("Chunk returned {} resources", resources.len());
             resources_set.extend(resources);
         }
 
-        let site_data = self.to_site_data(resources_set.clone());
         tracing::debug!(
-            "Final site data created with {} resources",
-            site_data.resources.inner.len()
+            "Final site data will be created with {} resources",
+            resources_set.len()
         );
-        Ok(site_data)
+        Ok(self.to_site_data(resources_set))
     }
 
     fn iter_dir(start: &Path) -> Result<Vec<PathBuf>> {

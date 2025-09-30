@@ -164,10 +164,6 @@ impl SiteManager {
             site_updates.has_updates()
         );
 
-        for (idx, op) in site_updates.resource_ops.iter().enumerate() {
-            tracing::debug!("  Resource op {}: {:?}", idx + 1, op);
-        }
-
         let store_blobs = !using_quilts;
         if store_blobs {
             let walrus_candidate_set = if self.blob_options.is_check_extend() {
