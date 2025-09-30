@@ -352,7 +352,7 @@ impl SiteManager {
         }
 
         let mut resources_iter = updates.resource_ops.iter().peekable();
-        let res = ptb
+        ptb
             .add_resource_operations(&mut resources_iter)
             .ok_if_limit_reached()?;
 
@@ -368,7 +368,7 @@ impl SiteManager {
             }
             routes_iter = new_routes.0.iter().peekable();
         }
-        let res = ptb
+        ptb
             .add_route_operations(&mut routes_iter)
             .ok_if_limit_reached()?;
 
