@@ -352,8 +352,7 @@ impl SiteManager {
         }
 
         let mut resources_iter = updates.resource_ops.iter().peekable();
-        ptb
-            .add_resource_operations(&mut resources_iter)
+        ptb.add_resource_operations(&mut resources_iter)
             .ok_if_limit_reached()?;
 
         // Update ptb limit to add routes. Keep 1 operation for transfer.
@@ -368,8 +367,7 @@ impl SiteManager {
             }
             routes_iter = new_routes.0.iter().peekable();
         }
-        ptb
-            .add_route_operations(&mut routes_iter)
+        ptb.add_route_operations(&mut routes_iter)
             .ok_if_limit_reached()?;
 
         if self.needs_transfer() {
