@@ -180,6 +180,9 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
     }
 
     pub fn with_max_move_calls<const NEW_MAX: u16>(self) -> SitePtb<T, NEW_MAX> {
+        // Optimally we would use a static_assertions::const_assert here, but it needs unstable
+        // feature: `#![feature(generic_const_exprs)]` to use it with generic parameters.
+        debug_assert!(NEW_MAX < PTB_MAX_MOVE_CALLS);
         let Self {
             pt_builder,
             move_call_counter,
