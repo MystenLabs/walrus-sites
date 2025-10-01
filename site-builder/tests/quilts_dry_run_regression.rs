@@ -50,18 +50,18 @@ fn parse_estimated_cost_from_output(output: &str) -> Option<u128> {
     None
 }
 
-/// Test dry-run mode with snake example (small site).
+/// Test dry-run mode with both small (snake) and large sites.
 /// This tests that the chunks iterator is not consumed during dry-run.
+/// Tests are combined into one to avoid gag stdout redirect conflicts when running in parallel.
 #[tokio::test]
-async fn dry_run_snake_site() -> anyhow::Result<()> {
-    test_dry_run("snake", 4).await
-}
+async fn dry_run_both_sites_sync() -> anyhow::Result<()> {
+    // Test small site (snake example)
+    test_dry_run("snake", 4).await?;
 
-/// Test dry-run mode with large site (150 files).
-/// This tests that the chunks iterator is not consumed during dry-run with many files.
-#[tokio::test]
-async fn dry_run_large_site() -> anyhow::Result<()> {
-    test_dry_run("large", 150).await
+    // Test large site (150 files)
+    test_dry_run("large", 150).await?;
+
+    Ok(())
 }
 
 /// Helper function to test dry-run execution.
