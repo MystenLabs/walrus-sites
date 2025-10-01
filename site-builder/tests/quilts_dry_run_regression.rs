@@ -30,24 +30,21 @@ use localnode::{
 
 mod helpers;
 
+/// Extract cost value from a line containing FROST amount
+fn extract_cost_from_frost_line(line: &str) -> Option<u128> {
+    let frost_idx = line.rfind("FROST")?;
+    let before_frost = line[..frost_idx].trim();
+    let num_str = before_frost.split_whitespace().last()?;
+    num_str.parse::<u128>().ok()
+}
+
 /// Helper function to parse estimated cost from captured output
 fn parse_estimated_cost_from_output(output: &str) -> Option<u128> {
     // Look for "Estimated Storage Cost for this publish/update (Gas Cost Excluded): X FROST"
-    for line in output.lines() {
-        if line.contains("Estimated Storage Cost") && line.contains("FROST") {
-            // Extract the number before "FROST"
-            if let Some(frost_idx) = line.rfind("FROST") {
-                let before_frost = line[..frost_idx].trim();
-                // Get the last word which should be the number
-                if let Some(num_str) = before_frost.split_whitespace().last() {
-                    if let Ok(cost) = num_str.parse::<u128>() {
-                        return Some(cost);
-                    }
-                }
-            }
-        }
-    }
-    None
+    output
+        .lines()
+        .find(|line| line.contains("Estimated Storage Cost") && line.contains("FROST"))
+        .and_then(extract_cost_from_frost_line)
 }
 
 /// Test dry-run mode with both small (snake) and large sites.
