@@ -359,14 +359,15 @@ impl SiteManager {
         let mut ptb = ptb.with_max_move_calls::<1023>();
 
         let mut routes_iter = btree_map::Iter::default().peekable();
-        // TODO: Remove logic from here, add it to SitePtb.
         if let RouteOps::Replace(new_routes) = &updates.route_ops {
-            ptb.remove_routes()?;
-            if !new_routes.is_empty() {
-                ptb.create_routes()?;
-            }
+            if new_routes.is_empty() {
+                ptb.remove_routes()
+            } else {
+                ptb.replace_routes()
+            }?;
             routes_iter = new_routes.0.iter().peekable();
         }
+
         ptb.add_route_operations(&mut routes_iter)
             .ok_if_limit_reached()?;
 

@@ -412,6 +412,14 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
         Ok(())
     }
 
+    /// Adds the move calls to remove and create new routes
+    pub fn replace_routes(&mut self) -> SitePtbBuilderResult<()> {
+        self.check_counter_in_advance(2)?; // remove + create routes
+        self.remove_routes()?;
+        self.create_routes()?;
+        Ok(())
+    }
+
     /// Adds the move calls to remove the routes object.
     // TODO: Remove pub and move logic here
     pub fn remove_routes(&mut self) -> SitePtbBuilderResult<()> {
