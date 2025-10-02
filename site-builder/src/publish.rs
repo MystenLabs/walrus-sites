@@ -187,7 +187,7 @@ impl SiteEditor {
         let ptb = SitePtb::<_, PTB_MAX_MOVE_CALLS>::new(
             self.config.package,
             Identifier::new(SITE_MODULE)?,
-        )?;
+        );
         let mut ptb = ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
         let site = RemoteSiteFactory::new(&retriable_client, self.config.package)
             .await?

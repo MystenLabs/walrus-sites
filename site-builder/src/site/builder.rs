@@ -60,16 +60,15 @@ pub struct SitePtb<T = (), const MAX_MOVE_CALLS: u16 = PTB_MAX_MOVE_CALLS> {
 
 /// A PTB to update a site.
 impl<const MAX_MOVE_CALLS: u16> SitePtb<(), MAX_MOVE_CALLS> {
-    pub fn new(package: ObjectID, module: Identifier) -> Result<Self> {
-        // TODO: Remove result
+    pub fn new(package: ObjectID, module: Identifier) -> Self {
         let pt_builder = ProgrammableTransactionBuilder::new();
-        Ok(SitePtb {
+        SitePtb {
             pt_builder,
             move_call_counter: 0,
             site_argument: (),
             package,
             module,
-        })
+        }
     }
 
     pub fn with_call_arg(self, site_arg: &CallArg) -> Result<SitePtb<Argument, MAX_MOVE_CALLS>> {
@@ -90,7 +89,7 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<(), MAX_MOVE_CALLS> {
         })
     }
 
-    pub fn with_arg(self, site_argument: Argument) -> Result<SitePtb<Argument, MAX_MOVE_CALLS>> {
+    pub fn with_arg(self, site_argument: Argument) -> SitePtb<Argument, MAX_MOVE_CALLS> {
         let Self {
             pt_builder,
             move_call_counter,
@@ -98,14 +97,13 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<(), MAX_MOVE_CALLS> {
             module,
             ..
         } = self;
-        // TODO: Remove Result
-        Ok(SitePtb {
+        SitePtb {
             pt_builder,
             move_call_counter,
             site_argument,
             package,
             module,
-        })
+        }
     }
 
     /// Makes the call to create a new site and keeps the resulting argument.
@@ -113,9 +111,9 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<(), MAX_MOVE_CALLS> {
         mut self,
         site_name: &str,
         metadata: Option<Metadata>,
-    ) -> Result<SitePtb<Argument, MAX_MOVE_CALLS>> {
+    ) -> SitePtbBuilderResult<SitePtb<Argument, MAX_MOVE_CALLS>> {
         let argument = self.create_site(site_name, metadata)?;
-        self.with_arg(argument)
+        Ok(self.with_arg(argument))
     }
 }
 
@@ -220,7 +218,7 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
         }
     }
 
-    fn increment_counter(&mut self) -> Result<(), SitePtbBuilderError> {
+    fn increment_counter(&mut self) -> SitePtbBuilderResult<()> {
         if self.move_call_counter > MAX_MOVE_CALLS {
             return Err(SitePtbBuilderError::TooManyMoveCalls(MAX_MOVE_CALLS));
         }

@@ -326,7 +326,7 @@ impl SiteManager {
         let ptb = SitePtb::<(), 1021>::new(
             self.config.package,
             Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
-        )?;
+        );
 
         // Add the call arg if we are updating a site, or add the command to create a new site.
         // Keep 3 operations for optional route deletion + creation + site-transfer
@@ -407,7 +407,7 @@ impl SiteManager {
             let ptb: SitePtb<(), { PTB_MAX_MOVE_CALLS }> = SitePtb::new(
                 self.config.package,
                 Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
-            )?;
+            );
             let call_arg: CallArg = self.wallet.get_object_ref(site_object_id).await?.into();
             let mut ptb = ptb.with_call_arg(&call_arg)?;
 
@@ -437,7 +437,7 @@ impl SiteManager {
         let ptb = SitePtb::<(), 1021>::new(
             self.config.package,
             Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
-        )?;
+        );
 
         let Some(site_id) = &self.site_id else {
             anyhow::bail!("`add_single_resource` is only supported for existing sites");
