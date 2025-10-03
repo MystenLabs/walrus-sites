@@ -9,7 +9,12 @@
 
 #![cfg(feature = "quilts-experimental")]
 
-use std::{fs::File, io::Write, num::NonZeroU32, path::PathBuf};
+use std::{
+    fs::File,
+    io::{Read, Write},
+    num::NonZeroU32,
+    path::PathBuf,
+};
 
 use site_builder::{
     args::{Commands, EpochCountOrMax},
@@ -25,23 +30,61 @@ use localnode::{
 
 mod helpers;
 
-/// Test dry-run mode with snake example (small site).
-/// This tests that the chunks iterator is not consumed during dry-run.
-#[tokio::test]
-async fn dry_run_snake_site() -> anyhow::Result<()> {
-    test_dry_run("snake", 4).await
+/// Extract cost value from a line containing FROST amount
+fn extract_cost_from_frost_line(line: &str) -> Option<u128> {
+    let frost_idx = line.rfind("FROST")?;
+    let before_frost = line[..frost_idx].trim();
+    let num_str = before_frost.split_whitespace().last()?;
+    num_str.parse::<u128>().ok()
 }
 
-/// Test dry-run mode with large site (150 files).
-/// This tests that the chunks iterator is not consumed during dry-run with many files.
+/// Helper function to parse estimated cost from captured output
+fn parse_estimated_cost_from_output(output: &str) -> Option<u128> {
+    // Look for "Estimated Storage Cost for this publish/update (Gas Cost Excluded): X FROST"
+    output
+        .lines()
+        .find(|line| line.contains("Estimated Storage Cost") && line.contains("FROST"))
+        .and_then(extract_cost_from_frost_line)
+}
+
+/// Test dry-run mode with both small (snake) and large sites.
+/// This tests that the chunks iterator is not consumed during dry-run.
+/// Tests are combined into one to avoid gag stdout redirect conflicts when running in parallel.
 #[tokio::test]
-async fn dry_run_large_site() -> anyhow::Result<()> {
-    test_dry_run("large", 150).await
+async fn dry_run_both_sites_sync() -> anyhow::Result<()> {
+    // Test small site (snake example)
+    test_dry_run("snake", 4).await?;
+
+    // Test large site (150 files)
+    test_dry_run("large", 150).await?;
+
+    Ok(())
 }
 
 /// Helper function to test dry-run execution.
 async fn test_dry_run(site_type: &str, expected_file_count: usize) -> anyhow::Result<()> {
-    let cluster = TestSetup::start_local_test_cluster().await?;
+    let mut cluster = TestSetup::start_local_test_cluster().await?;
+
+    // Get the wallet address for balance checking
+    let wallet_address = cluster.wallet.inner.active_address()?;
+
+    // Get the Walrus coin type from the admin client
+    // The SuiContractClient should have the coin type information
+    let walrus_sui_client = cluster.cluster_state.walrus_admin_client.inner.sui_client();
+    let frost_coin_type = walrus_sui_client.read_client().wal_coin_type().to_string();
+
+    // Get initial FROST balance
+    let initial_balance = cluster
+        .client
+        .coin_read_api()
+        .get_balance(wallet_address, Some(frost_coin_type.clone()))
+        .await?;
+
+    println!(
+        "Initial FROST balance: {} FROST",
+        initial_balance.total_balance
+    );
+
     let temp_dir = tempfile::tempdir()?;
     let directory = temp_dir.path().to_path_buf();
 
@@ -97,7 +140,47 @@ async fn test_dry_run(site_type: &str, expected_file_count: usize) -> anyhow::Re
         .build()?;
 
     // This will use cfg(test) to auto-proceed past the confirmation prompt
-    let result = site_builder::run(args).await;
+    // The dry-run will print "Estimated Storage Cost: X FROST" to stdout,
+    // then proceed with actual publish after confirmation
+
+    // Capture stdout to extract the estimated cost
+    // Wrap in a scope to ensure cleanup happens
+    let (result, estimated_cost) = {
+        let mut buf = gag::BufferRedirect::stdout().unwrap_or_else(|e| {
+            panic!("Failed to redirect stdout (maybe already redirected?): {e}");
+        });
+
+        let result = site_builder::run(args).await;
+
+        // Read captured output before dropping the buffer
+        let mut output = String::new();
+        buf.read_to_string(&mut output)
+            .expect("Failed to read captured output");
+
+        // Parse the estimated cost from captured output
+        let estimated_cost = parse_estimated_cost_from_output(&output);
+
+        // Drop buffer to restore stdout BEFORE printing
+        drop(buf);
+
+        // Print the captured output so it's visible in test output
+        print!("{output}");
+
+        (result, estimated_cost)
+    };
+
+    // Get final FROST balance after publish (if successful)
+    let final_balance = if result.is_ok() {
+        Some(
+            cluster
+                .client
+                .coin_read_api()
+                .get_balance(wallet_address, Some(frost_coin_type.clone()))
+                .await?,
+        )
+    } else {
+        None
+    };
 
     // Check that we didn't hit the specific bugs we're testing for
     if let Err(e) = &result {
@@ -114,6 +197,45 @@ async fn test_dry_run(site_type: &str, expected_file_count: usize) -> anyhow::Re
             !error_msg.contains("could not find the object ID for the created Walrus site"),
             "Command failed with object ID panic: {error_msg}"
         );
+    }
+
+    // Verify FROST cost if publish was successful
+    if let Some(final_balance) = final_balance {
+        let actual_cost = initial_balance.total_balance - final_balance.total_balance;
+
+        println!("\n=== FROST Cost Verification ===");
+        println!(
+            "Initial FROST balance: {} FROST",
+            initial_balance.total_balance
+        );
+        println!(
+            "Final FROST balance:   {} FROST",
+            final_balance.total_balance
+        );
+        println!("Actual FROST cost:     {actual_cost} FROST");
+        if let Some(est) = estimated_cost {
+            println!("Estimated FROST cost:  {est} FROST");
+        }
+        println!("================================\n");
+
+        // Verify that FROST was actually spent
+        assert!(
+            actual_cost > 0,
+            "Expected FROST to be spent, but balance did not decrease. \
+             Initial: {}, Final: {}",
+            initial_balance.total_balance,
+            final_balance.total_balance
+        );
+
+        // Verify the actual cost matches the dry-run estimate
+        if let Some(est) = estimated_cost {
+            assert_eq!(
+                actual_cost, est,
+                "Actual FROST cost ({actual_cost}) does not match dry-run estimate ({est})",
+            );
+        } else {
+            eprintln!("Warning: Could not parse estimated cost from output. Skipping exact match assertion.");
+        }
     }
 
     // The test passes if we got here without hitting the specific bugs
