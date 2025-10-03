@@ -17,7 +17,7 @@ use move_core_types::u256::U256;
 use site_builder::{
     args::{Commands, EpochCountOrMax},
     site_config::WSResources,
-    types::{HttpHeaders, VecMap},
+    types::{HttpHeaders, Routes, VecMap},
 };
 use walrus_sdk::core::{BlobId, QuiltPatchId};
 
@@ -226,6 +226,79 @@ async fn publish_quilts_a_lot_of_headers() -> anyhow::Result<()> {
             EXTRA_HEADERS_PER_HTML + 3 /* content-encoding + content-type + quilt-patch-id */
         )
     });
+
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore]
+async fn publish_quilts_with_many_routes() -> anyhow::Result<()> {
+    const N_RESOURCES: usize = 800;
+    const N_ROUTES: usize = 400;
+
+    let cluster = TestSetup::start_local_test_cluster().await?;
+
+    // Create 800 HTML files (resources)
+    let site_temp_dir = tempfile::tempdir()?;
+    (0..N_RESOURCES).try_for_each(|i| {
+        let file_path = site_temp_dir.path().join(format!("page_{i:03}.html"));
+        let mut file = File::create(file_path)?;
+        writeln!(file, "<html><body><h1>Resource {i}</h1></body></html>")?;
+        Ok::<(), anyhow::Error>(())
+    })?;
+
+    // Create 400 routes: redirect resources 400-799 to resources 0-399
+    // This creates routes that point the 2nd half of resources to the 1st half
+    let routes = Routes(VecMap(
+        (0..N_ROUTES)
+            .map(|i| {
+                // Route from page_4xx.html to page_0xx.html
+                let source_resource = format!("/page_{:03}.html", i + N_ROUTES); // 400-799
+                let target_resource = format!("/page_{i:03}.html"); // 0-399
+                (source_resource, target_resource)
+            })
+            .collect(),
+    ));
+
+    let ws_resources = WSResources {
+        routes: Some(routes),
+        ..Default::default()
+    };
+
+    let ws_temp_dir = tempfile::tempdir()?;
+    let temp_ws_resources = ws_temp_dir.path().join("ws-resources.json");
+    let file = File::create(&temp_ws_resources)?;
+    serde_json::to_writer_pretty(BufWriter::new(file), &ws_resources)?;
+
+    let args = ArgsBuilder::default()
+        .with_config(Some(cluster.sites_config_path().to_owned()))
+        .with_command(Commands::PublishQuilts {
+            publish_options: PublishOptionsBuilder::default()
+                .with_directory(site_temp_dir.path().to_owned())
+                .with_ws_resources(Some(temp_ws_resources))
+                .with_epoch_count_or_max(EpochCountOrMax::Max)
+                .build()?,
+            site_name: None,
+        })
+        .with_gas_budget(100_000_000_000) // Higher gas budget for the many move calls
+        .build()?;
+
+    // This should succeed despite having 800 resources + 400 routes because the site builder
+    // should handle the move call limits by splitting operations across multiple PTBs
+    site_builder::run(args).await
+        .inspect_err(|e| {
+            println!("error running site-builder: {e}");
+            // Apply this for debugging with sui-explorers
+            // cluster.wait_for_user_input().await?;
+        })?;
+
+    let site = cluster.last_site_created().await?;
+    let resources = cluster.site_resources(*site.id.object_id()).await?;
+    assert_eq!(resources.len(), N_RESOURCES); // All 800 resources should be created
+
+    // Verify that the site was created successfully with many resources and routes
+    // The routes redirect the 2nd half of resources to the 1st half
+    println!("Successfully created site with {} resources and {} routes", N_RESOURCES, N_ROUTES);
 
     Ok(())
 }

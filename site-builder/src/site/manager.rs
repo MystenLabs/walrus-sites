@@ -322,8 +322,9 @@ impl SiteManager {
         );
 
         // 1st iteration
-        // Keep 3 operations for optional route deletion + creation + site-transfer
-        let ptb = SitePtb::<(), 1021>::new(
+        // Keep 4 operations for optional update_name + route deletion + creation + site-transfer
+        const INITIAL_MAX: u16 = PTB_MAX_MOVE_CALLS - 4;
+        let ptb = SitePtb::<(), INITIAL_MAX>::new(
             self.config.package,
             Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
         );
@@ -356,7 +357,8 @@ impl SiteManager {
             .ok_if_limit_reached()?;
 
         // Update ptb limit to add routes. Keep 1 operation for transfer.
-        let mut ptb = ptb.with_max_move_calls::<1023>();
+        const TRANSFER_MAX: u16 = PTB_MAX_MOVE_CALLS - 1;
+        let mut ptb = ptb.with_max_move_calls::<TRANSFER_MAX>();
 
         let mut routes_iter = btree_map::Iter::default().peekable();
         if let RouteOps::Replace(new_routes) = &updates.route_ops {
@@ -371,14 +373,16 @@ impl SiteManager {
         ptb.add_route_operations(&mut routes_iter)
             .ok_if_limit_reached()?;
 
+        let mut ptb = ptb.with_max_move_calls::<PTB_MAX_MOVE_CALLS>(); // Update to actual max.
         if self.needs_transfer() {
-            ptb = ptb.with_max_move_calls(); // Update to actual max.
             ptb.transfer_site(self.active_address()?)?;
         }
 
         let retry_client = self.sui_client().await?;
+        let built_ptb = ptb.finish();
+        assert!(built_ptb.commands.len() <= PTB_MAX_MOVE_CALLS as usize);
         let result = self
-            .sign_and_send_ptb(ptb.finish(), self.gas_coin_ref().await?, &retry_client)
+            .sign_and_send_ptb(built_ptb, self.gas_coin_ref().await?, &retry_client)
             .await?;
 
         // Check explicitly for execution failures.
