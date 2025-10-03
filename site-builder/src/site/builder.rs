@@ -23,6 +23,10 @@ use crate::{
     types::{Metadata, Range},
 };
 
+#[cfg(test)]
+#[path = "../unit_tests/site.builder.tests.rs"]
+mod site_builder_tests;
+
 pub const PTB_MAX_MOVE_CALLS: u16 = 1024;
 
 /// Error type to differentiate max-move-calls limit reached from other unexpected `anyhow` errors.
