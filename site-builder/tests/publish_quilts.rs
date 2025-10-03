@@ -297,10 +297,7 @@ async fn publish_quilts_with_many_routes() -> anyhow::Result<()> {
 
     // Verify that the site was created successfully with many resources and routes
     // The routes redirect the 2nd half of resources to the 1st half
-    println!(
-        "Successfully created site with {} resources and {} routes",
-        N_RESOURCES, N_ROUTES
-    );
+    println!("Successfully created site with {N_RESOURCES} resources and {N_ROUTES} routes");
 
     Ok(())
 }
