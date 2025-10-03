@@ -5,7 +5,7 @@
 
 use std::{
     collections::{BTreeMap, BTreeSet},
-    fmt::{self, Display},
+    fmt::{self, Debug, Display},
     fs,
     io::Write,
     num::{NonZeroU16, NonZeroUsize},
@@ -498,12 +498,13 @@ impl ResourceManager {
     // it with ResourceData to return Resources
     async fn store_resource_chunk_into_quilt(
         &mut self,
-        res_data_and_quilt_files: impl Iterator<Item = (ResourceData, QuiltBlobInput)>,
+        res_data_and_quilt_files: impl IntoIterator<Item = (ResourceData, QuiltBlobInput)>,
     ) -> Result<Vec<Resource>> {
         // println!("resource_data.len(): {}", resource_data.len());
         // println!("resource_data: {resource_data:#?}");
 
-        let (resource_data, quilt_blob_inputs): (Vec<_>, Vec<_>) = res_data_and_quilt_files.unzip();
+        let (resource_data, quilt_blob_inputs): (Vec<_>, Vec<_>) =
+            res_data_and_quilt_files.into_iter().unzip();
         let mut store_resp = self
             .walrus
             .store_quilt(
@@ -663,17 +664,16 @@ impl ResourceManager {
 
         let resource_file_inputs = self.prepare_local_resources(root, rel_paths)?;
 
-        let chunks = resource_file_inputs
-            .into_iter()
-            // TODO(nikos): we split per max-quilts but there may be also other limits like max_size.
-            // TODO(nikos): Investigate whether indeed max_files == n_cols - 1 or if it is that one file
-            // takes more than a column, max_files becomes n_cols - 2
-            .chunks(Walrus::max_slots_in_quilt(self.n_shards) as usize);
+        // TODO(nikos): we split per max-quilts but there may be also other limits like max_size.
+        // TODO(nikos): Investigate whether indeed max_files == n_cols - 1 or if it is that one file
+        // takes more than a column, max_files becomes n_cols - 2
+        let chunk_size = Walrus::max_slots_in_quilt(self.n_shards) as usize;
+
         // TODO: Test Dry-run
         if dry_run {
             let mut total_storage_cost = 0;
-            for chunk in &chunks {
-                let (_, quilt_file_inputs): (Vec<_>, Vec<_>) = chunk.unzip();
+            for chunk in resource_file_inputs.chunks(chunk_size) {
+                let quilt_file_inputs = chunk.iter().map(|(_, f)| f.clone()).collect_vec();
                 let wal_storage_cost = self.dry_run_resource_chunk(quilt_file_inputs).await?;
                 total_storage_cost += wal_storage_cost;
             }
@@ -684,22 +684,40 @@ impl ResourceManager {
 
             // Add user confirmation prompt.
             display::action("Waiting for user confirmation...");
-            if !dialoguer::Confirm::new()
-                .with_prompt("Do you want to proceed with these updates?")
-                .default(true)
-                .interact()?
+            #[cfg(not(feature = "_testing-dry-run"))]
             {
-                display::error("Update cancelled by user");
-                return Err(anyhow!("Update cancelled by user"));
+                if !dialoguer::Confirm::new()
+                    .with_prompt("Do you want to proceed with these updates?")
+                    .default(true)
+                    .interact()?
+                {
+                    display::error("Update cancelled by user");
+                    return Err(anyhow!("Update cancelled by user"));
+                }
+            }
+            #[cfg(feature = "_testing-dry-run")]
+            {
+                // In tests, automatically proceed without prompting
+                println!("Test mode: automatically proceeding with updates");
             }
         }
 
         let mut resources_set = ResourceSet::empty();
-        for chunk in &chunks {
+        tracing::debug!("Processing chunks for quilt storage");
+
+        for chunk in resource_file_inputs
+            .into_iter()
+            .chunks(chunk_size)
+            .into_iter()
+        {
             let resources = self.store_resource_chunk_into_quilt(chunk).await?;
             resources_set.extend(resources);
         }
 
+        tracing::debug!(
+            "Final site data will be created with {} resources",
+            resources_set.len()
+        );
         Ok(self.to_site_data(resources_set))
     }
 
