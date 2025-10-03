@@ -278,6 +278,8 @@ impl TestSetup {
         self.wallet.inner.active_address()
     }
 
+    /// Pauses the test and waits for user input, allowing the user to inspect the current
+    /// state (e.g., by pasting the fn-url into a Sui explorer in their browser) before continuing.
     pub async fn wait_for_user_input(&mut self) -> anyhow::Result<()> {
         use tokio::io::{self, AsyncBufReadExt, BufReader};
         // Simple readline wait

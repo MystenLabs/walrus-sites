@@ -285,12 +285,11 @@ async fn publish_quilts_with_many_routes() -> anyhow::Result<()> {
 
     // This should succeed despite having 800 resources + 400 routes because the site builder
     // should handle the move call limits by splitting operations across multiple PTBs
-    site_builder::run(args).await
-        .inspect_err(|e| {
-            println!("error running site-builder: {e}");
-            // Apply this for debugging with sui-explorers
-            // cluster.wait_for_user_input().await?;
-        })?;
+    site_builder::run(args).await.inspect_err(|e| {
+        println!("error running site-builder: {e}");
+        // Apply this for debugging with sui-explorers
+        // cluster.wait_for_user_input().await?;
+    })?;
 
     let site = cluster.last_site_created().await?;
     let resources = cluster.site_resources(*site.id.object_id()).await?;
@@ -298,7 +297,10 @@ async fn publish_quilts_with_many_routes() -> anyhow::Result<()> {
 
     // Verify that the site was created successfully with many resources and routes
     // The routes redirect the 2nd half of resources to the 1st half
-    println!("Successfully created site with {} resources and {} routes", N_RESOURCES, N_ROUTES);
+    println!(
+        "Successfully created site with {} resources and {} routes",
+        N_RESOURCES, N_ROUTES
+    );
 
     Ok(())
 }
