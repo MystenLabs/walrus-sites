@@ -28,7 +28,7 @@ use crate::{
     preprocessor::Preprocessor,
     retry_client::RetriableSuiClient,
     site::{
-        builder::SitePtb,
+        builder::{SitePtb, PTB_MAX_MOVE_CALLS},
         config::WSResources,
         manager::SiteManager,
         resource::ResourceManager,
@@ -163,7 +163,9 @@ impl SiteEditor {
 
         // Add warning if no deletable blobs found.
         if all_blobs.is_empty() {
-            println!("Warning: No deletable resources found. This may be because the site was created with permanent=true");
+            println!(
+                "Warning: No deletable resources found. This may be because the site was created with permanent=true"
+            );
         } else {
             // TODO: Change the site manager not to require the unnecessary info.
             let mut site_manager = SiteManager::new(
@@ -182,7 +184,10 @@ impl SiteEditor {
 
         // Delete objects on SUI blockchain
         let mut wallet = self.config.load_wallet()?;
-        let ptb = SitePtb::new(self.config.package, Identifier::new(SITE_MODULE)?)?;
+        let ptb = SitePtb::<_, PTB_MAX_MOVE_CALLS>::new(
+            self.config.package,
+            Identifier::new(SITE_MODULE)?,
+        );
         let mut ptb = ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
         let site = RemoteSiteFactory::new(&retriable_client, self.config.package)
             .await?

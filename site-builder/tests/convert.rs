@@ -15,7 +15,7 @@ async fn converts_random_site_id() -> anyhow::Result<()> {
     let cluster = TestSetup::start_local_test_cluster().await?;
 
     let args = ArgsBuilder::default()
-        .with_config(Some(cluster.sites_config.inner.1))
+        .with_config(Some(cluster.sites_config_path().to_path_buf()))
         .with_command(Commands::Convert {
             object_id: ObjectID::random(),
         })

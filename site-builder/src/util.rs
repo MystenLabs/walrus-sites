@@ -37,6 +37,10 @@ use crate::{
     walrus::types::BlobId,
 };
 
+#[cfg(test)]
+#[path = "unit_tests/util.tests.rs"]
+mod util_tests;
+
 pub async fn sign_and_send_ptb(
     active_address: SuiAddress,
     wallet: &WalletContext,

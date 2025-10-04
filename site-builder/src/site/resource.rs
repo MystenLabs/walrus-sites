@@ -683,6 +683,7 @@ impl ResourceManager {
                 ));
 
             // Add user confirmation prompt.
+            #[cfg(test)]
             display::action("Waiting for user confirmation...");
             #[cfg(not(feature = "_testing-dry-run"))]
             {

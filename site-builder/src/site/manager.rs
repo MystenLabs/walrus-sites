@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{
-    collections::{BTreeSet, HashSet},
+    collections::{btree_map, BTreeSet, HashSet},
     num::NonZeroUsize,
     str::FromStr,
     time::Duration,
 };
 
-use anyhow::{anyhow, Error, Result};
+use anyhow::{anyhow, bail, Error, Result};
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{
     rpc_types::{
@@ -39,16 +39,12 @@ use crate::{
     display,
     publish::BlobManagementOptions,
     retry_client::RetriableSuiClient,
+    site::builder::{SitePtbBuilderResultExt, PTB_MAX_MOVE_CALLS},
     summary::SiteDataDiffSummary,
-    types::{Metadata, MetadataOp, SiteNameOp},
+    types::{Metadata, MetadataOp, RouteOps, SiteNameOp},
     util::{get_site_id_from_response, sign_and_send_ptb},
     walrus::{types::BlobId, Walrus},
 };
-
-// TODO: This is not correct, because depending on the resource headers given, the number of
-// move-calls in 1 ptb number is dynamic.
-const MAX_RESOURCES_PER_PTB: usize = 200;
-const MAX_RESOURCES_PER_PTB_QUILTS: usize = 170; // +1 header per resource
 
 const OS_ERROR_DELAY: Duration = Duration::from_secs(1);
 const MAX_RETRIES: u32 = 10;
@@ -164,16 +160,9 @@ impl SiteManager {
         // Check if there are any updates to the site on-chain.
         let result = if site_updates.has_updates() {
             display::action("Applying the Walrus Site object updates on Sui");
-            self.execute_sui_updates(
-                &site_updates,
-                if using_quilts {
-                    MAX_RESOURCES_PER_PTB_QUILTS
-                } else {
-                    MAX_RESOURCES_PER_PTB
-                },
-            )
-            .await
-            .inspect(|_| display::done())?
+            self.execute_sui_updates(&site_updates)
+                .await
+                .inspect(|_| display::done())?
         } else {
             SuiTransactionBlockResponse::default()
         };
@@ -309,10 +298,9 @@ impl SiteManager {
                 if blob_ids.contains(&blob_id) {
                     tracing::debug!(%blob_id, "blob deleted successfully");
                 } else {
-                    display::error(
-                        format!(
-                            "Could not delete blob {blob_id}, may be already deleted or may be a permanent blob"
-                        ));
+                    display::error(format!(
+                        "Could not delete blob {blob_id}, may be already deleted or may be a permanent blob"
+                    ));
                 }
             } else {
                 tracing::error!(?blob_output.blob_identity, "the blob ID is missing from the identity");
@@ -326,19 +314,23 @@ impl SiteManager {
     async fn execute_sui_updates(
         &self,
         updates: &SiteDataDiff<'_>,
-        max_resources_per_ptb: usize,
     ) -> Result<SuiTransactionBlockResponse> {
         tracing::debug!(
             address=?self.active_address()?,
             ?updates,
             "starting to update site resources on chain",
         );
-        let ptb = SitePtb::new(
+
+        // 1st iteration
+        // Keep 4 operations for optional update_name + route deletion + creation + site-transfer
+        const INITIAL_MAX: u16 = PTB_MAX_MOVE_CALLS - 4;
+        let ptb = SitePtb::<(), INITIAL_MAX>::new(
             self.config.package,
             Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
-        )?;
+        );
 
         // Add the call arg if we are updating a site, or add the command to create a new site.
+        // Keep 3 operations for optional route deletion + creation + site-transfer
         let mut ptb = match &self.site_id {
             Some(site_id) => {
                 let ptb = ptb.with_call_arg(&self.wallet.get_object_ref(*site_id).await?.into())?;
@@ -360,32 +352,44 @@ impl SiteManager {
             ptb.update_name(site_name)?;
         }
 
-        // Publish the first max_resources_per_ptb resources, or all resources if there are fewer
-        // than that.
-        let mut end = max_resources_per_ptb.min(updates.resource_ops.len());
-        tracing::debug!(
-            total_ops = updates.resource_ops.len(),
-            end,
-            "preparing and committing the first PTB"
-        );
+        let mut resources_iter = updates.resource_ops.iter().peekable();
+        ptb.add_resource_operations(&mut resources_iter)
+            .ok_if_limit_reached()?;
 
-        ptb.add_resource_operations(&updates.resource_ops[..end])?;
-        ptb.add_route_operations(&updates.route_ops)?;
+        // Update ptb limit to add routes. Keep 1 operation for transfer.
+        const TRANSFER_MAX: u16 = PTB_MAX_MOVE_CALLS - 1;
+        let mut ptb = ptb.with_max_move_calls::<TRANSFER_MAX>();
 
+        let mut routes_iter = btree_map::Iter::default().peekable();
+        if let RouteOps::Replace(new_routes) = &updates.route_ops {
+            if new_routes.is_empty() {
+                ptb.remove_routes()
+            } else {
+                ptb.replace_routes()
+            }?;
+            routes_iter = new_routes.0.iter().peekable();
+        }
+
+        ptb.add_route_operations(&mut routes_iter)
+            .ok_if_limit_reached()?;
+
+        let mut ptb = ptb.with_max_move_calls::<PTB_MAX_MOVE_CALLS>(); // Update to actual max.
         if self.needs_transfer() {
-            ptb.transfer_site(self.active_address()?);
+            ptb.transfer_site(self.active_address()?)?;
         }
 
         let retry_client = self.sui_client().await?;
+        let built_ptb = ptb.finish();
+        assert!(built_ptb.commands.len() <= PTB_MAX_MOVE_CALLS as usize);
         let result = self
-            .sign_and_send_ptb(ptb.finish(), self.gas_coin_ref().await?, &retry_client)
+            .sign_and_send_ptb(built_ptb, self.gas_coin_ref().await?, &retry_client)
             .await?;
 
         // Check explicitly for execution failures.
         if let Some(SuiExecutionStatus::Failure { error }) =
             result.effects.as_ref().map(|e| e.status())
         {
-            anyhow::bail!(
+            bail!(
                 "site ptb failed with error: {error} [tx_digest={}]",
                 result.digest
             );
@@ -402,19 +406,19 @@ impl SiteManager {
             }
         };
 
-        // Keep iterating to load resources.
-        while end < updates.resource_ops.len() {
-            let start = end;
-            end = (end + max_resources_per_ptb).min(updates.resource_ops.len());
-            tracing::debug!(%start, %end, "preparing and committing the next PTB");
-
-            let ptb = SitePtb::new(
+        // Keep iterating to load all resources and routes.
+        while resources_iter.peek().is_some() || routes_iter.peek().is_some() {
+            let ptb: SitePtb<(), { PTB_MAX_MOVE_CALLS }> = SitePtb::new(
                 self.config.package,
                 Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
-            )?;
+            );
             let call_arg: CallArg = self.wallet.get_object_ref(site_object_id).await?.into();
             let mut ptb = ptb.with_call_arg(&call_arg)?;
-            ptb.add_resource_operations(&updates.resource_ops[start..end])?;
+
+            ptb.add_resource_operations(&mut resources_iter)
+                .ok_if_limit_reached()?;
+            ptb.add_route_operations(&mut routes_iter)
+                .ok_if_limit_reached()?;
 
             let resource_result = self
                 .sign_and_send_ptb(ptb.finish(), self.gas_coin_ref().await?, &retry_client)
@@ -434,10 +438,10 @@ impl SiteManager {
 
     /// Adds a single resource to the site
     pub async fn update_single_resource(&mut self, resource: Resource) -> Result<()> {
-        let ptb = SitePtb::new(
+        let ptb = SitePtb::<(), 1021>::new(
             self.config.package,
             Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
-        )?;
+        );
 
         let Some(site_id) = &self.site_id else {
             anyhow::bail!("`add_single_resource` is only supported for existing sites");
@@ -445,7 +449,7 @@ impl SiteManager {
         let mut ptb = ptb.with_call_arg(&self.wallet.get_object_ref(*site_id).await?.into())?;
 
         // First remove, then add the resource.
-        let operations = vec![
+        let operations = [
             ResourceOp::Deleted(&resource),
             ResourceOp::Created(&resource),
         ];
@@ -480,7 +484,7 @@ impl SiteManager {
 
         // Create the PTB
         tracing::debug!("modifying the site object on chain");
-        ptb.add_resource_operations(&operations)?;
+        ptb.add_resource_operations(&mut operations.iter().peekable())?;
         self.sign_and_send_ptb(
             ptb.finish(),
             self.gas_coin_ref().await?,
