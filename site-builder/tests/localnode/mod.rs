@@ -32,7 +32,7 @@ use sui_sdk::{
     SuiClientBuilder,
 };
 use sui_types::{
-    base_types::ObjectID,
+    base_types::{ObjectID, SuiAddress},
     programmable_transaction_builder::ProgrammableTransactionBuilder,
     quorum_driver_types::ExecuteTransactionRequestType,
     transaction::TransactionData,
@@ -117,10 +117,6 @@ impl TestSetup {
             walrus_config,
             walrus_sites_package_id,
         })
-    }
-
-    pub fn sites_config_path(&self) -> &Path {
-        self.sites_config.inner.1.as_path()
     }
 
     pub async fn read_blob(&self, blob_id: &BlobId) -> ClientResult<Vec<u8>> {
@@ -266,6 +262,34 @@ impl TestSetup {
             resources.append(&mut resources_chunk);
         }
         Ok(resources)
+    }
+
+    // ============ Convenient accessors ============
+
+    pub fn sites_config_path(&self) -> &Path {
+        self.sites_config.inner.1.as_path()
+    }
+
+    pub fn rpc_url(&self) -> anyhow::Result<String> {
+        self.wallet.inner.get_rpc_url()
+    }
+
+    pub fn wallet_active_address(&mut self) -> anyhow::Result<SuiAddress> {
+        self.wallet.inner.active_address()
+    }
+
+    /// Pauses the test and waits for user input, allowing the user to inspect the current
+    /// state (e.g., by pasting the fn-url into a Sui explorer in their browser) before continuing.
+    pub async fn wait_for_user_input(&mut self) -> anyhow::Result<()> {
+        use tokio::io::{self, AsyncBufReadExt, BufReader};
+        // Simple readline wait
+        let mut stdin = BufReader::new(io::stdin());
+        let mut line = String::new();
+        println!("FN url: {}", self.rpc_url()?);
+        println!("Wallet address: {}", self.wallet_active_address()?);
+        println!("Press Enter to continue...");
+        stdin.read_line(&mut line).await?;
+        Ok(())
     }
 }
 
