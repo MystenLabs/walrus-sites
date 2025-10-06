@@ -33,7 +33,7 @@
     },
     "server": {
       "name": "server",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "dependencies": {
         "@amplitude/analytics-node": "^1.3.6",
         "@logtape/logtape": "^0.11.0",
@@ -58,7 +58,7 @@
     },
     "worker": {
       "name": "worker",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "dependencies": {
         "@mysten/sui": "^1.12.0",
         "common": "workspace:common",
