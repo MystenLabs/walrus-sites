@@ -29,17 +29,17 @@ async fn update_half_files() -> anyhow::Result<()> {
     let temp_dir = tempfile::tempdir()?;
     let test_site_dir = temp_dir.path().to_owned();
 
-    println!("Creating {} files for the test site...", N_FILES_IN_SITE);
+    println!("Creating {N_FILES_IN_SITE} files for the test site...");
 
     // Step 1: Create many simple HTML files
     fs::create_dir_all(&test_site_dir)?;
     for i in 0..N_FILES_IN_SITE {
-        let file_path = test_site_dir.join(format!("{}.html", i));
+        let file_path = test_site_dir.join(format!("{i}.html"));
         let mut file = File::create(file_path)?;
-        writeln!(file, "<html><body><h1>Page {}</h1></body></html>", i)?;
+        writeln!(file, "<html><body><h1>Page {i}</h1></body></html>")?;
     }
 
-    println!("Publishing initial site with {} files...", N_FILES_IN_SITE);
+    println!("Publishing initial site with {N_FILES_IN_SITE} files...");
 
     // Step 2: Publish the initial site
     let publish_args = ArgsBuilder::default()
@@ -60,7 +60,7 @@ async fn update_half_files() -> anyhow::Result<()> {
     let site = cluster.last_site_created().await?;
     let site_object_id = *site.id.object_id();
 
-    println!("Published site with object ID: {}", site_object_id);
+    println!("Published site with object ID: {site_object_id}");
 
     // Verify initial publish worked correctly
     let initial_resources = cluster.site_resources(site_object_id).await?;
