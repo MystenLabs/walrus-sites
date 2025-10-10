@@ -28,6 +28,7 @@ use localnode::{
     TestSetup,
 };
 
+#[allow(dead_code)]
 mod helpers;
 
 /// Extract cost value from a line containing FROST amount
