@@ -17,6 +17,7 @@ use site_builder::{
     site_config::WSResources,
     types::SuiResource,
 };
+use walrus_sdk::core::{BlobId, QuiltPatchId};
 
 #[allow(dead_code)]
 mod localnode;
@@ -24,8 +25,8 @@ use localnode::{
     args_builder::{ArgsBuilder, PublishOptionsBuilder},
     TestSetup,
 };
-use walrus_sdk::core::{BlobId, QuiltPatchId};
 
+#[allow(dead_code)]
 mod helpers;
 
 /// Verifies a resource by reading its quilt patch (if available) or blob and checking the hash.
