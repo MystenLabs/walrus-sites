@@ -344,7 +344,7 @@ async fn quilts_update_half_files() -> anyhow::Result<()> {
     // Verify that all resources have valid hashes (indicating they were processed)
     println!("Verifying {} updated resources...", updated_resources.len());
     for resource in updated_resources.iter() {
-        let data = verify_resource_and_get_content(&cluster, &resource).await?;
+        let data = verify_resource_and_get_content(&cluster, resource).await?;
 
         // Extract file number from path (e.g., "/42.html" -> 42)
         let file_number = resource
@@ -352,10 +352,7 @@ async fn quilts_update_half_files() -> anyhow::Result<()> {
             .strip_prefix('/')
             .and_then(|p| p.strip_suffix(".html"))
             .and_then(|p| p.parse::<usize>().ok())
-            .expect(&format!(
-                "Could not parse file number from path: {}",
-                resource.path
-            ));
+            .unwrap_or_else(|| panic!("Could not parse file number from path: {}", resource.path));
 
         // Verify the content - only odd numbered files should contain "UPDATED"
         let content = String::from_utf8_lossy(&data);
