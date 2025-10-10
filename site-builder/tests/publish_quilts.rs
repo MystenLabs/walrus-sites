@@ -90,12 +90,16 @@ async fn quilts_publish_snake() -> anyhow::Result<()> {
 #[tokio::test]
 #[ignore]
 async fn publish_quilts_lots_of_files() -> anyhow::Result<()> {
-    const N_FILES_IN_SITE: usize = 900;
+    let (mut config, selected_context) =
+        Config::load_from_multi_config(cluster.sites_config_path().to_owned(), context.as_deref())?;
+    let walrus = Config::walrus_client();
+    let files_to_generate = walrus.max_slots_in_quilt() + 10; // Generate more files than the max slots in quilts
+
+    const N_FILES_IN_SITE: usize = files_to_generate;
 
     let cluster = TestSetup::start_local_test_cluster().await?;
 
     let temp_dir = tempfile::tempdir()?;
-    // Generate 100 files: 1.html, 2.html, ..., 100.html
     (0..N_FILES_IN_SITE).try_for_each(|i| {
         let file_path = temp_dir.path().join(format!("{i}.html"));
         let mut file = File::create(file_path)?;
