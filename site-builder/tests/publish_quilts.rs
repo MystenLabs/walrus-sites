@@ -171,10 +171,12 @@ async fn publish_quilts_lots_of_identical_files() -> anyhow::Result<()> {
     let temp_dir = tempfile::tempdir()?;
     let subdir1 = temp_dir.path().join("subdir1");
     let subdir2 = temp_dir.path().join("subdir2");
+    fs::create_dir(&subdir1)?;
+    fs::create_dir(&subdir2)?;
 
     [&subdir1, &subdir2].iter().try_for_each(|subdir| {
         (0..n_files_per_dir).try_for_each(|i| {
-            let file_path = subdir.as_path().join(format!("{i}.html"));
+            let file_path = subdir.join(format!("{i}.html"));
             let mut file = File::create(file_path)?;
             writeln!(file, "<html><body><h1>File</h1></body></html>")?;
             Ok::<(), anyhow::Error>(())
