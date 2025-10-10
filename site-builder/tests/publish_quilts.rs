@@ -161,16 +161,19 @@ async fn publish_quilts_lots_of_files() -> anyhow::Result<()> {
 #[tokio::test]
 #[ignore]
 async fn publish_quilts_lots_of_identical_files() -> anyhow::Result<()> {
-    const N_FILES_IN_SITE: usize = 900;
-
     let cluster = TestSetup::start_local_test_cluster().await?;
+
+    let n_shards = cluster.cluster_state.walrus_cluster.n_shards;
+    let n_files_per_dir =
+        (u16::from(walrus_core::encoding::source_symbols_for_n_shards(n_shards).1) as usize - 1)
+            * 10; // 10 is arbitrary
 
     let temp_dir = tempfile::tempdir()?;
     let subdir1 = temp_dir.path().join("subdir1");
     let subdir2 = temp_dir.path().join("subdir2");
 
     [&subdir1, &subdir2].iter().try_for_each(|subdir| {
-        (0..N_FILES_IN_SITE).try_for_each(|i| {
+        (0..n_files_per_dir).try_for_each(|i| {
             let file_path = subdir.as_path().join(format!("{i}.html"));
             let mut file = File::create(file_path)?;
             writeln!(file, "<html><body><h1>File</h1></body></html>")?;
@@ -178,7 +181,6 @@ async fn publish_quilts_lots_of_identical_files() -> anyhow::Result<()> {
         })
     })?;
 
-    let publish_start = Instant::now();
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
         .with_command(Commands::PublishQuilts {
@@ -191,11 +193,10 @@ async fn publish_quilts_lots_of_identical_files() -> anyhow::Result<()> {
         .with_gas_budget(50_000_000_000)
         .build()?;
     site_builder::run(args).await?;
-    println!("Publishing took {:#?}", publish_start.elapsed());
 
     let site = cluster.last_site_created().await?;
     let resources = cluster.site_resources(*site.id.object_id()).await?;
-    assert_eq!(resources.len(), N_FILES_IN_SITE);
+    assert_eq!(resources.len(), n_files_per_dir);
 
     // This could be a bit optimized by fetching the whole blobs maybe. (for TestCluster ~= /8 less
     // get-quilt calls)
