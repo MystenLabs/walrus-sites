@@ -184,7 +184,7 @@ async fn update_with_file_rename() -> anyhow::Result<()> {
         .with_command(Commands::Publish {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(test_site_dir.clone())
-                .with_epoch_count_or_max(EpochCountOrMax::Max)
+                .with_epoch_count_or_max(EpochCountOrMax::Epochs(1.try_into()?))
                 .build()?,
             site_name: Some("Test Update With Rename".to_string()),
         })
@@ -220,7 +220,7 @@ async fn update_with_file_rename() -> anyhow::Result<()> {
         .with_command(Commands::Update {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(test_site_dir)
-                .with_epoch_count_or_max(EpochCountOrMax::Max)
+                .with_epoch_count_or_max(EpochCountOrMax::Epochs(20.try_into()?))
                 .build()?,
             object_id: site_object_id,
             watch: false,
@@ -258,11 +258,10 @@ async fn update_with_file_rename() -> anyhow::Result<()> {
         .await?;
 
     let blob_count = owned_blobs.data.len();
-
+    assert!(!owned_blobs.has_next_page);
     assert_eq!(
         blob_count, N_FILES,
-        "Expected {N_FILES} blob objects, found {}",
-        blob_count
+        "Expected {N_FILES} blob objects, found {blob_count}",
     );
 
     // Step 6: Verify the resources through site_resources method
@@ -288,5 +287,6 @@ async fn update_with_file_rename() -> anyhow::Result<()> {
             "Path {expected_path} should still exist"
         );
     }
+
     Ok(())
 }
