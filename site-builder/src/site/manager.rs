@@ -571,8 +571,9 @@ fn is_retriable_error(error: &Error) -> bool {
 
 /// Collects the `BlobId`s from the site_updates Deleted ResourceOps.
 /// These are candidates for deletion from Walrus.
+/// Resources that have been deleted but also created are excluded.
 fn collect_deletable_blob_candidates(site_updates: &SiteDataDiff) -> Vec<BlobId> {
-    site_updates
+    let mut deleted = site_updates
         .resource_ops
         .iter()
         .filter_map(|op| match op {
@@ -580,7 +581,17 @@ fn collect_deletable_blob_candidates(site_updates: &SiteDataDiff) -> Vec<BlobId>
             _ => None,
         })
         // Collect first to a hash-set to keep unique blob-ids.
-        .collect::<HashSet<_>>()
-        .into_iter()
-        .collect()
+        .collect::<HashSet<_>>();
+    let resource_deleted_but_blob_extended = site_updates
+        .resource_ops
+        .iter()
+        .filter_map(|op| match op {
+            ResourceOp::Created(resource) if deleted.contains(&resource.info.blob_id) => {
+                Some(resource.info.blob_id)
+            }
+            _ => None,
+        })
+        .collect::<HashSet<_>>();
+    deleted.retain(|blob_id| !resource_deleted_but_blob_extended.contains(blob_id));
+    deleted.into_iter().collect()
 }
