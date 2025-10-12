@@ -53,9 +53,9 @@ pub async fn get_blobs_for_resources(
 /// the blob will still be valid at the expiry time.
 pub fn calculate_min_end_epoch_for_expiry(
     expiry_time: SystemTime,
-    current_epoch: u64,
+    current_epoch: u32,
     epoch_duration_ms: u64,
-) -> anyhow::Result<u64> {
+) -> anyhow::Result<u32> {
     let now = SystemTime::now();
     let duration_until_expiry = expiry_time
         .duration_since(now)
@@ -65,5 +65,5 @@ pub fn calculate_min_end_epoch_for_expiry(
     // Ceiling division to ensure we have enough epochs
     let epochs_until_expiry = ms_until_expiry.div_ceil(epoch_duration_ms);
 
-    Ok(current_epoch + epochs_until_expiry)
+    Ok(current_epoch + epochs_until_expiry as u32)
 }

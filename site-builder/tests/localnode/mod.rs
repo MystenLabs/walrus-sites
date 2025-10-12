@@ -308,24 +308,54 @@ impl TestSetup {
         Ok(resources)
     }
 
-    /// Get the current epoch from the Sui system state.
-    pub async fn get_current_epoch(&self) -> anyhow::Result<u64> {
-        let system_state = self
-            .client
-            .governance_api()
-            .get_latest_sui_system_state()
+    /// Get the current Walrus epoch from the Walrus staking object.
+    pub async fn current_walrus_epoch(&self) -> anyhow::Result<u32> {
+        let staking_object = self
+            .cluster_state
+            .walrus_admin_client
+            .inner
+            .sui_client()
+            .read_client
+            .get_staking_object()
             .await?;
-        Ok(system_state.epoch)
+        Ok(staking_object.epoch())
     }
 
-    /// Get the epoch duration in milliseconds from the Sui system state.
-    pub async fn get_epoch_duration_ms(&self) -> anyhow::Result<u64> {
-        let system_state = self
-            .client
-            .governance_api()
-            .get_latest_sui_system_state()
+    /// Get the epoch duration in milliseconds from the Walrus staking object.
+    pub async fn epoch_duration_ms(&self) -> anyhow::Result<u64> {
+        let staking_object = self
+            .cluster_state
+            .walrus_admin_client
+            .inner
+            .sui_client()
+            .read_client
+            .get_staking_object()
             .await?;
-        Ok(system_state.epoch_duration_ms)
+        Ok(staking_object.epoch_duration_millis())
+    }
+
+    /// Get the epoch start timestamp from the Walrus staking object.
+    /// Returns the estimated start time of the current Walrus epoch.
+    pub async fn epoch_start_timestamp(&self) -> anyhow::Result<chrono::DateTime<chrono::Utc>> {
+        use walrus_sui::types::move_structs::EpochState;
+
+        let staking_object = self
+            .cluster_state
+            .walrus_admin_client
+            .inner
+            .sui_client()
+            .read_client
+            .get_staking_object()
+            .await?;
+
+        let epoch_state = staking_object.epoch_state();
+        let estimated_start_of_current_epoch = match epoch_state {
+            EpochState::EpochChangeDone(epoch_start)
+            | EpochState::NextParamsSelected(epoch_start) => *epoch_start,
+            EpochState::EpochChangeSync(_) => chrono::Utc::now(),
+        };
+
+        Ok(estimated_start_of_current_epoch)
     }
 
     /// Get blob information from a blob object ID.
