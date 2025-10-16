@@ -295,7 +295,11 @@ impl SiteEditor<EditOptions> {
         let local_site_data = resource_manager
             .read_dir_and_store_quilts(
                 self.directory(),
-                self.edit_options.publish_options.walrus_options.epoch_arg.clone(),
+                self.edit_options
+                    .publish_options
+                    .walrus_options
+                    .epoch_arg
+                    .clone(),
                 dry_run,
             )
             .await?;
