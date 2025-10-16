@@ -113,10 +113,12 @@ async fn quilts_update_snake() -> anyhow::Result<()> {
 
     // Update a resource
     let index_html_path = temp_dir.path().join("index.html");
-    let mut index_html = OpenOptions::new()
-        .append(true) // don't truncate, add to the end
-        .open(index_html_path)?;
-    writeln!(&mut index_html, "<!-- Updated by test -->")?;
+    {
+        let mut index_html = OpenOptions::new()
+            .append(true) // don't truncate, add to the end
+            .open(index_html_path)?;
+        writeln!(&mut index_html, "<!-- Updated by test -->")?;
+    } // File is automatically flushed and closed when it goes out of scope
     let ws_resources_updated: WSResources =
         serde_json::from_reader(File::open(ws_resources_path.as_path())?)?;
 
@@ -202,10 +204,12 @@ async fn quilts_update_blob_snake() -> anyhow::Result<()> {
 
     // Update a resource
     let index_html_path = temp_dir.path().join("index.html");
-    let mut index_html = OpenOptions::new()
-        .append(true) // don't truncate, add to the end
-        .open(index_html_path)?;
-    writeln!(index_html, "<!-- Updated by test -->")?;
+    {
+        let mut index_html = OpenOptions::new()
+            .append(true) // don't truncate, add to the end
+            .open(index_html_path)?;
+        writeln!(index_html, "<!-- Updated by test -->")?;
+    } // File is automatically flushed and closed when it goes out of scope
     let ws_resources_updated: WSResources =
         serde_json::from_reader(File::open(ws_resources_path.as_path())?)?;
 

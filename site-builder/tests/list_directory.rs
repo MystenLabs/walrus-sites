@@ -27,24 +27,22 @@ use helpers::copy_dir;
 async fn publish_snake_with_list_directory() -> anyhow::Result<()> {
     const SNAKE_FILES_UPLOAD_FILES: usize = 4;
     let cluster = TestSetup::start_local_test_cluster().await?;
-    let directory = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    let snake_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
         .join("examples")
         .join("snake");
 
-    let og_ws_resources = directory.join("ws-resources.json");
-    // Create a temp file copy so the original doesn't get mutated during the test.
+    // Copy the entire snake directory to a temp location to avoid modifying the original
     let temp_dir = tempfile::tempdir()?;
-    let temp_ws_resources = temp_dir.path().join("ws-resources.json");
-    fs::copy(&og_ws_resources, &temp_ws_resources)?;
+    let directory = temp_dir.path().join("snake");
+    copy_dir(&snake_dir, &directory)?;
 
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
         .with_command(Commands::Publish {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory)
-                .with_ws_resources(Some(temp_ws_resources))
                 .with_list_directory(true)
                 .with_epoch_count_or_max(EpochCountOrMax::Max)
                 .build()?,
