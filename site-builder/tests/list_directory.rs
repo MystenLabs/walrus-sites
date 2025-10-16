@@ -15,6 +15,10 @@ use localnode::{
     TestSetup,
 };
 
+#[allow(dead_code)]
+mod helpers;
+use helpers::copy_dir;
+
 #[tokio::test]
 #[ignore]
 // This test verifies that the site-builder can publish the example snake
@@ -85,17 +89,18 @@ async fn publish_snake_with_list_directory() -> anyhow::Result<()> {
 #[ignore]
 async fn preprocess_the_snake_example_with_list_directory_no_publish() -> anyhow::Result<()> {
     let cluster = TestSetup::start_local_test_cluster().await?;
-    let directory = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    let snake_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
         .join("examples")
         .join("snake");
 
-    let og_ws_resources = directory.join("ws-resources.json");
-    // Create a temp file copy so the original doesn't get mutated during the test.
+    // Copy the entire snake directory to a temp location to avoid modifying the original
     let temp_dir = tempfile::tempdir()?;
-    let temp_ws_resources = temp_dir.path().join("ws-resources.json");
-    fs::copy(&og_ws_resources, &temp_ws_resources)?;
+    let directory = temp_dir.path().join("snake");
+    copy_dir(&snake_dir, &directory)?;
+
+    let temp_ws_resources = directory.join("ws-resources.json");
 
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
