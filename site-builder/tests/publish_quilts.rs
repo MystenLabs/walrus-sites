@@ -198,7 +198,7 @@ async fn publish_quilts_lots_of_identical_files() -> anyhow::Result<()> {
 
     let site = cluster.last_site_created().await?;
     let resources = cluster.site_resources(*site.id.object_id()).await?;
-    assert_eq!(resources.len(), n_files_per_dir);
+    assert_eq!(resources.len(), n_files_per_dir * 2); // 2 = number of directories
 
     // This could be a bit optimized by fetching the whole blobs maybe. (for TestCluster ~= /8 less
     // get-quilt calls)
