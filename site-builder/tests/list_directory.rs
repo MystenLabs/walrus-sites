@@ -54,8 +54,8 @@ async fn publish_snake_with_list_directory() -> anyhow::Result<()> {
     let site = cluster.last_site_created().await?;
     let resources = cluster.site_resources(*site.id.object_id()).await?;
 
-    assert_eq!(resources.len(), SNAKE_FILES_UPLOAD_FILES + 1); // +1 because we use a temp
-                                                               // ws-resources
+    assert_eq!(resources.len(), SNAKE_FILES_UPLOAD_FILES);
+
     for resource in resources {
         let data = cluster.read_blob(&BlobId(resource.blob_id.0)).await?;
         let mut hash_function = Sha256::default();
