@@ -304,10 +304,7 @@ async fn quilts_update_with_different_epochs() -> anyhow::Result<()> {
 
     assert!(
         !updated_blobs.is_empty(),
-        "At least one blob should have the new end_epoch {} >= (current {} + {} epochs)",
-        expected_end_epoch,
-        current_epoch_after_update,
-        UPDATE_EPOCHS
+        "At least one blob should have the new end_epoch {expected_end_epoch} >= (current {current_epoch_after_update} + {UPDATE_EPOCHS} epochs)",
     );
 
     println!(
@@ -477,7 +474,7 @@ async fn quilts_publish_with_end_epoch() -> anyhow::Result<()> {
     let mut cluster = TestSetup::start_local_test_cluster().await?;
     let current_epoch = cluster.current_walrus_epoch().await?;
     // Use an end_epoch that's realistic (within MAX_EPOCHS_AHEAD)
-    let end_epoch = (current_epoch + 50) as u32;
+    let end_epoch = current_epoch + 50;
     let temp_dir = tempfile::tempdir()?;
     let directory = temp_dir.path().to_path_buf();
 
@@ -601,8 +598,7 @@ async fn quilts_update_with_end_epoch() -> anyhow::Result<()> {
 
     assert!(
         !updated_blobs.is_empty(),
-        "At least one blob should have the updated end_epoch {}",
-        UPDATE_END_EPOCH
+        "At least one blob should have the updated end_epoch {UPDATE_END_EPOCH}",
     );
 
     println!(
