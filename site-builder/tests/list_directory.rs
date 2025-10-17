@@ -233,9 +233,8 @@ async fn publish_quilts_with_list_directory() -> anyhow::Result<()> {
     let expected_files = ["Oi-Regular.ttf", "file.svg", "walrus.svg"];
     for file in &expected_files {
         assert!(
-            index_content.contains(&format!("<li><a href=\"/{}\">{}</a></li>", file, file)),
-            "Expected file {} to be listed in index.html",
-            file
+            index_content.contains(&format!("<li><a href=\"/{file}\">{file}</a></li>")),
+            "Expected file {file} to be listed in index.html",
         );
     }
 
