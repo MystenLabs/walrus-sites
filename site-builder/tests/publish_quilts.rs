@@ -160,6 +160,84 @@ async fn publish_quilts_lots_of_files() -> anyhow::Result<()> {
 
 #[tokio::test]
 #[ignore]
+async fn publish_quilts_lots_of_identical_files() -> anyhow::Result<()> {
+    let cluster = TestSetup::start_local_test_cluster().await?;
+
+    let n_shards = cluster.cluster_state.walrus_cluster.n_shards;
+    let n_files_per_dir =
+        (u16::from(walrus_core::encoding::source_symbols_for_n_shards(n_shards).1) as usize - 1)
+            * 10; // 10 is arbitrary
+
+    let temp_dir = tempfile::tempdir()?;
+    let subdir1 = temp_dir.path().join("subdir1");
+    let subdir2 = temp_dir.path().join("subdir2");
+    fs::create_dir(&subdir1)?;
+    fs::create_dir(&subdir2)?;
+
+    [&subdir1, &subdir2].iter().try_for_each(|subdir| {
+        (0..n_files_per_dir).try_for_each(|i| {
+            let file_path = subdir.join(format!("{i}.html"));
+            let mut file = File::create(file_path)?;
+            writeln!(file, "<html><body><h1>File</h1></body></html>")?;
+            Ok::<(), anyhow::Error>(())
+        })
+    })?;
+
+    let args = ArgsBuilder::default()
+        .with_config(Some(cluster.sites_config_path().to_owned()))
+        .with_command(Commands::PublishQuilts {
+            publish_options: PublishOptionsBuilder::default()
+                .with_directory(temp_dir.path().to_owned())
+                .with_epoch_count_or_max(EpochCountOrMax::Max)
+                .build()?,
+            site_name: None,
+        })
+        .with_gas_budget(50_000_000_000)
+        .build()?;
+    site_builder::run(args).await?;
+
+    let site = cluster.last_site_created().await?;
+    let resources = cluster.site_resources(*site.id.object_id()).await?;
+    assert_eq!(resources.len(), n_files_per_dir * 2); // 2 = number of directories
+
+    // This could be a bit optimized by fetching the whole blobs maybe. (for TestCluster ~= /8 less
+    // get-quilt calls)
+    let fetching_start = Instant::now();
+    for resource in resources {
+        let blob_id = BlobId(resource.blob_id.0);
+        let patch_id = resource.headers.0.get("x-wal-quilt-patch-internal-id");
+        assert!(patch_id.is_some());
+        let patch_id_bytes =
+            Vec::from_hex(patch_id.unwrap().trim_start_matches("0x")).expect("Invalid hex");
+
+        let _index: usize = Path::new(resource.path.as_str())
+            .file_stem()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .parse()?;
+        let mut res = cluster
+            .read_quilt_patches(&[QuiltPatchId {
+                patch_id_bytes,
+                quilt_id: blob_id,
+            }])
+            .await?;
+        assert_eq!(res.len(), 1);
+
+        let data = res.remove(0).into_data();
+        let text_file_contents = String::from_utf8(data)?;
+        assert_eq!(
+            text_file_contents,
+            format!("<html><body><h1>File</h1></body></html>\n")
+        );
+    }
+    println!("Fetching took {:#?}", fetching_start.elapsed());
+
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore]
 async fn publish_quilts_a_lot_of_headers() -> anyhow::Result<()> {
     const N_FILES_IN_SITE: usize = 10;
     const EXTRA_HEADERS_PER_HTML: usize = 100;
