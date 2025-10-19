@@ -210,7 +210,7 @@ async fn publish_quilts_lots_of_identical_files() -> anyhow::Result<()> {
         let patch_id_bytes =
             Vec::from_hex(patch_id.unwrap().trim_start_matches("0x")).expect("Invalid hex");
 
-        let index: usize = Path::new(resource.path.as_str())
+        let _index: usize = Path::new(resource.path.as_str())
             .file_stem()
             .unwrap()
             .to_str()
@@ -228,7 +228,7 @@ async fn publish_quilts_lots_of_identical_files() -> anyhow::Result<()> {
         let text_file_contents = String::from_utf8(data)?;
         assert_eq!(
             text_file_contents,
-            format!("<html><body><h1>File {index}</h1></body></html>\n")
+            format!("<html><body><h1>File</h1></body></html>\n")
         );
     }
     println!("Fetching took {:#?}", fetching_start.elapsed());
