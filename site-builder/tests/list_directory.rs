@@ -222,10 +222,17 @@ async fn publish_quilts_with_list_directory() -> anyhow::Result<()> {
     let index_content = String::from_utf8(quilt_patches[0].data().to_vec())?;
 
     // Verify the HTML structure matches the expected format for list-directory
-    assert!(index_content.contains("<!DOCTYPE html>"));
-    assert!(index_content.contains("<title>Directory listing for /</title>"));
-    assert!(index_content.contains("<h1>Directory listing for /</h1>"));
-    assert!(index_content.contains("<ul>"));
+    assert!(index_content.contains(
+        r#"<!DOCTYPE html>
+<html>
+<head>
+<title>Directory listing for /</title>
+</head>
+<body>
+<h1>Directory listing for /</h1>
+<hr>
+<ul>"#
+    ));
     assert!(index_content.contains("</ul>"));
 
     // Verify that the expected files from snake example are listed in the index
