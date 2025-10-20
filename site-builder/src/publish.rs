@@ -8,7 +8,7 @@ use std::{
     sync::mpsc::channel,
 };
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, Result};
 use notify::{RecursiveMode, Watcher};
 use sui_sdk::rpc_types::{
     SuiExecutionStatus,
@@ -251,20 +251,8 @@ impl SiteEditor<EditOptions> {
             "Parsing the directory {} and locally computing blob IDs",
             self.directory().to_string_lossy()
         ));
-        if self.edit_options.publish_options.list_directory {
-            display::action(format!("Preprocessing: {}", self.directory().display()));
-            let _ = Preprocessor::preprocess(
-                self.directory(),
-                &resource_manager
-                    .ws_resources
-                    .as_ref()
-                    .and_then(|ws| ws.ignore.clone()),
-            );
-            display::action(format!(
-                "Successfully preprocessed the {} directory!",
-                self.directory().display()
-            ));
-            display::done();
+        if self.is_list_directory() {
+            self.preprocess_directory(&resource_manager)?;
         }
 
         let local_site_data = resource_manager.read_dir(self.directory()).await?;
@@ -281,11 +269,10 @@ impl SiteEditor<EditOptions> {
     async fn run_single_edit_quilts(
         &self,
     ) -> Result<(SuiAddress, SuiTransactionBlockResponse, SiteDataDiffSummary)> {
-        if self.edit_options.publish_options.list_directory {
-            bail!("Option list-directory is not supported for Quilts yet.");
-        }
-
         let (mut resource_manager, mut site_manager) = self.create_managers().await?;
+        if self.is_list_directory() {
+            self.preprocess_directory(&resource_manager)?;
+        }
 
         display::action(format!(
             "Parsing the directory {} and locally computing Quilt IDs",
@@ -415,6 +402,29 @@ impl SiteEditor<EditOptions> {
             resource_manager.ws_resources,
             &path_for_saving,
         )
+    }
+
+    /// Returns whether the list_directory option is enabled.
+    fn is_list_directory(&self) -> bool {
+        self.edit_options.publish_options.list_directory
+    }
+
+    /// Runs the preprocessing step on the directory.
+    fn preprocess_directory(&self, resource_manager: &ResourceManager) -> Result<()> {
+        display::action(format!("Preprocessing: {}", self.directory().display()));
+        let _ = Preprocessor::preprocess(
+            self.directory(),
+            &resource_manager
+                .ws_resources
+                .as_ref()
+                .and_then(|ws| ws.ignore.clone()),
+        );
+        display::action(format!(
+            "Successfully preprocessed the {} directory!",
+            self.directory().display()
+        ));
+        display::done();
+        Ok(())
     }
 }
 

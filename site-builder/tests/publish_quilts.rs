@@ -5,7 +5,7 @@
 
 use std::{
     collections::BTreeMap,
-    fs::File,
+    fs::{self, File},
     io::{BufWriter, Write},
     path::{Path, PathBuf},
     time::Instant,
