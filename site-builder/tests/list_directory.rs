@@ -18,10 +18,6 @@ use localnode::{
     TestSetup,
 };
 
-#[allow(dead_code)]
-mod helpers;
-use helpers::copy_dir;
-
 #[tokio::test]
 #[ignore]
 // This test verifies that the site-builder can publish the example snake
