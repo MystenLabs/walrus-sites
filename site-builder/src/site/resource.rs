@@ -499,6 +499,7 @@ impl ResourceManager {
     async fn store_resource_chunk_into_quilt(
         &mut self,
         res_data_and_quilt_files: impl IntoIterator<Item = (ResourceData, QuiltBlobInput)>,
+        epochs: EpochArg,
     ) -> Result<Vec<Resource>> {
         // println!("resource_data.len(): {}", resource_data.len());
         // println!("resource_data: {resource_data:#?}");
@@ -509,10 +510,7 @@ impl ResourceManager {
             .walrus
             .store_quilt(
                 StoreQuiltInput::Blobs(quilt_blob_inputs.clone()),
-                EpochArg {
-                    epochs: Some(crate::args::EpochCountOrMax::default()),
-                    ..Default::default()
-                },
+                epochs,
                 false,
                 true,
             )
@@ -592,15 +590,13 @@ impl ResourceManager {
     async fn dry_run_resource_chunk(
         &mut self,
         quilt_blob_inputs: Vec<QuiltBlobInput>,
+        epochs: EpochArg,
     ) -> Result<u64> {
         let store_resp = self
             .walrus
             .dry_run_store_quilt(
                 StoreQuiltInput::Blobs(quilt_blob_inputs.clone()),
-                EpochArg {
-                    epochs: Some(crate::args::EpochCountOrMax::default()),
-                    ..Default::default()
-                },
+                epochs,
                 false,
                 true,
             )
@@ -650,6 +646,7 @@ impl ResourceManager {
     pub async fn read_dir_and_store_quilts(
         &mut self,
         root: &Path,
+        epochs: EpochArg,
         dry_run: bool,
     ) -> Result<SiteData> {
         let resource_paths = Self::iter_dir(root)?;
@@ -674,7 +671,9 @@ impl ResourceManager {
             let mut total_storage_cost = 0;
             for chunk in resource_file_inputs.chunks(chunk_size) {
                 let quilt_file_inputs = chunk.iter().map(|(_, f)| f.clone()).collect_vec();
-                let wal_storage_cost = self.dry_run_resource_chunk(quilt_file_inputs).await?;
+                let wal_storage_cost = self
+                    .dry_run_resource_chunk(quilt_file_inputs, epochs.clone())
+                    .await?;
                 total_storage_cost += wal_storage_cost;
             }
 
@@ -711,7 +710,9 @@ impl ResourceManager {
             .chunks(chunk_size)
             .into_iter()
         {
-            let resources = self.store_resource_chunk_into_quilt(chunk).await?;
+            let resources = self
+                .store_resource_chunk_into_quilt(chunk, epochs.clone())
+                .await?;
             resources_set.extend(resources);
         }
 

@@ -20,7 +20,7 @@ pub struct WalrusStoreOptionsBuilder {
     /// The epoch argument to specify either the number of epochs to store the blob, or the
     /// end epoch, or the earliest expiry time in rfc3339 format.
     ///
-    epoch_arg: Option<EpochArgEnum>,
+    epoch_arg: Option<EpochArg>,
     /// Make the stored resources permanent.
     ///
     /// By default, sites are deletable with site-builder delete command. By passing --permanent,
@@ -29,21 +29,6 @@ pub struct WalrusStoreOptionsBuilder {
     permanent: bool,
     /// Perform a dry run (you'll be asked for confirmation before committing changes).
     dry_run: bool,
-}
-
-#[derive(Debug, Clone)]
-enum EpochArgEnum {
-    /// The number of epochs the blob is stored for.
-    ///
-    /// If set to `max`, the blob is stored for the maximum number of epochs allowed by the
-    /// system object on chain. Otherwise, the blob is stored for the specified number of
-    /// epochs. The number of epochs must be greater than 0.
-    EpochCount(EpochCountOrMax),
-    /// The earliest time when the blob can expire, in RFC3339 format (e.g., "2024-03-20T15:00:00Z")
-    /// or a more relaxed format (e.g., "2024-03-20 15:00:00").
-    EarliestExpiryTime(SystemTime),
-    /// The end epoch for the blob.
-    EndEpoch(NonZeroU32),
 }
 
 #[derive(Debug, Error)]
@@ -64,21 +49,6 @@ impl WalrusStoreOptionsBuilder {
             return Err(InvalidWalrusStoreOptionsConfig::MissingEpochs);
         };
 
-        let epoch_arg = match epoch_arg {
-            EpochArgEnum::EpochCount(epochs) => EpochArg {
-                epochs: Some(epochs),
-                ..Default::default()
-            },
-            EpochArgEnum::EarliestExpiryTime(expiry_time) => EpochArg {
-                earliest_expiry_time: Some(expiry_time),
-                ..Default::default()
-            },
-            EpochArgEnum::EndEpoch(epoch) => EpochArg {
-                end_epoch: Some(epoch),
-                ..Default::default()
-            },
-        };
-
         Ok(WalrusStoreOptions {
             ws_resources,
             epoch_arg,
@@ -93,17 +63,31 @@ impl WalrusStoreOptionsBuilder {
     }
 
     pub fn with_epoch_count_or_max(mut self, epoch_count_or_max: EpochCountOrMax) -> Self {
-        self.epoch_arg = Some(EpochArgEnum::EpochCount(epoch_count_or_max));
+        self.epoch_arg = Some(EpochArg {
+            epochs: Some(epoch_count_or_max),
+            ..Default::default()
+        });
         self
     }
 
     pub fn with_earliest_expiry_time(mut self, earliest_expiry_time: SystemTime) -> Self {
-        self.epoch_arg = Some(EpochArgEnum::EarliestExpiryTime(earliest_expiry_time));
+        self.epoch_arg = Some(EpochArg {
+            earliest_expiry_time: Some(earliest_expiry_time),
+            ..Default::default()
+        });
         self
     }
 
     pub fn with_end_epoch(mut self, end_epoch: NonZeroU32) -> Self {
-        self.epoch_arg = Some(EpochArgEnum::EndEpoch(end_epoch));
+        self.epoch_arg = Some(EpochArg {
+            end_epoch: Some(end_epoch),
+            ..Default::default()
+        });
+        self
+    }
+
+    pub fn with_epoch_arg(mut self, epoch_arg: EpochArg) -> Self {
+        self.epoch_arg = Some(epoch_arg);
         self
     }
 

@@ -7,7 +7,7 @@ use std::{
     time::SystemTime,
 };
 
-use site_builder::args::{default as sites_default, EpochCountOrMax, PublishOptions};
+use site_builder::args::{default as sites_default, EpochArg, EpochCountOrMax, PublishOptions};
 use thiserror::Error;
 
 mod walrus_store_options_builder;
@@ -106,6 +106,11 @@ impl PublishOptionsBuilder {
 
     pub fn with_end_epoch(mut self, end_epoch: NonZeroU32) -> Self {
         self.walrus_options = self.walrus_options.with_end_epoch(end_epoch);
+        self
+    }
+
+    pub fn with_epoch_arg(mut self, epoch_arg: EpochArg) -> Self {
+        self.walrus_options = self.walrus_options.with_epoch_arg(epoch_arg);
         self
     }
 

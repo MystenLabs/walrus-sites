@@ -10,10 +10,12 @@ use std::{
 
 use anyhow::{anyhow, bail};
 use move_core_types::language_storage::StructTag;
+use serde::Deserialize;
 use site_builder::{
     args::GeneralArgs,
     config::Config as SitesConfig,
     contracts,
+    contracts::AssociatedContractStruct,
     types::{ResourceDynamicField, SiteFields, SuiResource},
 };
 use sui_move_build::BuildConfig;
@@ -58,6 +60,48 @@ use walrus_sui::{
 use walrus_test_utils::WithTempDir;
 
 pub mod args_builder;
+
+// ===== Type definitions for blob epoch testing =====
+
+/// Sui object for storage resources (copied from walrus::output module).
+#[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TestStorageResource {
+    /// Object ID of the Sui object.
+    pub id: ObjectID,
+    /// The start epoch of the resource (inclusive).
+    pub start_epoch: u32,
+    /// The end epoch of the resource (exclusive).
+    pub end_epoch: u32,
+    /// The total amount of reserved storage.
+    pub storage_size: u64,
+}
+
+/// Sui object for a blob (copied from walrus::output::SuiBlob).
+#[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TestBlob {
+    /// Object ID of the Sui object.
+    pub id: ObjectID,
+    /// The epoch in which the blob has been registered.
+    pub registered_epoch: u32,
+    /// The blob ID.
+    pub blob_id: walrus_sdk::core::BlobId,
+    /// The (unencoded) size of the blob.
+    pub size: u64,
+    /// The encoding coding type used for the blob.
+    pub encoding_type: u8,
+    /// The epoch in which the blob was first certified, `None` if the blob is uncertified.
+    pub certified_epoch: Option<u32>,
+    /// The [`TestStorageResource`] used to store the blob.
+    pub storage: TestStorageResource,
+    /// Marks the blob as deletable.
+    pub deletable: bool,
+}
+
+impl AssociatedContractStruct for TestBlob {
+    const CONTRACT_STRUCT: contracts::StructTag<'static> = contracts::walrus::Blob;
+}
 
 pub struct WalrusSitesClusterState {
     pub walrus_admin_client: WithTempDir<WalrusNodeClient<SuiContractClient>>,
@@ -262,6 +306,102 @@ impl TestSetup {
             resources.append(&mut resources_chunk);
         }
         Ok(resources)
+    }
+
+    /// Get the current Walrus epoch from the Walrus staking object.
+    pub async fn current_walrus_epoch(&self) -> anyhow::Result<u32> {
+        let staking_object = self
+            .cluster_state
+            .walrus_admin_client
+            .inner
+            .sui_client()
+            .read_client
+            .get_staking_object()
+            .await?;
+        Ok(staking_object.epoch())
+    }
+
+    /// Get the epoch duration in milliseconds from the Walrus staking object.
+    pub async fn epoch_duration_ms(&self) -> anyhow::Result<u64> {
+        let staking_object = self
+            .cluster_state
+            .walrus_admin_client
+            .inner
+            .sui_client()
+            .read_client
+            .get_staking_object()
+            .await?;
+        Ok(staking_object.epoch_duration_millis())
+    }
+
+    /// Get the epoch start timestamp from the Walrus staking object.
+    /// Returns the estimated start time of the current Walrus epoch.
+    pub async fn epoch_start_timestamp(&self) -> anyhow::Result<chrono::DateTime<chrono::Utc>> {
+        use walrus_sui::types::move_structs::EpochState;
+
+        let staking_object = self
+            .cluster_state
+            .walrus_admin_client
+            .inner
+            .sui_client()
+            .read_client
+            .get_staking_object()
+            .await?;
+
+        let epoch_state = staking_object.epoch_state();
+        let estimated_start_of_current_epoch = match epoch_state {
+            EpochState::EpochChangeDone(epoch_start)
+            | EpochState::NextParamsSelected(epoch_start) => *epoch_start,
+            EpochState::EpochChangeSync(_) => chrono::Utc::now(),
+        };
+
+        Ok(estimated_start_of_current_epoch)
+    }
+
+    /// Get blob information from a blob object ID.
+    /// Returns a `TestBlob` struct with the blob's storage information including end_epoch.
+    pub async fn get_blob_info(&self, blob_object_id: ObjectID) -> anyhow::Result<TestBlob> {
+        contracts::get_sui_object(&self.client, blob_object_id).await
+    }
+
+    /// Get all blob objects owned by the specified address.
+    /// Returns a vector of TestBlob structs with their storage information including end_epoch.
+    pub async fn get_owned_blobs(
+        &self,
+        wallet_address: SuiAddress,
+    ) -> anyhow::Result<Vec<TestBlob>> {
+        let owned_blobs = self
+            .client
+            .read_api()
+            .get_owned_objects(
+                wallet_address,
+                Some(sui_sdk::rpc_types::SuiObjectResponseQuery::new_with_filter(
+                    sui_sdk::rpc_types::SuiObjectDataFilter::StructType(StructTag {
+                        address: self.cluster_state.system_context.walrus_pkg_id.into(),
+                        module: Identifier::from_str("blob")?,
+                        name: Identifier::from_str("Blob")?,
+                        type_params: vec![],
+                    }),
+                )),
+                None,
+                None,
+            )
+            .await?;
+
+        let blob_object_ids: Vec<ObjectID> = owned_blobs
+            .data
+            .into_iter()
+            .filter_map(|obj| obj.data.map(|d| d.object_id))
+            .collect();
+
+        // Fetch full blob info for each object ID
+        let mut blobs = Vec::new();
+        for object_id in blob_object_ids {
+            let blob = self.get_blob_info(object_id).await?;
+            blobs.push(blob);
+        }
+
+        Ok(blobs)
     }
 
     // ============ Convenient accessors ============
