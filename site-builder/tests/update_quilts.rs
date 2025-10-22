@@ -497,14 +497,8 @@ async fn quilts_update_check_quilt_lifetime() -> anyhow::Result<()> {
         }
     };
 
-    println!(
-        "\n✓ Main quilt (blob {}): {} files",
-        main_quilt_blob_id, n_slots_in_quilts
-    );
-    println!(
-        "✓ Single file quilt (blob {}): 1 file ({})",
-        single_file_blob_id, single_file
-    );
+    println!("\n✓ Main quilt (blob {main_quilt_blob_id}): {n_slots_in_quilts} files",);
+    println!("✓ Single file quilt (blob {single_file_blob_id}): 1 file ({single_file})",);
 
     // Modify the single file
     println!("\nModifying single file: {single_file}");
@@ -560,13 +554,11 @@ async fn quilts_update_check_quilt_lifetime() -> anyhow::Result<()> {
     // Verify both blobs have been extended to the same end_epoch
     assert_eq!(
         main_blob_after_update_1.storage.end_epoch, expected_end_epoch_update_1,
-        "Main quilt blob should have end_epoch {}",
-        expected_end_epoch_update_1
+        "Main quilt blob should have end_epoch {expected_end_epoch_update_1}",
     );
     assert_eq!(
         single_blob_after_update_1.storage.end_epoch, expected_end_epoch_update_1,
-        "Single file blob should have end_epoch {}",
-        expected_end_epoch_update_1
+        "Single file blob should have end_epoch {expected_end_epoch_update_1}",
     );
 
     println!(
