@@ -184,6 +184,8 @@ async fn run_internal(
                     None,
                     ContinuousEditing::Once,
                     BlobManagementOptions {
+                        // check-extend does not apply on quilts, as the walrus-store step does not
+                        // depend on resource-difference.
                         check_extend: false,
                     },
                 )
