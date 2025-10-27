@@ -705,6 +705,7 @@ impl ResourceManager {
         let mut resources_set = ResourceSet::empty();
         tracing::debug!("Processing chunks for quilt storage");
 
+        // TODO(nikos) chunkify based on n_files AND size per file
         for chunk in resource_file_inputs
             .into_iter()
             .chunks(chunk_size)

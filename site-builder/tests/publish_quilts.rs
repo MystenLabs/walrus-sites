@@ -30,7 +30,7 @@ use localnode::{
 
 #[allow(dead_code)]
 mod helpers;
-use helpers::copy_dir;
+use helpers::{copy_dir, create_large_test_site};
 
 #[tokio::test]
 #[ignore]
@@ -378,6 +378,52 @@ async fn publish_quilts_with_many_routes() -> anyhow::Result<()> {
     // Verify that the site was created successfully with many resources and routes
     // The routes redirect the 2nd half of resources to the 1st half
     println!("Successfully created site with {N_RESOURCES} resources and {N_ROUTES} routes");
+
+    Ok(())
+}
+
+/// Test publishing a site with large files to empirically determine quilt size limits.
+///
+/// Tries to publish a site with 2 large files, each one taking pretty much the whole size of the
+/// Quilt.
+#[tokio::test]
+#[ignore]
+async fn publish_quilts_with_two_large_files() -> anyhow::Result<()> {
+    // TODO: Adjust these values to test different configurations
+    const N_FILES: usize = 2;
+    const MAX_SYMBOL_SIZE: usize = 65534;
+    const QUILT_PATCH_OVERHEAD: usize = 50;
+
+    let cluster = TestSetup::start_local_test_cluster().await?;
+    let n_shards = cluster.cluster_state.walrus_cluster.n_shards;
+    let (n_rows, n_cols) = walrus_core::encoding::source_symbols_for_n_shards(n_shards);
+    // n_rows x (n_cols - index_cols) * MAX_SYMBOL_SIZE - QUILT_PATCH_OVERHEAD
+    let almost_whole_quilt_file_size =
+        n_rows.get() as usize * (n_cols.get() as usize - 1) * MAX_SYMBOL_SIZE
+            - QUILT_PATCH_OVERHEAD;
+
+    let temp_dir = tempfile::tempdir()?;
+    create_large_test_site(temp_dir.path(), N_FILES, almost_whole_quilt_file_size)?;
+
+    let args = ArgsBuilder::default()
+        .with_config(Some(cluster.sites_config_path().to_owned()))
+        .with_command(Commands::PublishQuilts {
+            publish_options: PublishOptionsBuilder::default()
+                .with_directory(temp_dir.path().to_owned())
+                .with_epoch_count_or_max(EpochCountOrMax::Max)
+                .build()?,
+            site_name: None,
+        })
+        .with_gas_budget(100_000_000_000)
+        .build()?;
+
+    site_builder::run(args).await?;
+
+    let site = cluster.last_site_created().await?;
+    let resources = cluster.site_resources(*site.id.object_id()).await?;
+
+    println!("site: {}", site.id.object_id());
+    assert_eq!(resources.len(), N_FILES);
 
     Ok(())
 }
