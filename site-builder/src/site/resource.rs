@@ -36,6 +36,9 @@ use crate::{
     },
 };
 
+/// Maximum size (in bytes) for a BCS-serialized identifier in a quilt.
+const MAX_IDENTIFIER_SIZE: usize = 100;
+
 /// The resource that is to be created or updated on Sui.
 ///
 /// This struct contains additional information that is not stored on chain, compared to
@@ -474,7 +477,23 @@ impl ResourceManager {
                         .unwrap_or(resource_path.as_str()),
                 );
 
-                let identifier = Some(str_to_base36(resource_path.as_str())?);
+                let identifier_str = str_to_base36(resource_path.as_str())?;
+
+                // Validate identifier size (BCS serialized) should be just 1 + str.len(), but
+                // this is cleaner
+                let identifier_size = bcs::serialized_size(&identifier_str)
+                    .context("Failed to compute identifier size")?;
+                if identifier_size > MAX_IDENTIFIER_SIZE {
+                    bail!(
+                        "Identifier for '{}' is too long: {} bytes (max: {} bytes). \
+                        Consider using a shorter path name.",
+                        resource_path,
+                        identifier_size,
+                        MAX_IDENTIFIER_SIZE
+                    );
+                }
+
+                let identifier = Some(identifier_str);
                 let Some(res_data) = self.read_local_resource(&full_path, resource_path)? else {
                     return Ok(None);
                 };
@@ -727,8 +746,7 @@ impl ResourceManager {
         // Available columns: n_cols - 1 (reserve 1 for quilt index)
         let mut available_columns = Walrus::max_slots_in_quilt(self.n_shards) as usize;
 
-        // Per-file overhead constants (conservative estimates)
-        const MAX_IDENTIFIER_SIZE: usize = 50; // Maximum identifier length in bytes
+        // Per-file overhead constant
         const FIXED_OVERHEAD: usize = 8; // BLOB_IDENTIFIER_SIZE_BYTES_LENGTH (2) + BLOB_HEADER_SIZE (6)
 
         for (res_data, quilt_input) in resources.into_iter() {

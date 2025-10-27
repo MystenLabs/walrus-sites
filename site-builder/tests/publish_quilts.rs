@@ -392,7 +392,7 @@ async fn publish_quilts_with_two_large_files() -> anyhow::Result<()> {
     // TODO: Adjust these values to test different configurations
     const N_FILES: usize = 2;
     const MAX_SYMBOL_SIZE: usize = 65534;
-    const QUILT_PATCH_OVERHEAD: usize = 58;
+    const QUILT_PATCH_OVERHEAD: usize = 108;
 
     let cluster = TestSetup::start_local_test_cluster().await?;
     let n_shards = cluster.cluster_state.walrus_cluster.n_shards;
