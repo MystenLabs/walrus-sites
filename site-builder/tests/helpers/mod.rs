@@ -151,7 +151,7 @@ pub fn create_large_test_site(
         };
 
         // Write HTML header
-        write!(file, "{}", html_header)?;
+        write!(file, "{html_header}")?;
 
         // Generate random alphanumeric text in chunks to avoid memory issues
         const CHUNK_SIZE: usize = 8192; // 8KB chunks
@@ -161,17 +161,17 @@ pub fn create_large_test_site(
         // Write full chunks
         for _ in 0..full_chunks {
             let chunk = Alphanumeric.sample_string(&mut rng, CHUNK_SIZE);
-            write!(file, "{}", chunk)?;
+            write!(file, "{chunk}")?;
         }
 
         // Write remainder
         if remainder > 0 {
             let chunk = Alphanumeric.sample_string(&mut rng, remainder);
-            write!(file, "{}", chunk)?;
+            write!(file, "{chunk}")?;
         }
 
         // Write HTML footer
-        write!(file, "{}", html_footer)?;
+        write!(file, "{html_footer}")?;
     }
 
     Ok(())
