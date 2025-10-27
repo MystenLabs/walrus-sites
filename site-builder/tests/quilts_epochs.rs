@@ -11,7 +11,7 @@
 
 #![cfg(feature = "quilts-experimental")]
 
-use std::{fs::File, io::Write, num::NonZeroU32, time::SystemTime};
+use std::{io::Write, num::NonZeroU32, time::SystemTime};
 
 use site_builder::args::{Commands, EpochArg, EpochCountOrMax};
 
@@ -24,7 +24,7 @@ use localnode::{
 
 #[allow(dead_code)]
 mod helpers;
-use helpers::{calculate_min_end_epoch_for_expiry, get_blobs_for_resources};
+use helpers::{calculate_min_end_epoch_for_expiry, create_test_site, get_blobs_for_resources};
 
 /// Number of files to create in each test site
 const NUM_FILES: usize = 3;
@@ -68,31 +68,6 @@ async fn setup_test_cluster_and_site(
     let site_id = *site.id.object_id();
 
     Ok((cluster, temp_dir, directory, site_id))
-}
-
-/// Helper to create a simple test site with a few files.
-/// Adds a unique identifier to prevent blob deduplication across different test runs.
-fn create_test_site(directory: &std::path::Path, num_files: usize) -> anyhow::Result<()> {
-    // Use directory path hash as a unique identifier to prevent blob deduplication across tests
-    use std::{
-        collections::hash_map::DefaultHasher,
-        hash::{Hash, Hasher},
-    };
-
-    let mut hasher = DefaultHasher::new();
-    directory.hash(&mut hasher);
-    let unique_id = hasher.finish();
-
-    for i in 0..num_files {
-        let file_path = directory.join(format!("file_{i}.html"));
-        let mut file = File::create(file_path)?;
-        writeln!(file, "<html><body>")?;
-        writeln!(file, "<h1>Test File {i}</h1>")?;
-        writeln!(file, "<!-- Unique test ID: {unique_id} -->")?;
-        writeln!(file, "</body></html>")?;
-    }
-
-    Ok(())
 }
 
 #[tokio::test]

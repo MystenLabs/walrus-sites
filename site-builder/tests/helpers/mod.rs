@@ -1,7 +1,13 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::HashSet, fs, io, path::Path, time::SystemTime};
+use std::{
+    collections::HashSet,
+    fs::{self, File},
+    io::{self, Write},
+    path::Path,
+    time::SystemTime,
+};
 
 use site_builder::types::SuiResource;
 use sui_types::base_types::SuiAddress;
@@ -27,6 +33,31 @@ pub fn copy_dir(src: &Path, dst: &Path) -> io::Result<()> {
             fs::copy(&src_path, &dst_path)?;
         }
     }
+    Ok(())
+}
+
+/// Helper to create a simple test site with a few files.
+/// Adds a unique identifier to prevent blob deduplication across different test runs.
+pub fn create_test_site(directory: &std::path::Path, num_files: usize) -> anyhow::Result<()> {
+    // Use directory path hash as a unique identifier to prevent blob deduplication across tests
+    use std::{
+        collections::hash_map::DefaultHasher,
+        hash::{Hash, Hasher},
+    };
+
+    let mut hasher = DefaultHasher::new();
+    directory.hash(&mut hasher);
+    let unique_id = hasher.finish();
+
+    for i in 0..num_files {
+        let file_path = directory.join(format!("file_{i}.html"));
+        let mut file = File::create(file_path)?;
+        writeln!(file, "<html><body>")?;
+        writeln!(file, "<h1>Test File {i}</h1>")?;
+        writeln!(file, "<!-- Unique test ID: {unique_id} -->")?;
+        writeln!(file, "</body></html>")?;
+    }
+
     Ok(())
 }
 
