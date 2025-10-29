@@ -37,7 +37,7 @@ use crate::{
 };
 
 /// Maximum size (in bytes) for a BCS-serialized identifier in a quilt.
-const MAX_IDENTIFIER_SIZE: usize = 100;
+pub const MAX_IDENTIFIER_SIZE: usize = 2050;
 
 /// The resource that is to be created or updated on Sui.
 ///

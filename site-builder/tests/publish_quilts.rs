@@ -18,6 +18,7 @@ use site_builder::{
     args::{Commands, EpochCountOrMax},
     site_config::WSResources,
     types::{HttpHeaders, Routes, VecMap},
+    MAX_IDENTIFIER_SIZE,
 };
 use walrus_sdk::core::{BlobId, QuiltPatchId};
 
@@ -392,15 +393,17 @@ async fn publish_quilts_with_two_large_files() -> anyhow::Result<()> {
     // TODO: Adjust these values to test different configurations
     const N_FILES: usize = 2;
     const MAX_SYMBOL_SIZE: usize = 65534;
-    const QUILT_PATCH_OVERHEAD: usize = 108;
 
-    let cluster = TestSetup::start_local_test_cluster().await?;
+    let mut cluster = TestSetup::start_local_test_cluster().await?;
     let n_shards = cluster.cluster_state.walrus_cluster.n_shards;
     let (n_rows, n_cols) = walrus_core::encoding::source_symbols_for_n_shards(n_shards);
     // n_rows x (n_cols - index_cols) * MAX_SYMBOL_SIZE - QUILT_PATCH_OVERHEAD
+    // where QUILT_PATCH_OVERHEAD is the MAX_IDENTIFIER_SIZE + the constant overhead (6 for
+    // BLOB_HEADER and 2 for encoding the identifier length)
     let almost_whole_quilt_file_size =
         n_rows.get() as usize * (n_cols.get() as usize - 1) * MAX_SYMBOL_SIZE
-            - QUILT_PATCH_OVERHEAD;
+            - (MAX_IDENTIFIER_SIZE + 8);
+    println!("Storing two files with size: {almost_whole_quilt_file_size} bytes");
 
     let temp_dir = tempfile::tempdir()?;
     create_large_test_site(temp_dir.path(), N_FILES, almost_whole_quilt_file_size)?;
@@ -424,6 +427,10 @@ async fn publish_quilts_with_two_large_files() -> anyhow::Result<()> {
 
     println!("site: {}", site.id.object_id());
     assert_eq!(resources.len(), N_FILES);
+
+    let wallet_address = cluster.wallet_active_address()?;
+    let blobs = cluster.get_owned_blobs(wallet_address).await?;
+    assert_eq!(blobs.len(), N_FILES, "Should have {} blobs", N_FILES);
 
     Ok(())
 }
