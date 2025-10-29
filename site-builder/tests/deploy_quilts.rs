@@ -361,7 +361,7 @@ async fn quilts_deploy_updates_site_name() -> anyhow::Result<()> {
     );
 
     // Modify a file to trigger update
-    let index_html_path = temp_dir.path().join("0.html");
+    let index_html_path = temp_dir.path().join("file_0.html");
     {
         let mut index_html = OpenOptions::new().append(true).open(index_html_path)?;
         writeln!(&mut index_html, "<!-- Modified for name update test -->")?;
