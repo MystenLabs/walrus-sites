@@ -20,10 +20,9 @@ mod preprocessor;
 mod publish;
 mod retry_client;
 mod site;
-pub use site::config as site_config;
 // TODO: This can be a standalone crate, helping integration testing and other projects using our
 // contract.
-pub use site::contracts;
+pub use site::{config as site_config, contracts, resource::MAX_IDENTIFIER_SIZE};
 mod sitemap;
 mod suins;
 mod summary;

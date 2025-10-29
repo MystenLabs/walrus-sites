@@ -36,6 +36,9 @@ use crate::{
     },
 };
 
+/// Maximum size (in bytes) for a BCS-serialized identifier in a quilt.
+pub const MAX_IDENTIFIER_SIZE: usize = 2050;
+
 /// The resource that is to be created or updated on Sui.
 ///
 /// This struct contains additional information that is not stored on chain, compared to
@@ -474,7 +477,23 @@ impl ResourceManager {
                         .unwrap_or(resource_path.as_str()),
                 );
 
-                let identifier = Some(str_to_base36(resource_path.as_str())?);
+                let identifier_str = str_to_base36(resource_path.as_str())?;
+
+                // Validate identifier size (BCS serialized) should be just 1 + str.len(), but
+                // this is cleaner
+                let identifier_size = bcs::serialized_size(&identifier_str)
+                    .context("Failed to compute identifier size")?;
+                if identifier_size > MAX_IDENTIFIER_SIZE {
+                    bail!(
+                        "Identifier for '{}' is too long: {} bytes (max: {} bytes). \
+                        Consider using a shorter path name.",
+                        resource_path,
+                        identifier_size,
+                        MAX_IDENTIFIER_SIZE
+                    );
+                }
+
+                let identifier = Some(identifier_str);
                 let Some(res_data) = self.read_local_resource(&full_path, resource_path)? else {
                     return Ok(None);
                 };
@@ -660,16 +679,11 @@ impl ResourceManager {
             .collect::<Result<Vec<String>>>()?;
 
         let resource_file_inputs = self.prepare_local_resources(root, rel_paths)?;
+        let chunks = self.quilts_chunkify(resource_file_inputs)?;
 
-        // TODO(nikos): we split per max-quilts but there may be also other limits like max_size.
-        // TODO(nikos): Investigate whether indeed max_files == n_cols - 1 or if it is that one file
-        // takes more than a column, max_files becomes n_cols - 2
-        let chunk_size = Walrus::max_slots_in_quilt(self.n_shards) as usize;
-
-        // TODO: Test Dry-run
         if dry_run {
             let mut total_storage_cost = 0;
-            for chunk in resource_file_inputs.chunks(chunk_size) {
+            for chunk in &chunks {
                 let quilt_file_inputs = chunk.iter().map(|(_, f)| f.clone()).collect_vec();
                 let wal_storage_cost = self
                     .dry_run_resource_chunk(quilt_file_inputs, epochs.clone())
@@ -705,11 +719,7 @@ impl ResourceManager {
         let mut resources_set = ResourceSet::empty();
         tracing::debug!("Processing chunks for quilt storage");
 
-        for chunk in resource_file_inputs
-            .into_iter()
-            .chunks(chunk_size)
-            .into_iter()
-        {
+        for chunk in chunks {
             let resources = self
                 .store_resource_chunk_into_quilt(chunk, epochs.clone())
                 .await?;
@@ -721,6 +731,64 @@ impl ResourceManager {
             resources_set.len()
         );
         Ok(self.to_site_data(resources_set))
+    }
+
+    fn quilts_chunkify(
+        &self,
+        resources: Vec<(ResourceData, QuiltBlobInput)>,
+    ) -> Result<Vec<Vec<(ResourceData, QuiltBlobInput)>>> {
+        let mut chunks = vec![];
+        let mut current_chunk = vec![];
+
+        // Calculate capacity per column (slot) in bytes
+        let column_capacity = Walrus::max_slot_size(self.n_shards);
+
+        // Available columns: n_cols - 1 (reserve 1 for quilt index)
+        let mut available_columns = Walrus::max_slots_in_quilt(self.n_shards) as usize;
+
+        // Per-file overhead constant
+        const FIXED_OVERHEAD: usize = 8; // BLOB_IDENTIFIER_SIZE_BYTES_LENGTH (2) + BLOB_HEADER_SIZE (6)
+
+        for (res_data, quilt_input) in resources.into_iter() {
+            // Calculate total size including overhead
+            let file_size_with_overhead =
+                res_data.unencoded_size + MAX_IDENTIFIER_SIZE + FIXED_OVERHEAD;
+
+            // Abort if the file cannot fit in a single Quilt.
+            if file_size_with_overhead
+                > Walrus::max_slots_in_quilt(self.n_shards) as usize * column_capacity
+            {
+                bail!(
+                    "File size of {} exceeds maximum size of single file storage in Quilt.",
+                    res_data.full_path.as_path().display()
+                );
+            }
+
+            // Calculate how many columns this file needs
+            let columns_needed = file_size_with_overhead.div_ceil(column_capacity);
+
+            if available_columns >= columns_needed {
+                // File fits in current chunk
+                current_chunk.push((res_data, quilt_input));
+                available_columns -= columns_needed;
+            } else {
+                // File doesn't fit, start a new chunk
+                if !current_chunk.is_empty() {
+                    chunks.push(current_chunk);
+                }
+                current_chunk = vec![(res_data, quilt_input)];
+                // Reset available columns for new chunk
+                available_columns =
+                    (Walrus::max_slots_in_quilt(self.n_shards) as usize) - columns_needed;
+            }
+        }
+
+        // Push the last chunk if it's not empty
+        if !current_chunk.is_empty() {
+            chunks.push(current_chunk);
+        }
+
+        Ok(chunks)
     }
 
     fn iter_dir(start: &Path) -> Result<Vec<PathBuf>> {
