@@ -327,7 +327,7 @@ async fn quilts_deploy_updates_site_name() -> anyhow::Result<()> {
     let cluster = TestSetup::start_local_test_cluster().await?;
 
     // Create test site with 1 file
-    let temp_dir = helpers::create_test_site_with_n_files(1)?;
+    let temp_dir = helpers::create_test_site(1)?;
     let directory = temp_dir.path().to_path_buf();
 
     // Step 1: Initial publish with first name
