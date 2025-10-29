@@ -44,11 +44,10 @@ async fn setup_test_cluster_and_site(
     sui_types::base_types::ObjectID,
 )> {
     let cluster = TestSetup::start_local_test_cluster().await?;
-    let temp_dir = tempfile::tempdir()?;
-    let directory = temp_dir.path().to_path_buf();
 
     println!("Creating test site with {num_files} files...");
-    create_test_site(&directory, num_files)?;
+    let temp_dir = create_test_site(num_files)?;
+    let directory = temp_dir.path().to_path_buf();
 
     println!("Publishing site...");
     let args = ArgsBuilder::default()
@@ -76,11 +75,10 @@ async fn quilts_publish_with_specific_epochs() -> anyhow::Result<()> {
     const NUM_EPOCHS: u32 = 5;
 
     let mut cluster = TestSetup::start_local_test_cluster().await?;
-    let temp_dir = tempfile::tempdir()?;
-    let directory = temp_dir.path().to_path_buf();
 
     println!("Creating test site with {NUM_FILES} files...");
-    create_test_site(&directory, NUM_FILES)?;
+    let temp_dir = create_test_site(NUM_FILES)?;
+    let directory = temp_dir.path().to_path_buf();
 
     let current_epoch = cluster.current_walrus_epoch().await?;
     println!("Current epoch: {current_epoch}");
@@ -141,11 +139,10 @@ async fn quilts_publish_with_specific_epochs() -> anyhow::Result<()> {
 #[ignore]
 async fn quilts_publish_with_epochs_max() -> anyhow::Result<()> {
     let mut cluster = TestSetup::start_local_test_cluster().await?;
-    let temp_dir = tempfile::tempdir()?;
-    let directory = temp_dir.path().to_path_buf();
 
     println!("Creating test site with {NUM_FILES} files...");
-    create_test_site(&directory, NUM_FILES)?;
+    let temp_dir = create_test_site(NUM_FILES)?;
+    let directory = temp_dir.path().to_path_buf();
 
     let current_epoch = cluster.current_walrus_epoch().await?;
     println!("Current epoch: {current_epoch}");
@@ -295,11 +292,10 @@ async fn quilts_update_with_different_epochs() -> anyhow::Result<()> {
 #[ignore]
 async fn quilts_publish_with_earliest_expiry_time() -> anyhow::Result<()> {
     let mut cluster = TestSetup::start_local_test_cluster().await?;
-    let temp_dir = tempfile::tempdir()?;
-    let directory = temp_dir.path().to_path_buf();
 
     println!("Creating test site with {NUM_FILES} files...");
-    create_test_site(&directory, NUM_FILES)?;
+    let temp_dir = create_test_site(NUM_FILES)?;
+    let directory = temp_dir.path().to_path_buf();
 
     let epoch_duration_ms = cluster.epoch_duration_ms().await?;
     let epoch_start = cluster.epoch_start_timestamp().await?;
@@ -450,11 +446,10 @@ async fn quilts_publish_with_end_epoch() -> anyhow::Result<()> {
     let current_epoch = cluster.current_walrus_epoch().await?;
     // Use an end_epoch that's realistic (within MAX_EPOCHS_AHEAD)
     let end_epoch = current_epoch + 50;
-    let temp_dir = tempfile::tempdir()?;
-    let directory = temp_dir.path().to_path_buf();
 
     println!("Creating test site with {NUM_FILES} files...");
-    create_test_site(&directory, NUM_FILES)?;
+    let temp_dir = create_test_site(NUM_FILES)?;
+    let directory = temp_dir.path().to_path_buf();
 
     println!("Current epoch: {current_epoch}, using end_epoch: {end_epoch}");
 
