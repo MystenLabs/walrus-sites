@@ -117,9 +117,6 @@ async fn run_internal(
             site_name,
             object_id,
         } => {
-            // These two flags have no relevance in Quilts.
-            let (watch, check_extend) = (false, false);
-
             // Load the ws-resources file, to check for the site-object-id. If it exists, it means
             // the site is already deployed, in which case we should do update the site.
             // If it doesn't exist, we can publish a new site.
@@ -132,26 +129,13 @@ async fn run_internal(
             let site_object_id =
                 object_id.or_else(|| ws_resources.as_ref().and_then(|res| res.object_id));
 
-            let (identifier, continuous_editing, blob_management) = match site_object_id {
-                Some(object_id) => (
-                    Some(object_id),
-                    ContinuousEditing::from_watch_flag(watch),
-                    BlobManagementOptions { check_extend },
-                ),
-                None => (
-                    None,
-                    ContinuousEditing::Once,
-                    BlobManagementOptions::no_status_check(),
-                ),
-            };
-
             SiteEditor::new(context, config)
                 .with_edit_options(
                     publish_options,
-                    identifier,
+                    site_object_id,
                     site_name,
-                    continuous_editing,
-                    blob_management,
+                    ContinuousEditing::Once,
+                    BlobManagementOptions::no_status_check(),
                 )
                 .run_quilts()
                 .await?

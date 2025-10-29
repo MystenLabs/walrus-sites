@@ -307,5 +307,105 @@ async fn quilts_deploy_with_explicit_object_id() -> anyhow::Result<()> {
         }
     }
 
+    println!("quilts_deploy_with_explicit_object_id completed successfully");
+
+    Ok(())
+}
+
+/// Test 3: Deploy command updates site name on Sui via ws-resources.json
+///
+/// This test verifies that the site name is updated on Sui when ws-resources.json
+/// is modified to contain a different site_name.
+///
+/// Steps:
+/// 1. Publish a site with an initial name using DeployQuilts
+/// 2. Modify ws-resources.json to have a different site_name
+/// 3. Deploy again and verify the site name on Sui was updated
+#[tokio::test]
+#[ignore]
+async fn quilts_deploy_updates_site_name() -> anyhow::Result<()> {
+    let cluster = TestSetup::start_local_test_cluster().await?;
+
+    // Create test site with 1 file
+    let temp_dir = helpers::create_test_site_with_n_files(1)?;
+    let directory = temp_dir.path().to_path_buf();
+
+    // Step 1: Initial publish with first name
+    println!("Step 1: Publishing initial site with name 'Initial Site Name'...");
+    let publish_args = ArgsBuilder::default()
+        .with_config(Some(cluster.sites_config_path().to_owned()))
+        .with_command(Commands::DeployQuilts {
+            publish_options: PublishOptionsBuilder::default()
+                .with_directory(directory.clone())
+                .with_epoch_count_or_max(EpochCountOrMax::Epochs(1_u32.try_into().unwrap()))
+                .build()?,
+            site_name: Some("Initial Site Name".to_string()),
+            object_id: None,
+        })
+        .build()?;
+    site_builder::run(publish_args).await?;
+
+    let site_id = *cluster.last_site_created().await?.id.object_id();
+    println!("Published site with object ID: {site_id}");
+
+    // Verify initial name
+    let initial_site = cluster.last_site_created().await?;
+    assert_eq!(
+        initial_site.name, "Initial Site Name",
+        "Initial site name should be 'Initial Site Name'"
+    );
+
+    // Step 2: Modify ws-resources.json to have a different site_name, then deploy
+    println!(
+        "Step 2: Modifying ws-resources.json site_name to 'Updated Site Name' and deploying..."
+    );
+
+    // Modify a file to trigger update
+    let index_html_path = temp_dir.path().join("0.html");
+    {
+        let mut index_html = OpenOptions::new().append(true).open(index_html_path)?;
+        writeln!(&mut index_html, "<!-- Modified for name update test -->")?;
+    }
+
+    // Update the site_name in ws-resources.json
+    // TODO(fix): argument should take precedence from ws-resources.json, not the other way around.
+    let ws_resources_path = directory.join("ws-resources.json");
+    let mut ws_resources: WSResources = serde_json::from_reader(File::open(&ws_resources_path)?)?;
+    ws_resources.site_name = Some("Updated Site Name".to_string());
+    serde_json::to_writer_pretty(File::create(&ws_resources_path)?, &ws_resources)?;
+
+    let deploy_args = ArgsBuilder::default()
+        .with_config(Some(cluster.sites_config_path().to_owned()))
+        .with_command(Commands::DeployQuilts {
+            publish_options: PublishOptionsBuilder::default()
+                .with_directory(directory)
+                .with_epoch_count_or_max(EpochCountOrMax::Max)
+                .build()?,
+            site_name: None, // Let it read from ws-resources.json. TODO(fix): argument should take
+            // precedence from ws-resources.json, not the other way around.
+            object_id: None,
+        })
+        .build()?;
+    site_builder::run(deploy_args).await?;
+
+    // Step 3: Verify the name was updated on Sui
+    println!("Step 3: Verifying site name was updated on Sui...");
+    let updated_site = cluster.last_site_created().await?;
+
+    // Verify it's the same site (same object ID)
+    assert_eq!(
+        site_id,
+        *updated_site.id.object_id(),
+        "Site object ID should remain unchanged"
+    );
+
+    // Verify the name was updated
+    assert_eq!(
+        updated_site.name, "Updated Site Name",
+        "Site name should be updated to 'Updated Site Name'"
+    );
+
+    println!("quilts_deploy_updates_site_name completed successfully");
+
     Ok(())
 }
