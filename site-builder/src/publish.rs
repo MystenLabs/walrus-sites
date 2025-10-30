@@ -275,7 +275,7 @@ impl SiteEditor<EditOptions> {
         }
 
         display::action(format!(
-            "Parsing the directory {} and locally computing Quilt IDs",
+            "Parsing the directory {}, computing Quilt IDs, and storing Quilts",
             self.directory().to_string_lossy()
         ));
         let dry_run = self.edit_options.publish_options.walrus_options.dry_run;
