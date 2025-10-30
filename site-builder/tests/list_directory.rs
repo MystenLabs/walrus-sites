@@ -33,18 +33,14 @@ fn assert_quilt_identifiers(
     for identifier in expected_present {
         assert!(
             quilt_identifiers.contains(identifier),
-            "{}: Expected identifier {} to be present in quilt metadata",
-            context,
-            identifier
+            "{context}: Expected identifier {identifier} to be present in quilt metadata",
         );
     }
 
     for identifier in expected_absent {
         assert!(
             !quilt_identifiers.contains(identifier),
-            "{}: Ignored file identifier {} should NOT be present in quilt metadata",
-            context,
-            identifier
+            "{context}: Ignored file identifier {identifier} should NOT be present in quilt metadata",
         );
     }
 }
@@ -361,8 +357,7 @@ async fn deploy_quilts_with_list_directory_updates_ignored_files() -> anyhow::Re
     assert_eq!(
         quilt_identifiers_first.len(),
         EXPECTED_RESOURCES_PER_DEPLOY,
-        "First deploy: Quilt should contain exactly {} patches after ignoring file_2 and file_3",
-        EXPECTED_RESOURCES_PER_DEPLOY
+        "First deploy: Quilt should contain exactly {EXPECTED_RESOURCES_PER_DEPLOY} patches after ignoring file_2 and file_3",
     );
 
     // Encode the expected file paths to base36
@@ -451,8 +446,7 @@ async fn deploy_quilts_with_list_directory_updates_ignored_files() -> anyhow::Re
     assert_eq!(
         quilt_identifiers.len(),
         EXPECTED_RESOURCES_PER_DEPLOY,
-        "Quilt should contain exactly {} patches after ignoring file_0 and file_1",
-        EXPECTED_RESOURCES_PER_DEPLOY
+        "Quilt should contain exactly {EXPECTED_RESOURCES_PER_DEPLOY} patches after ignoring file_0 and file_1",
     );
 
     // Encode the expected file paths to base36
