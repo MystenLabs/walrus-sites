@@ -575,13 +575,13 @@ async fn deploy_quilts_with_list_directory_handles_ws_resources() -> anyhow::Res
     // Step 6: Verify both ws-resources files are included in the deployed resources
     let paths: Vec<&str> = resources.iter().map(|r| r.path.as_str()).collect();
 
-    // TODO(fix): This assertion is expected to fail - ws-resources.json should be included but currently isn't
+    // Site resources include the ws-resources.json not used as ws-resources
     assert!(
         paths.contains(&"/ws-resources.json"),
         "ws-resources.json from site directory should be included in deployed resources"
     );
 
-    // TODO(fix): This assertion is expected to fail - ws-resources-override.json should not be included but currently is
+    // Site resources exclude the ws-resources-override.json passed as ws-resources
     assert!(
         !paths.contains(&"/ws-resources-override.json"),
         "ws-resources-override.json from site directory should not be included in deployed resources"
@@ -630,11 +630,13 @@ async fn deploy_quilts_with_list_directory_handles_ws_resources() -> anyhow::Res
     let ws_resources_override_identifier =
         site_builder::util::str_to_base36("/ws-resources-override.json")?;
 
+    // Walrus store includes the ws-resources.json in site-root, not used as ws-resources
     assert!(
         quilt_identifiers.contains(&ws_resources_json_identifier),
         "ws-resources.json should be present in the quilt metadata"
     );
 
+    // Walrus store excludes the ws-resources-override.json, passed as ws-resources.
     assert!(
         !quilt_identifiers.contains(&ws_resources_override_identifier),
         "ws-resources-override.json should NOT be present in the quilt metadata (it's the config file, not site content)"
