@@ -111,6 +111,35 @@ async fn run_internal(
                 .run()
                 .await?
         }
+        #[cfg(feature = "quilts-experimental")]
+        Commands::DeployQuilts {
+            publish_options,
+            site_name,
+            object_id,
+        } => {
+            // Load the ws-resources file, to check for the site-object-id. If it exists, it means
+            // the site is already deployed, in which case we should do update the site.
+            // If it doesn't exist, we can publish a new site.
+            let (ws_resources, _) = load_ws_resources(
+                publish_options.walrus_options.ws_resources.as_deref(),
+                publish_options.directory.as_path(),
+            )?;
+
+            // if `object_id` is Some use it, else use the one from the ws-resources file
+            let site_object_id =
+                object_id.or_else(|| ws_resources.as_ref().and_then(|res| res.object_id));
+
+            SiteEditor::new(context, config)
+                .with_edit_options(
+                    publish_options,
+                    site_object_id,
+                    site_name,
+                    ContinuousEditing::Once,
+                    BlobManagementOptions::no_status_check(),
+                )
+                .run_quilts()
+                .await?
+        }
         Commands::Publish {
             publish_options,
             site_name,

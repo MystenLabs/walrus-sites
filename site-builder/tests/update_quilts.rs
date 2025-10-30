@@ -9,15 +9,10 @@ use std::{
     path::PathBuf,
 };
 
-use fastcrypto::hash::{HashFunction, Sha256};
-use hex::FromHex;
-use move_core_types::u256::U256;
 use site_builder::{
     args::{Commands, EpochCountOrMax},
     site_config::WSResources,
-    types::SuiResource,
 };
-use walrus_sdk::core::{BlobId, QuiltPatchId};
 
 #[allow(dead_code)]
 mod localnode;
@@ -28,49 +23,7 @@ use localnode::{
 
 #[allow(dead_code)]
 mod helpers;
-
-/// Verifies a resource by reading its quilt patch (if available) or blob and checking the hash.
-/// Returns the content data for additional verification by the caller.
-async fn verify_resource_and_get_content(
-    cluster: &TestSetup,
-    resource: &SuiResource,
-) -> anyhow::Result<Vec<u8>> {
-    let blob_id = BlobId(resource.blob_id.0);
-    let patch_id = resource.headers.0.get("x-wal-quilt-patch-internal-id");
-
-    let data = match patch_id {
-        Some(patch_id_hex) => {
-            // Read quilt patch
-            let patch_id_bytes = Vec::from_hex(patch_id_hex.trim_start_matches("0x"))
-                .expect("Invalid hex in patch ID");
-
-            let res = cluster
-                .read_quilt_patches(&[QuiltPatchId {
-                    patch_id_bytes,
-                    quilt_id: blob_id,
-                }])
-                .await?;
-            assert_eq!(res.len(), 1, "Should get exactly one quilt patch");
-            res[0].data().to_vec()
-        }
-        None => {
-            // Read regular blob
-            cluster.read_blob(&blob_id).await?
-        }
-    };
-
-    // Verify hash
-    let mut hash_function = Sha256::default();
-    hash_function.update(&data);
-    let resource_hash: [u8; 32] = hash_function.finalize().digest;
-    assert_eq!(
-        resource.blob_hash,
-        U256::from_le_bytes(&resource_hash),
-        "Resource hash mismatch"
-    );
-
-    Ok(data)
-}
+use helpers::verify_resource_and_get_content;
 
 #[tokio::test]
 #[ignore]

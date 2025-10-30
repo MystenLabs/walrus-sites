@@ -9,9 +9,12 @@ use std::{
     time::SystemTime,
 };
 
+use fastcrypto::hash::{HashFunction, Sha256};
+use hex::FromHex;
+use move_core_types::u256::U256;
 use site_builder::types::SuiResource;
 use sui_types::base_types::SuiAddress;
-use walrus_sdk::core::BlobId;
+use walrus_sdk::core::{BlobId, QuiltPatchId};
 
 use crate::localnode::{TestBlob, TestSetup};
 
@@ -38,12 +41,14 @@ pub fn copy_dir(src: &Path, dst: &Path) -> io::Result<()> {
 
 /// Helper to create a simple test site with a few files.
 /// Adds a unique identifier to prevent blob deduplication across different test runs.
-pub fn create_test_site(directory: &std::path::Path, num_files: usize) -> anyhow::Result<()> {
+pub fn create_test_site(num_files: usize) -> anyhow::Result<tempfile::TempDir> {
     // Use directory path hash as a unique identifier to prevent blob deduplication across tests
     use std::{
         collections::hash_map::DefaultHasher,
         hash::{Hash, Hasher},
     };
+    let temp_dir = tempfile::tempdir()?;
+    let directory = temp_dir.path();
 
     let mut hasher = DefaultHasher::new();
     directory.hash(&mut hasher);
@@ -58,7 +63,7 @@ pub fn create_test_site(directory: &std::path::Path, num_files: usize) -> anyhow
         writeln!(file, "</body></html>")?;
     }
 
-    Ok(())
+    Ok(temp_dir)
 }
 
 /// Get blobs owned by wallet filtered to only those matching the given resources.
@@ -175,4 +180,47 @@ pub fn create_large_test_site(
     }
 
     Ok(())
+}
+
+/// Verifies a resource by reading its quilt patch (if available) or blob and checking the hash.
+/// Returns the content data for additional verification by the caller.
+pub async fn verify_resource_and_get_content(
+    cluster: &TestSetup,
+    resource: &SuiResource,
+) -> anyhow::Result<Vec<u8>> {
+    let blob_id = BlobId(resource.blob_id.0);
+    let patch_id = resource.headers.0.get("x-wal-quilt-patch-internal-id");
+
+    let data = match patch_id {
+        Some(patch_id_hex) => {
+            // Read quilt patch
+            let patch_id_bytes = Vec::from_hex(patch_id_hex.trim_start_matches("0x"))
+                .expect("Invalid hex in patch ID");
+
+            let res = cluster
+                .read_quilt_patches(&[QuiltPatchId {
+                    patch_id_bytes,
+                    quilt_id: blob_id,
+                }])
+                .await?;
+            assert_eq!(res.len(), 1, "Should get exactly one quilt patch");
+            res[0].data().to_vec()
+        }
+        None => {
+            // Read regular blob
+            cluster.read_blob(&blob_id).await?
+        }
+    };
+
+    // Verify hash
+    let mut hash_function = Sha256::default();
+    hash_function.update(&data);
+    let resource_hash: [u8; 32] = hash_function.finalize().digest;
+    assert_eq!(
+        resource.blob_hash,
+        U256::from_le_bytes(&resource_hash),
+        "Resource hash mismatch"
+    );
+
+    Ok(data)
 }

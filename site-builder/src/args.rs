@@ -280,6 +280,26 @@ pub enum Commands {
         #[arg(long)]
         check_extend: bool,
     },
+    /// Deploy a new site on Sui.
+    ///
+    /// If the site has not been published before, this command publishes it and stores
+    /// the object ID of the Site in the ws-resources.json file.
+    /// If the site has been published before, this command updates the site(indicaded
+    /// by the site_object_id field in the ws-resources.json file).
+    #[cfg(feature = "quilts-experimental")]
+    DeployQuilts {
+        #[clap(flatten)]
+        publish_options: PublishOptions,
+        /// The name of the site.
+        #[arg(short, long)]
+        site_name: Option<String>,
+        /// The object ID of a partially published site to be completed.
+        ///
+        /// This is the object ID of the site that was published before, and is now being updated.
+        /// If this is provided, it will override the object ID in the ws-resources.json file.
+        #[arg(short, long)]
+        object_id: Option<ObjectID>,
+    },
     /// Publish a new site on Sui.
     Publish {
         #[clap(flatten)]
