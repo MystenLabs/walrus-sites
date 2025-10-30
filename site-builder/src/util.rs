@@ -41,7 +41,7 @@ use crate::{
 #[path = "unit_tests/util.tests.rs"]
 mod util_tests;
 
-pub async fn sign_and_send_ptb(
+pub(crate) async fn sign_and_send_ptb(
     active_address: SuiAddress,
     wallet: &WalletContext,
     retry_client: &RetriableSuiClient,
@@ -61,7 +61,7 @@ pub async fn sign_and_send_ptb(
     retry_client.execute_transaction(transaction).await
 }
 
-pub async fn handle_pagination<F, T, C, Fut>(
+pub(crate) async fn handle_pagination<F, T, C, Fut>(
     closure: F,
 ) -> Result<impl Iterator<Item = T>, sui_sdk::error::Error>
 where
@@ -137,7 +137,7 @@ pub fn id_to_base36(id: &ObjectID) -> Result<String> {
 /// in the transaction, or if the transaction did not result in the expected object creation
 /// structure that this function relies on. Can also fail if the transaction itself failed (not
 /// enough gas, etc.)
-pub fn get_site_id_from_response(
+pub(crate) fn get_site_id_from_response(
     address: SuiAddress,
     effects: &SuiTransactionBlockEffects,
 ) -> Result<ObjectID> {
@@ -164,7 +164,10 @@ pub fn get_site_id_from_response(
 }
 
 /// Returns the path if it is `Some` or any of the default paths if they exist (attempt in order).
-pub fn path_or_defaults_if_exist(path: Option<&Path>, defaults: &[PathBuf]) -> Option<PathBuf> {
+pub(crate) fn path_or_defaults_if_exist(
+    path: Option<&Path>,
+    defaults: &[PathBuf],
+) -> Option<PathBuf> {
     let mut path = path.map(|p| p.to_path_buf());
     for default in defaults {
         if path.is_some() {
@@ -205,7 +208,7 @@ pub(crate) async fn type_origin_map_for_package(
 /// then from the standard Sui configuration directory.
 // NB: When making changes to the logic, make sure to update the argument docs in
 // `crates/walrus-service/bin/client.rs`.
-pub fn load_wallet_context(
+pub(crate) fn load_wallet_context(
     path: Option<&Path>,
     wallet_env: Option<&str>,
     wallet_address: Option<&SuiAddress>,
@@ -271,7 +274,7 @@ pub fn load_wallet_context(
 /// Persists the site_object_id and site_name to the ws-resources.json file.
 ///
 /// > Note: This function should be called only after a successful deployment operation.
-pub fn persist_site_id_and_name(
+pub(crate) fn persist_site_id_and_name(
     site_object_id: ObjectID,
     site_name: Option<String>,
     initial_ws_resources_opt: Option<WSResources>,
@@ -361,14 +364,14 @@ pub fn persist_site_id_and_name(
 /// # Returns
 /// Returns `true` if the resource path matches the pattern, `false` otherwise.
 /// If the pattern is invalid, returns `false`.
-pub fn is_pattern_match(pattern: &str, resource_path: &str) -> bool {
+pub(crate) fn is_pattern_match(pattern: &str, resource_path: &str) -> bool {
     Pattern::new(pattern)
         .map(|pattern| pattern.matches(resource_path))
         .expect("Invalid glob pattern.")
 }
 
 /// Checks if a resource path matches any of the provided ignore patterns.
-pub fn is_ignored<'a>(
+pub(crate) fn is_ignored<'a>(
     mut ignore_patterns: impl Iterator<Item = &'a str>,
     resource_path: &str,
 ) -> bool {
@@ -377,7 +380,7 @@ pub fn is_ignored<'a>(
 
 /// Fetches the staking object by its ID and the current walrus package ID.
 /// Returns a `StakingObject` that includes version, package IDs, and staking parameters.
-pub async fn get_staking_object(
+pub(crate) async fn get_staking_object(
     sui_client: &RetriableSuiClient,
     staking_object_id: ObjectID,
 ) -> Result<Staking> {
@@ -413,7 +416,7 @@ pub async fn get_staking_object(
 /// # Returns
 /// Returns a `Result` containing the decoded bytes as a `Vec<u8>` on success,
 /// or a `String` error message on failure.
-pub fn decode_hex(hex_str: &str) -> Result<Vec<u8>, std::string::String> {
+pub(crate) fn decode_hex(hex_str: &str) -> Result<Vec<u8>, std::string::String> {
     hex::decode(&hex_str[2..]).map_err(|e| format!("Failed to decode hex: {e}"))
 }
 
@@ -429,7 +432,7 @@ pub fn decode_hex(hex_str: &str) -> Result<Vec<u8>, std::string::String> {
 ///
 /// # Returns
 /// Returns `Some(QuiltPatchId)` if the required header is present and valid, otherwise `None`.
-pub fn parse_quilt_patch_id(
+pub(crate) fn parse_quilt_patch_id(
     blob_id: &BlobId,
     resource_headers: &HttpHeaders,
 ) -> Option<QuiltPatchId> {

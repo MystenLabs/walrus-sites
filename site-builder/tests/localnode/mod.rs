@@ -46,6 +46,7 @@ use walrus_sdk::{
     client::WalrusNodeClient,
     core::{
         encoding::{quilt_encoding::QuiltStoreBlob, Primary},
+        metadata::QuiltMetadata,
         BlobId,
         QuiltPatchId,
     },
@@ -193,6 +194,15 @@ impl TestSetup {
             .inner
             .quilt_client()
             .get_blobs_by_identifiers(blob_id, file_identifiers)
+            .await
+    }
+
+    pub async fn read_quilt_metadata(&self, quilt_id: &BlobId) -> ClientResult<QuiltMetadata> {
+        self.cluster_state
+            .walrus_admin_client
+            .inner
+            .quilt_client()
+            .get_quilt_metadata(quilt_id)
             .await
     }
 

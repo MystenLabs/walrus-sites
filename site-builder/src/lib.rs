@@ -29,7 +29,7 @@ mod summary;
 // TODO: This can be a standalone crate, helping integration testing and other projects using our
 // contract.
 pub mod types;
-mod util;
+pub mod util;
 mod walrus;
 
 /// The default path to the configuration file for the site builder.
