@@ -477,8 +477,7 @@ async fn deploy_quilts_with_list_directory_updates_ignored_files() -> anyhow::Re
 
     assert!(
         !owned_blob_ids.contains(&quilt_blob_id_first),
-        "Old quilt blob from first deploy (ID: {:?}) should have been deleted after second deploy",
-        quilt_blob_id_first
+        "Old quilt blob from first deploy (ID: {quilt_blob_id_first:?}) should have been deleted after second deploy",
     );
 
     Ok(())
