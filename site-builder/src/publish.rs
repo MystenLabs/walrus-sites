@@ -231,6 +231,7 @@ impl SiteEditor<EditOptions> {
         Ok(())
     }
 
+    #[cfg(feature = "quilts-experimental")]
     pub async fn run_quilts(&self) -> Result<()> {
         let (active_address, response, summary) = self.run_single_edit_quilts().await?;
         print_summary(
@@ -266,6 +267,7 @@ impl SiteEditor<EditOptions> {
         Ok((site_manager.active_address()?, response, summary))
     }
 
+    #[cfg(feature = "quilts-experimental")]
     async fn run_single_edit_quilts(
         &self,
     ) -> Result<(SuiAddress, SuiTransactionBlockResponse, SiteDataDiffSummary)> {
@@ -279,6 +281,7 @@ impl SiteEditor<EditOptions> {
             self.directory().to_string_lossy()
         ));
         let dry_run = self.edit_options.publish_options.walrus_options.dry_run;
+        let max_size_per_quilt = self.edit_options.publish_options.walrus_options.max_total_file_size_per_quilt;
         let local_site_data = resource_manager
             .read_dir_and_store_quilts(
                 self.directory(),
@@ -288,6 +291,7 @@ impl SiteEditor<EditOptions> {
                     .epoch_arg
                     .clone(),
                 dry_run,
+                max_size_per_quilt,
             )
             .await?;
         display::done();

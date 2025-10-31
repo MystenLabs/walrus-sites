@@ -201,6 +201,7 @@ async fn run_internal(
                 .run()
                 .await?
         }
+        #[cfg(feature = "quilts-experimental")]
         Commands::UpdateQuilts {
             publish_options,
             object_id,

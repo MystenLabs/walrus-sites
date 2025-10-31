@@ -358,6 +358,7 @@ pub enum Commands {
     /// Update an existing site using quilts. Note that contrary to old update where
     /// `--check-extend` was optional, updating using quilts will extend any quilts that haven't
     /// changed for the epochs passed (as long as they are larger than the current end-epochs).
+    #[cfg(feature = "quilts-experimental")]
     UpdateQuilts {
         #[clap(flatten)]
         publish_options: PublishOptions,
@@ -468,6 +469,10 @@ pub struct WalrusStoreOptions {
     /// Perform a dry run (you'll be asked for confirmation before committing changes).
     #[arg(long)]
     pub dry_run: bool,
+    /// Max total size of all the files stored per Quilt
+    #[cfg(feature = "quilts-experimental")]
+    #[arg(long)]
+    pub max_total_file_size_per_quilt: usize,
 }
 
 /// The number of epochs to store the blob for.

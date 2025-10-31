@@ -54,6 +54,8 @@ impl WalrusStoreOptionsBuilder {
             epoch_arg,
             permanent,
             dry_run,
+            #[cfg(feature = "quilts-experimental")]
+            max_total_file_size_per_quilt: 512 * 1024 * 1024, // 512 MB
         })
     }
 
