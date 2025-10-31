@@ -358,6 +358,7 @@ pub enum Commands {
     /// Update an existing site using quilts. Note that contrary to old update where
     /// `--check-extend` was optional, updating using quilts will extend any quilts that haven't
     /// changed for the epochs passed (as long as they are larger than the current end-epochs).
+    #[cfg(feature = "quilts-experimental")]
     UpdateQuilts {
         #[clap(flatten)]
         publish_options: PublishOptions,
