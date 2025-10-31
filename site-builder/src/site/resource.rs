@@ -661,6 +661,7 @@ impl ResourceManager {
         root: &Path,
         epochs: EpochArg,
         dry_run: bool,
+        max_size_per_quilt: usize,
     ) -> Result<SiteData> {
         let resource_paths = Self::iter_dir(root)?;
         if resource_paths.is_empty() {
@@ -673,7 +674,7 @@ impl ResourceManager {
             .collect::<Result<Vec<String>>>()?;
 
         let resource_file_inputs = self.prepare_local_resources(root, rel_paths)?;
-        let chunks = self.quilts_chunkify(resource_file_inputs)?;
+        let chunks = self.quilts_chunkify(resource_file_inputs, max_size_per_quilt)?;
 
         if dry_run {
             let mut total_storage_cost = 0;
@@ -730,15 +731,15 @@ impl ResourceManager {
     fn quilts_chunkify(
         &self,
         resources: Vec<(ResourceData, QuiltBlobInput)>,
+        max_size_per_quilt: usize,
     ) -> Result<Vec<Vec<(ResourceData, QuiltBlobInput)>>> {
         let mut chunks = vec![];
         let mut current_chunk = vec![];
 
-        // Calculate capacity per column (slot) in bytes
-        let column_capacity = Walrus::max_slot_size(self.n_shards);
-
         // Available columns: n_cols - 1 (reserve 1 for quilt index)
         let mut available_columns = Walrus::max_slots_in_quilt(self.n_shards) as usize;
+        // Calculate capacity per column (slot) in bytes
+        let column_capacity = max_size_per_quilt / available_columns;
 
         // Per-file overhead constant
         const FIXED_OVERHEAD: usize = 8; // BLOB_IDENTIFIER_SIZE_BYTES_LENGTH (2) + BLOB_HEADER_SIZE (6)
@@ -749,8 +750,8 @@ impl ResourceManager {
                 res_data.unencoded_size + MAX_IDENTIFIER_SIZE + FIXED_OVERHEAD;
 
             // Abort if the file cannot fit in a single Quilt.
-            if file_size_with_overhead
-                > Walrus::max_slots_in_quilt(self.n_shards) as usize * column_capacity
+            // TODO(fix): We could still store a single-file quilt for this case.
+            if file_size_with_overhead > max_size_per_quilt
             {
                 bail!(
                     "File size of {} exceeds maximum size of single file storage in Quilt.",
