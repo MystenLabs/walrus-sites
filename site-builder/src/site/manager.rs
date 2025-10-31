@@ -370,8 +370,11 @@ impl SiteManager {
             routes_iter = new_routes.0.iter().peekable();
         }
 
-        ptb.add_route_operations(&mut routes_iter)
-            .ok_if_limit_reached()?;
+        // Add routes only if all resources have been added.
+        if resources_iter.peek().is_none() {
+            ptb.add_route_operations(&mut routes_iter)
+                .ok_if_limit_reached()?;
+        }
 
         let mut ptb = ptb.with_max_move_calls::<PTB_MAX_MOVE_CALLS>(); // Update to actual max.
         if self.needs_transfer() {
@@ -417,8 +420,12 @@ impl SiteManager {
 
             ptb.add_resource_operations(&mut resources_iter)
                 .ok_if_limit_reached()?;
-            ptb.add_route_operations(&mut routes_iter)
-                .ok_if_limit_reached()?;
+
+            // Add routes only if all resources have been added.
+            if resources_iter.peek().is_none() {
+                ptb.add_route_operations(&mut routes_iter)
+                    .ok_if_limit_reached()?;
+            }
 
             let resource_result = self
                 .sign_and_send_ptb(ptb.finish(), self.gas_coin_ref().await?, &retry_client)
