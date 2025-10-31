@@ -33,6 +33,8 @@ use localnode::{
 mod helpers;
 use helpers::{copy_dir, create_large_test_site};
 
+use crate::helpers::{create_test_site, verify_resource_and_get_content};
+
 #[tokio::test]
 #[ignore]
 async fn quilts_publish_snake() -> anyhow::Result<()> {
@@ -97,21 +99,15 @@ async fn publish_quilts_lots_of_files() -> anyhow::Result<()> {
 
     let cluster = TestSetup::start_local_test_cluster().await?;
 
-    let temp_dir = tempfile::tempdir()?;
-    // Generate 100 files: 1.html, 2.html, ..., 100.html
-    (0..N_FILES_IN_SITE).try_for_each(|i| {
-        let file_path = temp_dir.path().join(format!("{i}.html"));
-        let mut file = File::create(file_path)?;
-        writeln!(file, "<html><body><h1>File {i}</h1></body></html>")?;
-        Ok::<(), anyhow::Error>(())
-    })?;
+    let temp_dir = create_test_site(N_FILES_IN_SITE)?;
+    let directory = temp_dir.path();
 
     let publish_start = Instant::now();
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
         .with_command(Commands::PublishQuilts {
             publish_options: PublishOptionsBuilder::default()
-                .with_directory(temp_dir.path().to_owned())
+                .with_directory(directory.to_owned())
                 .with_epoch_count_or_max(EpochCountOrMax::Max)
                 .build()?,
             site_name: None,
@@ -129,32 +125,7 @@ async fn publish_quilts_lots_of_files() -> anyhow::Result<()> {
     // get-quilt calls)
     let fetching_start = Instant::now();
     for resource in resources {
-        let blob_id = BlobId(resource.blob_id.0);
-        let patch_id = resource.headers.0.get("x-wal-quilt-patch-internal-id");
-        assert!(patch_id.is_some());
-        let patch_id_bytes =
-            Vec::from_hex(patch_id.unwrap().trim_start_matches("0x")).expect("Invalid hex");
-
-        let index: usize = Path::new(resource.path.as_str())
-            .file_stem()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .parse()?;
-        let mut res = cluster
-            .read_quilt_patches(&[QuiltPatchId {
-                patch_id_bytes,
-                quilt_id: blob_id,
-            }])
-            .await?;
-        assert_eq!(res.len(), 1);
-
-        let data = res.remove(0).into_data();
-        let text_file_contents = String::from_utf8(data)?;
-        assert_eq!(
-            text_file_contents,
-            format!("<html><body><h1>File {index}</h1></body></html>\n")
-        );
+        verify_resource_and_get_content(&cluster, &resource).await?;
     }
     println!("Fetching took {:#?}", fetching_start.elapsed());
 
@@ -243,21 +214,16 @@ async fn publish_quilts_lots_of_identical_files() -> anyhow::Result<()> {
 #[ignore]
 async fn publish_quilts_a_lot_of_headers() -> anyhow::Result<()> {
     const N_FILES_IN_SITE: usize = 10;
-    const EXTRA_HEADERS_PER_HTML: usize = 100;
+    const EXTRA_HEADERS_PER_HTML: usize = 200;
 
-    let cluster = TestSetup::start_local_test_cluster().await?;
+    let mut cluster = TestSetup::start_local_test_cluster().await?;
 
-    // Create a fake site
-    let site_temp_dir = tempfile::tempdir()?;
-    // Generate 100 files: 1.html, 2.html, ..., 100.html
-    (0..N_FILES_IN_SITE).try_for_each(|i| {
-        let file_path = site_temp_dir.path().join(format!("{i}.html"));
-        let mut file = File::create(file_path)?;
-        writeln!(file, "<html><body><h1>File {i}</h1></body></html>")?;
-        Ok::<(), anyhow::Error>(())
-    })?;
+    let temp_dir = create_test_site(N_FILES_IN_SITE)?;
+    let directory = temp_dir.path();
 
-    // Create a ws-resources with a lot of headers per .html file.
+    // Also add route
+    let ws_resources_path = directory.join("ws-resources.json");
+
     let headers = BTreeMap::<String, HttpHeaders>::from([(
         "*.html".to_string(),
         HttpHeaders(VecMap(
@@ -271,23 +237,23 @@ async fn publish_quilts_a_lot_of_headers() -> anyhow::Result<()> {
                 .collect(),
         )),
     )]);
+    let routes = Routes(VecMap(BTreeMap::from([(
+        "/file_0.html".to_string(),
+        format!("/file_{}.html", N_FILES_IN_SITE - 1),
+    )])));
     let ws_resources = WSResources {
         headers: Some(headers),
+        routes: Some(routes),
         ..Default::default()
     };
-
-    let ws_temp_dir = tempfile::tempdir()?;
-    let temp_ws_resources = ws_temp_dir.path().join("ws-resources.json");
-    let file = File::create(&temp_ws_resources)?;
-    serde_json::to_writer_pretty(BufWriter::new(file), &ws_resources)?;
+    serde_json::to_writer_pretty(File::create(&ws_resources_path)?, &ws_resources)?;
 
     // ws_resources.headers.
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
         .with_command(Commands::PublishQuilts {
             publish_options: PublishOptionsBuilder::default()
-                .with_directory(site_temp_dir.path().to_owned())
-                .with_ws_resources(Some(temp_ws_resources))
+                .with_directory(directory.to_owned())
                 .with_epoch_count_or_max(EpochCountOrMax::Max)
                 .build()?,
             site_name: None,
@@ -296,6 +262,7 @@ async fn publish_quilts_a_lot_of_headers() -> anyhow::Result<()> {
         .build()?;
 
     site_builder::run(args).await?;
+    cluster.wait_for_user_input().await?;
 
     let site = cluster.last_site_created().await?;
     let resources = cluster.site_resources(*site.id.object_id()).await?;
