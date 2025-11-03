@@ -25,6 +25,8 @@ use localnode::{
 mod helpers;
 use helpers::verify_resource_and_get_content;
 
+use crate::helpers::create_test_site;
+
 #[tokio::test]
 #[ignore]
 async fn quilts_update_snake() -> anyhow::Result<()> {
@@ -215,22 +217,12 @@ async fn quilts_update_half_files() -> anyhow::Result<()> {
     let cluster = TestSetup::start_local_test_cluster().await?;
 
     // Create a temporary directory for our test site
-    let temp_dir = tempfile::tempdir()?;
+    println!("Creating {N_FILES_IN_SITE} files for the test site...");
+    let temp_dir = create_test_site(N_FILES_IN_SITE)?;
     let test_site_dir = temp_dir.path().to_owned();
 
-    println!("Creating {N_FILES_IN_SITE} files for the test site...");
-
-    // Step 1: Create many simple HTML files
-    fs::create_dir_all(&test_site_dir)?;
-    for i in 0..N_FILES_IN_SITE {
-        let file_path = test_site_dir.join(format!("{i}.html"));
-        let mut file = File::create(file_path)?;
-        writeln!(file, "<html><body><h1>Page {i}</h1></body></html>")?;
-    }
-
-    println!("Publishing initial site with {N_FILES_IN_SITE} files...");
-
     // Step 2: Publish the initial site
+    println!("Publishing initial site with {N_FILES_IN_SITE} files...");
     let publish_args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
         .with_command(Commands::PublishQuilts {
@@ -265,10 +257,9 @@ async fn quilts_update_half_files() -> anyhow::Result<()> {
         if i % 2 == 0 {
             continue;
         } // Skip even numbered files
-        let file_path = test_site_dir.join(format!("{i}.html"));
-        let content = fs::read_to_string(&file_path)?;
-        let updated_content = content.replace(&format!("Page {i}"), &format!("UPDATED Page {i}"));
-        fs::write(&file_path, updated_content)?;
+        let file_path = test_site_dir.join(format!("file_{i}.html"));
+        let mut file = OpenOptions::new().append(true).open(&file_path)?;
+        writeln!(file, "<!-- UPDATED Page {i} -->")?;
     }
 
     // Step 4: Update the site using the Update command
@@ -304,11 +295,12 @@ async fn quilts_update_half_files() -> anyhow::Result<()> {
     for resource in updated_resources.iter() {
         let data = verify_resource_and_get_content(&cluster, resource).await?;
 
-        // Extract file number from path (e.g., "/42.html" -> 42)
+        // Extract file number from path (e.g., "/file_42.html" -> 42)
         let file_number = resource
             .path
             .strip_prefix('/')
             .and_then(|p| p.strip_suffix(".html"))
+            .and_then(|p| p.strip_prefix("file_"))
             .and_then(|p| p.parse::<usize>().ok())
             .unwrap_or_else(|| panic!("Could not parse file number from path: {}", resource.path));
 
@@ -368,22 +360,13 @@ async fn quilts_update_check_quilt_lifetime() -> anyhow::Result<()> {
         u16::from(walrus_core::encoding::source_symbols_for_n_shards(n_shards).1) as usize - 1;
 
     let n_files = n_slots_in_quilts + 1;
-    println!("Creating test site with {n_files} files (n_slots_in_quilts + 1)...");
-
     // Create a temporary directory for our test site
-    let temp_dir = tempfile::tempdir()?;
+    println!("Creating test site with {n_files} files (n_slots_in_quilts + 1)...");
+    let temp_dir = create_test_site(n_files)?;
     let test_site_dir = temp_dir.path().to_owned();
 
-    // Create n_slots_in_quilts + 1 files directly in the root
-    for i in 0..n_files {
-        let file_path = test_site_dir.join(format!("file_{i}.html"));
-        let mut file = File::create(file_path)?;
-        writeln!(file, "<html><body><h1>File {i}</h1></body></html>")?;
-    }
-
-    println!("Publishing initial site with publish-quilts for {PUBLISH_EPOCHS} epochs...");
-
     // Publish the initial site with publish-quilts
+    println!("Publishing initial site with publish-quilts for {PUBLISH_EPOCHS} epochs...");
     let publish_epoch = cluster.current_walrus_epoch().await?;
     let publish_args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
