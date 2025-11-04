@@ -466,6 +466,17 @@ async fn publish_quilts_with_weird_filenames() -> anyhow::Result<()> {
         "αβγ.html",
         "emoji😀file.html",
         "🎉party🎊.html",
+        // Extended Unicode: Math operators, symbols, and special characters
+        "math∮∯∰∱∲∳.html",
+        "arrows←↑→↓↔↕.html",
+        "symbols⊕⊖⊗⊘⊙⊚.html",
+        "currency₠₡₢₣₤₥₦₧₨₩₪₫€₭₮₯.html",
+        "superscript⁰¹²³⁴⁵⁶⁷⁸⁹.html",
+        "subscript₀₁₂₃₄₅₆₇₈₉.html",
+        "boxdraw┌┬┐├┼┤└┴┘.html",
+        "shapes■□▢▣▤▥▦▧▨▩.html",
+        "stars★☆☇☈☉☊☋.html",
+        "misc⌘⌥⌦⌫⎋⏎⏏.html",
         // Mixed dots and special chars
         "file.with.many.dots.html",
         "file..double-dot.html",
