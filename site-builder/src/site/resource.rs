@@ -192,12 +192,12 @@ impl ResourceSet {
     }
 
     /// Returns a vector of operations to delete all resources in the set.
-    pub fn delete_all(&self) -> Vec<ResourceOp> {
+    pub fn delete_all(&self) -> Vec<ResourceOp<'_>> {
         self.inner.iter().map(ResourceOp::Deleted).collect()
     }
 
     /// Returns a vector of operations to create all resources in the set.
-    pub fn create_all(&self) -> Vec<ResourceOp> {
+    pub fn create_all(&self) -> Vec<ResourceOp<'_>> {
         self.inner.iter().map(ResourceOp::Created).collect()
     }
 
@@ -483,11 +483,8 @@ impl ResourceManager {
                     .context("Failed to compute identifier size")?;
                 if identifier_size > MAX_IDENTIFIER_SIZE {
                     bail!(
-                        "Identifier for '{}' is too long: {} bytes (max: {} bytes). \
+                        "Identifier for '{resource_path}' is too long: {identifier_size} bytes (max: {MAX_IDENTIFIER_SIZE} bytes). \
                         Consider using a shorter path name.",
-                        resource_path,
-                        identifier_size,
-                        MAX_IDENTIFIER_SIZE
                     );
                 }
 
@@ -836,7 +833,7 @@ pub(crate) fn full_path_to_resource_path(full_path: &Path, root: &Path) -> Resul
         "/{}",
         rel_path
             .to_str()
-            .ok_or(anyhow!("could not process the path string: {:?}", rel_path))?
+            .ok_or(anyhow!("could not process the path string: {rel_path:?}"))?
     ))
 }
 

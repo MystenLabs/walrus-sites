@@ -61,7 +61,7 @@ impl SiteDataDiff<'_> {
     }
 
     /// Returns the resources that need to be updated on Walrus.
-    pub fn get_walrus_updates(&self, blob_options: &BlobManagementOptions) -> Vec<&ResourceOp> {
+    pub fn get_walrus_updates(&self, blob_options: &BlobManagementOptions) -> Vec<&ResourceOp<'_>> {
         self.resource_ops
             .iter()
             .filter(|u| u.is_walrus_update(blob_options))
@@ -187,7 +187,7 @@ impl RemoteSiteFactory<'_> {
     pub async fn new(
         sui_client: &RetriableSuiClient,
         package_id: ObjectID,
-    ) -> Result<RemoteSiteFactory> {
+    ) -> Result<RemoteSiteFactory<'_>> {
         let type_origin_map = type_origin_map_for_package(sui_client, package_id).await?;
         Ok(RemoteSiteFactory {
             sui_client,

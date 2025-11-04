@@ -94,7 +94,7 @@ where
         self.0.is_empty()
     }
 
-    pub fn entry(&mut self, key: K) -> btree_map::Entry<K, V> {
+    pub fn entry(&mut self, key: K) -> btree_map::Entry<'_, K, V> {
         self.0.entry(key)
     }
 
@@ -122,7 +122,7 @@ where
         self.0.len()
     }
 
-    pub fn iter(&self) -> btree_map::Iter<K, V> {
+    pub fn iter(&self) -> btree_map::Iter<'_, K, V> {
         self.0.iter()
     }
 

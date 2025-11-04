@@ -78,6 +78,9 @@ pub struct StoredQuiltPatch {
     pub identifier: String,
     /// The quilt patch id.
     pub quilt_patch_id: String,
+    /// The range of the quilt patch.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub range: Option<(u64, u64)>,
 }
 
 /// A enum wrapper around the quilt index.

@@ -217,8 +217,7 @@ impl ObjectIdOrName {
                     Ok(object_id)
                 } else {
                     Err(anyhow!(
-                        "the SuiNS name ({}) provided does not point to any object",
-                        domain
+                        "the SuiNS name ({domain}) provided does not point to any object"
                     ))
                 }
             }
