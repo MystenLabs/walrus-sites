@@ -25,9 +25,9 @@ use localnode::{
 
 /// Verify quilt contains expected identifiers and doesn't contain ignored ones.
 fn assert_quilt_identifiers(
-    quilt_identifiers: &[String],
-    expected_present: &[String],
-    expected_absent: &[String],
+    quilt_identifiers: &[&str],
+    expected_present: &[&str],
+    expected_absent: &[&str],
     context: &str,
 ) {
     for identifier in expected_present {
@@ -350,7 +350,7 @@ async fn deploy_quilts_with_list_directory_updates_ignored_files() -> anyhow::Re
         .index
         .quilt_patches
         .iter()
-        .map(|p| p.identifier.clone())
+        .map(|p| p.identifier.as_str())
         .collect();
 
     // Verify count
@@ -360,18 +360,14 @@ async fn deploy_quilts_with_list_directory_updates_ignored_files() -> anyhow::Re
         "First deploy: Quilt should contain exactly {EXPECTED_RESOURCES_PER_DEPLOY} patches after ignoring file_2 and file_3",
     );
 
-    // Encode the expected file paths to base36
-    let expected_present_first = vec![
-        site_builder::util::str_to_base36("/file_0.html")?,
-        site_builder::util::str_to_base36("/file_1.html")?,
-        site_builder::util::str_to_base36("/file_4.html")?,
-        site_builder::util::str_to_base36("/index.html")?,
+    let expected_present_first = [
+        "/file_0.html",
+        "/file_1.html",
+        "/file_4.html",
+        "/index.html",
     ];
 
-    let expected_ignored_first = vec![
-        site_builder::util::str_to_base36("/file_2.html")?,
-        site_builder::util::str_to_base36("/file_3.html")?,
-    ];
+    let expected_ignored_first = ["/file_2.html", "/file_3.html"];
 
     // Verify that expected files are present and ignored files are absent
     assert_quilt_identifiers(
@@ -439,7 +435,7 @@ async fn deploy_quilts_with_list_directory_updates_ignored_files() -> anyhow::Re
         .index
         .quilt_patches
         .iter()
-        .map(|p| p.identifier.clone())
+        .map(|p| p.identifier.as_str())
         .collect();
 
     // Verify count
@@ -449,18 +445,14 @@ async fn deploy_quilts_with_list_directory_updates_ignored_files() -> anyhow::Re
         "Quilt should contain exactly {EXPECTED_RESOURCES_PER_DEPLOY} patches after ignoring file_0 and file_1",
     );
 
-    // Encode the expected file paths to base36
-    let expected_present = vec![
-        site_builder::util::str_to_base36("/file_2.html")?,
-        site_builder::util::str_to_base36("/file_3.html")?,
-        site_builder::util::str_to_base36("/file_4.html")?,
-        site_builder::util::str_to_base36("/index.html")?,
+    let expected_present = [
+        "/file_2.html",
+        "/file_3.html",
+        "/file_4.html",
+        "/index.html",
     ];
 
-    let expected_ignored = vec![
-        site_builder::util::str_to_base36("/file_0.html")?,
-        site_builder::util::str_to_base36("/file_1.html")?,
-    ];
+    let expected_ignored = ["/file_0.html", "/file_1.html"];
 
     // Verify that expected files are present and ignored files are absent
     assert_quilt_identifiers(
@@ -622,13 +614,11 @@ async fn deploy_quilts_with_list_directory_handles_ws_resources() -> anyhow::Res
         .index
         .quilt_patches
         .iter()
-        .map(|p| p.identifier.clone())
+        .map(|p| p.identifier.as_str())
         .collect();
 
-    // Encode the file paths to base36 for comparison
-    let ws_resources_json_identifier = site_builder::util::str_to_base36("/ws-resources.json")?;
-    let ws_resources_override_identifier =
-        site_builder::util::str_to_base36("/ws-resources-override.json")?;
+    let ws_resources_json_identifier = "/ws-resources.json";
+    let ws_resources_override_identifier = "/ws-resources-override.json";
 
     // Walrus store includes the ws-resources.json in site-root, not used as ws-resources
     assert!(
