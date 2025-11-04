@@ -192,12 +192,12 @@ impl ResourceSet {
     }
 
     /// Returns a vector of operations to delete all resources in the set.
-    pub fn delete_all(&self) -> Vec<ResourceOp> {
+    pub fn delete_all(&self) -> Vec<ResourceOp<'_>> {
         self.inner.iter().map(ResourceOp::Deleted).collect()
     }
 
     /// Returns a vector of operations to create all resources in the set.
-    pub fn create_all(&self) -> Vec<ResourceOp> {
+    pub fn create_all(&self) -> Vec<ResourceOp<'_>> {
         self.inner.iter().map(ResourceOp::Created).collect()
     }
 
