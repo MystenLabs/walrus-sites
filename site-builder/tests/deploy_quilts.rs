@@ -527,7 +527,7 @@ async fn deploy_quilts_with_slot_sized_files() -> anyhow::Result<()> {
     let resource_blob_ids: std::collections::HashSet<_> =
         updated_resources.iter().map(|r| r.blob_id).collect();
 
-    println!("Resource blob_ids: {:?}", resource_blob_ids);
+    println!("Resource blob_ids: {resource_blob_ids:?}");
     assert_eq!(
         resource_blob_ids.len(),
         2,
@@ -548,8 +548,7 @@ async fn deploy_quilts_with_slot_sized_files() -> anyhow::Result<()> {
     for blob_id in &resource_blob_ids {
         assert!(
             owned_blob_ids.contains(&blob_id.0),
-            "Resource blob_id {:?} should be in owned blobs",
-            blob_id
+            "Resource blob_id {blob_id:?} should be in owned blobs"
         );
     }
 
