@@ -23,9 +23,7 @@ use localnode::{
 
 #[allow(dead_code)]
 mod helpers;
-use helpers::verify_resource_and_get_content;
-
-use crate::helpers::create_test_site;
+use helpers::{create_test_site, verify_resource_and_get_content};
 
 #[tokio::test]
 #[ignore]
