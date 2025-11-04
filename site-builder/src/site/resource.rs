@@ -28,7 +28,7 @@ use crate::{
     publish::BlobManagementOptions,
     site::{config::WSResources, content::ContentType},
     types::{HttpHeaders, SuiResource, VecMap},
-    util::{is_ignored, is_pattern_match, str_to_base36},
+    util::{is_ignored, is_pattern_match},
     walrus::{
         command::{QuiltBlobInput, StoreQuiltInput},
         types::BlobId,
@@ -477,11 +477,9 @@ impl ResourceManager {
                         .unwrap_or(resource_path.as_str()),
                 );
 
-                let identifier_str = str_to_base36(resource_path.as_str())?;
-
                 // Validate identifier size (BCS serialized) should be just 1 + str.len(), but
                 // this is cleaner
-                let identifier_size = bcs::serialized_size(&identifier_str)
+                let identifier_size = bcs::serialized_size(&resource_path)
                     .context("Failed to compute identifier size")?;
                 if identifier_size > MAX_IDENTIFIER_SIZE {
                     bail!(
@@ -493,14 +491,13 @@ impl ResourceManager {
                     );
                 }
 
-                let identifier = Some(identifier_str);
-                let Some(res_data) = self.read_local_resource(&full_path, resource_path)? else {
+                let Some(res_data) = self.read_local_resource(&full_path, resource_path.clone())?
+                else {
                     return Ok(None);
                 };
-                // TODO: When walrus dep is updated to support any type of identifiers, replace base36 to regular path
                 let quilt_blob_input = QuiltBlobInput {
                     path: full_path.clone(),
-                    identifier,
+                    identifier: Some(resource_path),
                     tags: BTreeMap::new(),
                 };
                 Ok(Some((res_data, quilt_blob_input)))
@@ -563,9 +560,9 @@ impl ResourceManager {
                     }
                 | {
                     // TODO(nikos): We have already calculated this
-                    let b36 = str_to_base36(&resource_path)?;
+                    let patch_identifier = resource_path.as_str();
                     // Walrus store does not maintain the order the files were passed
-                    let Some(pos) = quilt_patches.iter().position(|p| p.identifier == b36) else {
+                    let Some(pos) = quilt_patches.iter().position(|p| p.identifier == patch_identifier) else {
                         bail!("Resource {resource_path} exists but doesn't have a matching quilt-patch");
                     };
                     let patch = quilt_patches.swap_remove(pos);

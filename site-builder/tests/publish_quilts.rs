@@ -401,3 +401,144 @@ async fn publish_quilts_with_two_large_files() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+/// Test publishing a site with files that have special characters in their names.
+///
+/// Previously, special characters were not supported and required base36 conversion
+/// to work around Walrus limitations. This test ensures that after removing the base36
+/// conversion, Walrus now properly supports various special characters in patch identifiers.
+#[tokio::test]
+#[ignore]
+async fn publish_quilts_with_weird_filenames() -> anyhow::Result<()> {
+    let cluster = TestSetup::start_local_test_cluster().await?;
+
+    let temp_dir = tempfile::tempdir()?;
+    let directory = temp_dir.path();
+
+    // Create files with various special characters that would have previously
+    // caused errors like: "Invalid identifier: must contain only alphanumeric,
+    // underscore, hyphen, or period characters"
+    //
+    // Note: We avoid filesystem-forbidden characters: / \ NUL on Unix, and < > : " | ? * on Windows
+    let weird_filenames = vec![
+        // Special characters in middle
+        "file with spaces.html",
+        "file+plus.html",
+        "file(parens).html",
+        "file[brackets].html",
+        "file{braces}.html",
+        "file@at.html",
+        "file!exclaim.html",
+        "file#hash.html",
+        "file$dollar.html",
+        "file%percent.html",
+        "file&ampersand.html",
+        "file=equals.html",
+        "file,comma.html",
+        "file;semicolon.html",
+        "file'quote.html",
+        "file~tilde.html",
+        "file`backtick.html",
+        "file^caret.html",
+        // Starting with special characters
+        " leading-space.html",
+        "+plus-start.html",
+        "@at-start.html",
+        "!exclaim-start.html",
+        "#hash-start.html",
+        "-dash-start.html",
+        ".dot-start.html",
+        // Ending with special characters (after extension)
+        // "trailing-space.html ", // Not supported by Walrus
+        "trailing-dot.html.",
+        "plus-end.html+",
+        "at-end.html@",
+        "exclaim-end.html!",
+        "hash-end.html#",
+        // Multiple consecutive special characters
+        "multiple+++special.html",
+        "many   spaces.html",
+        "mix@#$chars.html",
+        // Unicode characters (UTF-8)
+        "café.html",
+        "日本語.html",
+        "файл.html",
+        "αβγ.html",
+        "emoji😀file.html",
+        "🎉party🎊.html",
+        // Extended Unicode: Math operators, symbols, and special characters
+        "math∮∯∰∱∲∳.html",
+        "arrows←↑→↓↔↕.html",
+        "symbols⊕⊖⊗⊘⊙⊚.html",
+        "currency₠₡₢₣₤₥₦₧₨₩₪₫€₭₮₯.html",
+        "superscript⁰¹²³⁴⁵⁶⁷⁸⁹.html",
+        "subscript₀₁₂₃₄₅₆₇₈₉.html",
+        "boxdraw┌┬┐├┼┤└┴┘.html",
+        "shapes■□▢▣▤▥▦▧▨▩.html",
+        "stars★☆☇☈☉☊☋.html",
+        "misc⌘⌥⌦⌫⎋⏎⏏.html",
+        // Mixed dots and special chars
+        "file.with.many.dots.html",
+        "file..double-dot.html",
+        // Underscores and hyphens (should always work, but let's be thorough)
+        "file_with_underscores.html",
+        "file-with-hyphens.html",
+        "mixed_chars-and.dots.html",
+    ];
+
+    // Create subdirectory with special characters too
+    let subdir = directory.join("sub dir");
+    fs::create_dir(&subdir)?;
+
+    for (idx, filename) in weird_filenames.iter().enumerate() {
+        let file_path = directory.join(filename);
+        let mut file = File::create(file_path)?;
+        writeln!(file, "<html><body>")?;
+        writeln!(file, "<h1>Test File {idx}: {filename}</h1>")?;
+        writeln!(file, "</body></html>")?;
+    }
+
+    // Also create a file in the subdirectory
+    let subdir_file = subdir.join("file in subdir.html");
+    let mut file = File::create(subdir_file)?;
+    writeln!(file, "<html><body>")?;
+    writeln!(file, "<h1>File in subdirectory with space</h1>")?;
+    writeln!(file, "</body></html>")?;
+
+    let expected_file_count = weird_filenames.len() + 1; // +1 for subdir file
+
+    let args = ArgsBuilder::default()
+        .with_config(Some(cluster.sites_config_path().to_owned()))
+        .with_command(Commands::PublishQuilts {
+            publish_options: PublishOptionsBuilder::default()
+                .with_directory(directory.to_owned())
+                .with_epoch_count_or_max(EpochCountOrMax::Max)
+                .build()?,
+            site_name: None,
+        })
+        .with_gas_budget(50_000_000_000)
+        .build()?;
+
+    // This should succeed without any identifier errors
+    site_builder::run(args).await?;
+
+    let site = cluster.last_site_created().await?;
+    let resources = cluster.site_resources(*site.id.object_id()).await?;
+
+    assert_eq!(
+        resources.len(),
+        expected_file_count,
+        "All files with special characters should be published"
+    );
+
+    // Verify each resource can be read and has correct content
+    for resource in resources {
+        verify_resource_and_get_content(&cluster, &resource).await?;
+    }
+
+    println!(
+        "Successfully published {expected_file_count} files with special characters in their names"
+    );
+
+    Ok(())
+}
