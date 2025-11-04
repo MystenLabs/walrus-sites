@@ -22,7 +22,8 @@ use localnode::{
 
 #[allow(dead_code)]
 mod helpers;
-use helpers::verify_resource_and_get_content;
+use helpers::{create_large_test_site, verify_resource_and_get_content};
+use site_builder::MAX_IDENTIFIER_SIZE;
 
 /// Test 1: Deploy command with automatic site detection (object_id = None)
 ///
@@ -406,6 +407,158 @@ async fn quilts_deploy_updates_site_name() -> anyhow::Result<()> {
     );
 
     println!("quilts_deploy_updates_site_name completed successfully");
+
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore]
+async fn deploy_quilts_with_slot_sized_files() -> anyhow::Result<()> {
+    let mut cluster = TestSetup::start_local_test_cluster().await?;
+    let n_shards = cluster.cluster_state.walrus_cluster.n_shards;
+
+    // Calculate capacity per column (slot) in bytes
+    let (n_rows, n_cols) = walrus_core::encoding::source_symbols_for_n_shards(n_shards);
+    let max_symbol_size = walrus_core::DEFAULT_ENCODING.max_symbol_size() as usize;
+    let column_capacity = max_symbol_size * n_rows.get() as usize;
+
+    // Available columns: n_cols - 1 (reserve 1 for quilt index)
+    let available_columns = n_cols.get() as usize - 1;
+    let n_files = available_columns;
+
+    // Calculate the size for each file to exactly fill one slot
+    // Each file needs (MAX_IDENTIFIER_SIZE + 8) bytes of overhead for the quilt patch header
+    let file_size = column_capacity - (MAX_IDENTIFIER_SIZE + 8);
+
+    println!("Testing full quilt with {n_files} files, each filling one slot");
+    println!("File size: {file_size} bytes, Column capacity: {column_capacity} bytes");
+
+    let temp_dir = tempfile::tempdir()?;
+    create_large_test_site(temp_dir.path(), n_files, file_size)?;
+
+    let args = ArgsBuilder::default()
+        .with_config(Some(cluster.sites_config_path().to_owned()))
+        .with_command(Commands::PublishQuilts {
+            publish_options: PublishOptionsBuilder::default()
+                .with_directory(temp_dir.path().to_owned())
+                .with_epoch_count_or_max(EpochCountOrMax::Max)
+                .build()?,
+            site_name: None,
+        })
+        .with_gas_budget(100_000_000_000)
+        .build()?;
+
+    site_builder::run(args).await?;
+
+    let site = cluster.last_site_created().await?;
+    let resources = cluster.site_resources(*site.id.object_id()).await?;
+
+    println!(
+        "Successfully published site with object ID: {}",
+        site.id.object_id()
+    );
+    assert_eq!(resources.len(), n_files);
+
+    let wallet_address = cluster.wallet_active_address()?;
+    let blobs = cluster.get_owned_blobs(wallet_address).await?;
+    assert_eq!(
+        blobs.len(),
+        1,
+        "Should have exactly 1 quilt containing all {n_files} files"
+    );
+
+    // Verify all resources are in the same quilt (same blob_id)
+    let first_blob_id = resources[0].blob_id;
+    for resource in &resources {
+        assert_eq!(
+            resource.blob_id, first_blob_id,
+            "All resources should be in the same quilt"
+        );
+    }
+
+    // Verify each resource can be read back
+    for resource in &resources {
+        verify_resource_and_get_content(&cluster, resource).await?;
+    }
+
+    println!("Successfully verified {n_files} slot-sized files in a single full quilt");
+
+    // Step 2: Deploy new content with larger files (column_capacity - MAX_IDENTIFIER_SIZE)
+    // This will cause files to span multiple slots, creating 2 quilts instead of 1
+    let site_id = *site.id.object_id();
+    let initial_blob_id = first_blob_id;
+
+    let new_file_size = column_capacity - MAX_IDENTIFIER_SIZE;
+    println!("\nStep 2: Deploying new site with {n_files} files of size {new_file_size} bytes...");
+    println!("This should create 2 quilts instead of 1");
+
+    let temp_dir_new = tempfile::tempdir()?;
+    create_large_test_site(temp_dir_new.path(), n_files, new_file_size)?;
+
+    let deploy_args = ArgsBuilder::default()
+        .with_config(Some(cluster.sites_config_path().to_owned()))
+        .with_command(Commands::DeployQuilts {
+            publish_options: PublishOptionsBuilder::default()
+                .with_directory(temp_dir_new.path().to_owned())
+                .with_epoch_count_or_max(EpochCountOrMax::Max)
+                .build()?,
+            site_name: None,
+            object_id: Some(site_id),
+        })
+        .with_gas_budget(100_000_000_000)
+        .build()?;
+
+    site_builder::run(deploy_args).await?;
+
+    // Verify only 2 blob objects remain
+    let final_blobs = cluster.get_owned_blobs(wallet_address).await?;
+    println!("Final blob count: {}", final_blobs.len());
+    assert_eq!(
+        final_blobs.len(),
+        2,
+        "Should have exactly 2 blobs after deploy (old quilt deleted, 2 new quilts created)"
+    );
+
+    // Verify resources and their blob_ids
+    let updated_resources = cluster.site_resources(site_id).await?;
+    assert_eq!(updated_resources.len(), n_files);
+
+    // Collect unique blob_ids from resources
+    let resource_blob_ids: std::collections::HashSet<_> =
+        updated_resources.iter().map(|r| r.blob_id).collect();
+
+    println!("Resource blob_ids: {resource_blob_ids:?}");
+    assert_eq!(
+        resource_blob_ids.len(),
+        2,
+        "Resources should reference exactly 2 different blob_ids"
+    );
+
+    // Verify none of the resources use the old blob_id
+    for resource in &updated_resources {
+        assert_ne!(
+            resource.blob_id, initial_blob_id,
+            "No resource should reference the old blob_id after deploy"
+        );
+    }
+
+    // Verify that resource blob_ids match owned blobs
+    let owned_blob_ids: std::collections::HashSet<_> =
+        final_blobs.iter().map(|b| b.blob_id.0).collect();
+    for blob_id in &resource_blob_ids {
+        assert!(
+            owned_blob_ids.contains(&blob_id.0),
+            "Resource blob_id {blob_id:?} should be in owned blobs"
+        );
+    }
+
+    // Verify each resource can be read back
+    println!("Verifying all resources can be read back after deploy...");
+    for resource in &updated_resources {
+        verify_resource_and_get_content(&cluster, resource).await?;
+    }
+
+    println!("Successfully verified deployment replaced 1 quilt with 2 quilts");
 
     Ok(())
 }
