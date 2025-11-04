@@ -438,8 +438,7 @@ fn print_summary(
     if let Some(SuiTransactionBlockEffects::V1(eff)) = response.effects.as_ref() {
         if let SuiExecutionStatus::Failure { error } = &eff.status {
             return Err(anyhow!(
-                "error while processing the Sui transaction: {}",
-                error
+                "error while processing the Sui transaction: {error}"
             ));
         }
     }

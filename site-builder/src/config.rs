@@ -97,7 +97,7 @@ impl Config {
                 Ok((
                     contexts
                         .remove(context)
-                        .ok_or_else(|| anyhow!("could not find the context: {}", context))?,
+                        .ok_or_else(|| anyhow!("could not find the context: {context}"))?,
                     Some(context.to_owned()),
                 ))
             }
