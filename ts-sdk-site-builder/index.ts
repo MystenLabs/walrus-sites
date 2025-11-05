@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { SuiClient } from "@mysten/sui/client";
-import * as site from "./src/generated/walrus_site/site";
-import * as site_metadata from "./src/generated/walrus_site/metadata";
+import * as site from "./contracts/sites/walrus_site/site";
+import * as site_metadata from "./contracts/sites/walrus_site/metadata";
 import { Transaction } from "@mysten/sui/transactions";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 

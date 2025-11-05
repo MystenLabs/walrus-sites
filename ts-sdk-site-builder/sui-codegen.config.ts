@@ -4,7 +4,7 @@
 import type { SuiCodegenConfig } from "@mysten/codegen";
 
 const config: SuiCodegenConfig = {
-	output: './src/generated',
+	output: './contracts/walrus-sites',
 	generateSummaries: true,
 	prune: true,
 	packages: [
