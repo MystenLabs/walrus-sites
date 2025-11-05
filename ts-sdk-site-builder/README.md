@@ -1,15 +1,5 @@
 # ts-sdk-site-builder
 
-To install dependencies:
+An attempt to create a typescript version of the site-builder.
 
-```bash
-bun install
-```
-
-To run:
-
-```bash
-bun run index.ts
-```
-
-This project was created using `bun init` in bun v1.2.21. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+The smart contract integration is done automatically through the [sui-codegen](https://www.npmjs.com/package/@mysten/codegen) tool.
