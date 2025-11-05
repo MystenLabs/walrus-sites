@@ -4,15 +4,15 @@
 import type { SuiCodegenConfig } from "@mysten/codegen";
 
 const config: SuiCodegenConfig = {
-	output: './contracts/walrus-sites',
-	generateSummaries: true,
-	prune: true,
-	packages: [
-		{
-			package: '@walrus/sites',
-			path: '../move/walrus_site',
-		},
-	],
+    output: "./contracts/sites",
+    generateSummaries: true,
+    prune: true,
+    packages: [
+        {
+            package: "@walrus/sites",
+            path: "../move/walrus_site",
+        },
+    ],
 };
 
 export default config;
