@@ -734,18 +734,31 @@ impl ResourceManager {
         resources: Vec<(ResourceData, QuiltBlobInput)>,
         max_quilt_size: ByteSize,
     ) -> Result<Vec<Vec<(ResourceData, QuiltBlobInput)>>> {
-        let max_size_per_quilt = max_quilt_size.as_u64() as usize;
-        let mut chunks = vec![];
-        let mut current_chunk = vec![];
-
-        // Available columns: n_cols - 1 (reserve 1 for quilt index)
+        let max_quilt_size = max_quilt_size.as_u64() as usize;
         let max_available_columns = Walrus::max_slots_in_quilt(self.n_shards) as usize;
+        let max_theoretical_quilt_size =
+            Walrus::max_slot_size(self.n_shards) as usize * max_available_columns;
+
+        // Cap the effective_quilt_size to the min between the theoretical and the passed
+        let effective_quilt_size = if max_theoretical_quilt_size < max_quilt_size as usize {
+            display::warning(format!(
+                "Configured max quilt size ({}) exceeds theoretical maximum ({}). Using {} instead.",
+                ByteSize(max_quilt_size as u64),
+                ByteSize(max_theoretical_quilt_size as u64),
+                ByteSize(max_theoretical_quilt_size as u64)
+            ));
+            max_theoretical_quilt_size
+        } else {
+            max_quilt_size
+        };
         let mut available_columns = max_available_columns;
         // Calculate capacity per column (slot) in bytes
-        let column_capacity = max_size_per_quilt / available_columns;
-
+        let column_capacity = effective_quilt_size / available_columns;
         // Per-file overhead constant
         const FIXED_OVERHEAD: usize = 8; // BLOB_IDENTIFIER_SIZE_BYTES_LENGTH (2) + BLOB_HEADER_SIZE (6)
+
+        let mut chunks = vec![];
+        let mut current_chunk = vec![];
 
         for (res_data, quilt_input) in resources.into_iter() {
             // Calculate total size including overhead
@@ -754,7 +767,7 @@ impl ResourceManager {
 
             // Abort if the file cannot fit in a single Quilt.
             // TODO(fix): We could still store a single-file quilt for this case.
-            if file_size_with_overhead > max_size_per_quilt {
+            if file_size_with_overhead > effective_quilt_size {
                 bail!(
                     "File size of {} exceeds maximum size of single file storage in Quilt (current limit: {max_quilt_size}). \
                     Consider increasing the limit using --max-quilt-size flag (e.g., --max-quilt-size 1GiB).",
