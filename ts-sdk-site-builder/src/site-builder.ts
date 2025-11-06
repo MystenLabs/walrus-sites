@@ -6,6 +6,7 @@ import { SuiClient } from "@mysten/sui/client";
 import { walrus } from "@mysten/walrus";
 import { getFullnodeUrl } from "@mysten/sui/client";
 import { loadSitesConfig } from "../utils/file_io";
+import type { Transaction } from "@mysten/sui/transactions";
 
 export class SiteBuilder {
     keypair: Ed25519Keypair;
@@ -28,5 +29,14 @@ export class SiteBuilder {
                 },
             }),
         );
+    }
+
+    public async run(tx: Transaction, gasBudget = 1_000_000_000) {
+    	tx.setGasBudget(gasBudget);
+	    const { errors } = await this.client.signAndExecuteTransaction({
+	        transaction: tx,
+	        signer: this.keypair,
+	    });
+		return errors
     }
 }

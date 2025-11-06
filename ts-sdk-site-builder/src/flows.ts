@@ -7,7 +7,7 @@ import { Transaction } from "@mysten/sui/transactions";
 import { SiteBuilder } from "./site-builder";
 
 // TODO attach resources, construct metadata etc later on
-export async function publish_site_flow(tx: Transaction, siteBuilder: SiteBuilder) {
+export function publish_site_flow(tx: Transaction, siteBuilder: SiteBuilder): Transaction {
     const metadata = site_metadata.newMetadata({
         arguments: {
             link: "https://docs.wal.app",
@@ -23,11 +23,7 @@ export async function publish_site_flow(tx: Transaction, siteBuilder: SiteBuilde
     });
 
     const res = tx.add(site_object);
+    // Send the Site object to the signer.
     tx.transferObjects([res], siteBuilder.keypair.getPublicKey().toSuiAddress());
-    tx.setGasBudget(1_000_000_000);
-    const { errors } = await siteBuilder.client.signAndExecuteTransaction({
-        transaction: tx,
-        signer: siteBuilder.keypair,
-    });
-    return errors;
+    return tx;
 }
