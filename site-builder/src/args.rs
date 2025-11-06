@@ -261,7 +261,7 @@ pub enum Commands {
         #[arg(short, long)]
         object_id: Option<ObjectID>,
     },
-    /// Publish a new site on Sui using Quilts
+    /// Publish a new site on Sui.
     Publish {
         #[clap(flatten)]
         publish_options: PublishOptions,
@@ -269,9 +269,9 @@ pub enum Commands {
         #[arg(short, long)]
         site_name: Option<String>,
     },
-    /// Update an existing site using quilts. Note that contrary to old update where
-    /// `--check-extend` was optional, updating using quilts will extend any quilts that haven't
-    /// changed for the epochs passed (as long as they are larger than the current end-epochs).
+    /// Update an existing site.
+    /// If the update epoch is larger than the site-expiration epoch, all Quilts are extended to the
+    /// new update epoch.
     Update {
         #[clap(flatten)]
         publish_options: PublishOptions,
