@@ -737,10 +737,10 @@ impl ResourceManager {
         let max_quilt_size = max_quilt_size.as_u64() as usize;
         let max_available_columns = Walrus::max_slots_in_quilt(self.n_shards) as usize;
         let max_theoretical_quilt_size =
-            Walrus::max_slot_size(self.n_shards) as usize * max_available_columns;
+            Walrus::max_slot_size(self.n_shards) * max_available_columns;
 
         // Cap the effective_quilt_size to the min between the theoretical and the passed
-        let effective_quilt_size = if max_theoretical_quilt_size < max_quilt_size as usize {
+        let effective_quilt_size = if max_theoretical_quilt_size < max_quilt_size {
             display::warning(format!(
                 "Configured max quilt size ({}) exceeds theoretical maximum ({}). Using {} instead.",
                 ByteSize(max_quilt_size as u64),
