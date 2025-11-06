@@ -5,6 +5,7 @@ use std::{
     fs::{self, File, OpenOptions},
     io::Write,
     path::PathBuf,
+    str::FromStr,
 };
 
 use move_core_types::language_storage::StructTag;
