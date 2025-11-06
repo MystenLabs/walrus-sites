@@ -5,15 +5,7 @@ import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { SuiClient } from "@mysten/sui/client";
 import { walrus } from "@mysten/walrus";
 import { getFullnodeUrl } from "@mysten/sui/client";
-import { parseSitesConfig, type SitesConfig } from "../utils/sites_config_parser";
-import { readFileSync } from "fs";
-import { parse as parseYaml } from "yaml";
-
-export function loadSitesConfig(configPath: string): SitesConfig {
-    const fileContent = readFileSync(configPath, "utf-8");
-    const yamlData = parseYaml(fileContent);
-    return parseSitesConfig(yamlData);
-}
+import { loadSitesConfig } from "../utils/file_io";
 
 export class SiteBuilder {
     keypair: Ed25519Keypair;
