@@ -113,7 +113,7 @@ async fn publish_quilts_with_list_directory() -> anyhow::Result<()> {
 
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::PublishQuilts {
+        .with_command(Commands::Publish {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory.clone())
                 .with_list_directory(true)
@@ -248,7 +248,7 @@ async fn deploy_quilts_with_list_directory_updates_ignored_files() -> anyhow::Re
     // Step 3: First deploy with --list-directory
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::DeployQuilts {
+        .with_command(Commands::Deploy {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory.to_path_buf())
                 .with_list_directory(true)
@@ -329,7 +329,7 @@ async fn deploy_quilts_with_list_directory_updates_ignored_files() -> anyhow::Re
     // Step 5: Second deploy with changed ignore patterns
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::DeployQuilts {
+        .with_command(Commands::Deploy {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory.to_path_buf())
                 .with_list_directory(true)
@@ -450,7 +450,7 @@ async fn deploy_quilts_with_list_directory_handles_ws_resources() -> anyhow::Res
     // Step 4: Deploy with --list-directory, passing the external ws-resources.json
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::DeployQuilts {
+        .with_command(Commands::Deploy {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory.to_path_buf())
                 .with_list_directory(true)

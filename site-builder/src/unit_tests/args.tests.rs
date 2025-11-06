@@ -19,7 +19,7 @@ fn test_max_quilt_size() {
     ]);
     assert!(args.is_ok());
 
-    if let Commands::PublishQuilts {
+    if let Commands::Publish {
         publish_options, ..
     } = &args.unwrap().command
     {
@@ -41,7 +41,7 @@ fn test_max_quilt_size() {
     ]);
     assert!(args.is_ok());
 
-    if let Commands::PublishQuilts {
+    if let Commands::Publish {
         publish_options, ..
     } = &args.unwrap().command
     {
@@ -63,7 +63,7 @@ fn test_max_quilt_size() {
     ]);
     assert!(args.is_ok());
 
-    if let Commands::PublishQuilts {
+    if let Commands::Publish {
         publish_options, ..
     } = &args.unwrap().command
     {
@@ -85,7 +85,7 @@ fn test_max_quilt_size() {
     ]);
     assert!(args.is_ok());
 
-    if let Commands::PublishQuilts {
+    if let Commands::Publish {
         publish_options, ..
     } = &args.unwrap().command
     {
@@ -107,7 +107,7 @@ fn test_max_quilt_size() {
     ]);
     assert!(args.is_ok());
 
-    if let Commands::PublishQuilts {
+    if let Commands::Publish {
         publish_options, ..
     } = &args.unwrap().command
     {

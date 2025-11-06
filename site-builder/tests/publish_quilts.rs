@@ -52,7 +52,7 @@ async fn quilts_publish_snake() -> anyhow::Result<()> {
 
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::PublishQuilts {
+        .with_command(Commands::Publish {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory)
                 .with_epoch_count_or_max(EpochCountOrMax::Max)
@@ -103,7 +103,7 @@ async fn publish_quilts_lots_of_files() -> anyhow::Result<()> {
     let publish_start = Instant::now();
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::PublishQuilts {
+        .with_command(Commands::Publish {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory.to_owned())
                 .with_epoch_count_or_max(EpochCountOrMax::Max)
@@ -157,7 +157,7 @@ async fn publish_quilts_lots_of_identical_files() -> anyhow::Result<()> {
 
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::PublishQuilts {
+        .with_command(Commands::Publish {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(temp_dir.path().to_owned())
                 .with_epoch_count_or_max(EpochCountOrMax::Max)
@@ -249,7 +249,7 @@ async fn publish_quilts_a_lot_of_headers() -> anyhow::Result<()> {
     // ws_resources.headers.
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::PublishQuilts {
+        .with_command(Commands::Publish {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory.to_owned())
                 .with_epoch_count_or_max(EpochCountOrMax::Max)
@@ -318,7 +318,7 @@ async fn publish_quilts_with_many_routes() -> anyhow::Result<()> {
 
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::PublishQuilts {
+        .with_command(Commands::Publish {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(site_temp_dir.path().to_owned())
                 .with_ws_resources(Some(temp_ws_resources))
@@ -375,7 +375,7 @@ async fn publish_quilts_with_two_large_files() -> anyhow::Result<()> {
 
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::PublishQuilts {
+        .with_command(Commands::Publish {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(temp_dir.path().to_owned())
                 .with_epoch_count_or_max(EpochCountOrMax::Max)
@@ -507,7 +507,7 @@ async fn publish_quilts_with_weird_filenames() -> anyhow::Result<()> {
 
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::PublishQuilts {
+        .with_command(Commands::Publish {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory.to_owned())
                 .with_epoch_count_or_max(EpochCountOrMax::Max)

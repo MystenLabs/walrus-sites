@@ -248,7 +248,7 @@ pub enum Commands {
     /// the object ID of the Site in the ws-resources.json file.
     /// If the site has been published before, this command updates the site(indicaded
     /// by the site_object_id field in the ws-resources.json file).
-    DeployQuilts {
+    Deploy {
         #[clap(flatten)]
         publish_options: PublishOptions,
         /// The name of the site.
@@ -262,7 +262,7 @@ pub enum Commands {
         object_id: Option<ObjectID>,
     },
     /// Publish a new site on Sui using Quilts
-    PublishQuilts {
+    Publish {
         #[clap(flatten)]
         publish_options: PublishOptions,
         /// The name of the site.
@@ -272,7 +272,7 @@ pub enum Commands {
     /// Update an existing site using quilts. Note that contrary to old update where
     /// `--check-extend` was optional, updating using quilts will extend any quilts that haven't
     /// changed for the epochs passed (as long as they are larger than the current end-epochs).
-    UpdateQuilts {
+    Update {
         #[clap(flatten)]
         publish_options: PublishOptions,
         /// The object ID of a partially published site to be completed.
