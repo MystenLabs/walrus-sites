@@ -68,7 +68,7 @@ async fn run_internal(
     tracing::info!(?config, "configuration loaded");
 
     match command {
-        Commands::DeployQuilts {
+        Commands::Deploy {
             publish_options,
             site_name,
             object_id,
@@ -90,7 +90,7 @@ async fn run_internal(
                 .run_quilts()
                 .await?
         }
-        Commands::PublishQuilts {
+        Commands::Publish {
             publish_options,
             site_name,
         } => {
@@ -99,7 +99,7 @@ async fn run_internal(
                 .run_quilts()
                 .await?
         }
-        Commands::UpdateQuilts {
+        Commands::Update {
             publish_options,
             object_id,
         } => {
