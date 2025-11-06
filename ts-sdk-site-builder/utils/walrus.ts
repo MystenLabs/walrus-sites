@@ -1,4 +1,4 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-// TODO: parse the ws-resources.json
+// TODO: include the logic of storing blobs/quilts on Walrus.

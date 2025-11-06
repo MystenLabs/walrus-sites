@@ -11,6 +11,8 @@
   "dependencies": {
     "@mysten/codegen": "^0.5.9",
     "@mysten/sui": "^1.44.0",
-    "@mysten/walrus": "^0.8.3"
+    "@mysten/walrus": "^0.8.3",
+    "effect": "^3.19.1",
+    "yaml": "^2.8.1"
   }
 }

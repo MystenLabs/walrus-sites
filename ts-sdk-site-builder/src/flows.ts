@@ -8,7 +8,8 @@ import { Transaction } from "@mysten/sui/transactions";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 
 
-export async function publish_site(suiClient: SuiClient) {
+// TODO attach resources, construct metadata etc later on
+export async function publish_site_flow(suiClient: SuiClient) {
     const tx = new Transaction();
     const metadata = site_metadata.newMetadata({
         arguments: {
