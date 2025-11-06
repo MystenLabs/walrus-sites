@@ -768,11 +768,12 @@ impl ResourceManager {
             // Abort if the file cannot fit in a single Quilt.
             // TODO(fix): We could still store a single-file quilt for this case.
             if file_size_with_overhead > effective_quilt_size {
-                bail!(
-                    "File size of {} exceeds maximum size of single file storage in Quilt (current limit: {max_quilt_size}). \
-                    Consider increasing the limit using --max-quilt-size flag (e.g., --max-quilt-size 1GiB).",
-                    res_data.full_path.as_path().display()
-                );
+                return Err(Self::file_too_large_error(
+                    &res_data.full_path,
+                    file_size_with_overhead,
+                    effective_quilt_size,
+                    max_theoretical_quilt_size,
+                ));
             }
 
             // Calculate how many columns this file needs
@@ -828,6 +829,32 @@ impl ResourceManager {
                 .as_ref()
                 .and_then(|config| config.site_name.clone()),
         )
+    }
+
+    fn file_too_large_error(
+        file_path: &std::path::Path,
+        file_size: usize,
+        effective_quilt_size: usize,
+        max_theoretical_quilt_size: usize,
+    ) -> anyhow::Error {
+        if file_size > max_theoretical_quilt_size {
+            anyhow::anyhow!(
+                "File '{}' with size {} exceeds Walrus theoretical maximum of {} for single file storage. \
+                This file cannot be stored in Walrus with the current shard configuration.",
+                file_path.display(),
+                ByteSize(file_size as u64),
+                ByteSize(max_theoretical_quilt_size as u64)
+            )
+        } else {
+            anyhow::anyhow!(
+                "File '{}' with size {} exceeds the configured maximum of {} for single file storage. \
+                Consider increasing the limit using --max-quilt-size flag (e.g., --max-quilt-size {}).",
+                file_path.display(),
+                ByteSize(file_size as u64),
+                ByteSize(effective_quilt_size as u64),
+                ByteSize(max_theoretical_quilt_size as u64)
+            )
+        }
     }
 }
 
