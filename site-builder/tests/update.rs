@@ -7,10 +7,13 @@ use std::{
     path::PathBuf,
 };
 
+use move_core_types::language_storage::StructTag;
 use site_builder::{
     args::{Commands, EpochCountOrMax},
     site_config::WSResources,
 };
+use sui_sdk::rpc_types::SuiObjectResponseQuery;
+use sui_types::Identifier;
 
 #[allow(dead_code)]
 mod localnode;
