@@ -751,8 +751,7 @@ impl ResourceManager {
 
             // Abort if the file cannot fit in a single Quilt.
             // TODO(fix): We could still store a single-file quilt for this case.
-            if file_size_with_overhead > max_size_per_quilt
-            {
+            if file_size_with_overhead > max_size_per_quilt {
                 bail!(
                     "File size of {} exceeds maximum size of single file storage in Quilt.",
                     res_data.full_path.as_path().display()

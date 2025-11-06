@@ -281,7 +281,11 @@ impl SiteEditor<EditOptions> {
             self.directory().to_string_lossy()
         ));
         let dry_run = self.edit_options.publish_options.walrus_options.dry_run;
-        let max_size_per_quilt = self.edit_options.publish_options.walrus_options.max_total_file_size_per_quilt;
+        let max_size_per_quilt = self
+            .edit_options
+            .publish_options
+            .walrus_options
+            .max_total_file_size_per_quilt;
         let local_site_data = resource_manager
             .read_dir_and_store_quilts(
                 self.directory(),
