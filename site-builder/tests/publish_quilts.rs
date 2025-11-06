@@ -369,7 +369,7 @@ async fn publish_quilts_with_two_large_files() -> anyhow::Result<()> {
     // BLOB_HEADER and 2 for encoding the identifier length)
     let almost_whole_quilt_file_size =
         n_rows.get() as usize * (n_cols.get() as usize - 1) * MAX_SYMBOL_SIZE
-            - (MAX_IDENTIFIER_SIZE as usize + 8);
+            - (MAX_IDENTIFIER_SIZE + 8);
     println!("Storing two files with size: {almost_whole_quilt_file_size} bytes");
 
     let temp_dir = tempfile::tempdir()?;

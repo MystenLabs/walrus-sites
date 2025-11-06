@@ -38,7 +38,7 @@ use crate::{
 };
 
 /// Maximum size (in bytes) for a BCS-serialized identifier in a quilt.
-pub const MAX_IDENTIFIER_SIZE: u64 = 2050;
+pub const MAX_IDENTIFIER_SIZE: usize = 2050;
 
 /// The resource that is to be created or updated on Sui.
 ///
@@ -481,7 +481,7 @@ impl ResourceManager {
                 // Validate identifier size (BCS serialized) should be just 1 + str.len(), but
                 // this is cleaner
                 let identifier_size = bcs::serialized_size(&resource_path)
-                    .context("Failed to compute identifier size")? as u64;
+                    .context("Failed to compute identifier size")?;
                 if identifier_size > MAX_IDENTIFIER_SIZE {
                     bail!(
                         "Identifier for '{resource_path}' is too long: {identifier_size} bytes (max: {MAX_IDENTIFIER_SIZE} bytes). \
@@ -734,23 +734,23 @@ impl ResourceManager {
         resources: Vec<(ResourceData, QuiltBlobInput)>,
         max_quilt_size: ByteSize,
     ) -> Result<Vec<Vec<(ResourceData, QuiltBlobInput)>>> {
-        let max_size_per_quilt = max_quilt_size.as_u64();
+        let max_size_per_quilt = max_quilt_size.as_u64() as usize;
         let mut chunks = vec![];
         let mut current_chunk = vec![];
 
         // Available columns: n_cols - 1 (reserve 1 for quilt index)
-        let max_available_columns = Walrus::max_slots_in_quilt(self.n_shards) as u64;
+        let max_available_columns = Walrus::max_slots_in_quilt(self.n_shards) as usize;
         let mut available_columns = max_available_columns;
         // Calculate capacity per column (slot) in bytes
         let column_capacity = max_size_per_quilt / available_columns;
 
         // Per-file overhead constant
-        const FIXED_OVERHEAD: u64 = 8; // BLOB_IDENTIFIER_SIZE_BYTES_LENGTH (2) + BLOB_HEADER_SIZE (6)
+        const FIXED_OVERHEAD: usize = 8; // BLOB_IDENTIFIER_SIZE_BYTES_LENGTH (2) + BLOB_HEADER_SIZE (6)
 
         for (res_data, quilt_input) in resources.into_iter() {
             // Calculate total size including overhead
             let file_size_with_overhead =
-                res_data.unencoded_size as u64 + MAX_IDENTIFIER_SIZE + FIXED_OVERHEAD;
+                res_data.unencoded_size + MAX_IDENTIFIER_SIZE + FIXED_OVERHEAD;
 
             // Abort if the file cannot fit in a single Quilt.
             // TODO(fix): We could still store a single-file quilt for this case.
