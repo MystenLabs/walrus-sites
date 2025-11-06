@@ -11,6 +11,7 @@ use std::{
 };
 
 use anyhow::{anyhow, ensure, Result};
+use bytesize::ByteSize;
 use clap::{ArgGroup, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use sui_sdk::wallet_context::WalletContext;
@@ -22,6 +23,10 @@ use crate::{
     util::load_wallet_context,
     walrus::output::EpochCount,
 };
+
+#[cfg(test)]
+#[path = "unit_tests/args.tests.rs"]
+mod args_tests;
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
@@ -468,10 +473,13 @@ pub struct WalrusStoreOptions {
     /// Perform a dry run (you'll be asked for confirmation before committing changes).
     #[arg(long)]
     pub dry_run: bool,
-    /// Max total size of all the files stored per Quilt
+    /// Limits the max total size of all the files stored per Quilt.
+    ///
+    /// Supports both decimal (KB, MB, GB) and binary (KiB, MiB, GiB) units, or plain byte numbers.
+    /// Examples: "512MiB", "1GB", "1048576"
     #[cfg(feature = "quilts-experimental")]
-    #[arg(long)]
-    pub max_total_file_size_per_quilt: usize,
+    #[arg(long, default_value_t = default::max_quilt_size())]
+    pub max_quilt_size: ByteSize,
 }
 
 /// The number of epochs to store the blob for.
@@ -561,6 +569,9 @@ impl EpochCountOrMax {
 pub mod default {
     use std::num::NonZeroUsize;
 
+    #[cfg(feature = "quilts-experimental")]
+    use bytesize::ByteSize;
+
     pub const DEFAULT_SITE_NAME: &str = "My Walrus Site";
     pub const DEFAULT_WS_RESOURCES_FILE: &str = "ws-resources.json";
 
@@ -572,5 +583,9 @@ pub mod default {
     }
     pub fn max_parallel_stores() -> NonZeroUsize {
         NonZeroUsize::new(50).unwrap()
+    }
+    #[cfg(feature = "quilts-experimental")]
+    pub fn max_quilt_size() -> ByteSize {
+        ByteSize::mb(512) // 512 MB
     }
 }

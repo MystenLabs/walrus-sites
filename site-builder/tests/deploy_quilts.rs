@@ -428,7 +428,7 @@ async fn deploy_quilts_with_slot_sized_files() -> anyhow::Result<()> {
 
     // Calculate the size for each file to exactly fill one slot
     // Each file needs (MAX_IDENTIFIER_SIZE + 8) bytes of overhead for the quilt patch header
-    let file_size = column_capacity - (MAX_IDENTIFIER_SIZE + 8);
+    let file_size = column_capacity - (MAX_IDENTIFIER_SIZE as usize + 8);
 
     println!("Testing full quilt with {n_files} files, each filling one slot");
     println!("File size: {file_size} bytes, Column capacity: {column_capacity} bytes");
@@ -488,7 +488,7 @@ async fn deploy_quilts_with_slot_sized_files() -> anyhow::Result<()> {
     let site_id = *site.id.object_id();
     let initial_blob_id = first_blob_id;
 
-    let new_file_size = column_capacity - MAX_IDENTIFIER_SIZE;
+    let new_file_size = column_capacity - MAX_IDENTIFIER_SIZE as usize;
     println!("\nStep 2: Deploying new site with {n_files} files of size {new_file_size} bytes...");
     println!("This should create 2 quilts instead of 1");
 

@@ -14,6 +14,7 @@ use std::{
 
 use anyhow::{anyhow, bail, Context, Result};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use bytesize::ByteSize;
 use fastcrypto::hash::{HashFunction, Sha256};
 use flate2::{write::GzEncoder, Compression};
 use futures::{stream, StreamExt};
@@ -37,7 +38,7 @@ use crate::{
 };
 
 /// Maximum size (in bytes) for a BCS-serialized identifier in a quilt.
-pub const MAX_IDENTIFIER_SIZE: usize = 2050;
+pub const MAX_IDENTIFIER_SIZE: u64 = 2050;
 
 /// The resource that is to be created or updated on Sui.
 ///
@@ -480,7 +481,7 @@ impl ResourceManager {
                 // Validate identifier size (BCS serialized) should be just 1 + str.len(), but
                 // this is cleaner
                 let identifier_size = bcs::serialized_size(&resource_path)
-                    .context("Failed to compute identifier size")?;
+                    .context("Failed to compute identifier size")? as u64;
                 if identifier_size > MAX_IDENTIFIER_SIZE {
                     bail!(
                         "Identifier for '{resource_path}' is too long: {identifier_size} bytes (max: {MAX_IDENTIFIER_SIZE} bytes). \
@@ -661,7 +662,7 @@ impl ResourceManager {
         root: &Path,
         epochs: EpochArg,
         dry_run: bool,
-        max_size_per_quilt: usize,
+        max_quilt_size: ByteSize,
     ) -> Result<SiteData> {
         let resource_paths = Self::iter_dir(root)?;
         if resource_paths.is_empty() {
@@ -674,7 +675,7 @@ impl ResourceManager {
             .collect::<Result<Vec<String>>>()?;
 
         let resource_file_inputs = self.prepare_local_resources(root, rel_paths)?;
-        let chunks = self.quilts_chunkify(resource_file_inputs, max_size_per_quilt)?;
+        let chunks = self.quilts_chunkify(resource_file_inputs, max_quilt_size)?;
 
         if dry_run {
             let mut total_storage_cost = 0;
@@ -731,23 +732,25 @@ impl ResourceManager {
     fn quilts_chunkify(
         &self,
         resources: Vec<(ResourceData, QuiltBlobInput)>,
-        max_size_per_quilt: usize,
+        max_quilt_size: ByteSize,
     ) -> Result<Vec<Vec<(ResourceData, QuiltBlobInput)>>> {
+        let max_size_per_quilt = max_quilt_size.as_u64();
         let mut chunks = vec![];
         let mut current_chunk = vec![];
 
         // Available columns: n_cols - 1 (reserve 1 for quilt index)
-        let mut available_columns = Walrus::max_slots_in_quilt(self.n_shards) as usize;
+        let max_available_columns = Walrus::max_slots_in_quilt(self.n_shards) as u64;
+        let mut available_columns = max_available_columns;
         // Calculate capacity per column (slot) in bytes
         let column_capacity = max_size_per_quilt / available_columns;
 
         // Per-file overhead constant
-        const FIXED_OVERHEAD: usize = 8; // BLOB_IDENTIFIER_SIZE_BYTES_LENGTH (2) + BLOB_HEADER_SIZE (6)
+        const FIXED_OVERHEAD: u64 = 8; // BLOB_IDENTIFIER_SIZE_BYTES_LENGTH (2) + BLOB_HEADER_SIZE (6)
 
         for (res_data, quilt_input) in resources.into_iter() {
             // Calculate total size including overhead
             let file_size_with_overhead =
-                res_data.unencoded_size + MAX_IDENTIFIER_SIZE + FIXED_OVERHEAD;
+                res_data.unencoded_size as u64 + MAX_IDENTIFIER_SIZE + FIXED_OVERHEAD;
 
             // Abort if the file cannot fit in a single Quilt.
             // TODO(fix): We could still store a single-file quilt for this case.
@@ -772,8 +775,7 @@ impl ResourceManager {
                 }
                 current_chunk = vec![(res_data, quilt_input)];
                 // Reset available columns for new chunk
-                available_columns =
-                    (Walrus::max_slots_in_quilt(self.n_shards) as usize) - columns_needed;
+                available_columns = max_available_columns - columns_needed;
             }
         }
 
