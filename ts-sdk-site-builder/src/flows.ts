@@ -7,7 +7,10 @@ import { Transaction } from "@mysten/sui/transactions";
 import { SiteBuilder } from "./site-builder";
 
 // TODO attach resources, construct metadata etc later on
-export function create_site_and_send_to_sender(tx: Transaction, siteBuilder: SiteBuilder): Transaction {
+export function create_site_and_send_to_sender(
+    tx: Transaction,
+    siteBuilder: SiteBuilder,
+): Transaction {
     const metadata = site_metadata.newMetadata({
         arguments: {
             link: "https://docs.wal.app",
