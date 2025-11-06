@@ -476,7 +476,7 @@ pub struct WalrusStoreOptions {
     /// Limits the max total size of all the files stored per Quilt.
     ///
     /// Supports both decimal (KB, MB, GB) and binary (KiB, MiB, GiB) units, or plain byte numbers.
-    /// Examples: "512MiB", "1GB", "1048576"
+    /// Examples: "512MiB", "1GB", "1048576".
     #[cfg(feature = "quilts-experimental")]
     #[arg(long, default_value_t = default::max_quilt_size())]
     pub max_quilt_size: ByteSize,
@@ -586,6 +586,6 @@ pub mod default {
     }
     #[cfg(feature = "quilts-experimental")]
     pub fn max_quilt_size() -> ByteSize {
-        ByteSize::mb(512) // 512 MB
+        ByteSize::mib(512) // 512 MiB
     }
 }

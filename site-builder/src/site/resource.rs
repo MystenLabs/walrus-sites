@@ -756,7 +756,8 @@ impl ResourceManager {
             // TODO(fix): We could still store a single-file quilt for this case.
             if file_size_with_overhead > max_size_per_quilt {
                 bail!(
-                    "File size of {} exceeds maximum size of single file storage in Quilt.",
+                    "File size of {} exceeds maximum size of single file storage in Quilt (current limit: {max_quilt_size}). \
+                    Consider increasing the limit using --max-quilt-size flag (e.g., --max-quilt-size 1GiB).",
                     res_data.full_path.as_path().display()
                 );
             }
