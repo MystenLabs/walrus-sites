@@ -1,8 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-#![cfg(feature = "quilts-experimental")]
-
 use std::{
     collections::BTreeMap,
     fs::{self, File},

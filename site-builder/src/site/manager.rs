@@ -37,7 +37,6 @@ use crate::{
     backoff::ExponentialBackoffConfig,
     config::Config,
     display,
-    publish::BlobManagementOptions,
     retry_client::RetriableSuiClient,
     site::builder::{SitePtbBuilderResultExt, PTB_MAX_MOVE_CALLS},
     summary::SiteDataDiffSummary,
@@ -54,7 +53,6 @@ pub struct SiteManager {
     pub walrus: Walrus,
     pub wallet: WalletContext,
     pub site_id: Option<ObjectID>,
-    pub blob_options: BlobManagementOptions,
     pub backoff_config: ExponentialBackoffConfig,
     pub metadata: Option<Metadata>,
     pub site_name: Option<String>,
@@ -67,7 +65,6 @@ impl SiteManager {
     pub async fn new(
         config: Config,
         site_id: Option<ObjectID>,
-        blob_options: BlobManagementOptions,
         walrus_options: WalrusStoreOptions,
         metadata: Option<Metadata>,
         site_name: Option<String>,
@@ -78,7 +75,6 @@ impl SiteManager {
             wallet: config.load_wallet()?,
             config,
             site_id,
-            blob_options,
             backoff_config: ExponentialBackoffConfig::default(),
             metadata,
             site_name,
@@ -123,9 +119,6 @@ impl SiteManager {
     pub async fn update_site(
         &mut self,
         local_site_data: &SiteData,
-        // Currently Quilts implementation, needs to store Quilt in advance, in order to get the
-        // full resource needed to save on Sui. We use this to skip storing also as blobs.
-        using_quilts: bool,
     ) -> Result<(SuiTransactionBlockResponse, SiteDataDiffSummary)> {
         tracing::debug!(?self.site_id, "creating or updating site");
         let retriable_client = self.sui_client().await?;
@@ -141,21 +134,6 @@ impl SiteManager {
         tracing::debug!(?existing_site, "checked existing site");
 
         let site_updates = local_site_data.diff(&existing_site);
-
-        let store_blobs = !using_quilts;
-        if store_blobs {
-            let walrus_candidate_set = if self.blob_options.is_check_extend() {
-                // We need to check the status of all blobs: Return the full list of existing and added
-                // blobs as possible updates.
-                existing_site.replace_all(local_site_data)
-            } else {
-                // We only need to upload the new blobs.
-                site_updates.clone()
-            };
-            // IMPORTANT: Perform the store operations on Walrus first, to ensure zero "downtime".
-            self.select_and_store_single_blob_resources_to_walrus(&walrus_candidate_set)
-                .await?;
-        }
 
         // Check if there are any updates to the site on-chain.
         let result = if site_updates.has_updates() {
@@ -174,41 +152,7 @@ impl SiteManager {
             self.delete_from_walrus(&blobs_to_delete).await?;
         }
 
-        Ok((result, site_updates.summary(&self.blob_options)))
-    }
-
-    /// Selects the necessary walrus store operations and executes them.
-    async fn select_and_store_single_blob_resources_to_walrus(
-        &mut self,
-        walrus_candidate_set: &SiteDataDiff<'_>,
-    ) -> Result<()> {
-        let walrus_updates = walrus_candidate_set.get_walrus_updates(&self.blob_options);
-
-        if !walrus_updates.is_empty() {
-            if self.walrus_options.dry_run {
-                let total_storage_cost = self
-                    .dry_run_walrus_single_blob_store(&walrus_updates)
-                    .await?;
-                // Before doing the actual execution, perform a dry run
-                display::action(format!(
-                    "Estimated Storage Cost for this publish/update (Gas Cost Excluded): {total_storage_cost} FROST"
-                ));
-
-                // Add user confirmation prompt.
-                display::action("Waiting for user confirmation...");
-                if !dialoguer::Confirm::new()
-                    .with_prompt("Do you want to proceed with these updates?")
-                    .default(true)
-                    .interact()?
-                {
-                    display::error("Update cancelled by user");
-                    return Err(anyhow!("Update cancelled by user"));
-                }
-            }
-            self.store_single_blob_resources_to_walrus(&walrus_updates)
-                .await?;
-        }
-        Ok(())
+        Ok((result, site_updates.summary()))
     }
 
     /// Publishes the resources to Walrus.
@@ -465,7 +409,7 @@ impl SiteManager {
         tracing::debug!("uploading the resource to Walrus");
         let walrus_ops = operations
             .iter()
-            .filter(|u| u.is_walrus_update(&self.blob_options))
+            .filter(|u| u.is_walrus_update())
             .collect::<Vec<_>>();
 
         //Perform dry run

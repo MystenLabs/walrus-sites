@@ -9,8 +9,6 @@
 //! - `--earliest-expiry-time`: Store until at least a specific time
 //! - `--end-epoch`: Store until a specific epoch number
 
-#![cfg(feature = "quilts-experimental")]
-
 use std::{io::Write, num::NonZeroU32, time::SystemTime};
 
 use site_builder::args::{Commands, EpochArg, EpochCountOrMax};

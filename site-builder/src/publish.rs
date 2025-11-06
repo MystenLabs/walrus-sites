@@ -5,11 +5,9 @@ use std::{
     collections::{BTreeSet, HashSet},
     num::NonZeroUsize,
     path::{Path, PathBuf},
-    sync::mpsc::channel,
 };
 
 use anyhow::{anyhow, Result};
-use notify::{RecursiveMode, Watcher};
 use sui_sdk::rpc_types::{
     SuiExecutionStatus,
     SuiTransactionBlockEffects,
@@ -47,53 +45,10 @@ use crate::{
 
 const DEFAULT_WS_RESOURCES_FILE: &str = "ws-resources.json";
 
-/// The continuous editing options.
-#[derive(Debug, Clone)]
-pub(crate) enum ContinuousEditing {
-    /// Edit the site once and exit.
-    Once,
-    /// Watch the directory for changes and publish the site on change.
-    Watch,
-}
-
-impl ContinuousEditing {
-    /// Convert the flag to the enum.
-    pub fn from_watch_flag(flag: bool) -> Self {
-        if flag {
-            ContinuousEditing::Watch
-        } else {
-            ContinuousEditing::Once
-        }
-    }
-}
-
-/// Options for the management of Walrus blobs.
-#[derive(Debug, Clone)]
-pub struct BlobManagementOptions {
-    /// Forces a check of the expiration of all blobs, and extension if necessary.
-    pub(crate) check_extend: bool,
-}
-
-impl BlobManagementOptions {
-    /// Returns true if the expiration of all blobs should be checked.
-    pub fn is_check_extend(&self) -> bool {
-        self.check_extend
-    }
-
-    /// Returns an instance of `Self` with the expiration check disabled.
-    pub fn no_status_check() -> Self {
-        BlobManagementOptions {
-            check_extend: false,
-        }
-    }
-}
-
 pub(crate) struct EditOptions {
     pub publish_options: PublishOptions,
     pub site_id: Option<ObjectID>,
     pub site_name: Option<String>,
-    pub continuous_editing: ContinuousEditing,
-    pub blob_options: BlobManagementOptions,
 }
 
 pub(crate) struct SiteEditor<E = ()> {
@@ -116,8 +71,6 @@ impl SiteEditor {
         publish_options: PublishOptions,
         site_id: Option<ObjectID>,
         site_name: Option<String>,
-        continuous_editing: ContinuousEditing,
-        blob_options: BlobManagementOptions,
     ) -> SiteEditor<EditOptions> {
         SiteEditor {
             context: self.context,
@@ -126,8 +79,6 @@ impl SiteEditor {
                 publish_options,
                 site_id,
                 site_name,
-                continuous_editing,
-                blob_options,
             },
         }
     }
@@ -171,7 +122,6 @@ impl SiteEditor {
             let mut site_manager = SiteManager::new(
                 self.config.clone(),
                 Some(site_id),
-                BlobManagementOptions::no_status_check(),
                 WalrusStoreOptions::default(),
                 None,
                 None,
@@ -222,16 +172,6 @@ impl SiteEditor<EditOptions> {
         &self.edit_options.publish_options.directory
     }
 
-    /// Run the editing operations requested.
-    pub async fn run(&self) -> Result<()> {
-        match self.edit_options.continuous_editing {
-            ContinuousEditing::Once => self.run_single_and_print_summary().await?,
-            ContinuousEditing::Watch => self.run_continuous().await?,
-        }
-        Ok(())
-    }
-
-    #[cfg(feature = "quilts-experimental")]
     pub async fn run_quilts(&self) -> Result<()> {
         let (active_address, response, summary) = self.run_single_edit_quilts().await?;
         print_summary(
@@ -244,30 +184,6 @@ impl SiteEditor<EditOptions> {
         Ok(())
     }
 
-    async fn run_single_edit(
-        &self,
-    ) -> Result<(SuiAddress, SuiTransactionBlockResponse, SiteDataDiffSummary)> {
-        let (mut resource_manager, mut site_manager) = self.create_managers().await?;
-        display::action(format!(
-            "Parsing the directory {} and locally computing blob IDs",
-            self.directory().to_string_lossy()
-        ));
-        if self.is_list_directory() {
-            self.preprocess_directory(&resource_manager)?;
-        }
-
-        let local_site_data = resource_manager.read_dir(self.directory()).await?;
-        display::done();
-        tracing::debug!(?local_site_data, "resources loaded from directory");
-
-        let (response, summary) = site_manager.update_site(&local_site_data, false).await?;
-
-        self.persist_site_identifier(resource_manager, &site_manager, &response)?;
-
-        Ok((site_manager.active_address()?, response, summary))
-    }
-
-    #[cfg(feature = "quilts-experimental")]
     async fn run_single_edit_quilts(
         &self,
     ) -> Result<(SuiAddress, SuiTransactionBlockResponse, SiteDataDiffSummary)> {
@@ -302,7 +218,7 @@ impl SiteEditor<EditOptions> {
             "resources loaded and stored from directory"
         );
 
-        let (response, summary) = site_manager.update_site(&local_site_data, true).await?;
+        let (response, summary) = site_manager.update_site(&local_site_data).await?;
 
         self.persist_site_identifier(resource_manager, &site_manager, &response)?;
 
@@ -326,13 +242,9 @@ impl SiteEditor<EditOptions> {
             );
         }
 
-        let resource_manager = ResourceManager::new(
-            self.config.walrus_client(),
-            ws_resources,
-            ws_resources_path,
-            self.edit_options.publish_options.max_concurrent,
-        )
-        .await?;
+        let resource_manager =
+            ResourceManager::new(self.config.walrus_client(), ws_resources, ws_resources_path)
+                .await?;
 
         let site_metadata = match resource_manager.ws_resources.clone() {
             Some(value) => value.metadata,
@@ -347,7 +259,6 @@ impl SiteEditor<EditOptions> {
         let site_manager = SiteManager::new(
             self.config.clone(),
             self.edit_options.site_id,
-            self.edit_options.blob_options.clone(),
             self.edit_options.publish_options.walrus_options.clone(),
             site_metadata,
             self.edit_options.site_name.clone().or(site_name),
@@ -356,39 +267,6 @@ impl SiteEditor<EditOptions> {
         .await?;
 
         Ok((resource_manager, site_manager))
-    }
-
-    async fn run_single_and_print_summary(&self) -> Result<()> {
-        let (active_address, response, summary) = self.run_single_edit().await?;
-        print_summary(
-            &self.config,
-            &active_address,
-            &self.edit_options.site_id,
-            &response,
-            &summary,
-        )?;
-        Ok(())
-    }
-
-    async fn run_continuous(&self) -> Result<()> {
-        let (tx, rx) = channel();
-        let mut watcher = notify::recommended_watcher(move |res| {
-            tx.send(res).expect("Error in sending the watch event")
-        })?;
-
-        // Add a path to be watched. All files and directories at that path and
-        // below will be monitored for changes.
-        watcher.watch(self.directory(), RecursiveMode::Recursive)?;
-
-        loop {
-            match rx.recv() {
-                Ok(event) => {
-                    tracing::info!("change detected: {:?}", event);
-                    self.run_single_and_print_summary().await?;
-                }
-                Err(e) => println!("Watch error!: {e}"),
-            }
-        }
     }
 
     fn persist_site_identifier(

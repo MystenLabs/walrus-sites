@@ -20,8 +20,6 @@ pub struct PublishOptionsBuilder {
     /// Preprocess the directory before publishing.
     /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
     pub list_directory: bool,
-    /// The maximum number of concurrent calls to the Walrus CLI for the computation of blob IDs.
-    pub max_concurrent: Option<NonZeroUsize>,
     /// The maximum number of blobs that can be stored concurrently.
     ///
     /// More blobs can be stored concurrently, but this will increase memory usage.
@@ -46,7 +44,6 @@ impl PublishOptionsBuilder {
         let PublishOptionsBuilder {
             directory,
             list_directory,
-            max_concurrent,
             max_parallel_stores,
             walrus_options,
         } = self;
@@ -59,7 +56,6 @@ impl PublishOptionsBuilder {
         Ok(PublishOptions {
             directory,
             list_directory,
-            max_concurrent,
             max_parallel_stores,
             walrus_options,
         })
@@ -72,11 +68,6 @@ impl PublishOptionsBuilder {
 
     pub fn with_list_directory(mut self, list_directory: bool) -> Self {
         self.list_directory = list_directory;
-        self
-    }
-
-    pub fn with_max_concurrent(mut self, max_concurrent: Option<NonZeroUsize>) -> Self {
-        self.max_concurrent = max_concurrent;
         self
     }
 
@@ -130,7 +121,6 @@ impl Default for PublishOptionsBuilder {
         Self {
             directory: None,
             list_directory: false,
-            max_concurrent: None,
             max_parallel_stores: sites_default::max_parallel_stores(),
             walrus_options: WalrusStoreOptionsBuilder::default(),
         }

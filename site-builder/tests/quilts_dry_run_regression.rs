@@ -7,8 +7,6 @@
 //! would consume the chunks iterator during cost estimation, causing resource
 //! processing to fail after user confirmation with "Transaction effects not found".
 
-#![cfg(feature = "quilts-experimental")]
-
 use std::{
     fs::File,
     io::{Read, Write},

@@ -1,8 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-#![cfg(feature = "quilts-experimental")]
-
 use std::{
     fs::{self, File, OpenOptions},
     io::Write,
@@ -112,97 +110,6 @@ async fn quilts_update_snake() -> anyhow::Result<()> {
     }
 
     println!("quilts_update_snake completed successfully");
-
-    Ok(())
-}
-
-#[tokio::test]
-#[ignore]
-async fn quilts_update_blob_snake() -> anyhow::Result<()> {
-    let cluster = TestSetup::start_local_test_cluster().await?;
-    let directory = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .join("examples")
-        .join("snake");
-
-    // Copy snake and reset ws-resources object_id
-    let temp_dir = tempfile::tempdir()?;
-    helpers::copy_dir(directory.as_path(), temp_dir.path())?;
-    let directory = temp_dir.path().to_path_buf();
-    let ws_resources_path = directory.join("ws-resources.json");
-    let mut ws_resources_init: WSResources =
-        serde_json::from_reader(File::open(ws_resources_path.as_path())?)?;
-    ws_resources_init.object_id = None;
-    serde_json::to_writer_pretty(
-        File::create(ws_resources_path.as_path())?,
-        &ws_resources_init,
-    )?;
-
-    let publish_args = ArgsBuilder::default()
-        .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::Publish {
-            publish_options: PublishOptionsBuilder::default()
-                .with_directory(directory.clone())
-                .with_epoch_count_or_max(EpochCountOrMax::Epochs(1_u32.try_into().unwrap()))
-                .build()?,
-            site_name: None,
-        })
-        .build()?;
-    site_builder::run(publish_args).await?;
-
-    // Store original index.html line count before update
-    let original_index_content = fs::read_to_string(temp_dir.path().join("index.html"))?;
-    let original_line_count = original_index_content.lines().count();
-
-    // Update a resource
-    let index_html_path = temp_dir.path().join("index.html");
-    {
-        let mut index_html = OpenOptions::new()
-            .append(true) // don't truncate, add to the end
-            .open(index_html_path)?;
-        writeln!(index_html, "<!-- Updated by test -->")?;
-    } // File is automatically flushed and closed when it goes out of scope
-    let ws_resources_updated: WSResources =
-        serde_json::from_reader(File::open(ws_resources_path.as_path())?)?;
-
-    let site_id = *cluster.last_site_created().await?.id.object_id();
-    assert_eq!(ws_resources_updated.object_id.unwrap(), site_id);
-
-    let update_args = ArgsBuilder::default()
-        .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::UpdateQuilts {
-            publish_options: PublishOptionsBuilder::default()
-                .with_directory(directory)
-                .with_epoch_count_or_max(EpochCountOrMax::Max)
-                .build()?,
-            object_id: site_id,
-        })
-        .build()?;
-    site_builder::run(update_args).await?;
-
-    // Verify the update worked
-    let updated_site = cluster.last_site_created().await?;
-    let updated_resources = cluster.site_resources(*updated_site.id.object_id()).await?;
-
-    // The site should still have the same object ID
-    assert_eq!(site_id, *updated_site.id.object_id());
-
-    // Verify that all resources have valid hashes
-    for resource in updated_resources {
-        let data = verify_resource_and_get_content(&cluster, &resource).await?;
-
-        // For index.html, verify it has exactly one more line than the original
-        if resource.path == "/index.html" {
-            let content = String::from_utf8_lossy(&data);
-            let updated_line_count = content.lines().count();
-            assert_eq!(updated_line_count, original_line_count + 1,
-                "index.html should have exactly one more line after update. Original: {original_line_count}, Updated: {updated_line_count}"
-            )
-        }
-    }
-
-    println!("quilts_update_blob_snake completed successfully");
 
     Ok(())
 }

@@ -5,7 +5,6 @@ use clap::Parser;
 
 use crate::args::{Args, Commands};
 
-#[cfg(feature = "quilts-experimental")]
 #[test]
 fn test_max_quilt_size() {
     // Test parsing "10MiB" (binary megabytes)

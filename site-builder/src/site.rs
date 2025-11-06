@@ -18,7 +18,6 @@ use sui_sdk::rpc_types::DynamicFieldInfo;
 use sui_types::{base_types::ObjectID, TypeTag};
 
 use crate::{
-    publish::BlobManagementOptions,
     retry_client::RetriableSuiClient,
     summary::SiteDataDiffSummary,
     types::{
@@ -60,19 +59,8 @@ impl SiteDataDiff<'_> {
             || !self.site_name_op.is_noop()
     }
 
-    /// Returns the resources that need to be updated on Walrus.
-    pub fn get_walrus_updates(&self, blob_options: &BlobManagementOptions) -> Vec<&ResourceOp<'_>> {
-        self.resource_ops
-            .iter()
-            .filter(|u| u.is_walrus_update(blob_options))
-            .collect::<Vec<_>>()
-    }
-
     /// Returns the summary of the operations in the diff.
-    pub fn summary(&self, blob_options: &BlobManagementOptions) -> SiteDataDiffSummary {
-        if blob_options.is_check_extend() {
-            return SiteDataDiffSummary::from(self);
-        }
+    pub fn summary(&self) -> SiteDataDiffSummary {
         SiteDataDiffSummary {
             resource_ops: self
                 .resource_ops
@@ -130,16 +118,6 @@ impl SiteData {
             route_ops: self.routes_diff(start),
             metadata_op: self.metadata_diff(start),
             site_name_op: self.site_name_diff(start),
-        }
-    }
-
-    /// Returns the operations to perform to replace all resources in self with the ones in other.
-    pub fn replace_all<'a>(&'a self, other: &'a SiteData) -> SiteDataDiff<'a> {
-        SiteDataDiff {
-            resource_ops: self.resources.replace_all(&other.resources),
-            route_ops: self.routes_diff(other),
-            metadata_op: self.metadata_diff(other),
-            site_name_op: self.site_name_diff(other),
         }
     }
 

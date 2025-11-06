@@ -248,49 +248,6 @@ pub enum Commands {
     /// the object ID of the Site in the ws-resources.json file.
     /// If the site has been published before, this command updates the site(indicaded
     /// by the site_object_id field in the ws-resources.json file).
-    Deploy {
-        #[clap(flatten)]
-        publish_options: PublishOptions,
-        /// The name of the site.
-        #[arg(short, long)]
-        site_name: Option<String>,
-        /// The object ID of a partially published site to be completed.
-        ///
-        /// This is the object ID of the site that was published before, and is now being updated.
-        /// If this is provided, it will override the object ID in the ws-resources.json file.
-        #[arg(short, long)]
-        object_id: Option<ObjectID>,
-        /// Watch the site directory for changes and automatically redeploy when files are modified.
-        ///
-        /// When enabled, the command will continuously monitor the site directory and trigger a
-        /// redepoloyment whenever changes are detected, allowing for rapid development iteration.
-        #[arg(short, long)]
-        watch: bool,
-        /// Checks and extends all blobs in an existing site during an update.
-        ///
-        /// With this flag, the site-builder will force a check of the status of all the Walrus
-        /// blobs composing the site, and will extend the ones that expire before `--epochs` epochs.
-        /// This is useful to ensure all the resources in the site are available for the same
-        /// amount of epochs.
-        ///
-        /// Further, when this flag is set, _missing_ blobs will also be reuploaded (e.g., in case
-        /// they were deleted, or are all expired and were not owned, or, in case of testnet, the
-        /// network was wiped).
-        ///
-        /// Without this flag, when updating a site, the `deploy` command will only create new blobs
-        /// for the resources that have been added or modified (compared to the object on Sui).
-        /// This implies that successive updates (without --check-extend) may result in the site
-        /// having resources with different expiration times (and possibly some that are expired).
-        #[arg(long)]
-        check_extend: bool,
-    },
-    /// Deploy a new site on Sui.
-    ///
-    /// If the site has not been published before, this command publishes it and stores
-    /// the object ID of the Site in the ws-resources.json file.
-    /// If the site has been published before, this command updates the site(indicaded
-    /// by the site_object_id field in the ws-resources.json file).
-    #[cfg(feature = "quilts-experimental")]
     DeployQuilts {
         #[clap(flatten)]
         publish_options: PublishOptions,
@@ -304,16 +261,7 @@ pub enum Commands {
         #[arg(short, long)]
         object_id: Option<ObjectID>,
     },
-    /// Publish a new site on Sui.
-    Publish {
-        #[clap(flatten)]
-        publish_options: PublishOptions,
-        /// The name of the site.
-        #[arg(short, long)]
-        site_name: Option<String>,
-    },
     /// Publish a new site on Sui using Quilts
-    #[cfg(feature = "quilts-experimental")]
     PublishQuilts {
         #[clap(flatten)]
         publish_options: PublishOptions,
@@ -321,48 +269,9 @@ pub enum Commands {
         #[arg(short, long)]
         site_name: Option<String>,
     },
-    /// Update an existing site.
-    Update {
-        #[clap(flatten)]
-        publish_options: PublishOptions,
-        /// The object ID of a partially published site to be completed.
-        object_id: ObjectID,
-        /// Watch the site directory for changes and automatically redeploy when files are modified.
-        ///
-        /// When enabled, the command will continuously monitor the site directory and trigger a
-        /// redepoloyment whenever changes are detected, allowing for rapid development iteration.
-        #[arg(short, long)]
-        watch: bool,
-        /// This flag is deprecated and will be removed in the future. Use --check-extend.
-        ///
-        /// Publish all resources to Sui and Walrus, even if they may be already present.
-        /// This can be useful in case the Walrus devnet is reset, but the resources are still
-        /// available on Sui.
-        #[arg(long)]
-        #[deprecated(note = "This flag is being removed; please use --check-extend")]
-        force: bool,
-        /// Checks and extends all blobs in the site during the update.
-        ///
-        /// With this flag, the site-builder will force a check of the status of all the Walrus
-        /// blobs composing the site, and will extend the ones that expire before `--epochs` epochs.
-        /// This is useful to ensure all the resources in the site are available for the same
-        /// amount of epochs.
-        ///
-        /// Further, when this flag is set, _missing_ blobs will also be reuploaded (e.g., in case
-        /// they were deleted, or are all expired and were not owned, or, in case of testnet, the
-        /// network was wiped).
-        ///
-        /// Without this flag, the `update` command will only create new blobs for the resources
-        /// that have been added or modified (compared to the object on Sui). This implies that
-        /// successive updates (without --check-extend) may result in the site having resources
-        /// with different expiration times (and possibly some that are expired).
-        #[arg(long)]
-        check_extend: bool,
-    },
     /// Update an existing site using quilts. Note that contrary to old update where
     /// `--check-extend` was optional, updating using quilts will extend any quilts that haven't
     /// changed for the epochs passed (as long as they are larger than the current end-epochs).
-    #[cfg(feature = "quilts-experimental")]
     UpdateQuilts {
         #[clap(flatten)]
         publish_options: PublishOptions,
@@ -433,9 +342,6 @@ pub struct PublishOptions {
     /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
     #[arg(long)]
     pub list_directory: bool,
-    /// The maximum number of concurrent calls to the Walrus CLI for the computation of blob IDs.
-    #[arg(long)]
-    pub max_concurrent: Option<NonZeroUsize>,
     /// The maximum number of blobs that can be stored concurrently.
     ///
     /// More blobs can be stored concurrently, but this will increase memory usage.
@@ -479,7 +385,6 @@ pub struct WalrusStoreOptions {
     /// Examples: "512MiB", "1GB", "1048576".
     ///
     /// Note: Larger sizes require more memory during storing and may increase storage overhead.
-    #[cfg(feature = "quilts-experimental")]
     #[arg(long, default_value_t = default::max_quilt_size())]
     pub max_quilt_size: ByteSize,
 }
@@ -571,7 +476,6 @@ impl EpochCountOrMax {
 pub mod default {
     use std::num::NonZeroUsize;
 
-    #[cfg(feature = "quilts-experimental")]
     use bytesize::ByteSize;
 
     pub const DEFAULT_SITE_NAME: &str = "My Walrus Site";
@@ -586,7 +490,6 @@ pub mod default {
     pub fn max_parallel_stores() -> NonZeroUsize {
         NonZeroUsize::new(50).unwrap()
     }
-    #[cfg(feature = "quilts-experimental")]
     pub fn max_quilt_size() -> ByteSize {
         ByteSize::mib(512) // 512 MiB
     }
