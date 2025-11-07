@@ -25,11 +25,12 @@ export class InstrumentationFacade {
     private fetchRoutesDynamicFieldObjectHistogram: Histogram<Attributes>;
     private resolveSuiNsAddressHistogram: Histogram<Attributes>;
     private resolveDomainAndFetchUrlHistogram: Histogram<Attributes>;
+    private aggregatorTime: Histogram<Attributes>;
 
-    constructor (port: number) {
+    constructor(port: number) {
         // Create the Prometheus exporter
         const exporter = new PrometheusExporter({ port: port }, () => {
-            logger.info(`Prometheus Exporter endpoint running on port ${ port }`);
+            logger.info(`Prometheus Exporter endpoint running on port ${port}`);
         });
 
         // Initialize the Meter provider
@@ -72,6 +73,14 @@ export class InstrumentationFacade {
             "ws_resolve_domain_and_fetch_url_time",
             {
                 description: "Time spent in resolve domain and fetch Url",
+                unit: "ms",
+            },
+        );
+
+        this.aggregatorTime = this.meter.createHistogram(
+            "ws_aggregator_fetching_time",
+            {
+                description: "Time spent fetching data from Walrus aggregator",
                 unit: "ms",
             },
         );
@@ -147,6 +156,10 @@ export class InstrumentationFacade {
 
     public recordResolveDomainAndFetchUrlResponseTime(time: number, resolvedObjectId: string) {
         this.resolveDomainAndFetchUrlHistogram.record(time, { resolvedObjectId });
+    }
+
+    public recordAggregatorTime(time: number, data: { siteId: string; blobOrPatchId: string; path: string; }) {
+        this.aggregatorTime.record(time, data);
     }
 
     public recordResourceNotFoundRequests() {

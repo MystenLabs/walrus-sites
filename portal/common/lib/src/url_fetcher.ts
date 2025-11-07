@@ -25,6 +25,7 @@ import { HttpStatusCodes } from "@lib/http/http_status_codes";
 import logger from "@lib/logger";
 import BlocklistChecker from "@lib/blocklist_checker";
 import { QuiltPatch } from "@lib/quilt";
+import { instrumentationFacade } from "./instrumentation";
 
 /**
 * Includes all the logic for fetching the URL contents of a walrus site.
@@ -178,19 +179,24 @@ export class UrlFetcher {
 
         const quilt_patch_internal_id = result.headers.get("x-wal-quilt-patch-internal-id")
         let aggregator_endpoint: URL;
+        let blobOrPatchId: string;
         if (quilt_patch_internal_id) {
             const quilt_patch = new QuiltPatch(result.blob_id, quilt_patch_internal_id)
             const quilt_patch_id = quilt_patch.derive_id()
+            blobOrPatchId = quilt_patch_id;
             logger.info("Resource is stored as a quilt patch.", { quilt_patch_id })
             aggregator_endpoint = quiltAggregatorEndpoint(quilt_patch_id, this.aggregatorUrl)
         } else {
             logger.info("Resource is stored as a blob.", { blob_id:  result.blob_id })
+            blobOrPatchId = result.blob_id;
             aggregator_endpoint = blobAggregatorEndpoint(result.blob_id, this.aggregatorUrl)
         }
 
         // We have a resource, get the range header.
         let range_header = optionalRangeToRequestHeaders(result.range);
         logger.info("Fetching blob from aggregator", {aggregatorUrl: this.aggregatorUrl, blob_id: result.blob_id})
+
+        const aggregatorFetchingStart = Date.now();
         const contents = await this.fetchWithRetry(aggregator_endpoint, { headers: range_header });
         if (!contents.ok) {
             logger.error(
@@ -199,6 +205,8 @@ export class UrlFetcher {
             );
             return siteNotFound();
         }
+        const aggregatorFetchingDuration = Date.now() - aggregatorFetchingStart;
+        instrumentationFacade.recordAggregatorTime(aggregatorFetchingDuration, { siteId: objectId, path, blobOrPatchId});
 
         const body = await contents.arrayBuffer();
         // Verify the integrity of the aggregator response by hashing
