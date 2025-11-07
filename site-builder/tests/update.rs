@@ -5,16 +5,12 @@ use std::{
     fs::{self, File, OpenOptions},
     io::Write,
     path::PathBuf,
-    str::FromStr,
 };
 
-use move_core_types::language_storage::StructTag;
 use site_builder::{
     args::{Commands, EpochCountOrMax},
     site_config::WSResources,
 };
-use sui_sdk::rpc_types::SuiObjectResponseQuery;
-use sui_types::Identifier;
 
 #[allow(dead_code)]
 mod localnode;
@@ -508,7 +504,7 @@ async fn quilts_update_check_quilt_lifetime() -> anyhow::Result<()> {
 async fn update_with_file_rename() -> anyhow::Result<()> {
     const N_FILES: usize = 10;
 
-    let mut cluster = TestSetup::start_local_test_cluster().await?;
+    let cluster = TestSetup::start_local_test_cluster().await?;
 
     // Create a temporary directory for our test site
     let temp_dir = tempfile::tempdir()?;
@@ -555,9 +551,12 @@ async fn update_with_file_rename() -> anyhow::Result<()> {
         initial_resources.len()
     );
 
-    // Step 3: Rename one file (file_0.html -> renamed_file.html)
-    println!("Renaming file_0.html to renamed_file.html...");
+    // Step 3: Store the original content of file_0.html before renaming
     let old_path = test_site_dir.join("file_0.html");
+    let original_file_0_content = fs::read_to_string(&old_path)?;
+
+    // Rename one file (file_0.html -> renamed_file.html)
+    println!("Renaming file_0.html to renamed_file.html...");
     let new_path = test_site_dir.join("renamed_file.html");
     fs::rename(&old_path, &new_path)?;
 
@@ -579,39 +578,29 @@ async fn update_with_file_rename() -> anyhow::Result<()> {
 
     println!("Successfully updated site with renamed file");
 
-    // Step 5: Use SuiClient to verify objects under the wallet address
-    let wallet_address = cluster.wallet.inner.active_address()?;
-    println!("Verifying objects owned by address: {wallet_address}");
-
-    // Get all objects owned by the wallet address
-    let owned_blobs = cluster
-        .client
-        .read_api()
-        .get_owned_objects(
-            wallet_address,
-            Some(SuiObjectResponseQuery::new_with_filter(
-                sui_sdk::rpc_types::SuiObjectDataFilter::StructType(StructTag {
-                    address: cluster.cluster_state.system_context.walrus_pkg_id.into(),
-                    module: Identifier::from_str("blob")?,
-                    name: Identifier::from_str("Blob")?,
-                    type_params: vec![],
-                }),
-            )),
-            None,
-            None,
-        )
-        .await?;
-
-    let blob_count = owned_blobs.data.len();
-    assert!(!owned_blobs.has_next_page);
-    assert_eq!(
-        blob_count, N_FILES,
-        "Expected {N_FILES} blob objects, found {blob_count}",
-    );
-
-    // Step 6: Verify the resources through site_resources method
+    // Step 5: Verify the resources through site_resources method
     let updated_resources = cluster.site_resources(site_object_id).await?;
     assert_eq!(updated_resources.len(), N_FILES);
+
+    // Verify that all resources can be read from Walrus network
+    println!(
+        "Verifying {} resources from Walrus network...",
+        updated_resources.len()
+    );
+    for resource in &updated_resources {
+        let content = verify_resource_and_get_content(&cluster, resource).await?;
+
+        // For the renamed file, verify it has the same content as the original file_0.html
+        if resource.path == "/renamed_file.html" {
+            let content_str = String::from_utf8_lossy(&content);
+            assert_eq!(
+                content_str, original_file_0_content,
+                "renamed_file.html should have the same content as the original file_0.html"
+            );
+            println!("✓ Verified renamed_file.html has the same content as original file_0.html");
+        }
+    }
+    println!("Successfully verified all resources from Walrus network");
 
     // Verify that the old path is gone and the new path exists
     let paths: Vec<String> = updated_resources.iter().map(|r| r.path.clone()).collect();
