@@ -4,7 +4,7 @@
 use std::{num::NonZeroUsize, path::PathBuf};
 
 use anyhow::anyhow;
-use args::{Args, Commands};
+use args::{Args, Commands, ResourceArg};
 use config::Config;
 use preprocessor::Preprocessor;
 use publish::{load_ws_resources, SiteEditor};
@@ -134,9 +134,8 @@ async fn run_internal(
             let site_editor = SiteEditor::new(context, config);
             site_editor.destroy(object).await?;
         }
-        Commands::UpdateResource {
-            resource,
-            path,
+        Commands::UpdateResources {
+            resources,
             site_object,
             common,
         } => {
@@ -149,13 +148,6 @@ async fn run_internal(
             let resource_manager =
                 ResourceManager::new(config.walrus_client(), ws_res, common.ws_resources.clone())
                     .await?;
-            let resource = resource_manager
-                .read_single_blob_resource(&resource, path)
-                .await?
-                .ok_or(anyhow!(
-                    "could not read the resource at path: {}",
-                    resource.display()
-                ))?;
             let mut site_manager = SiteManager::new(
                 config,
                 Some(site_object),
@@ -165,8 +157,19 @@ async fn run_internal(
                 NonZeroUsize::new(1).expect("non-zero"),
             )
             .await?;
-            site_manager.update_single_resource(resource).await?;
-            display::header("Resource updated successfully");
+
+            // TODO: Use quilts. Placeholder loop:
+            for ResourceArg(resource, path) in resources {
+                let resource = resource_manager
+                    .read_single_blob_resource(&resource, path)
+                    .await?
+                    .ok_or(anyhow!(
+                        "could not read the resource at path: {}",
+                        resource.display()
+                    ))?;
+                site_manager.update_single_resource(resource).await?;
+                display::header("Resource updated successfully");
+            }
         }
     };
 
