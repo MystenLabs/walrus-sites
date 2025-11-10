@@ -354,3 +354,198 @@ async fn test_update_resources_add_and_replace() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+#[ignore]
+async fn test_update_resources_respects_ws_resources() -> anyhow::Result<()> {
+    let cluster = TestSetup::start_local_test_cluster().await?;
+
+    // 1. Generate a dummy site with initial files
+    let temp_dir = create_test_site(3)?;
+    let directory = temp_dir.path().to_path_buf();
+
+    // 2. Create a ws-resources.json file with a custom header for *.html files
+    let ws_resources_path = directory.join("ws-resources.json");
+    // TODO: ignore patterns should support .gitignore format
+    let ws_resources_content = r#"{
+        "headers": {
+            "**/*.html": {"X-Custom-Header": "CustomValue"}
+        },
+        "ignore": [
+            "**/private/**/*"
+        ]
+    }"#;
+    writeln!(
+        File::create(&ws_resources_path)?,
+        "{}",
+        ws_resources_content
+    )?;
+
+    // Publish the initial site
+    let publish_args = ArgsBuilder::default()
+        .with_config(Some(cluster.sites_config_path().to_owned()))
+        .with_command(Commands::Publish {
+            publish_options: PublishOptionsBuilder::default()
+                .with_directory(directory.clone())
+                .with_epoch_count_or_max(EpochCountOrMax::Epochs(1_u32.try_into().unwrap()))
+                .build()?,
+            site_name: None,
+        })
+        .build()?;
+    site_builder::run(publish_args).await?;
+
+    let site_id = *cluster.last_site_created().await?.id.object_id();
+
+    // Verify original resources have the custom header
+    let original_resources = cluster.site_resources(site_id).await?;
+    for resource in &original_resources {
+        if resource.path.ends_with(".html") {
+            assert!(
+                resource.headers.0.contains_key("X-Custom-Header"),
+                "Original HTML files should have custom header"
+            );
+            assert_eq!(
+                resource.headers.0.get("X-Custom-Header").unwrap(),
+                "CustomValue",
+                "Original HTML files should have correct custom header value"
+            );
+        }
+    }
+
+    // 3. Create new files in a completely different directory
+    let different_temp_dir = tempfile::tempdir()?;
+    let external_file_path = different_temp_dir.path().join("external_file.html");
+    writeln!(
+        File::create(&external_file_path)?,
+        "<html><body><h1>External File</h1></body></html>"
+    )?;
+
+    // Create a file in a private subdirectory that matches the ignore pattern
+    let private_dir = different_temp_dir.path().join("private");
+    std::fs::create_dir(&private_dir)?;
+    let ignored_file_path = private_dir.join("secret.html");
+    writeln!(
+        File::create(&ignored_file_path)?,
+        "<html><body><h1>Private File</h1></body></html>"
+    )?;
+
+    // 4. Call update-resources to add both files (one normal, one matching ignore pattern)
+    let update_resources_args = ArgsBuilder::default()
+        .with_config(Some(cluster.sites_config_path().to_owned()))
+        .with_command(Commands::UpdateResources {
+            resources: vec![
+                ResourceArg(
+                    external_file_path.clone(),
+                    "/external_file.html".to_string(),
+                ),
+                // TODO: #SEW-480 BUG Fix, ignore should look on the full-path, not the resource-path
+                ResourceArg(
+                    ignored_file_path.clone(),
+                    "/private/secret.html".to_string(),
+                ),
+            ],
+            site_object: site_id,
+            common: WalrusStoreOptions {
+                ws_resources: Some(ws_resources_path.clone()),
+                epoch_arg: site_builder::args::EpochArg {
+                    epochs: Some(EpochCountOrMax::Epochs(1_u32.try_into().unwrap())),
+                    earliest_expiry_time: None,
+                    end_epoch: None,
+                },
+                permanent: false,
+                dry_run: false,
+                max_quilt_size: Default::default(),
+            },
+        })
+        .build()?;
+    let res = site_builder::run(update_resources_args).await;
+
+    assert!(
+        res.is_err(),
+        "Expected site-builder to error as ignored-pattern should match"
+    );
+
+    let err_msg = res.unwrap_err().to_string();
+    assert!(
+        err_msg.contains("filtered out"),
+        "Error message should mention the file was filtered out"
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore]
+async fn test_update_resources_filters_ws_resources_file() -> anyhow::Result<()> {
+    let cluster = TestSetup::start_local_test_cluster().await?;
+
+    // 1. Generate a dummy site with initial files
+    let temp_dir = create_test_site(3)?;
+    let directory = temp_dir.path().to_path_buf();
+
+    // 2. Create a ws-resources.json file
+    let ws_resources_path = directory.join("ws-resources.json");
+    let ws_resources_content = r#"{
+        "headers": {
+            "**/*.html": {"X-Custom-Header": "CustomValue"}
+        }
+    }"#;
+    writeln!(
+        File::create(&ws_resources_path)?,
+        "{}",
+        ws_resources_content
+    )?;
+
+    // Publish the initial site
+    let publish_args = ArgsBuilder::default()
+        .with_config(Some(cluster.sites_config_path().to_owned()))
+        .with_command(Commands::Publish {
+            publish_options: PublishOptionsBuilder::default()
+                .with_directory(directory.clone())
+                .with_epoch_count_or_max(EpochCountOrMax::Epochs(1_u32.try_into().unwrap()))
+                .build()?,
+            site_name: None,
+        })
+        .build()?;
+    site_builder::run(publish_args).await?;
+
+    let site_id = *cluster.last_site_created().await?.id.object_id();
+
+    // 3. Try to add the ws-resources.json file itself as a resource
+    let update_resources_args = ArgsBuilder::default()
+        .with_config(Some(cluster.sites_config_path().to_owned()))
+        .with_command(Commands::UpdateResources {
+            resources: vec![ResourceArg(
+                ws_resources_path.clone(),
+                "/ws-resources.json".to_string(),
+            )],
+            site_object: site_id,
+            common: WalrusStoreOptions {
+                ws_resources: Some(ws_resources_path.clone()),
+                epoch_arg: site_builder::args::EpochArg {
+                    epochs: Some(EpochCountOrMax::Epochs(1_u32.try_into().unwrap())),
+                    earliest_expiry_time: None,
+                    end_epoch: None,
+                },
+                permanent: false,
+                dry_run: false,
+                max_quilt_size: Default::default(),
+            },
+        })
+        .build()?;
+
+    // 4. Verify that the operation fails because ws-resources.json is filtered out
+    let res = site_builder::run(update_resources_args).await;
+    assert!(
+        res.is_err(),
+        "Expected update-resources to fail when trying to add ws-resources.json"
+    );
+
+    let err_msg = res.unwrap_err().to_string();
+    assert!(
+        err_msg.contains("filtered out"),
+        "Error message should mention the file was filtered out"
+    );
+
+    Ok(())
+}

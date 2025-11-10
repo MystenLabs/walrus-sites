@@ -343,6 +343,7 @@ pub enum Commands {
     },
 }
 
+/// (file-path, url-path)
 #[derive(Clone, Debug)]
 pub struct ResourceArg(pub PathBuf, pub String);
 

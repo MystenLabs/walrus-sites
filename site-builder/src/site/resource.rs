@@ -321,6 +321,8 @@ impl ResourceManager {
         })
     }
 
+    /// Returns None when file is the ws-resources.json file parsed, or when it matches any of the
+    /// ignore patterns
     fn read_local_resource(
         &self,
         full_path: &Path,
@@ -398,7 +400,8 @@ impl ResourceManager {
 
     /// Read a resource at a path.
     ///
-    /// Ignores empty files.
+    /// Returns None for the ws-resources.json parsed during the command, and resources matching
+    /// ignore patterns.
     pub async fn read_single_blob_resource(
         &self,
         full_path: &Path,

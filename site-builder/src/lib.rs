@@ -159,13 +159,15 @@ async fn run_internal(
             .await?;
 
             // TODO: Use quilts. Placeholder loop:
-            for ResourceArg(resource, path) in resources {
+            for ResourceArg(file_path, url_path) in resources {
                 let resource = resource_manager
-                    .read_single_blob_resource(&resource, path)
+                    .read_single_blob_resource(&file_path, url_path.clone())
                     .await?
                     .ok_or(anyhow!(
-                        "could not read the resource at path: {}",
-                        resource.display()
+                        "Resource '{url_path}' at path '{}' was filtered out. This can happen if the file:\n\
+                         - Matches an ignore pattern in ws-resources.json\n\
+                         - Is the ws-resources.json file itself",
+                         file_path.display()
                     ))?;
                 site_manager.update_single_resource(resource).await?;
                 display::header("Resource updated successfully");
