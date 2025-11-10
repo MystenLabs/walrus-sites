@@ -116,3 +116,107 @@ async fn test_update_resources_add_files() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+#[ignore]
+async fn test_update_resources_replace_file() -> anyhow::Result<()> {
+    let cluster = TestSetup::start_local_test_cluster().await?;
+
+    // 1. Generate a dummy site with initial files
+    let temp_dir = create_test_site(3)?;
+    let directory = temp_dir.path().to_path_buf();
+
+    // Publish the initial site
+    let publish_args = ArgsBuilder::default()
+        .with_config(Some(cluster.sites_config_path().to_owned()))
+        .with_command(Commands::Publish {
+            publish_options: PublishOptionsBuilder::default()
+                .with_directory(directory.clone())
+                .with_epoch_count_or_max(EpochCountOrMax::Epochs(1_u32.try_into().unwrap()))
+                .build()?,
+            site_name: None,
+        })
+        .build()?;
+    site_builder::run(publish_args).await?;
+
+    let site_id = *cluster.last_site_created().await?.id.object_id();
+
+    // Get the original resources to verify replacement later
+    let original_resources = cluster.site_resources(site_id).await?;
+    assert_eq!(original_resources.len(), 3, "Expected 3 initial resources");
+
+    // Find the original file_1.html resource
+    let original_file_1 = original_resources
+        .iter()
+        .find(|r| r.path == "/file_1.html")
+        .expect("Original file_1.html should exist");
+
+    // 2. Create a new file with updated content
+    let updated_file_path = directory.join("updated_file.html");
+    writeln!(
+        File::create(&updated_file_path)?,
+        "<html><body><h1>Updated Content</h1></body></html>"
+    )?;
+
+    // 3. Call update-resources to replace file_1.html with the new content
+    let update_resources_args = ArgsBuilder::default()
+        .with_config(Some(cluster.sites_config_path().to_owned()))
+        .with_command(Commands::UpdateResources {
+            resources: vec![ResourceArg(
+                updated_file_path.clone(),
+                "/file_1.html".to_string(),
+            )],
+            site_object: site_id,
+            common: WalrusStoreOptions {
+                ws_resources: None,
+                epoch_arg: site_builder::args::EpochArg {
+                    epochs: Some(EpochCountOrMax::Epochs(1_u32.try_into().unwrap())),
+                    earliest_expiry_time: None,
+                    end_epoch: None,
+                },
+                permanent: false,
+                dry_run: false,
+                max_quilt_size: Default::default(),
+            },
+        })
+        .build()?;
+    site_builder::run(update_resources_args).await?;
+
+    // 4. Verify that we still have 3 files (resource was replaced, not added)
+    let updated_resources = cluster.site_resources(site_id).await?;
+    assert_eq!(
+        updated_resources.len(),
+        3,
+        "Expected 3 resources after replacement (same count)"
+    );
+
+    // Verify that all resources have valid hashes
+    for resource in &updated_resources {
+        let _data = verify_resource_and_get_content(&cluster, resource).await?;
+    }
+
+    // Verify the replaced file has new content
+    let replaced_resource = updated_resources
+        .iter()
+        .find(|r| r.path == "/file_1.html")
+        .expect("Replaced resource should be present");
+
+    let replaced_content = verify_resource_and_get_content(&cluster, replaced_resource).await?;
+    let replaced_content_str = String::from_utf8(replaced_content)?;
+    assert!(
+        replaced_content_str.contains("Updated Content"),
+        "Replaced file should have new content"
+    );
+    assert!(
+        !replaced_content_str.contains("Test File 1"),
+        "Replaced file should not have old content"
+    );
+
+    // Verify the blob ID changed (since content changed)
+    assert_ne!(
+        original_file_1.blob_id, replaced_resource.blob_id,
+        "Blob ID should change when content is updated"
+    );
+
+    Ok(())
+}
