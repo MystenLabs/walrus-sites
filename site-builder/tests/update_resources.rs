@@ -3,12 +3,12 @@
 
 use std::{fs::File, io::Write};
 
-use site_builder::args::{Commands, EpochCountOrMax, ResourceArg, WalrusStoreOptions};
+use site_builder::args::{Commands, EpochCountOrMax, ResourceArg};
 
 #[allow(dead_code)]
 mod localnode;
 use localnode::{
-    args_builder::{ArgsBuilder, PublishOptionsBuilder},
+    args_builder::{ArgsBuilder, PublishOptionsBuilder, WalrusStoreOptionsBuilder},
     TestSetup,
 };
 
@@ -60,17 +60,9 @@ async fn test_update_resources_add_files() -> anyhow::Result<()> {
                 ResourceArg(new_file2_path.clone(), "/new_file2.html".to_string()),
             ],
             site_object: site_id,
-            common: WalrusStoreOptions {
-                ws_resources: None,
-                epoch_arg: site_builder::args::EpochArg {
-                    epochs: Some(EpochCountOrMax::Epochs(1_u32.try_into().unwrap())),
-                    earliest_expiry_time: None,
-                    end_epoch: None,
-                },
-                permanent: false,
-                dry_run: false,
-                max_quilt_size: Default::default(),
-            },
+            common: WalrusStoreOptionsBuilder::default()
+                .with_epoch_count_or_max(EpochCountOrMax::Epochs(1.try_into()?))
+                .build()?,
         })
         .build()?;
     site_builder::run(update_resources_args).await?;
@@ -167,17 +159,9 @@ async fn test_update_resources_replace_file() -> anyhow::Result<()> {
                 "/file_1.html".to_string(),
             )],
             site_object: site_id,
-            common: WalrusStoreOptions {
-                ws_resources: None,
-                epoch_arg: site_builder::args::EpochArg {
-                    epochs: Some(EpochCountOrMax::Epochs(1_u32.try_into().unwrap())),
-                    earliest_expiry_time: None,
-                    end_epoch: None,
-                },
-                permanent: false,
-                dry_run: false,
-                max_quilt_size: Default::default(),
-            },
+            common: WalrusStoreOptionsBuilder::default()
+                .with_epoch_count_or_max(EpochCountOrMax::Epochs(1.try_into()?))
+                .build()?,
         })
         .build()?;
     site_builder::run(update_resources_args).await?;
@@ -278,17 +262,9 @@ async fn test_update_resources_add_and_replace() -> anyhow::Result<()> {
                 ResourceArg(replacement_file_path.clone(), "/file_0.html".to_string()),
             ],
             site_object: site_id,
-            common: WalrusStoreOptions {
-                ws_resources: None,
-                epoch_arg: site_builder::args::EpochArg {
-                    epochs: Some(EpochCountOrMax::Epochs(1_u32.try_into().unwrap())),
-                    earliest_expiry_time: None,
-                    end_epoch: None,
-                },
-                permanent: false,
-                dry_run: false,
-                max_quilt_size: Default::default(),
-            },
+            common: WalrusStoreOptionsBuilder::default()
+                .with_epoch_count_or_max(EpochCountOrMax::Epochs(1.try_into()?))
+                .build()?,
         })
         .build()?;
     site_builder::run(update_resources_args).await?;
@@ -445,30 +421,63 @@ async fn test_update_resources_respects_ws_resources() -> anyhow::Result<()> {
                 ),
             ],
             site_object: site_id,
-            common: WalrusStoreOptions {
-                ws_resources: Some(ws_resources_path.clone()),
-                epoch_arg: site_builder::args::EpochArg {
-                    epochs: Some(EpochCountOrMax::Epochs(1_u32.try_into().unwrap())),
-                    earliest_expiry_time: None,
-                    end_epoch: None,
-                },
-                permanent: false,
-                dry_run: false,
-                max_quilt_size: Default::default(),
-            },
+            common: WalrusStoreOptionsBuilder::default()
+                .with_ws_resources(Some(ws_resources_path.clone()))
+                .with_epoch_count_or_max(EpochCountOrMax::Epochs(1.try_into()?))
+                .build()?,
         })
         .build()?;
-    let res = site_builder::run(update_resources_args).await;
+    site_builder::run(update_resources_args).await?;
 
-    assert!(
-        res.is_err(),
-        "Expected site-builder to error as ignored-pattern should match"
+    // 5. Verify that the external file was added but the ignored file was not
+    let updated_resources = cluster.site_resources(site_id).await?;
+
+    // Should have 4 files (3 original + 1 external, ignored file should be skipped)
+    assert_eq!(
+        updated_resources.len(),
+        4,
+        "Expected 4 resources (ignored file should be skipped)"
     );
 
-    let err_msg = res.unwrap_err().to_string();
+    // Verify that all resources have valid hashes
+    for resource in &updated_resources {
+        let _data = verify_resource_and_get_content(&cluster, resource).await?;
+    }
+
+    // Verify the external file is present
+    let external_resource = updated_resources
+        .iter()
+        .find(|r| r.path == "/external_file.html")
+        .expect("External resource should be present");
+
+    let external_content = verify_resource_and_get_content(&cluster, external_resource).await?;
+    let external_content_str = String::from_utf8(external_content)?;
     assert!(
-        err_msg.contains("filtered out"),
-        "Error message should mention the file was filtered out"
+        external_content_str.contains("External File"),
+        "External file should have correct content"
+    );
+
+    // Verify that the ignored file was NOT added to the site
+    let ignored_resource = updated_resources
+        .iter()
+        .find(|r| r.path == "/private/secret.html");
+    assert!(
+        ignored_resource.is_none(),
+        "File matching ignore pattern should not be added to the site"
+    );
+
+    // Verify the original files are still present
+    assert!(
+        updated_resources.iter().any(|r| r.path == "/file_0.html"),
+        "file_0.html should still be present"
+    );
+    assert!(
+        updated_resources.iter().any(|r| r.path == "/file_1.html"),
+        "file_1.html should still be present"
+    );
+    assert!(
+        updated_resources.iter().any(|r| r.path == "/file_2.html"),
+        "file_2.html should still be present"
     );
 
     Ok(())
@@ -520,31 +529,51 @@ async fn test_update_resources_filters_ws_resources_file() -> anyhow::Result<()>
                 "/ws-resources.json".to_string(),
             )],
             site_object: site_id,
-            common: WalrusStoreOptions {
-                ws_resources: Some(ws_resources_path.clone()),
-                epoch_arg: site_builder::args::EpochArg {
-                    epochs: Some(EpochCountOrMax::Epochs(1_u32.try_into().unwrap())),
-                    earliest_expiry_time: None,
-                    end_epoch: None,
-                },
-                permanent: false,
-                dry_run: false,
-                max_quilt_size: Default::default(),
-            },
+            common: WalrusStoreOptionsBuilder::default()
+                .with_ws_resources(Some(ws_resources_path.clone()))
+                .with_epoch_count_or_max(EpochCountOrMax::Epochs(1.try_into()?))
+                .build()?,
         })
         .build()?;
 
-    // 4. Verify that the operation fails because ws-resources.json is filtered out
-    let res = site_builder::run(update_resources_args).await;
-    assert!(
-        res.is_err(),
-        "Expected update-resources to fail when trying to add ws-resources.json"
+    // 4. Verify that ws-resources.json is filtered out and not added
+    site_builder::run(update_resources_args).await?;
+
+    let updated_resources = cluster.site_resources(site_id).await?;
+
+    // Should still have 3 files (ws-resources.json should be skipped)
+    assert_eq!(
+        updated_resources.len(),
+        3,
+        "Expected 3 resources (ws-resources.json should be filtered out)"
     );
 
-    let err_msg = res.unwrap_err().to_string();
+    // Verify that all resources have valid hashes
+    for resource in &updated_resources {
+        let _data = verify_resource_and_get_content(&cluster, resource).await?;
+    }
+
+    // Verify that ws-resources.json was NOT added to the site
+    let ws_resource = updated_resources
+        .iter()
+        .find(|r| r.path == "/ws-resources.json");
     assert!(
-        err_msg.contains("filtered out"),
-        "Error message should mention the file was filtered out"
+        ws_resource.is_none(),
+        "ws-resources.json should not be added to the site"
+    );
+
+    // Verify the original files are still present
+    assert!(
+        updated_resources.iter().any(|r| r.path == "/file_0.html"),
+        "file_0.html should still be present"
+    );
+    assert!(
+        updated_resources.iter().any(|r| r.path == "/file_1.html"),
+        "file_1.html should still be present"
+    );
+    assert!(
+        updated_resources.iter().any(|r| r.path == "/file_2.html"),
+        "file_2.html should still be present"
     );
 
     Ok(())

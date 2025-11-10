@@ -1,10 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{num::NonZeroUsize, path::PathBuf};
+use std::path::PathBuf;
 
 use anyhow::anyhow;
-use args::{Args, Commands, ResourceArg};
+use args::{Args, Commands};
 use config::Config;
 use preprocessor::Preprocessor;
 use publish::{load_ws_resources, SiteEditor};
@@ -145,33 +145,20 @@ async fn run_internal(
                 .as_ref()
                 .map(WSResources::read)
                 .transpose()?;
-            let resource_manager =
+            let mut resource_manager =
                 ResourceManager::new(config.walrus_client(), ws_res, common.ws_resources.clone())
                     .await?;
-            let mut site_manager = SiteManager::new(
-                config,
-                Some(site_object),
-                common,
-                None,
-                None,
-                NonZeroUsize::new(1).expect("non-zero"),
-            )
-            .await?;
+            let mut site_manager = SiteManager::new(config, Some(site_object), None, None).await?;
 
-            // TODO: Use quilts. Placeholder loop:
-            for ResourceArg(file_path, url_path) in resources {
-                let resource = resource_manager
-                    .read_single_blob_resource(&file_path, url_path.clone())
-                    .await?
-                    .ok_or(anyhow!(
-                        "Resource '{url_path}' at path '{}' was filtered out. This can happen if the file:\n\
-                         - Matches an ignore pattern in ws-resources.json\n\
-                         - Is the ws-resources.json file itself",
-                         file_path.display()
-                    ))?;
-                site_manager.update_single_resource(resource).await?;
-                display::header("Resource updated successfully");
-            }
+            let resources = resource_manager
+                .parse_resources_and_store_quilts(
+                    resources,
+                    common.epoch_arg,
+                    common.dry_run,
+                    common.max_quilt_size,
+                )
+                .await?;
+            site_manager.update_resources(resources).await?;
         }
     };
 
