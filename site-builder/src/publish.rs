@@ -231,6 +231,7 @@ impl SiteEditor<EditOptions> {
         Ok(())
     }
 
+    #[cfg(feature = "quilts-experimental")]
     pub async fn run_quilts(&self) -> Result<()> {
         let (active_address, response, summary) = self.run_single_edit_quilts().await?;
         print_summary(
@@ -266,6 +267,7 @@ impl SiteEditor<EditOptions> {
         Ok((site_manager.active_address()?, response, summary))
     }
 
+    #[cfg(feature = "quilts-experimental")]
     async fn run_single_edit_quilts(
         &self,
     ) -> Result<(SuiAddress, SuiTransactionBlockResponse, SiteDataDiffSummary)> {
@@ -288,6 +290,10 @@ impl SiteEditor<EditOptions> {
                     .epoch_arg
                     .clone(),
                 dry_run,
+                self.edit_options
+                    .publish_options
+                    .walrus_options
+                    .max_quilt_size,
             )
             .await?;
         display::done();

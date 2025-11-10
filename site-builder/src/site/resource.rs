@@ -14,6 +14,7 @@ use std::{
 
 use anyhow::{anyhow, bail, Context, Result};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use bytesize::ByteSize;
 use fastcrypto::hash::{HashFunction, Sha256};
 use flate2::{write::GzEncoder, Compression};
 use futures::{stream, StreamExt};
@@ -661,6 +662,7 @@ impl ResourceManager {
         root: &Path,
         epochs: EpochArg,
         dry_run: bool,
+        max_quilt_size: ByteSize,
     ) -> Result<SiteData> {
         let resource_paths = Self::iter_dir(root)?;
         if resource_paths.is_empty() {
@@ -673,7 +675,7 @@ impl ResourceManager {
             .collect::<Result<Vec<String>>>()?;
 
         let resource_file_inputs = self.prepare_local_resources(root, rel_paths)?;
-        let chunks = self.quilts_chunkify(resource_file_inputs)?;
+        let chunks = self.quilts_chunkify(resource_file_inputs, max_quilt_size)?;
 
         if dry_run {
             let mut total_storage_cost = 0;
@@ -730,18 +732,33 @@ impl ResourceManager {
     fn quilts_chunkify(
         &self,
         resources: Vec<(ResourceData, QuiltBlobInput)>,
+        max_quilt_size: ByteSize,
     ) -> Result<Vec<Vec<(ResourceData, QuiltBlobInput)>>> {
-        let mut chunks = vec![];
-        let mut current_chunk = vec![];
+        let max_quilt_size = max_quilt_size.as_u64() as usize;
+        let max_available_columns = Walrus::max_slots_in_quilt(self.n_shards) as usize;
+        let max_theoretical_quilt_size =
+            Walrus::max_slot_size(self.n_shards) * max_available_columns;
 
+        // Cap the effective_quilt_size to the min between the theoretical and the passed
+        let effective_quilt_size = if max_theoretical_quilt_size < max_quilt_size {
+            display::warning(format!(
+                "Configured max quilt size ({}) exceeds theoretical maximum ({}). Using {} instead.",
+                ByteSize(max_quilt_size as u64),
+                ByteSize(max_theoretical_quilt_size as u64),
+                ByteSize(max_theoretical_quilt_size as u64)
+            ));
+            max_theoretical_quilt_size
+        } else {
+            max_quilt_size
+        };
+        let mut available_columns = max_available_columns;
         // Calculate capacity per column (slot) in bytes
-        let column_capacity = Walrus::max_slot_size(self.n_shards);
-
-        // Available columns: n_cols - 1 (reserve 1 for quilt index)
-        let mut available_columns = Walrus::max_slots_in_quilt(self.n_shards) as usize;
-
+        let column_capacity = effective_quilt_size / available_columns;
         // Per-file overhead constant
         const FIXED_OVERHEAD: usize = 8; // BLOB_IDENTIFIER_SIZE_BYTES_LENGTH (2) + BLOB_HEADER_SIZE (6)
+
+        let mut chunks = vec![];
+        let mut current_chunk = vec![];
 
         for (res_data, quilt_input) in resources.into_iter() {
             // Calculate total size including overhead
@@ -749,13 +766,14 @@ impl ResourceManager {
                 res_data.unencoded_size + MAX_IDENTIFIER_SIZE + FIXED_OVERHEAD;
 
             // Abort if the file cannot fit in a single Quilt.
-            if file_size_with_overhead
-                > Walrus::max_slots_in_quilt(self.n_shards) as usize * column_capacity
-            {
-                bail!(
-                    "File size of {} exceeds maximum size of single file storage in Quilt.",
-                    res_data.full_path.as_path().display()
-                );
+            // TODO(fix): We could still store a single-file quilt for this case.
+            if file_size_with_overhead > effective_quilt_size {
+                return Err(Self::file_too_large_error(
+                    &res_data.full_path,
+                    file_size_with_overhead,
+                    effective_quilt_size,
+                    max_theoretical_quilt_size,
+                ));
             }
 
             // Calculate how many columns this file needs
@@ -772,8 +790,7 @@ impl ResourceManager {
                 }
                 current_chunk = vec![(res_data, quilt_input)];
                 // Reset available columns for new chunk
-                available_columns =
-                    (Walrus::max_slots_in_quilt(self.n_shards) as usize) - columns_needed;
+                available_columns = max_available_columns - columns_needed;
             }
         }
 
@@ -812,6 +829,32 @@ impl ResourceManager {
                 .as_ref()
                 .and_then(|config| config.site_name.clone()),
         )
+    }
+
+    fn file_too_large_error(
+        file_path: &std::path::Path,
+        file_size: usize,
+        effective_quilt_size: usize,
+        max_theoretical_quilt_size: usize,
+    ) -> anyhow::Error {
+        if file_size > max_theoretical_quilt_size {
+            anyhow::anyhow!(
+                "File '{}' with size {} exceeds Walrus theoretical maximum of {} for single file storage. \
+                This file cannot be stored in Walrus with the current shard configuration.",
+                file_path.display(),
+                ByteSize(file_size as u64),
+                ByteSize(max_theoretical_quilt_size as u64)
+            )
+        } else {
+            anyhow::anyhow!(
+                "File '{}' with size {} exceeds the configured maximum of {} for single file storage. \
+                Consider increasing the limit using --max-quilt-size flag (e.g., --max-quilt-size {}).",
+                file_path.display(),
+                ByteSize(file_size as u64),
+                ByteSize(effective_quilt_size as u64),
+                ByteSize(max_theoretical_quilt_size as u64)
+            )
+        }
     }
 }
 

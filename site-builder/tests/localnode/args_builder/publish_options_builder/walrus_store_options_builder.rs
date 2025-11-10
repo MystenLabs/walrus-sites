@@ -54,6 +54,8 @@ impl WalrusStoreOptionsBuilder {
             epoch_arg,
             permanent,
             dry_run,
+            #[cfg(feature = "quilts-experimental")]
+            max_quilt_size: bytesize::ByteSize::mb(512), // 512 MB
         })
     }
 
