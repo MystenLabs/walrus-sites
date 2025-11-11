@@ -3,7 +3,7 @@
 
 use std::{fs::File, io::Write};
 
-use site_builder::args::{Commands, EpochCountOrMax, ResourceArg};
+use site_builder::args::{Commands, EpochCountOrMax, ResourcePaths};
 
 #[allow(dead_code)]
 mod localnode;
@@ -56,8 +56,14 @@ async fn test_update_resources_add_files() -> anyhow::Result<()> {
         .with_config(Some(cluster.sites_config_path().to_owned()))
         .with_command(Commands::UpdateResources {
             resources: vec![
-                ResourceArg(new_file1_path.clone(), "/new_file1.html".to_string()),
-                ResourceArg(new_file2_path.clone(), "/new_file2.html".to_string()),
+                ResourcePaths {
+                    file_path: new_file1_path.clone(),
+                    url_path: "/new_file1.html".to_string(),
+                },
+                ResourcePaths {
+                    file_path: new_file2_path.clone(),
+                    url_path: "/new_file2.html".to_string(),
+                },
             ],
             site_object: site_id,
             common: WalrusStoreOptionsBuilder::default()
@@ -154,10 +160,10 @@ async fn test_update_resources_replace_file() -> anyhow::Result<()> {
     let update_resources_args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
         .with_command(Commands::UpdateResources {
-            resources: vec![ResourceArg(
-                updated_file_path.clone(),
-                "/file_1.html".to_string(),
-            )],
+            resources: vec![ResourcePaths {
+                file_path: updated_file_path.clone(),
+                url_path: "/file_1.html".to_string(),
+            }],
             site_object: site_id,
             common: WalrusStoreOptionsBuilder::default()
                 .with_epoch_count_or_max(EpochCountOrMax::Epochs(1.try_into()?))
@@ -258,8 +264,14 @@ async fn test_update_resources_add_and_replace() -> anyhow::Result<()> {
         .with_config(Some(cluster.sites_config_path().to_owned()))
         .with_command(Commands::UpdateResources {
             resources: vec![
-                ResourceArg(new_file_path.clone(), "/new_file.html".to_string()),
-                ResourceArg(replacement_file_path.clone(), "/file_0.html".to_string()),
+                ResourcePaths {
+                    file_path: new_file_path.clone(),
+                    url_path: "/new_file.html".to_string(),
+                },
+                ResourcePaths {
+                    file_path: replacement_file_path.clone(),
+                    url_path: "/file_0.html".to_string(),
+                },
             ],
             site_object: site_id,
             common: WalrusStoreOptionsBuilder::default()
@@ -410,15 +422,15 @@ async fn test_update_resources_respects_ws_resources() -> anyhow::Result<()> {
         .with_config(Some(cluster.sites_config_path().to_owned()))
         .with_command(Commands::UpdateResources {
             resources: vec![
-                ResourceArg(
-                    external_file_path.clone(),
-                    "/external_file.html".to_string(),
-                ),
+                ResourcePaths {
+                    file_path: external_file_path.clone(),
+                    url_path: "/external_file.html".to_string(),
+                },
                 // TODO: #SEW-480 BUG Fix, ignore should look on the full-path, not the resource-path
-                ResourceArg(
-                    ignored_file_path.clone(),
-                    "/private/secret.html".to_string(),
-                ),
+                ResourcePaths {
+                    file_path: ignored_file_path.clone(),
+                    url_path: "/private/secret.html".to_string(),
+                },
             ],
             site_object: site_id,
             common: WalrusStoreOptionsBuilder::default()
@@ -524,10 +536,10 @@ async fn test_update_resources_filters_ws_resources_file() -> anyhow::Result<()>
     let update_resources_args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
         .with_command(Commands::UpdateResources {
-            resources: vec![ResourceArg(
-                ws_resources_path.clone(),
-                "/ws-resources.json".to_string(),
-            )],
+            resources: vec![ResourcePaths {
+                file_path: ws_resources_path.clone(),
+                url_path: "/ws-resources.json".to_string(),
+            }],
             site_object: site_id,
             common: WalrusStoreOptionsBuilder::default()
                 .with_ws_resources(Some(ws_resources_path.clone()))

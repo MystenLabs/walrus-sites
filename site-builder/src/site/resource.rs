@@ -23,7 +23,7 @@ use tracing::debug;
 
 use super::SiteData;
 use crate::{
-    args::{EpochArg, ResourceArg},
+    args::{EpochArg, ResourcePaths},
     display,
     site::{config::WSResources, content::ContentType},
     types::{HttpHeaders, SuiResource, VecMap},
@@ -537,7 +537,7 @@ impl ResourceManager {
 
     pub async fn parse_resources_and_store_quilts(
         &mut self,
-        resource_args: Vec<ResourceArg>,
+        resource_args: Vec<ResourcePaths>,
         epochs: EpochArg,
         dry_run: bool,
         max_quilt_size: ByteSize,
@@ -569,11 +569,14 @@ impl ResourceManager {
 
         let rel_paths = resource_paths
             .into_iter()
-            .map(|full_path| {
-                let resource_path = full_path_to_resource_path(full_path.as_path(), root)?;
-                Ok(ResourceArg(full_path, resource_path))
+            .map(|file_path| {
+                let url_path = full_path_to_resource_path(file_path.as_path(), root)?;
+                Ok(ResourcePaths {
+                    file_path,
+                    url_path,
+                })
             })
-            .collect::<Result<Vec<ResourceArg>>>()?;
+            .collect::<Result<Vec<ResourcePaths>>>()?;
 
         let resource_file_inputs = self.resource_paths_to_quilt_inputs(rel_paths)?;
         let resources_set = self
@@ -645,29 +648,29 @@ impl ResourceManager {
     /// Filters resource_paths and prepares them as inputs for Quilt creation.
     fn resource_paths_to_quilt_inputs(
         &self,
-        resources: Vec<ResourceArg>,
+        resources: impl IntoIterator<Item = ResourcePaths>,
     ) -> Result<Vec<(ResourceData, QuiltBlobInput)>> {
         let res = resources
             .into_iter()
-            .map(|ResourceArg(full_path, resource_path)| {
+            .map(|ResourcePaths{file_path, url_path}| {
                 // Validate identifier size (BCS serialized) should be just 1 + str.len(), but
                 // this is cleaner
-                let identifier_size = bcs::serialized_size(&resource_path)
+                let identifier_size = bcs::serialized_size(&url_path)
                     .context("Failed to compute identifier size")?;
                 if identifier_size > MAX_IDENTIFIER_SIZE {
                     bail!(
-                        "Identifier for '{resource_path}' is too long: {identifier_size} bytes (max: {MAX_IDENTIFIER_SIZE} bytes). \
+                        "Identifier for '{url_path}' is too long: {identifier_size} bytes (max: {MAX_IDENTIFIER_SIZE} bytes). \
                         Consider using a shorter path name.",
                     );
                 }
 
-                let Some(res_data) = self.read_local_resource(&full_path, resource_path.clone())?
+                let Some(res_data) = self.read_local_resource(&file_path, url_path.clone())?
                 else {
                     return Ok(None);
                 };
                 let quilt_blob_input = QuiltBlobInput {
-                    path: full_path.clone(),
-                    identifier: Some(resource_path),
+                    path: file_path.clone(),
+                    identifier: Some(url_path),
                     tags: BTreeMap::new(),
                 };
                 Ok(Some((res_data, quilt_blob_input)))

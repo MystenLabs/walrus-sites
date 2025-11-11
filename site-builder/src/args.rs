@@ -333,7 +333,7 @@ pub enum Commands {
         ///   --resources ./index.html:/index.html ./style.css:/assets/style.css
         ///   --resources "my file.html:/my-file.html" image.jpg:/image.jpg
         #[arg(long, num_args = 1..)]
-        resources: Vec<ResourceArg>,
+        resources: Vec<ResourcePaths>,
         /// The object ID of the Site object on Sui, to which the resource will be added.
         #[arg(long)]
         site_object: ObjectID,
@@ -345,9 +345,12 @@ pub enum Commands {
 
 /// (file-path, url-path)
 #[derive(Clone, Debug)]
-pub struct ResourceArg(pub PathBuf, pub String);
+pub struct ResourcePaths {
+    pub file_path: PathBuf,
+    pub url_path: String,
+}
 
-impl FromStr for ResourceArg {
+impl FromStr for ResourcePaths {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> anyhow::Result<Self> {
@@ -373,7 +376,10 @@ impl FromStr for ResourceArg {
             bail!("Expected 'local:site', got '{s}'");
         }
 
-        Ok(ResourceArg(PathBuf::from(&merged[0]), merged[1].clone()))
+        Ok(ResourcePaths {
+            file_path: PathBuf::from(&merged[0]),
+            url_path: merged[1].clone(),
+        })
     }
 }
 
