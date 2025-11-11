@@ -192,6 +192,7 @@ impl SiteManager {
         let mut ptb = ptb.with_max_move_calls::<TRANSFER_MAX>();
 
         let mut routes_iter = btree_map::Iter::default().peekable();
+        // TODO: Could this logic be transfered inside `SitePtb`?
         if let RouteOps::Replace(new_routes) = &updates.route_ops {
             if new_routes.is_empty() {
                 ptb.remove_routes()

@@ -514,7 +514,6 @@ impl ResourceManager {
                         blob_hash,
                     }
                 | {
-                    // TODO(nikos): We have already calculated this
                     let patch_identifier = resource_path.as_str();
                     // Walrus store does not maintain the order the files were passed
                     let Some(pos) = quilt_patches.iter().position(|p| p.identifier == patch_identifier) else {

@@ -211,10 +211,9 @@ impl Walrus {
         Ok(n_shards.n_shards)
     }
 
-    // TODO: Theoretically we shouldn't need to do this ourselves, but I couldn't find how to get
-    // this info from walrus.
-    // TODO: Is this correct? My guess is that if a file is very large, it should take up 2 of the
-    // spaces returned here
+    /// Returns the number of columns available to fill with files in a Quilt.
+    ///
+    /// (All columns minus one for the index.)
     pub fn max_slots_in_quilt(n_shards: NonZeroU16) -> u16 {
         let (_n_rows, n_cols) = walrus_core::encoding::source_symbols_for_n_shards(n_shards);
         n_cols.get() - 1

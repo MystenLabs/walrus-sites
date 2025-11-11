@@ -355,7 +355,6 @@ async fn publish_quilts_with_many_routes() -> anyhow::Result<()> {
 #[tokio::test]
 #[ignore]
 async fn publish_quilts_with_two_large_files() -> anyhow::Result<()> {
-    // TODO: Adjust these values to test different configurations
     const N_FILES: usize = 2;
     const MAX_SYMBOL_SIZE: usize = 65534;
 

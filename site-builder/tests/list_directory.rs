@@ -526,13 +526,15 @@ async fn deploy_quilts_with_list_directory_handles_ws_resources() -> anyhow::Res
         helpers::verify_resource_and_get_content(&cluster, index_resource).await?;
     let _index_content = String::from_utf8(index_content_bytes)?;
 
-    // TODO(fix): This assertion is expected to fail - ws-resources.json should be listed but currently isn't
+    // TODO(fix): #SEW-462 This assertion is expected to fail - ws-resources.json should be listed
+    // but currently isn't
     // assert!(
     //     index_content.contains("ws-resources.json"),
     //     "ws-resources.json should be listed in the generated index.html"
     // );
 
-    // TODO(fix): This assertion is expected to fail - ws-resources-override.json should be listed but currently isn't
+    // TODO(fix): #SEW-462 This assertion is expected to fail - ws-resources-override.json should be
+    // listed but currently isn't
     // assert!(
     //     !index_content.contains("ws-resources-override.json"),
     //     "ws-resources-override.json should not be listed in the generated index.html"
