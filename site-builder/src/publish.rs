@@ -117,7 +117,6 @@ impl SiteEditor {
                 "Warning: No deletable resources found. This may be because the site was created with permanent=true"
             );
         } else {
-            // TODO: Change the site manager not to require the unnecessary info.
             let mut site_manager =
                 SiteManager::new(self.config.clone(), Some(site_id), None, None).await?;
 
