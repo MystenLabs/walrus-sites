@@ -332,7 +332,7 @@ pub enum Commands {
         /// Examples:
         ///   --resources ./index.html:/index.html ./style.css:/assets/style.css
         ///   --resources "my file.html:/my-file.html" image.jpg:/image.jpg
-        #[arg(long, num_args = 1..)]
+        #[arg(long, num_args = 1.., required = true)]
         resources: Vec<ResourcePaths>,
         /// The object ID of the Site object on Sui, to which the resource will be added.
         #[arg(long)]
