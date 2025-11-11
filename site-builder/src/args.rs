@@ -3,12 +3,7 @@
 
 //! Arguments for the site builder CLI.
 
-use std::{
-    num::{NonZeroU32, NonZeroUsize},
-    path::PathBuf,
-    str::FromStr,
-    time::SystemTime,
-};
+use std::{num::NonZeroU32, path::PathBuf, str::FromStr, time::SystemTime};
 
 use anyhow::{anyhow, bail, ensure, Result};
 use bytesize::ByteSize;
@@ -391,11 +386,6 @@ pub struct PublishOptions {
     /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
     #[arg(long)]
     pub list_directory: bool,
-    /// The maximum number of blobs that can be stored concurrently.
-    ///
-    /// More blobs can be stored concurrently, but this will increase memory usage.
-    #[arg(long, default_value_t = default::max_parallel_stores())]
-    pub max_parallel_stores: NonZeroUsize,
     /// Common configurations.
     #[clap(flatten)]
     pub walrus_options: WalrusStoreOptions,
@@ -523,8 +513,6 @@ impl EpochCountOrMax {
 }
 
 pub mod default {
-    use std::num::NonZeroUsize;
-
     use bytesize::ByteSize;
 
     pub const DEFAULT_SITE_NAME: &str = "My Walrus Site";
@@ -535,9 +523,6 @@ pub mod default {
     }
     pub fn gas_budget() -> Option<u64> {
         Some(500_000_000)
-    }
-    pub fn max_parallel_stores() -> NonZeroUsize {
-        NonZeroUsize::new(50).unwrap()
     }
     pub fn max_quilt_size() -> ByteSize {
         ByteSize::mib(512) // 512 MiB
