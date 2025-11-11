@@ -3,6 +3,7 @@
 use std::{
     path::{Path, PathBuf},
     str,
+    time::Duration,
 };
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -19,6 +20,7 @@ use sui_sdk::{
         SuiTransactionBlockEffects,
         SuiTransactionBlockEffectsAPI,
         SuiTransactionBlockResponse,
+        SuiTransactionBlockResponseOptions,
     },
     wallet_context::WalletContext,
 };
@@ -58,7 +60,42 @@ pub(crate) async fn sign_and_send_ptb(
         gas_price,
     );
     let transaction = wallet.sign_transaction(&transaction).await;
-    retry_client.execute_transaction(transaction).await
+    let first_res = retry_client.execute_transaction(transaction).await?;
+
+    // "WaitForLocalExecution" For the wallet SuiClient too.
+    let client = wallet.get_client().await?;
+
+    const WAIT_FOR_LOCAL_EXECUTION_DELAY: Duration = Duration::from_millis(200);
+    const WAIT_FOR_LOCAL_EXECUTION_INTERVAL: Duration = Duration::from_secs(2);
+    const WAIT_FOR_LOCAL_EXECUTION_TIMEOUT: Duration = Duration::from_secs(60);
+    let poll_response = tokio::time::timeout(WAIT_FOR_LOCAL_EXECUTION_TIMEOUT, async {
+        // Apply a short delay to give the full node a chance to catch up.
+        tokio::time::sleep(WAIT_FOR_LOCAL_EXECUTION_DELAY).await;
+
+        let mut interval = tokio::time::interval(WAIT_FOR_LOCAL_EXECUTION_INTERVAL);
+        loop {
+            interval.tick().await;
+
+            if let Ok(poll_response) = client
+                .read_api()
+                .get_transaction_with_options(
+                    first_res.digest,
+                    SuiTransactionBlockResponseOptions::new()
+                        .with_effects()
+                        .with_input()
+                        .with_events()
+                        .with_object_changes()
+                        .with_balance_changes(),
+                )
+                .await
+            {
+                break poll_response;
+            }
+        }
+    })
+    .await?;
+
+    Ok(poll_response)
 }
 
 pub(crate) async fn handle_pagination<F, T, C, Fut>(
