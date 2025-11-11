@@ -3,6 +3,7 @@
 
 use std::{num::NonZeroU32, path::PathBuf, time::SystemTime};
 
+use bytesize::ByteSize;
 use site_builder::args::{EpochArg, EpochCountOrMax, WalrusStoreOptions};
 use thiserror::Error;
 
@@ -29,6 +30,11 @@ pub struct WalrusStoreOptionsBuilder {
     permanent: bool,
     /// Perform a dry run (you'll be asked for confirmation before committing changes).
     dry_run: bool,
+    /// Limits the max total size of all the files stored per Quilt.
+    ///
+    /// Supports both decimal (KB, MB, GB) and binary (KiB, MiB, GiB) units, or plain byte numbers.
+    /// Examples: "512MiB", "1GB", "1048576".
+    max_quilt_size: Option<ByteSize>,
 }
 
 #[derive(Debug, Error)]
@@ -44,6 +50,7 @@ impl WalrusStoreOptionsBuilder {
             epoch_arg,
             permanent,
             dry_run,
+            max_quilt_size,
         } = self;
         let Some(epoch_arg) = epoch_arg else {
             return Err(InvalidWalrusStoreOptionsConfig::MissingEpochs);
@@ -54,8 +61,7 @@ impl WalrusStoreOptionsBuilder {
             epoch_arg,
             permanent,
             dry_run,
-            #[cfg(feature = "quilts-experimental")]
-            max_quilt_size: bytesize::ByteSize::mb(512), // 512 MB
+            max_quilt_size: max_quilt_size.unwrap_or(ByteSize::mib(512)),
         })
     }
 
@@ -100,6 +106,11 @@ impl WalrusStoreOptionsBuilder {
 
     pub fn with_dry_run(mut self, dry_run: bool) -> Self {
         self.dry_run = dry_run;
+        self
+    }
+
+    pub fn with_max_quilt_size(mut self, max_quilt_size: ByteSize) -> Self {
+        self.max_quilt_size = Some(max_quilt_size);
         self
     }
 }

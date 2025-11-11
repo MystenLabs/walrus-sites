@@ -9,8 +9,6 @@
 //! - `--earliest-expiry-time`: Store until at least a specific time
 //! - `--end-epoch`: Store until a specific epoch number
 
-#![cfg(feature = "quilts-experimental")]
-
 use std::{io::Write, num::NonZeroU32, time::SystemTime};
 
 use site_builder::args::{Commands, EpochArg, EpochCountOrMax};
@@ -52,7 +50,7 @@ async fn setup_test_cluster_and_site(
     println!("Publishing site...");
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::PublishQuilts {
+        .with_command(Commands::Publish {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory.clone())
                 .with_epoch_arg(epoch_arg)
@@ -86,7 +84,7 @@ async fn quilts_publish_with_specific_epochs() -> anyhow::Result<()> {
     println!("Publishing site with --epochs {NUM_EPOCHS}...");
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::PublishQuilts {
+        .with_command(Commands::Publish {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory)
                 .with_epoch_count_or_max(EpochCountOrMax::Epochs(
@@ -150,7 +148,7 @@ async fn quilts_publish_with_epochs_max() -> anyhow::Result<()> {
     println!("Publishing site with --epochs max...");
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::PublishQuilts {
+        .with_command(Commands::Publish {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory)
                 .with_epoch_count_or_max(EpochCountOrMax::Max)
@@ -232,7 +230,7 @@ async fn quilts_update_with_different_epochs() -> anyhow::Result<()> {
     println!("Updating site with --epochs {UPDATE_EPOCHS}...");
     let update_args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::UpdateQuilts {
+        .with_command(Commands::Update {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory)
                 .with_epoch_count_or_max(EpochCountOrMax::Epochs(
@@ -311,7 +309,7 @@ async fn quilts_publish_with_earliest_expiry_time() -> anyhow::Result<()> {
     println!("Publishing site with --earliest-expiry-time...");
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::PublishQuilts {
+        .with_command(Commands::Publish {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory)
                 .with_earliest_expiry_time(expiry_time)
@@ -397,7 +395,7 @@ async fn quilts_update_with_earliest_expiry_time() -> anyhow::Result<()> {
     println!("Updating site with --earliest-expiry-time...");
     let update_args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::UpdateQuilts {
+        .with_command(Commands::Update {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory)
                 .with_earliest_expiry_time(expiry_time)
@@ -456,7 +454,7 @@ async fn quilts_publish_with_end_epoch() -> anyhow::Result<()> {
     println!("Publishing site with --end-epoch {end_epoch}...");
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::PublishQuilts {
+        .with_command(Commands::Publish {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory)
                 .with_end_epoch(NonZeroU32::new(end_epoch).unwrap())
@@ -534,7 +532,7 @@ async fn quilts_update_with_end_epoch() -> anyhow::Result<()> {
     println!("Updating site with --end-epoch {UPDATE_END_EPOCH}...");
     let update_args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::UpdateQuilts {
+        .with_command(Commands::Update {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory)
                 .with_end_epoch(NonZeroU32::new(UPDATE_END_EPOCH).unwrap())

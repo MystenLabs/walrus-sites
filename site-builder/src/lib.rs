@@ -7,7 +7,7 @@ use anyhow::anyhow;
 use args::{Args, Commands};
 use config::Config;
 use preprocessor::Preprocessor;
-use publish::{load_ws_resources, BlobManagementOptions, ContinuousEditing, SiteEditor};
+use publish::{load_ws_resources, SiteEditor};
 use site::{config::WSResources, manager::SiteManager, resource::ResourceManager};
 use sitemap::display_sitemap;
 use util::{id_to_base36, path_or_defaults_if_exist};
@@ -72,50 +72,6 @@ async fn run_internal(
             publish_options,
             site_name,
             object_id,
-            watch,
-            check_extend,
-        } => {
-            // Load the ws-resources file, to check for the site-object-id. If it exists, it means
-            // the site is already deployed, in which case we should do update the site.
-            // If it doesn't exist, we can publish a new site.
-            let (ws_resources, _) = load_ws_resources(
-                publish_options.walrus_options.ws_resources.as_deref(),
-                publish_options.directory.as_path(),
-            )?;
-
-            // if `object_id` is Some use it, else use the one from the ws-resources file
-            let site_object_id =
-                object_id.or_else(|| ws_resources.as_ref().and_then(|res| res.object_id));
-
-            let (identifier, continuous_editing, blob_management) = match site_object_id {
-                Some(object_id) => (
-                    Some(object_id),
-                    ContinuousEditing::from_watch_flag(watch),
-                    BlobManagementOptions { check_extend },
-                ),
-                None => (
-                    None,
-                    ContinuousEditing::Once,
-                    BlobManagementOptions::no_status_check(),
-                ),
-            };
-
-            SiteEditor::new(context, config)
-                .with_edit_options(
-                    publish_options,
-                    identifier,
-                    site_name,
-                    continuous_editing,
-                    blob_management,
-                )
-                .run()
-                .await?
-        }
-        #[cfg(feature = "quilts-experimental")]
-        Commands::DeployQuilts {
-            publish_options,
-            site_name,
-            object_id,
         } => {
             // Load the ws-resources file, to check for the site-object-id. If it exists, it means
             // the site is already deployed, in which case we should do update the site.
@@ -130,13 +86,7 @@ async fn run_internal(
                 object_id.or_else(|| ws_resources.as_ref().and_then(|res| res.object_id));
 
             SiteEditor::new(context, config)
-                .with_edit_options(
-                    publish_options,
-                    site_object_id,
-                    site_name,
-                    ContinuousEditing::Once,
-                    BlobManagementOptions::no_status_check(),
-                )
+                .with_edit_options(publish_options, site_object_id, site_name)
                 .run_quilts()
                 .await?
         }
@@ -145,79 +95,16 @@ async fn run_internal(
             site_name,
         } => {
             SiteEditor::new(context, config)
-                .with_edit_options(
-                    publish_options,
-                    None,
-                    site_name,
-                    ContinuousEditing::Once,
-                    BlobManagementOptions::no_status_check(),
-                )
-                .run()
-                .await?
-        }
-        #[cfg(feature = "quilts-experimental")]
-        Commands::PublishQuilts {
-            publish_options,
-            site_name,
-        } => {
-            SiteEditor::new(context, config)
-                .with_edit_options(
-                    publish_options,
-                    None,
-                    site_name,
-                    ContinuousEditing::Once,
-                    BlobManagementOptions::no_status_check(),
-                )
+                .with_edit_options(publish_options, None, site_name)
                 .run_quilts()
                 .await?
         }
-        #[allow(deprecated)]
         Commands::Update {
             publish_options,
             object_id,
-            watch,
-            force,
-            check_extend,
-        } => {
-            if force {
-                display::warning(
-                    "Warning: The --force flag is deprecated and will be removed in a future \
-                    version. Please use --check-extend instead.",
-                )
-            }
-            SiteEditor::new(context, config)
-                .with_edit_options(
-                    publish_options,
-                    Some(object_id),
-                    None,
-                    ContinuousEditing::from_watch_flag(watch),
-                    // Check the extension if either `check_extend` is true or `force` is true.
-                    // This is for backwards compatibility.
-                    // TODO: Remove once the `force` flag is deprecated.
-                    BlobManagementOptions {
-                        check_extend: check_extend || force,
-                    },
-                )
-                .run()
-                .await?
-        }
-        #[cfg(feature = "quilts-experimental")]
-        Commands::UpdateQuilts {
-            publish_options,
-            object_id,
         } => {
             SiteEditor::new(context, config)
-                .with_edit_options(
-                    publish_options,
-                    Some(object_id),
-                    None,
-                    ContinuousEditing::Once,
-                    BlobManagementOptions {
-                        // check-extend does not apply on quilts, as the walrus-store step does not
-                        // depend on resource-difference.
-                        check_extend: false,
-                    },
-                )
+                .with_edit_options(publish_options, Some(object_id), None)
                 .run_quilts()
                 .await?
         }
@@ -259,13 +146,9 @@ async fn run_internal(
                 .as_ref()
                 .map(WSResources::read)
                 .transpose()?;
-            let resource_manager = ResourceManager::new(
-                config.walrus_client(),
-                ws_res,
-                common.ws_resources.clone(),
-                None,
-            )
-            .await?;
+            let resource_manager =
+                ResourceManager::new(config.walrus_client(), ws_res, common.ws_resources.clone())
+                    .await?;
             let resource = resource_manager
                 .read_single_blob_resource(&resource, path)
                 .await?
@@ -276,7 +159,6 @@ async fn run_internal(
             let mut site_manager = SiteManager::new(
                 config,
                 Some(site_object),
-                BlobManagementOptions::no_status_check(),
                 common,
                 None,
                 None,

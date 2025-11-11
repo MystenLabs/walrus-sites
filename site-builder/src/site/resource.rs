@@ -8,7 +8,7 @@ use std::{
     fmt::{self, Debug, Display},
     fs,
     io::Write,
-    num::{NonZeroU16, NonZeroUsize},
+    num::NonZeroU16,
     path::{Path, PathBuf},
 };
 
@@ -17,7 +17,6 @@ use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use bytesize::ByteSize;
 use fastcrypto::hash::{HashFunction, Sha256};
 use flate2::{write::GzEncoder, Compression};
-use futures::{stream, StreamExt};
 use itertools::Itertools;
 use move_core_types::u256::U256;
 use tracing::debug;
@@ -26,7 +25,6 @@ use super::SiteData;
 use crate::{
     args::EpochArg,
     display,
-    publish::BlobManagementOptions,
     site::{config::WSResources, content::ContentType},
     types::{HttpHeaders, SuiResource, VecMap},
     util::{is_ignored, is_pattern_match},
@@ -151,9 +149,8 @@ impl<'a> ResourceOp<'a> {
     }
 
     /// Returns if the operation needs to be uploaded to Walrus.
-    pub fn is_walrus_update(&self, blob_options: &BlobManagementOptions) -> bool {
+    pub fn is_walrus_update(&self) -> bool {
         matches!(self, ResourceOp::Created(_))
-            || (blob_options.is_check_extend() && matches!(self, ResourceOp::Unchanged(_)))
     }
 
     /// Returns true if the operation modifies a resource.
@@ -292,8 +289,6 @@ pub(crate) struct ResourceManager {
     pub ws_resources_path: Option<PathBuf>,
     /// The number of shards of the Walrus system.
     pub n_shards: NonZeroU16,
-    /// The maximum number of concurrent calls to the walrus cli for computing the blob ID.
-    pub max_concurrent: Option<NonZeroUsize>,
 }
 
 impl ResourceManager {
@@ -301,7 +296,6 @@ impl ResourceManager {
         walrus: Walrus,
         ws_resources: Option<WSResources>,
         ws_resources_path: Option<PathBuf>,
-        max_concurrent: Option<NonZeroUsize>,
     ) -> Result<Self> {
         let n_shards = walrus.n_shards().await?;
 
@@ -324,7 +318,6 @@ impl ResourceManager {
             ws_resources,
             ws_resources_path,
             n_shards,
-            max_concurrent,
         })
     }
 
@@ -623,37 +616,6 @@ impl ResourceManager {
                     .join(", ")
             ))?;
         Ok(store_resp.quilt_blob_output.storage_cost)
-    }
-
-    /// Recursively iterate a directory and load all [`Resources`][Resource] within.
-    pub async fn read_dir(&mut self, root: &Path) -> Result<SiteData> {
-        let resource_paths = Self::iter_dir(root)?;
-        if resource_paths.is_empty() {
-            return Ok(SiteData::empty());
-        }
-
-        let futures = resource_paths
-            .iter()
-            .map(|full_path| {
-                full_path_to_resource_path(full_path, root)
-                    .map(|resource_path| self.read_single_blob_resource(full_path, resource_path))
-            })
-            .collect::<Result<Vec<_>>>()?;
-
-        // Limit the amount of futures awaited concurrently.
-        let concurrency_limit = self
-            .max_concurrent
-            .map(NonZeroUsize::get)
-            .unwrap_or_else(|| resource_paths.len());
-
-        let mut stream = stream::iter(futures).buffer_unordered(concurrency_limit);
-
-        let mut resources = ResourceSet::empty();
-        while let Some(resource) = stream.next().await {
-            resources.extend(resource?);
-        }
-
-        Ok(self.to_site_data(resources))
     }
 
     /// Recursively iterate a directory and load all [`Resources`][Resource] within.

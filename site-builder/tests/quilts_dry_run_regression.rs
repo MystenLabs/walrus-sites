@@ -7,8 +7,6 @@
 //! would consume the chunks iterator during cost estimation, causing resource
 //! processing to fail after user confirmation with "Transaction effects not found".
 
-#![cfg(feature = "quilts-experimental")]
-
 use std::{
     fs::File,
     io::{Read, Write},
@@ -129,7 +127,7 @@ async fn test_dry_run(site_type: &str, expected_file_count: usize) -> anyhow::Re
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
         .with_gas_budget(50_000_000_000) // Same gas budget as publish_quilts.rs
-        .with_command(Commands::PublishQuilts {
+        .with_command(Commands::Publish {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory.clone())
                 .with_ws_resources(Some(ws_resources_path))

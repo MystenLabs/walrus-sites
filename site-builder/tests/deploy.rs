@@ -1,8 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-#![cfg(feature = "quilts-experimental")]
-
 use std::{
     fs::{self, File, OpenOptions},
     io::Write,
@@ -49,7 +47,7 @@ async fn quilts_deploy_auto_update() -> anyhow::Result<()> {
     println!("Step 1: Publishing initial site with DeployQuilts...");
     let publish_args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::DeployQuilts {
+        .with_command(Commands::Deploy {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory.clone())
                 .with_epoch_count_or_max(EpochCountOrMax::Epochs(1_u32.try_into().unwrap()))
@@ -87,7 +85,7 @@ async fn quilts_deploy_auto_update() -> anyhow::Result<()> {
     println!("Step 3: Deploying with DeployQuilts (auto-detect site ID)...");
     let deploy_args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::DeployQuilts {
+        .with_command(Commands::Deploy {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory)
                 .with_epoch_count_or_max(EpochCountOrMax::Max)
@@ -172,7 +170,7 @@ async fn quilts_deploy_with_explicit_object_id() -> anyhow::Result<()> {
     println!("Step 1a: Publishing first site...");
     let publish_args_1 = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::DeployQuilts {
+        .with_command(Commands::Deploy {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory_1.clone())
                 .with_epoch_count_or_max(EpochCountOrMax::Epochs(1_u32.try_into().unwrap()))
@@ -194,7 +192,7 @@ async fn quilts_deploy_with_explicit_object_id() -> anyhow::Result<()> {
     println!("Step 1b: Publishing second site...");
     let publish_args_2 = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::DeployQuilts {
+        .with_command(Commands::Deploy {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory_2.clone())
                 .with_epoch_count_or_max(EpochCountOrMax::Epochs(1_u32.try_into().unwrap()))
@@ -246,7 +244,7 @@ async fn quilts_deploy_with_explicit_object_id() -> anyhow::Result<()> {
 
     let deploy_args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::DeployQuilts {
+        .with_command(Commands::Deploy {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory_2.clone())
                 .with_epoch_count_or_max(EpochCountOrMax::Max)
@@ -335,7 +333,7 @@ async fn quilts_deploy_updates_site_name() -> anyhow::Result<()> {
     println!("Step 1: Publishing initial site with name 'Initial Site Name'...");
     let publish_args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::DeployQuilts {
+        .with_command(Commands::Deploy {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory.clone())
                 .with_epoch_count_or_max(EpochCountOrMax::Epochs(1_u32.try_into().unwrap()))
@@ -377,7 +375,7 @@ async fn quilts_deploy_updates_site_name() -> anyhow::Result<()> {
 
     let deploy_args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::DeployQuilts {
+        .with_command(Commands::Deploy {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory)
                 .with_epoch_count_or_max(EpochCountOrMax::Max)
@@ -438,7 +436,7 @@ async fn deploy_quilts_with_slot_sized_files() -> anyhow::Result<()> {
 
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::PublishQuilts {
+        .with_command(Commands::Publish {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(temp_dir.path().to_owned())
                 .with_epoch_count_or_max(EpochCountOrMax::Max)
@@ -497,7 +495,7 @@ async fn deploy_quilts_with_slot_sized_files() -> anyhow::Result<()> {
 
     let deploy_args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::DeployQuilts {
+        .with_command(Commands::Deploy {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(temp_dir_new.path().to_owned())
                 .with_epoch_count_or_max(EpochCountOrMax::Max)

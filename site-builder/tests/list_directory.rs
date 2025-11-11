@@ -45,66 +45,6 @@ fn assert_quilt_identifiers(
     }
 }
 
-#[tokio::test]
-#[ignore]
-// This test verifies that the site-builder can publish the example snake
-// with the --list-directory command and assert that the ignored resources
-// are published on-chain.
-async fn publish_snake_with_list_directory() -> anyhow::Result<()> {
-    const SNAKE_FILES_UPLOAD_FILES: usize = 4;
-    let cluster = TestSetup::start_local_test_cluster().await?;
-    let snake_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .join("examples")
-        .join("snake");
-
-    // Copy the entire snake directory to a temp location to avoid modifying the original
-    let temp_dir = tempfile::tempdir()?;
-    let directory = temp_dir.path().join("snake");
-    copy_dir(&snake_dir, &directory)?;
-
-    let args = ArgsBuilder::default()
-        .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::Publish {
-            publish_options: PublishOptionsBuilder::default()
-                .with_directory(directory)
-                .with_list_directory(true)
-                .with_epoch_count_or_max(EpochCountOrMax::Max)
-                .build()?,
-            site_name: None,
-        })
-        .build()?;
-    site_builder::run(args).await?;
-
-    let site = cluster.last_site_created().await?;
-    let resources = cluster.site_resources(*site.id.object_id()).await?;
-
-    assert_eq!(resources.len(), SNAKE_FILES_UPLOAD_FILES);
-
-    for resource in resources {
-        let data = cluster.read_blob(&BlobId(resource.blob_id.0)).await?;
-        let mut hash_function = Sha256::default();
-        hash_function.update(&data);
-        let resource_hash: [u8; 32] = hash_function.finalize().digest;
-        assert_eq!(resource.blob_hash, U256::from_le_bytes(&resource_hash));
-
-        // Make sure that the ignored files in ws-resources.json are not published.
-        let ignored_paths = [
-            "/secret.txt",
-            "/private/data.txt",
-            "/private/nested/hidden.doc",
-        ];
-        for ignored_path in &ignored_paths {
-            assert_ne!(resource.path, *ignored_path);
-        }
-        // Make sure that the produced index.html from the list-directory command does
-        // not include paths to the ignored files of ws-resources.json
-    }
-
-    Ok(())
-}
-
 // This test verifies that the site-builder can run the list-directory command
 // for the examples/snake directory without publishing it.
 // Makes sure that the resources that should be ignored are not included in the
@@ -151,7 +91,6 @@ async fn preprocess_the_snake_example_with_list_directory_no_publish() -> anyhow
     Ok(())
 }
 
-#[cfg(feature = "quilts-experimental")]
 #[tokio::test]
 #[ignore]
 // This test verifies that the site-builder can publish using Quilts
@@ -174,7 +113,7 @@ async fn publish_quilts_with_list_directory() -> anyhow::Result<()> {
 
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::PublishQuilts {
+        .with_command(Commands::Publish {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory.clone())
                 .with_list_directory(true)
@@ -276,7 +215,6 @@ async fn publish_quilts_with_list_directory() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[cfg(feature = "quilts-experimental")]
 #[tokio::test]
 #[ignore]
 // This test verifies that DeployQuilts with --list-directory correctly handles
@@ -310,7 +248,7 @@ async fn deploy_quilts_with_list_directory_updates_ignored_files() -> anyhow::Re
     // Step 3: First deploy with --list-directory
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::DeployQuilts {
+        .with_command(Commands::Deploy {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory.to_path_buf())
                 .with_list_directory(true)
@@ -391,7 +329,7 @@ async fn deploy_quilts_with_list_directory_updates_ignored_files() -> anyhow::Re
     // Step 5: Second deploy with changed ignore patterns
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::DeployQuilts {
+        .with_command(Commands::Deploy {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory.to_path_buf())
                 .with_list_directory(true)
@@ -475,7 +413,6 @@ async fn deploy_quilts_with_list_directory_updates_ignored_files() -> anyhow::Re
     Ok(())
 }
 
-#[cfg(feature = "quilts-experimental")]
 #[tokio::test]
 #[ignore]
 // This test verifies that DeployQuilts with --list-directory correctly handles ws-resources.json:
@@ -513,7 +450,7 @@ async fn deploy_quilts_with_list_directory_handles_ws_resources() -> anyhow::Res
     // Step 4: Deploy with --list-directory, passing the external ws-resources.json
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_owned()))
-        .with_command(Commands::DeployQuilts {
+        .with_command(Commands::Deploy {
             publish_options: PublishOptionsBuilder::default()
                 .with_directory(directory.to_path_buf())
                 .with_list_directory(true)
