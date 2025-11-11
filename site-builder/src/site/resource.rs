@@ -419,52 +419,6 @@ impl ResourceManager {
             .unwrap_or_default()
     }
 
-    /// Filters resource_paths, and prepares their ResourceData, while also grouping them into a
-    /// single Quilt.
-    fn prepare_local_resources(
-        &mut self,
-        full_path: &Path,
-        resource_paths: Vec<String>,
-    ) -> Result<Vec<(ResourceData, QuiltBlobInput)>> {
-        let res = resource_paths
-            .into_iter()
-            .map(|resource_path| {
-                let full_path = full_path.join(
-                    resource_path
-                        .strip_prefix('/')
-                        .unwrap_or(resource_path.as_str()),
-                );
-
-                // Validate identifier size (BCS serialized) should be just 1 + str.len(), but
-                // this is cleaner
-                let identifier_size = bcs::serialized_size(&resource_path)
-                    .context("Failed to compute identifier size")?;
-                if identifier_size > MAX_IDENTIFIER_SIZE {
-                    bail!(
-                        "Identifier for '{resource_path}' is too long: {identifier_size} bytes (max: {MAX_IDENTIFIER_SIZE} bytes). \
-                        Consider using a shorter path name.",
-                    );
-                }
-
-                let Some(res_data) = self.read_local_resource(&full_path, resource_path.clone())?
-                else {
-                    return Ok(None);
-                };
-                let quilt_blob_input = QuiltBlobInput {
-                    path: full_path.clone(),
-                    identifier: Some(resource_path),
-                    tags: BTreeMap::new(),
-                };
-                Ok(Some((res_data, quilt_blob_input)))
-            })
-            .collect::<Result<Vec<Option<(ResourceData, QuiltBlobInput)>>>>()?
-            .into_iter()
-            .flatten()
-            .collect();
-
-        Ok(res)
-    }
-
     // Extracts Blob-id and Quilt-patch-id from the walrus store response, in order to combine
     // it with ResourceData to return Resources
     async fn store_resource_chunk_into_quilt(
@@ -588,7 +542,7 @@ impl ResourceManager {
         dry_run: bool,
         max_quilt_size: ByteSize,
     ) -> Result<ResourceSet> {
-        let resource_file_inputs = self.resource_args_to_quilt_inputs(resource_args)?;
+        let resource_file_inputs = self.resource_paths_to_quilt_inputs(resource_args)?;
 
         let resources_set = self
             .store_into_quilts(resource_file_inputs, epochs, dry_run, max_quilt_size)
@@ -614,11 +568,14 @@ impl ResourceManager {
         }
 
         let rel_paths = resource_paths
-            .iter()
-            .map(|full_path| full_path_to_resource_path(full_path, root))
-            .collect::<Result<Vec<String>>>()?;
+            .into_iter()
+            .map(|full_path| {
+                let resource_path = full_path_to_resource_path(full_path.as_path(), root)?;
+                Ok(ResourceArg(full_path, resource_path))
+            })
+            .collect::<Result<Vec<ResourceArg>>>()?;
 
-        let resource_file_inputs = self.prepare_local_resources(root, rel_paths)?;
+        let resource_file_inputs = self.resource_paths_to_quilt_inputs(rel_paths)?;
         let resources_set = self
             .store_into_quilts(resource_file_inputs, epochs, dry_run, max_quilt_size)
             .await?;
@@ -685,10 +642,8 @@ impl ResourceManager {
         Ok(resources_set)
     }
 
-    // TODO: Deduplicate: Check prepare_local_resource
-    /// Filters resource_paths, and prepares their ResourceData, while also grouping them into a
-    /// single Quilt.
-    fn resource_args_to_quilt_inputs(
+    /// Filters resource_paths and prepares them as inputs for Quilt creation.
+    fn resource_paths_to_quilt_inputs(
         &self,
         resources: Vec<ResourceArg>,
     ) -> Result<Vec<(ResourceData, QuiltBlobInput)>> {
