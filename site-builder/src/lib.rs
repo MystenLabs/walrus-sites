@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{num::NonZeroUsize, path::PathBuf};
+use std::path::PathBuf;
 
 use anyhow::anyhow;
 use args::{Args, Commands};
@@ -134,9 +134,8 @@ async fn run_internal(
             let site_editor = SiteEditor::new(context, config);
             site_editor.destroy(object).await?;
         }
-        Commands::UpdateResource {
-            resource,
-            path,
+        Commands::UpdateResources {
+            resources,
             site_object,
             common,
         } => {
@@ -146,27 +145,20 @@ async fn run_internal(
                 .as_ref()
                 .map(WSResources::read)
                 .transpose()?;
-            let resource_manager =
+            let mut resource_manager =
                 ResourceManager::new(config.walrus_client(), ws_res, common.ws_resources.clone())
                     .await?;
-            let resource = resource_manager
-                .read_single_blob_resource(&resource, path)
-                .await?
-                .ok_or(anyhow!(
-                    "could not read the resource at path: {}",
-                    resource.display()
-                ))?;
-            let mut site_manager = SiteManager::new(
-                config,
-                Some(site_object),
-                common,
-                None,
-                None,
-                NonZeroUsize::new(1).expect("non-zero"),
-            )
-            .await?;
-            site_manager.update_single_resource(resource).await?;
-            display::header("Resource updated successfully");
+            let mut site_manager = SiteManager::new(config, Some(site_object), None, None).await?;
+
+            let resources = resource_manager
+                .parse_resources_and_store_quilts(
+                    resources,
+                    common.epoch_arg,
+                    common.dry_run,
+                    common.max_quilt_size,
+                )
+                .await?;
+            site_manager.update_resources(resources).await?;
         }
     };
 

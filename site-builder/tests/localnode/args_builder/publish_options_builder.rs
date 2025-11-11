@@ -1,30 +1,21 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{
-    num::{NonZeroU32, NonZeroUsize},
-    path::PathBuf,
-    time::SystemTime,
-};
+use std::{num::NonZeroU32, path::PathBuf, time::SystemTime};
 
-use site_builder::args::{default as sites_default, EpochArg, EpochCountOrMax, PublishOptions};
+use site_builder::args::{EpochArg, EpochCountOrMax, PublishOptions};
 use thiserror::Error;
 
-mod walrus_store_options_builder;
+pub mod walrus_store_options_builder;
 use walrus_store_options_builder::{InvalidWalrusStoreOptionsConfig, WalrusStoreOptionsBuilder};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct PublishOptionsBuilder {
     /// The directory containing the site sources.
     pub directory: Option<PathBuf>,
     /// Preprocess the directory before publishing.
     /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
     pub list_directory: bool,
-    /// The maximum number of blobs that can be stored concurrently.
-    ///
-    /// More blobs can be stored concurrently, but this will increase memory usage.
-    // #[arg(long, default_value_t = default::max_parallel_stores())]
-    pub max_parallel_stores: NonZeroUsize,
     /// Common configurations.
     // Note: We are currently re-using `WalrusStoreOptionsBuilder`'s methods for convenience,
     // and keeping walrus_store_options_builder mod private.
@@ -44,7 +35,6 @@ impl PublishOptionsBuilder {
         let PublishOptionsBuilder {
             directory,
             list_directory,
-            max_parallel_stores,
             walrus_options,
         } = self;
         let Some(directory) = directory else {
@@ -56,7 +46,6 @@ impl PublishOptionsBuilder {
         Ok(PublishOptions {
             directory,
             list_directory,
-            max_parallel_stores,
             walrus_options,
         })
     }
@@ -68,11 +57,6 @@ impl PublishOptionsBuilder {
 
     pub fn with_list_directory(mut self, list_directory: bool) -> Self {
         self.list_directory = list_directory;
-        self
-    }
-
-    pub fn with_max_parallel_stores(mut self, max_parallel_stores: NonZeroUsize) -> Self {
-        self.max_parallel_stores = max_parallel_stores;
         self
     }
 
@@ -113,16 +97,5 @@ impl PublishOptionsBuilder {
     pub fn with_dry_run(mut self, dry_run: bool) -> Self {
         self.walrus_options = self.walrus_options.with_dry_run(dry_run);
         self
-    }
-}
-
-impl Default for PublishOptionsBuilder {
-    fn default() -> Self {
-        Self {
-            directory: None,
-            list_directory: false,
-            max_parallel_stores: sites_default::max_parallel_stores(),
-            walrus_options: WalrusStoreOptionsBuilder::default(),
-        }
     }
 }

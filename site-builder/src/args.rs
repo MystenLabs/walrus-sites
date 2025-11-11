@@ -3,14 +3,9 @@
 
 //! Arguments for the site builder CLI.
 
-use std::{
-    num::{NonZeroU32, NonZeroUsize},
-    path::PathBuf,
-    str::FromStr,
-    time::SystemTime,
-};
+use std::{num::NonZeroU32, path::PathBuf, str::FromStr, time::SystemTime};
 
-use anyhow::{anyhow, ensure, Result};
+use anyhow::{anyhow, bail, ensure, Result};
 use bytesize::ByteSize;
 use clap::{ArgGroup, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
@@ -313,18 +308,27 @@ pub enum Commands {
     /// the owner. Warning: this action is irreversible! Re-publishing the site will generate a
     /// different Site object ID.
     Destroy { object: ObjectID },
-    /// Adds or updates a single resource in a site, eventually replacing any pre-existing ones.
+    /// Adds or updates one or more resources in a site, eventually replacing any pre-existing ones.
+    ///
+    /// Multiple resources can be updated in a single command, and will be grouped into Quilts
+    /// for efficient storage on the Walrus network.
     ///
     /// The ws_resource file will still be used to determine the resource's headers.
-    UpdateResource {
-        /// The path to the resource to be added.
-        #[arg(long)]
-        resource: PathBuf,
-        /// The path the resource should have in the site.
+    UpdateResources {
+        /// Resources to add or update, specified as 'local_path:site_path' pairs.
         ///
-        /// Should be in the form `/path/to/resource.html`, with a leading `/`.
-        #[arg(long)]
-        path: String,
+        /// Each resource is specified in the format 'local_path:site_path', where:
+        /// - local_path: The path to the resource file on your local filesystem
+        /// - site_path: The path the resource should have in the site (with a leading '/')
+        ///
+        /// Multiple resources can be provided separated by spaces. If a path contains a literal
+        /// colon, escape it with a backslash: 'file\:name.html:/site/path.html'.
+        ///
+        /// Examples:
+        ///   --resources ./index.html:/index.html ./style.css:/assets/style.css
+        ///   --resources "my file.html:/my-file.html" image.jpg:/image.jpg
+        #[arg(long, num_args = 1.., required = true)]
+        resources: Vec<ResourcePaths>,
         /// The object ID of the Site object on Sui, to which the resource will be added.
         #[arg(long)]
         site_object: ObjectID,
@@ -332,6 +336,46 @@ pub enum Commands {
         #[clap(flatten)]
         common: WalrusStoreOptions,
     },
+}
+
+/// (file-path, url-path)
+#[derive(Clone, Debug)]
+pub struct ResourcePaths {
+    pub file_path: PathBuf,
+    pub url_path: String,
+}
+
+impl FromStr for ResourcePaths {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> anyhow::Result<Self> {
+        let parts: Vec<&str> = s.split(':').collect();
+
+        // Handle escaped colons specifically
+        let merged = parts
+            .iter()
+            .fold(Vec::new(), |mut acc: Vec<String>, &part| {
+                if let Some(last) = acc.last_mut() {
+                    if last.ends_with('\\') {
+                        last.pop();
+                        last.push(':');
+                        last.push_str(part);
+                        return acc;
+                    }
+                }
+                acc.push(part.to_string());
+                acc
+            });
+
+        if merged.len() != 2 {
+            bail!("Expected 'local:site', got '{s}'");
+        }
+
+        Ok(ResourcePaths {
+            file_path: PathBuf::from(&merged[0]),
+            url_path: merged[1].clone(),
+        })
+    }
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -342,11 +386,6 @@ pub struct PublishOptions {
     /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
     #[arg(long)]
     pub list_directory: bool,
-    /// The maximum number of blobs that can be stored concurrently.
-    ///
-    /// More blobs can be stored concurrently, but this will increase memory usage.
-    #[arg(long, default_value_t = default::max_parallel_stores())]
-    pub max_parallel_stores: NonZeroUsize,
     /// Common configurations.
     #[clap(flatten)]
     pub walrus_options: WalrusStoreOptions,
@@ -474,8 +513,6 @@ impl EpochCountOrMax {
 }
 
 pub mod default {
-    use std::num::NonZeroUsize;
-
     use bytesize::ByteSize;
 
     pub const DEFAULT_SITE_NAME: &str = "My Walrus Site";
@@ -486,9 +523,6 @@ pub mod default {
     }
     pub fn gas_budget() -> Option<u64> {
         Some(500_000_000)
-    }
-    pub fn max_parallel_stores() -> NonZeroUsize {
-        NonZeroUsize::new(50).unwrap()
     }
     pub fn max_quilt_size() -> ByteSize {
         ByteSize::mib(512) // 512 MiB

@@ -404,8 +404,7 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
     // Routes
 
     /// Adds the move calls to create a new routes object.
-    // TODO: Remove pub and move logic here
-    pub fn create_routes(&mut self) -> SitePtbBuilderResult<()> {
+    fn create_routes(&mut self) -> SitePtbBuilderResult<()> {
         self.add_programmable_move_call(
             contracts::site::create_routes.identifier(),
             vec![],
@@ -423,7 +422,7 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
     }
 
     /// Adds the move calls to remove the routes object.
-    // TODO: Remove pub and move logic here
+    // TODO: Remove pub and move RouteOp logic from `manager.rs`?
     pub fn remove_routes(&mut self) -> SitePtbBuilderResult<()> {
         self.add_programmable_move_call(
             contracts::site::remove_all_routes_if_exist.identifier(),

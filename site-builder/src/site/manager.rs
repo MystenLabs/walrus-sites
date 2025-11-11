@@ -3,12 +3,10 @@
 
 use std::{
     collections::{btree_map, BTreeSet, HashSet},
-    num::NonZeroUsize,
     str::FromStr,
-    time::Duration,
 };
 
-use anyhow::{anyhow, bail, Error, Result};
+use anyhow::{anyhow, bail, Result};
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{
     rpc_types::{
@@ -26,27 +24,26 @@ use sui_types::{
 
 use super::{
     builder::SitePtb,
-    resource::{Resource, ResourceOp},
+    resource::ResourceOp,
     RemoteSiteFactory,
     SiteData,
     SiteDataDiff,
     SITE_MODULE,
 };
 use crate::{
-    args::WalrusStoreOptions,
     backoff::ExponentialBackoffConfig,
     config::Config,
     display,
     retry_client::RetriableSuiClient,
-    site::builder::{SitePtbBuilderResultExt, PTB_MAX_MOVE_CALLS},
+    site::{
+        builder::{SitePtbBuilderResultExt, PTB_MAX_MOVE_CALLS},
+        resource::ResourceSet,
+    },
     summary::SiteDataDiffSummary,
     types::{Metadata, MetadataOp, RouteOps, SiteNameOp},
     util::{get_site_id_from_response, sign_and_send_ptb},
     walrus::{types::BlobId, Walrus},
 };
-
-const OS_ERROR_DELAY: Duration = Duration::from_secs(1);
-const MAX_RETRIES: u32 = 10;
 
 pub struct SiteManager {
     pub config: Config,
@@ -56,8 +53,6 @@ pub struct SiteManager {
     pub backoff_config: ExponentialBackoffConfig,
     pub metadata: Option<Metadata>,
     pub site_name: Option<String>,
-    pub walrus_options: WalrusStoreOptions,
-    pub max_parallel_stores: NonZeroUsize,
 }
 
 impl SiteManager {
@@ -65,10 +60,8 @@ impl SiteManager {
     pub async fn new(
         config: Config,
         site_id: Option<ObjectID>,
-        walrus_options: WalrusStoreOptions,
         metadata: Option<Metadata>,
         site_name: Option<String>,
-        max_parallel_stores: NonZeroUsize,
     ) -> Result<Self> {
         Ok(SiteManager {
             walrus: config.walrus_client(),
@@ -78,38 +71,7 @@ impl SiteManager {
             backoff_config: ExponentialBackoffConfig::default(),
             metadata,
             site_name,
-            walrus_options,
-            max_parallel_stores,
         })
-    }
-
-    /// Perform a dry-run of Walrus store operations for the given updates
-    /// and return the total storage cost that would be incurred.
-    async fn dry_run_walrus_single_blob_store(
-        &mut self,
-        walrus_updates: &Vec<&ResourceOp<'_>>,
-    ) -> anyhow::Result<u64> {
-        tracing::info!("Dry-running Walrus store operations");
-        let mut total_storage_cost = 0;
-
-        for update in walrus_updates {
-            let resource = update.inner();
-            let dry_run_outputs = self
-                .walrus
-                .dry_run_store(
-                    resource.full_path.clone(),
-                    self.walrus_options.epoch_arg.clone(),
-                    !self.walrus_options.permanent,
-                    false,
-                )
-                .await?;
-
-            for dry_run_output in dry_run_outputs {
-                total_storage_cost += dry_run_output.storage_cost;
-            }
-        }
-
-        Ok(total_storage_cost)
     }
 
     /// Updates the site with the given [`Resource`].
@@ -153,81 +115,6 @@ impl SiteManager {
         }
 
         Ok((result, site_updates.summary()))
-    }
-
-    /// Publishes the resources to Walrus.
-    async fn store_single_blob_resources_to_walrus(
-        &mut self,
-        walrus_updates: &[&ResourceOp<'_>],
-    ) -> Result<()> {
-        for (idx, update_set) in walrus_updates
-            .chunks(self.max_parallel_stores.get())
-            .enumerate()
-        {
-            display::action(format!(
-                "Storing resources on Walrus: batch {} of {}",
-                idx + 1,
-                walrus_updates
-                    .len()
-                    .div_ceil(self.max_parallel_stores.get()),
-            ));
-            self.store_multiple_to_walrus_with_retry(update_set).await?;
-            display::done();
-        }
-        Ok(())
-    }
-
-    async fn store_multiple_to_walrus_with_retry(
-        &mut self,
-        update_batch: &[&ResourceOp<'_>],
-    ) -> Result<()> {
-        let deletable = !self.walrus_options.permanent;
-        let resource_paths = update_batch
-            .iter()
-            .map(|update| update.inner().full_path.clone())
-            .collect::<Vec<_>>();
-
-        tracing::debug!(?resource_paths, "storing resource batch on Walrus",);
-
-        // Retry if the store operation fails with an os error.
-        // NOTE(giac): This can be improved when the rust sdk for the client is open sourced.
-        let mut retry_num = 0;
-        loop {
-            anyhow::ensure!(
-                retry_num < MAX_RETRIES,
-                "maximum number of retries exceeded"
-            );
-            tracing::debug!(retry_num, "attempting to store resource");
-            retry_num += 1;
-            let result = self
-                .walrus
-                .store(
-                    resource_paths.clone(),
-                    self.walrus_options.epoch_arg.clone(),
-                    false,
-                    deletable,
-                )
-                .await;
-
-            match result {
-                Ok(_) => {
-                    break;
-                }
-                Err(error) => {
-                    if !is_retriable_error(&error) || retry_num >= MAX_RETRIES {
-                        return Err(error);
-                    } else {
-                        tracing::warn!(
-                            ?error,
-                            delay = ?OS_ERROR_DELAY,
-                            "calling the Walrus CLI encountered a retriable error, retrying"
-                        );
-                        tokio::time::sleep(OS_ERROR_DELAY).await;
-                    }
-                }
-            }
-        }
-        Ok(())
     }
 
     /// Deletes the resources from Walrus.
@@ -305,6 +192,7 @@ impl SiteManager {
         let mut ptb = ptb.with_max_move_calls::<TRANSFER_MAX>();
 
         let mut routes_iter = btree_map::Iter::default().peekable();
+        // TODO: Could this logic be transferred inside `SitePtb`?
         if let RouteOps::Replace(new_routes) = &updates.route_ops {
             if new_routes.is_empty() {
                 ptb.remove_routes()
@@ -387,61 +275,40 @@ impl SiteManager {
         Ok(result)
     }
 
-    /// Adds a single resource to the site
-    pub async fn update_single_resource(&mut self, resource: Resource) -> Result<()> {
-        let ptb = SitePtb::<(), 1021>::new(
-            self.config.package,
-            Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
-        );
-
+    pub async fn update_resources(&mut self, resources: ResourceSet) -> Result<()> {
         let Some(site_id) = &self.site_id else {
-            anyhow::bail!("`add_single_resource` is only supported for existing sites");
+            anyhow::bail!("`update_resources` is only supported for existing sites");
         };
-        let mut ptb = ptb.with_call_arg(&self.wallet.get_object_ref(*site_id).await?.into())?;
 
-        // First remove, then add the resource.
-        let operations = [
-            ResourceOp::Deleted(&resource),
-            ResourceOp::Created(&resource),
-        ];
-
-        // Upload to Walrus
-        tracing::debug!("uploading the resource to Walrus");
-        let walrus_ops = operations
+        // Create operations: for each resource, delete then immediately create it
+        // This ensures the delete/create pairs are adjacent, which is better for updates
+        let operations: Vec<_> = resources
+            .inner
             .iter()
-            .filter(|u| u.is_walrus_update())
-            .collect::<Vec<_>>();
+            .flat_map(|resource| [ResourceOp::Deleted(resource), ResourceOp::Created(resource)])
+            .collect();
 
-        //Perform dry run
-        if self.walrus_options.dry_run {
-            let total_storage_cost = self.dry_run_walrus_single_blob_store(&walrus_ops).await?;
-            // Before doing the actual execution, perform a dry run
-            display::action(format!(
-                "Estimated Storage Cost for this publish/update (Gas Cost Excluded): {total_storage_cost} FROST"
-            ));
-            // Add user confirmation prompt.
-            display::action("Waiting for user confirmation...");
-            if !dialoguer::Confirm::new()
-                .with_prompt("Do you want to proceed with these updates?")
-                .default(true)
-                .interact()?
-            {
-                display::error("Update cancelled by user");
-                return Err(anyhow!("Update cancelled by user"));
-            }
-        }
-        self.store_single_blob_resources_to_walrus(&walrus_ops)
-            .await?;
+        let mut operations_iter = operations.iter().peekable();
+        let retry_client = self.sui_client().await?;
 
-        // Create the PTB
         tracing::debug!("modifying the site object on chain");
-        ptb.add_resource_operations(&mut operations.iter().peekable())?;
-        self.sign_and_send_ptb(
-            ptb.finish(),
-            self.gas_coin_ref().await?,
-            &self.sui_client().await?,
-        )
-        .await?;
+
+        // Create PTBs until all operations are processed
+        while operations_iter.peek().is_some() {
+            let ptb = SitePtb::<(), PTB_MAX_MOVE_CALLS>::new(
+                self.config.package,
+                Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
+            );
+            let call_arg: CallArg = self.wallet.get_object_ref(*site_id).await?.into();
+            let mut ptb = ptb.with_call_arg(&call_arg)?;
+
+            ptb.add_resource_operations(&mut operations_iter)
+                .ok_if_limit_reached()?;
+
+            self.sign_and_send_ptb(ptb.finish(), self.gas_coin_ref().await?, &retry_client)
+                .await?;
+        }
+
         Ok(())
     }
 
@@ -504,19 +371,6 @@ impl SiteManager {
     /// A new site needs to be transferred to the active address.
     fn needs_transfer(&self) -> bool {
         self.site_id.is_none()
-    }
-}
-
-fn is_retriable_error(error: &Error) -> bool {
-    let error_message = error.to_string();
-    if error_message.contains("os error 54") {
-        // The connection was reset by the peer -- a common RPC error under load.
-        true
-    } else if error_message.contains("response does not contain object data") {
-        // The RPC may be slow, and does not have the correct object version.
-        true
-    } else {
-        false
     }
 }
 

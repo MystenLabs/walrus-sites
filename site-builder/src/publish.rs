@@ -3,7 +3,6 @@
 
 use std::{
     collections::{BTreeSet, HashSet},
-    num::NonZeroUsize,
     path::{Path, PathBuf},
 };
 
@@ -19,7 +18,7 @@ use sui_types::{
 };
 
 use crate::{
-    args::{PublishOptions, WalrusStoreOptions},
+    args::PublishOptions,
     backoff::ExponentialBackoffConfig,
     config::Config,
     display,
@@ -118,16 +117,8 @@ impl SiteEditor {
                 "Warning: No deletable resources found. This may be because the site was created with permanent=true"
             );
         } else {
-            // TODO: Change the site manager not to require the unnecessary info.
-            let mut site_manager = SiteManager::new(
-                self.config.clone(),
-                Some(site_id),
-                WalrusStoreOptions::default(),
-                None,
-                None,
-                NonZeroUsize::new(1).expect("non-zero"),
-            )
-            .await?;
+            let mut site_manager =
+                SiteManager::new(self.config.clone(), Some(site_id), None, None).await?;
 
             site_manager.delete_from_walrus(&all_blobs).await?;
         }
@@ -259,10 +250,8 @@ impl SiteEditor<EditOptions> {
         let site_manager = SiteManager::new(
             self.config.clone(),
             self.edit_options.site_id,
-            self.edit_options.publish_options.walrus_options.clone(),
             site_metadata,
             self.edit_options.site_name.clone().or(site_name),
-            self.edit_options.publish_options.max_parallel_stores,
         )
         .await?;
 
