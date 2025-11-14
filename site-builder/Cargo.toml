@@ -61,3 +61,7 @@ walrus-service = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-
 ] }
 walrus-sui = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.37.0" }
 walrus-test-utils = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.37.0" }
+
+# Version constraint for transitive dependency compatibility
+# (sui-tls -> axum-server v0.6.1 requires hyper <1.8)
+hyper = "=1.6.0"
