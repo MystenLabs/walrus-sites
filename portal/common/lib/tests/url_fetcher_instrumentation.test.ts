@@ -10,7 +10,9 @@ import { RPCSelector } from '@lib/rpc_selector';
 import { instrumentationFacade } from '@lib/instrumentation';
 import { ResourceStruct, DynamicFieldStruct, ResourcePathStruct } from '@lib/bcs_data_parsing';
 import { toBase64 } from '@mysten/sui/utils';
-import type { Server } from 'bun';
+import { sha256 } from '@lib/crypto';
+import { createServer } from 'node:http';
+import type { Server } from 'node:http';
 
 describe('UrlFetcher records aggregator timing with mock servers', () => {
     // TESTING STRATEGY: Mock at the network boundary
@@ -22,26 +24,26 @@ describe('UrlFetcher records aggregator timing with mock servers', () => {
     let suiRpcUrl: string;
     let aggregatorUrl: string;
 
-    beforeAll(() => {
+    beforeAll(async () => {
         const testBlobData = new Uint8Array(8);
-        mockSuiServer = createMockSuiFullnode(testBlobData);
-        mockAggregatorServer = Bun.serve({
-            port: 0,
-            fetch() {
-                return new Response(testBlobData, {
-                    status: 200,
-                    headers: { "Content-Type": "application/octet-stream" }
-                });
-            }
-        });
+        mockSuiServer = await createMockSuiFullnode(testBlobData);
 
-        suiRpcUrl = `http://localhost:${mockSuiServer.port}`;
-        aggregatorUrl = `http://localhost:${mockAggregatorServer.port}`;
+        mockAggregatorServer = createServer((req, res) => {
+            res.writeHead(200, { "Content-Type": "application/octet-stream" });
+            res.end(testBlobData);
+        });
+        mockAggregatorServer.listen(0);
+
+        const suiAddress = mockSuiServer.address() as { port: number };
+        const aggregatorAddress = mockAggregatorServer.address() as { port: number };
+
+        suiRpcUrl = `http://localhost:${suiAddress.port}`;
+        aggregatorUrl = `http://localhost:${aggregatorAddress.port}`;
     });
 
     afterAll(() => {
-        mockSuiServer.stop();
-        mockAggregatorServer.stop();
+        mockSuiServer.close();
+        mockAggregatorServer.close();
     });
 
     it('should record aggregator time when fetching a resource', async () => {
@@ -82,8 +84,8 @@ describe('UrlFetcher records aggregator timing with mock servers', () => {
 });
 
 // Helper: Create mock Sui Full Node server
-function createMockSuiFullnode(testBlobData: Uint8Array): Server {
-    const testBlobDataHashBytes = Bun.SHA256.hash(testBlobData);
+async function createMockSuiFullnode(testBlobData: Uint8Array): Promise<Server> {
+    const testBlobDataHashBytes = await sha256(testBlobData.buffer);
 
     let hashBigInt = 0n;
     for (let i = testBlobDataHashBytes.length - 1; i >= 0; i--) {
@@ -109,15 +111,18 @@ function createMockSuiFullnode(testBlobData: Uint8Array): Server {
 
     const bcsBytes = toBase64(dynamicField.toBytes());
 
-    return Bun.serve({
-        port: 0,
-        async fetch(req) {
-            const body = await req.json() as any;
-            const ids = body.params[0] || [];
+    const server = createServer(async (req, res) => {
+        let body = '';
+        req.on('data', chunk => {
+            body += chunk.toString();
+        });
+        req.on('end', () => {
+            const parsedBody = JSON.parse(body);
+            const ids = parsedBody.params[0] || [];
 
-            return new Response(JSON.stringify({
+            const response = JSON.stringify({
                 jsonrpc: "2.0",
-                id: body.id,
+                id: parsedBody.id,
                 result: [
                     {
                         data: {
@@ -145,9 +150,13 @@ function createMockSuiFullnode(testBlobData: Uint8Array): Server {
                         }
                     }
                 ]
-            }), {
-                headers: { "Content-Type": "application/json" }
             });
-        }
+
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(response);
+        });
     });
+
+    server.listen(0);
+    return server;
 }
