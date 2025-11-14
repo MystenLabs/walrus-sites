@@ -33,6 +33,7 @@ version = 2
 # [possible values: any SPDX 3.11 short identifier (+ optional exception)].
 allow = [
     "0BSD",
+    "Apache-2.0 WITH LLVM-exception",
     "Apache-2.0",
     "BSD-2-Clause",
     "BSD-3-Clause",
@@ -72,6 +73,7 @@ ignore = true
 # Lint level for when multiple versions of the same crate are detected
 multiple-versions = "deny"
 skip = [
+    { name = "const-str" },                        # Sui and Walrus depend on multiple versions.
     { name = "funty", version = "1.1.0" },         # Sui depends on both 1.1.0 and 2.0.0.
     { name = "itertools", version = "<=12.1" },
     { name = "radium", version = "0.6.2" },        # Sui depends on both 0.6.2 and 0.7.0.
