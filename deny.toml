@@ -33,6 +33,7 @@ version = 2
 # [possible values: any SPDX 3.11 short identifier (+ optional exception)].
 allow = [
     "0BSD",
+    "Apache-2.0 WITH LLVM-exception",
     "Apache-2.0",
     "BSD-2-Clause",
     "BSD-3-Clause",
@@ -72,19 +73,23 @@ ignore = true
 # Lint level for when multiple versions of the same crate are detected
 multiple-versions = "deny"
 skip = [
-    { name = "funty", version = "1.1.0" },         # Sui depends on both 1.1.0 and 2.0.0.
     { name = "itertools", version = "<=12.1" },
-    { name = "radium", version = "0.6.2" },        # Sui depends on both 0.6.2 and 0.7.0.
     { name = "synstructure", version = "0.12.6" },
 ]
 skip-tree = [
     # Mysten's libraries pull in several conflicting repo versions.
+    # Sui's bin-version pulls in conflicting const-str versions.
+    { name = "bin-version", depth = 1 },
     { name = "fastcrypto", depth = 4 },
     { name = "sui-rest-api", depth = 6 },
     { name = "sui-sdk", depth = 6 },
-    # several crates depend on an older version of windows-sys
+    # Sui's test infrastructure has many version conflicts.
+    { name = "test-cluster", depth = 6 },
+    # Walrus's typed-store has dependency conflicts.
+    { name = "typed-store", depth = 6 },
+    # several crates depend on an older version of windows-sys.
     { name = "windows-sys", depth = 3, version = "0.48" },
-    # Several crates depend on older windows versions
+    # Several crates depend on older windows versions.
     { name = "windows-targets", depth = 3, version = "0.42.2" },
 ]
 
