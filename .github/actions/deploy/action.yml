@@ -82,12 +82,6 @@ inputs:
         description: Epochs to keep
         required: false
         default: "5"
-    CHECK_EXTEND:
-        description: |
-          Whether to check and extend the storage period if needed.
-          When set to true, adds the --check-extend flag to the deploy command.
-        required: false
-        default: "false"
     GITHUB_TOKEN:
         description: |
           The GITHUB_TOKEN for creating a PR, in case of ws-resources changed during
@@ -265,7 +259,6 @@ runs:
           env:
             DIST_PATH: ${{ inputs.DIST }}
             WS_RESOURCES_PATH: ${{ inputs.WS_RESOURCES }}
-            CHECK_EXTEND: ${{ inputs.CHECK_EXTEND }}
             EPOCHS: ${{ inputs.EPOCHS }}
             SUI_NETWORK: ${{ inputs.SUI_NETWORK }}
           run: |
@@ -279,9 +272,6 @@ runs:
             )
             if [[ -n "$WS_RESOURCES_PATH" ]]; then
               ARGS+=(--ws-resources "$WS_RESOURCES_PATH")
-            fi
-            if [[ "$CHECK_EXTEND" == "true" ]]; then
-              ARGS+=(--check-extend)
             fi
             site-builder "${ARGS[@]}"
           shell: bash
