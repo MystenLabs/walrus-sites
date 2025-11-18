@@ -1,5 +1,14 @@
 name: "Deploy Walrus Site"
 description: |
+  ⚠️ **DEPRECATED: This action has moved to its own repository.**
+
+  Please update your workflows to use: `MystenLabs/walrus-sites-github-actions/deploy@v1`
+
+  This wrapper will continue to work but will be removed in a future release.
+  See https://github.com/MystenLabs/walrus-sites-github-actions for the new location.
+
+  ---
+
   Deploys a static site to Walrus and publishes it as a webpage.
 
   **Note:** This action operates on an existing set of static files.
@@ -28,7 +37,7 @@ description: |
   For usage examples, see the following workflows and their corresponding sites:
   - `.github/workflows/deploy-snake.yml`: Deploys `examples/snake`, a site with ready-to-deploy
     assets.
-  - `.github/workflows/deploy-vite-react-ts.yml`: Deploys `examples/vite-react-ts`, which requires a
+  - In MystenLabs/walrus-sites-github-actions: `example/.github/workflows/deploy-vite-react-ts.yml`: Deploys `example/vite-react-ts`, which requires a
     build step first.
 inputs:
     # Setup Walrus action inputs:
@@ -94,227 +103,27 @@ inputs:
 runs:
     using: "composite"
     steps:
-        # Validate deployer Sui account setup inputs and determine which method is being used
-        - name: Validate Sui Account Setup
-          id: sui_auth_method
+        # Display deprecation warning
+        - name: Display Deprecation Warning
           shell: bash
-          env:
+          run: |
+            echo "::warning::⚠️ DEPRECATED: This action has moved to MystenLabs/walrus-sites-github-actions"
+            echo "::warning::Please update your workflow to use: MystenLabs/walrus-sites-github-actions/deploy@v1"
+            echo "::warning::This wrapper will be removed in a future release."
+            echo "::warning::See https://github.com/MystenLabs/walrus-sites-github-actions for details."
+
+        # Call the new standalone action
+        - name: Call New Deploy Action
+          uses: MystenLabs/walrus-sites-github-actions/deploy@v1
+          with:
             SUI_ADDRESS: ${{ inputs.SUI_ADDRESS }}
             SUI_KEYSTORE: ${{ inputs.SUI_KEYSTORE }}
             SUI_BECH32_PRIVATE_KEY: ${{ inputs.SUI_BECH32_PRIVATE_KEY }}
             SUI_SECRET_PHRASE: ${{ inputs.SUI_SECRET_PHRASE }}
-          run: |
-            # Count how many authentication methods are provided
-            auth_methods=0
-            needs_derivation="false"
-            key_string=""
-
-            # Check Address + Keystore method
-            if [[ -n "$SUI_ADDRESS" && -n "$SUI_KEYSTORE" ]]; then
-              auth_methods=$((auth_methods + 1))
-              echo "✓ Using SUI_ADDRESS + SUI_KEYSTORE authentication"
-            elif [[ -n "$SUI_ADDRESS" || -n "$SUI_KEYSTORE" ]]; then
-              echo "❌ ERROR: Both SUI_ADDRESS and SUI_KEYSTORE must be provided together"
-              exit 1
-            fi
-
-            # Check Bech32 Private Key method
-            if [[ -n "$SUI_BECH32_PRIVATE_KEY" ]]; then
-              auth_methods=$((auth_methods + 1))
-              needs_derivation="true"
-              key_string="$SUI_BECH32_PRIVATE_KEY"
-              echo "✓ Using SUI_BECH32_PRIVATE_KEY authentication"
-            fi
-
-            # Check Secret Phrase method
-            if [[ -n "$SUI_SECRET_PHRASE" ]]; then
-              auth_methods=$((auth_methods + 1))
-              needs_derivation="true"
-              key_string="$SUI_SECRET_PHRASE"
-              echo "✓ Using SUI_SECRET_PHRASE authentication"
-            fi
-
-            # Validate exactly one authentication method is provided
-            if [[ $auth_methods -eq 0 ]]; then
-              echo "❌ ERROR: Must provide one of the following Sui account setup methods:"
-              echo "  1. SUI_ADDRESS + SUI_KEYSTORE"
-              echo "  2. SUI_BECH32_PRIVATE_KEY"
-              echo "  3. SUI_SECRET_PHRASE"
-              exit 1
-            elif [[ $auth_methods -gt 1 ]]; then
-              echo "❌ ERROR: Only one Sui account setup method can be used at a time"
-              echo "  Provided: $auth_methods methods"
-              exit 1
-            fi
-
-            # Set outputs for subsequent steps
-            echo "needs_derivation=$needs_derivation" >> "$GITHUB_OUTPUT"
-            echo "key_string=$key_string" >> "$GITHUB_OUTPUT"
-            echo "🎯 Authentication method validated successfully"
-
-        # Install suiup when we need to set up Sui from private key or secret phrase
-        - name: Install Suiup
-          if: steps.sui_auth_method.outputs.needs_derivation == 'true'
-          shell: bash
-          env:
+            WALRUS_CONFIG: ${{ inputs.WALRUS_CONFIG }}
             SUI_NETWORK: ${{ inputs.SUI_NETWORK }}
-          run: |
-            echo "📦 Installing suiup to manage Sui CLI tools..."
-            curl -sSf https://raw.githubusercontent.com/MystenLabs/suiup/main/install.sh | bash
-
-            # Verify installation works
-            suiup --version
-            echo "✅ Suiup installed successfully"
-
-            # Install Sui CLI for the specified network
-            echo "📥 Installing Sui CLI for $SUI_NETWORK network..."
-            suiup install "sui@$SUI_NETWORK" -y
-
-            # Verify Sui CLI installation
-            sui --version
-            echo "✅ Sui CLI installed successfully"
-
-        # Setup Sui account (handles both direct inputs and derivation)
-        - name: Setup Sui Account
-          id: sui_account
-          shell: bash
-          env:
-            NEEDS_DERIVATION: ${{ steps.sui_auth_method.outputs.needs_derivation }}
-            KEY_STRING: ${{ steps.sui_auth_method.outputs.key_string }}
-            INPUT_SUI_ADDRESS: ${{ inputs.SUI_ADDRESS }}
-            INPUT_SUI_KEYSTORE: ${{ inputs.SUI_KEYSTORE }}
-          run: |
-            if [[ "$NEEDS_DERIVATION" == "true" ]]; then
-              echo "🔑 Deriving Sui Ed25519 account from provided credentials..."
-
-              # Import the key using sui keytool with Ed25519 scheme
-              import_result=$(sui keytool import "$KEY_STRING" ed25519 --json)
-
-              # Extract address from the JSON result
-              sui_address=$(echo "$import_result" | jq -r '.suiAddress')
-
-              # Get the keystore content (this will be in ~/.sui/sui_config/sui.keystore)
-              keystore_content=$(cat ~/.sui/sui_config/sui.keystore)
-
-              echo "✅ Sui account derived successfully"
-              echo "📍 Address: $sui_address"
-            else
-              echo "📋 Using provided SUI_ADDRESS and SUI_KEYSTORE"
-              sui_address="$INPUT_SUI_ADDRESS"
-              keystore_content="$INPUT_SUI_KEYSTORE"
-            fi
-
-            # Output the final values for subsequent steps
-            echo "sui_address=$sui_address" >> "$GITHUB_OUTPUT"
-
-            # Remove newlines from keystore content for safe single-line output
-            keystore_oneline=$(echo "$keystore_content" | tr -d '\n\r')
-            echo "sui_keystore=$keystore_oneline" >> "$GITHUB_OUTPUT"
-
-        # This step prepares the Walrus configuration file. It uses the input `WALRUS_CONFIG` if
-        # provided; otherwise, it downloads the default configuration from the Walrus repository.
-        # The configuration is then passed to the next step via an output.
-        - name: Prepare Walrus Config
-          id: walrus_config_step
-          shell: bash
-          env:
-            WALRUS_CONFIG_CONTENT: ${{ inputs.WALRUS_CONFIG }}
-          run: |
-            if [[ -n "$WALRUS_CONFIG_CONTENT" ]]; then
-              CONFIG_CONTENT="$WALRUS_CONFIG_CONTENT"
-            else
-              CONFIG_CONTENT=$(curl -sL https://raw.githubusercontent.com/MystenLabs/walrus/refs/heads/main/setup/client_config.yaml)
-            fi
-            EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
-            echo "walrus_config<<$EOF" >> "$GITHUB_OUTPUT"
-            echo "$CONFIG_CONTENT" >> "$GITHUB_OUTPUT"
-            echo "$EOF" >> "$GITHUB_OUTPUT"
-
-        # This step sets up the Sui and Walrus environment using a dedicated GitHub Action. It
-        # installs the necessary tools, like the `walrus` and `site-builder` binaries.
-        - name: Setup Walrus
-          uses: "MystenLabs/walrus/.github/actions/set-up-walrus/@ebb65a1b3f9e0e3cf663d3a041deb7928dc544fe" # main
-          with:
-              SUI_ADDRESS: "${{ steps.sui_account.outputs.sui_address }}"
-              SUI_KEYSTORE: "${{ steps.sui_account.outputs.sui_keystore }}"
-              WALRUS_CONFIG: "${{ steps.walrus_config_step.outputs.walrus_config }}"
-              SUI_NETWORK: "${{ inputs.SUI_NETWORK }}"
-        # This step prepares the sites-config.yaml file, which defines the sites to be deployed.
-        # It uses the `SITES_CONFIG` input if provided; otherwise, it downloads the default
-        # configuration for the mainnet from the walrus-sites repository.
-        - name: Prepare Sites Config
-          env:
-            SITES_CONFIG_CONTENT: ${{ inputs.SITES_CONFIG }}
-          run: |
-            if [[ -n "$SITES_CONFIG_CONTENT" ]]; then
-              echo "$SITES_CONFIG_CONTENT" > sites-config.yaml
-            else
-              curl -sL https://raw.githubusercontent.com/MystenLabs/walrus-sites/refs/heads/main/sites-config.yaml -o sites-config.yaml
-            fi
-          shell: bash
-        # This is the core step that deploys the site. It constructs the command-line arguments for
-        # the `site-builder` CLI, including the network context, config file, and distribution
-        # folder.
-        - name: "Deploy the site"
-          env:
-            DIST_PATH: ${{ inputs.DIST }}
-            WS_RESOURCES_PATH: ${{ inputs.WS_RESOURCES }}
+            DIST: ${{ inputs.DIST }}
+            SITES_CONFIG: ${{ inputs.SITES_CONFIG }}
+            WS_RESOURCES: ${{ inputs.WS_RESOURCES }}
             EPOCHS: ${{ inputs.EPOCHS }}
-            SUI_NETWORK: ${{ inputs.SUI_NETWORK }}
-          run: |
-            ARGS=(
-              --context "$SUI_NETWORK"
-              --config sites-config.yaml
-            )
-            ARGS+=(
-              deploy "$DIST_PATH"
-              --epochs "$EPOCHS"
-            )
-            if [[ -n "$WS_RESOURCES_PATH" ]]; then
-              ARGS+=(--ws-resources "$WS_RESOURCES_PATH")
-            fi
-            site-builder "${ARGS[@]}"
-          shell: bash
-        # If a GITHUB_TOKEN is provided, this step determines the path to the `ws-resources.json`
-        # file. This file contains the resources related to the deployed site. The path is needed for
-        # the subsequent steps that check for changes and create a pull request.
-        - name: Set ws-resources path
-          id: ws_path
-          if: inputs.GITHUB_TOKEN != ''
-          env:
-            WS_RESOURCES_PATH: ${{ inputs.WS_RESOURCES }}
-            DIST_PATH: ${{ inputs.DIST }}
-          shell: bash
-          run: |
-            if [[ -n "$WS_RESOURCES_PATH" ]]; then
-              echo "path=$WS_RESOURCES_PATH" >> "$GITHUB_OUTPUT"
-            else
-              echo "path=$DIST_PATH/ws-resources.json" >> "$GITHUB_OUTPUT"
-            fi
-        # This step checks if the `ws-resources.json` file was modified during the deployment. It uses
-        # `git status` to detect changes and sets an output variable `changed` to true or false.
-        - name: Detect if there was any change in ws-resources
-          id: file_change
-          if: inputs.GITHUB_TOKEN != ''
-          env:
-            WS_RESOURCES_PATH_FROM_STEP: ${{ steps.ws_path.outputs.path }}
-          run: |
-            if [[ -n "$(git status --porcelain -- "$WS_RESOURCES_PATH_FROM_STEP")" ]]; then
-              echo "changed=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "changed=false" >> "$GITHUB_OUTPUT"
-            fi
-          shell: bash
-        # If the `ws-resources.json` file has changed, this step creates a pull request with the
-        # updated file. It uses the `peter-evans/create-pull-request` action to automate the PR
-        # creation. The PR will contain only the changes to the `ws-resources.json` file.
-        - name: Create Pull Request
-          if: inputs.GITHUB_TOKEN != '' && steps.file_change.outputs.changed == 'true'
-          uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
-          with:
-            token: ${{ inputs.GITHUB_TOKEN }}
-            branch: update-ws-resources-${{ github.run_id }}
-            title: "ci: Update ${{ steps.ws_path.outputs.path }} after deployment to ${{ inputs.SUI_NETWORK }}"
-            body: "This PR was created because ws-resources file was updated during deployment"
-            add-paths: ${{ steps.ws_path.outputs.path }}
-            commit-message: "ci: Update ${{ steps.ws_path.outputs.path }} after deployment"
+            GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN }}
