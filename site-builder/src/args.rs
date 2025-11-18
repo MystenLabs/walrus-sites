@@ -423,6 +423,8 @@ pub struct WalrusStoreOptions {
     /// Supports both decimal (KB, MB, GB) and binary (KiB, MiB, GiB) units, or plain byte numbers.
     /// Examples: "512MiB", "1GB", "1048576".
     ///
+    /// Files exceeding this limit are placed alone in their own Quilt.
+    ///
     /// Note: Larger sizes require more memory during storing and may increase storage overhead.
     #[arg(long, default_value_t = default::max_quilt_size())]
     pub max_quilt_size: ByteSize,
