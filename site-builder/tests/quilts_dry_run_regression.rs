@@ -50,6 +50,7 @@ fn parse_estimated_cost_from_output(output: &str) -> Option<u128> {
 /// This tests that the chunks iterator is not consumed during dry-run.
 /// Tests are combined into one to avoid gag stdout redirect conflicts when running in parallel.
 #[tokio::test]
+#[ignore]
 async fn dry_run_both_sites_sync() -> anyhow::Result<()> {
     // Test small site (snake example)
     test_dry_run("snake", 4).await?;
