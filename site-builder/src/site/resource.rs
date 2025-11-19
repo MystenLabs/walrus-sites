@@ -35,6 +35,10 @@ use crate::{
     },
 };
 
+#[path = "../unit_tests/site.resource.tests.rs"]
+#[cfg(test)]
+mod resource_tests;
+
 /// Maximum size (in bytes) for a BCS-serialized identifier in a quilt.
 pub const MAX_IDENTIFIER_SIZE: usize = 2050;
 
@@ -719,15 +723,24 @@ impl ResourceManager {
             let file_size_with_overhead =
                 res_data.unencoded_size + MAX_IDENTIFIER_SIZE + FIXED_OVERHEAD;
 
-            // Abort if the file cannot fit in a single Quilt.
-            // TODO(fix): We could still store a single-file quilt for this case.
+            // Abort if the file cannot fit even in the theoretical maximum
+            if file_size_with_overhead > max_theoretical_quilt_size {
+                anyhow::bail!(
+                    "File '{}' with size {} exceeds Walrus theoretical maximum of {} for single file storage. \
+                    This file cannot be stored in Walrus with the current shard configuration.",
+                    res_data.full_path.display(),
+                    ByteSize(file_size_with_overhead as u64),
+                    ByteSize(max_theoretical_quilt_size as u64)
+                );
+            }
+
+            // If file exceeds effective_quilt_size but is below theoretical limit,
+            // place it alone in its own chunk and continue with the current chunk
             if file_size_with_overhead > effective_quilt_size {
-                return Err(Self::file_too_large_error(
-                    &res_data.full_path,
-                    file_size_with_overhead,
-                    effective_quilt_size,
-                    max_theoretical_quilt_size,
-                ));
+                // Place large file in its own chunk (don't save current_chunk yet)
+                chunks.push(vec![(res_data, quilt_input)]);
+                // Continue filling the current chunk with remaining capacity
+                continue;
             }
 
             // Calculate how many columns this file needs
@@ -784,32 +797,6 @@ impl ResourceManager {
                 .and_then(|config| config.site_name.clone()),
         )
     }
-
-    fn file_too_large_error(
-        file_path: &std::path::Path,
-        file_size: usize,
-        effective_quilt_size: usize,
-        max_theoretical_quilt_size: usize,
-    ) -> anyhow::Error {
-        if file_size > max_theoretical_quilt_size {
-            anyhow::anyhow!(
-                "File '{}' with size {} exceeds Walrus theoretical maximum of {} for single file storage. \
-                This file cannot be stored in Walrus with the current shard configuration.",
-                file_path.display(),
-                ByteSize(file_size as u64),
-                ByteSize(max_theoretical_quilt_size as u64)
-            )
-        } else {
-            anyhow::anyhow!(
-                "File '{}' with size {} exceeds the configured maximum of {} for single file storage. \
-                Consider increasing the limit using --max-quilt-size flag (e.g., --max-quilt-size {}).",
-                file_path.display(),
-                ByteSize(file_size as u64),
-                ByteSize(effective_quilt_size as u64),
-                ByteSize(max_theoretical_quilt_size as u64)
-            )
-        }
-    }
 }
 
 #[allow(dead_code)]
@@ -832,53 +819,4 @@ pub(crate) fn full_path_to_resource_path(full_path: &Path, root: &Path) -> Resul
             .to_str()
             .ok_or(anyhow!("could not process the path string: {rel_path:?}"))?
     ))
-}
-
-#[cfg(test)]
-mod tests {
-    use std::collections::BTreeMap;
-
-    use super::{HttpHeaders, ResourceManager};
-    use crate::site::config::WSResources;
-
-    #[test]
-    fn test_derive_http_headers() {
-        let test_paths = vec![
-            // This is the longest path. So `/foo/bar/baz/*.svg` would persist over `*.svg`.
-            ("/foo/bar/baz/image.svg", "etag"),
-            // This will only match `*.svg`.
-            (
-                "/very_long_name_that_should_not_be_matched.svg",
-                "cache-control",
-            ),
-        ];
-        let ws_resources = mock_ws_resources();
-        for (path, expected) in test_paths {
-            let result = ResourceManager::derive_http_headers(&ws_resources, path);
-            assert_eq!(result.len(), 1);
-            assert!(result.contains_key(expected));
-        }
-    }
-
-    /// Helper function for testing the `derive_http_headers` method.
-    fn mock_ws_resources() -> Option<WSResources> {
-        let headers_json = r#"{
-                    "/*.svg": {
-                        "cache-control": "public, max-age=86400"
-                    },
-                    "/foo/bar/baz/*.svg": {
-                        "etag": "\"abc123\""
-                    }
-                }"#;
-        let headers: BTreeMap<String, HttpHeaders> = serde_json::from_str(headers_json).unwrap();
-
-        Some(WSResources {
-            headers: Some(headers),
-            routes: None,
-            metadata: None,
-            site_name: None,
-            object_id: None,
-            ignore: None,
-        })
-    }
 }
