@@ -143,7 +143,7 @@ impl RetriableSuiClient {
     /// [`RetriableSuiClient::new_from_wallet`] instead. This is because the wallet context will
     /// make a call to the RPC server in [`WalletContext::get_client`], which may fail without any
     /// retries. `new_from_wallet` will handle this case correctly.
-    pub fn new(sui_client: SuiClient, backoff_config: ExponentialBackoffConfig) -> Self {
+    fn new(sui_client: SuiClient, backoff_config: ExponentialBackoffConfig) -> Self {
         RetriableSuiClient {
             sui_client,
             backoff_config,
@@ -154,16 +154,6 @@ impl RetriableSuiClient {
     #[allow(dead_code)]
     pub fn backoff_config(&self) -> &ExponentialBackoffConfig {
         &self.backoff_config
-    }
-
-    /// Creates a new retriable client from an RCP address.
-    #[allow(dead_code)]
-    pub async fn new_for_rpc<S: AsRef<str>>(
-        rpc_address: S,
-        backoff_config: ExponentialBackoffConfig,
-    ) -> Result<Self> {
-        let client = SuiClientBuilder::default().build(rpc_address).await?;
-        Ok(Self::new(client, backoff_config))
     }
 
     /// Creates a new retriable client from a wallet context.
