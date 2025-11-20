@@ -25,8 +25,8 @@ export function noObjectIdFound(): Response {
 export function custom404NotFound(): Response {
     return Response404(
         "Oops!",
-        "Page not found. We can’t seem to find the page you’re looking for.",
-        template_404_fallback_if_missing.toString(),
+        "Page not found. We can't seem to find the page you're looking for.",
+        template_404_fallback_if_missing as string,
     );
 }
 
@@ -68,7 +68,7 @@ export function genericError(): Response {
     )
 }
 
-function Response404(message: string, secondaryMessage?: string, template: string = template_404.toString()): Response {
+function Response404(message: string, secondaryMessage?: string, template: string = template_404 as string): Response {
     const interpolated = template
         .replace("${message}", message)
         .replace("${secondaryMessage}", secondaryMessage ?? '')
@@ -85,7 +85,7 @@ function Response404(message: string, secondaryMessage?: string, template: strin
  * Used when the portal encounters an unhandled exception or unexpected error.
  */
 function Response500(message: string, secondaryMessage?: string): Response {
-    const template = template_404.toString();
+    const template = template_404 as string;
     const interpolated = template
         .replace("${message}", message)
         .replace("${secondaryMessage}", secondaryMessage ?? '')
@@ -102,7 +102,7 @@ function Response500(message: string, secondaryMessage?: string): Response {
  * Used when services (Sui full node RPC, Walrus aggregator) are unavailable or failing.
  */
 function Response503(message: string, secondaryMessage?: string): Response {
-    const template = template_404.toString();
+    const template = template_404 as string;
     const interpolated = template
         .replace("${message}", message)
         .replace("${secondaryMessage}", secondaryMessage ?? '')
@@ -127,7 +127,7 @@ export function bringYourOwnDomainDoesNotSupportSubdomainsYet(attemptedSite: Str
 * the blob hash (checksum).
 */
 export function generateHashErrorResponse(): Response {
-    return new Response(hash_mismatch.toString(), {
+    return new Response(hash_mismatch as string, {
         status: HttpStatusCodes.UNPROCESSABLE_CONTENT,
         headers: {
             "Content-Type": "text/html"
