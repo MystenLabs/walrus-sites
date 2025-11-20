@@ -30,8 +30,22 @@ export function custom404NotFound(): Response {
     );
 }
 
+/**
+ * Returns 503 Service Unavailable when the Sui full node RPC is unreachable.
+ */
 export function fullNodeFail(): Response {
-    return Response404("Failed to contact the full node.");
+    return Response503(
+        "Failed to contact the full node. Please try again later."
+    );
+}
+
+/**
+ * Returns 503 Service Unavailable when the Walrus aggregator is unreachable or fails.
+ */
+export function aggregatorFail(): Response {
+    return Response503(
+        "Failed to contact the aggregator. Please try again later."
+    );
 }
 
 export function resourceNotFound(): Response {
@@ -41,9 +55,13 @@ export function resourceNotFound(): Response {
     );
 }
 
+/**
+ * Returns 500 Internal Server Error for unhandled exceptions.
+ * This catches unexpected errors that occur during request processing.
+ */
 export function genericError(): Response {
-    return Response404(
-        mainNotFoundErrorMessage
+    return Response500(
+        "An unexpected error occurred while processing your request. Please try again later."
     )
 }
 
@@ -53,6 +71,40 @@ function Response404(message: string, secondaryMessage?: string, template: strin
         .replace("${secondaryMessage}", secondaryMessage ?? '')
     return new Response(interpolated, {
         status: 404,
+        headers: {
+            "Content-Type": "text/html",
+        },
+    });
+}
+
+/**
+ * Returns a 500 Internal Server Error response.
+ * Used when the portal encounters an unhandled exception or unexpected error.
+ */
+function Response500(message: string, secondaryMessage?: string): Response {
+    const template = template_404.toString();
+    const interpolated = template
+        .replace("${message}", message)
+        .replace("${secondaryMessage}", secondaryMessage ?? '')
+    return new Response(interpolated, {
+        status: HttpStatusCodes.INTERNAL_SERVER_ERROR,
+        headers: {
+            "Content-Type": "text/html",
+        },
+    });
+}
+
+/**
+ * Returns a 503 Service Unavailable response.
+ * Used when services (Sui full node RPC, Walrus aggregator) are unavailable or failing.
+ */
+function Response503(message: string, secondaryMessage?: string): Response {
+    const template = template_404.toString();
+    const interpolated = template
+        .replace("${message}", message)
+        .replace("${secondaryMessage}", secondaryMessage ?? '')
+    return new Response(interpolated, {
+        status: HttpStatusCodes.SERVICE_UNAVAILABLE,
         headers: {
             "Content-Type": "text/html",
         },
