@@ -35,6 +35,7 @@ export function custom404NotFound(): Response {
  */
 export function fullNodeFail(): Response {
     return Response503(
+        "Service temporarily unavailable",
         "Failed to contact the full node. Please try again later."
     );
 }
@@ -44,6 +45,7 @@ export function fullNodeFail(): Response {
  */
 export function aggregatorFail(): Response {
     return Response503(
+        "Service temporarily unavailable",
         "Failed to contact the aggregator. Please try again later."
     );
 }
@@ -61,6 +63,7 @@ export function resourceNotFound(): Response {
  */
 export function genericError(): Response {
     return Response500(
+        "Something went wrong",
         "An unexpected error occurred while processing your request. Please try again later."
     )
 }
