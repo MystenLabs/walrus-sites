@@ -26,7 +26,7 @@ export function custom404NotFound(): Response {
     return Response404(
         "Oops!",
         "Page not found. We can't seem to find the page you're looking for.",
-        template_404_fallback_if_missing as string,
+        template_404_fallback_if_missing as unknown as string,
     );
 }
 
@@ -68,7 +68,7 @@ export function genericError(): Response {
     )
 }
 
-function Response404(message: string, secondaryMessage?: string, template: string = template_404 as string): Response {
+function Response404(message: string, secondaryMessage?: string, template: string = template_404 as unknown as string): Response {
     // Handle case where template import returns path instead of content (CI environment issue)
     let templateContent = template;
     if (templateContent.startsWith('/') || (templateContent.includes('.html') && templateContent.length < 200)) {
@@ -92,7 +92,7 @@ function Response404(message: string, secondaryMessage?: string, template: strin
  * Used when the portal encounters an unhandled exception or unexpected error.
  */
 function Response500(message: string, secondaryMessage?: string): Response {
-    let template = template_404 as string;
+    let template = template_404 as unknown as string;
     // Handle case where template import returns path instead of content (CI environment issue)
     if (template.startsWith('/') || (template.includes('.html') && template.length < 200)) {
         // Template import failed, create fallback HTML
@@ -115,7 +115,7 @@ function Response500(message: string, secondaryMessage?: string): Response {
  * Used when services (Sui full node RPC, Walrus aggregator) are unavailable or failing.
  */
 function Response503(message: string, secondaryMessage?: string): Response {
-    let template = template_404 as string;
+    let template = template_404 as unknown as string;
     // Handle case where template import returns path instead of content (CI environment issue)
     if (template.startsWith('/') || (template.includes('.html') && template.length < 200)) {
         // Template import failed, create fallback HTML
@@ -146,7 +146,7 @@ export function bringYourOwnDomainDoesNotSupportSubdomainsYet(attemptedSite: Str
 * the blob hash (checksum).
 */
 export function generateHashErrorResponse(): Response {
-    return new Response(hash_mismatch as string, {
+    return new Response(hash_mismatch as unknown as string, {
         status: HttpStatusCodes.UNPROCESSABLE_CONTENT,
         headers: {
             "Content-Type": "text/html"
