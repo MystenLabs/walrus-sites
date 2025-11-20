@@ -27,7 +27,7 @@ use crate::{
 #[path = "../unit_tests/site.builder.tests.rs"]
 mod site_builder_tests;
 
-// We limit the max-move-calls to 1000 to protect also against max-dynamic-field-acceses per PTB,
+// We limit the max-move-calls to 1000 to protect also against max-dynamic-field-accesses per PTB,
 // triggered from `remove_resource_if_exists`
 // TODO?: Track multiple limits and behave accordingly.
 pub const PTB_MAX_MOVE_CALLS: u16 = 1000;
