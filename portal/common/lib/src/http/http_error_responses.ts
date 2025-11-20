@@ -69,7 +69,14 @@ export function genericError(): Response {
 }
 
 function Response404(message: string, secondaryMessage?: string, template: string = template_404 as string): Response {
-    const interpolated = template
+    // Handle case where template import returns path instead of content (CI environment issue)
+    let templateContent = template;
+    if (templateContent.startsWith('/') || (templateContent.includes('.html') && templateContent.length < 200)) {
+        // Template import failed, create fallback HTML
+        templateContent = `<!DOCTYPE html><html><head><title>404 Not Found</title></head><body><h1>\${message}</h1><p>\${secondaryMessage}</p></body></html>`;
+    }
+
+    const interpolated = templateContent
         .replace("${message}", message)
         .replace("${secondaryMessage}", secondaryMessage ?? '')
     return new Response(interpolated, {
@@ -85,7 +92,13 @@ function Response404(message: string, secondaryMessage?: string, template: strin
  * Used when the portal encounters an unhandled exception or unexpected error.
  */
 function Response500(message: string, secondaryMessage?: string): Response {
-    const template = template_404 as string;
+    let template = template_404 as string;
+    // Handle case where template import returns path instead of content (CI environment issue)
+    if (template.startsWith('/') || (template.includes('.html') && template.length < 200)) {
+        // Template import failed, create fallback HTML
+        template = `<!DOCTYPE html><html><head><title>500 Internal Server Error</title></head><body><h1>\${message}</h1><p>\${secondaryMessage}</p></body></html>`;
+    }
+
     const interpolated = template
         .replace("${message}", message)
         .replace("${secondaryMessage}", secondaryMessage ?? '')
@@ -102,7 +115,13 @@ function Response500(message: string, secondaryMessage?: string): Response {
  * Used when services (Sui full node RPC, Walrus aggregator) are unavailable or failing.
  */
 function Response503(message: string, secondaryMessage?: string): Response {
-    const template = template_404 as string;
+    let template = template_404 as string;
+    // Handle case where template import returns path instead of content (CI environment issue)
+    if (template.startsWith('/') || (template.includes('.html') && template.length < 200)) {
+        // Template import failed, create fallback HTML
+        template = `<!DOCTYPE html><html><head><title>503 Service Unavailable</title></head><body><h1>\${message}</h1><p>\${secondaryMessage}</p></body></html>`;
+    }
+
     const interpolated = template
         .replace("${message}", message)
         .replace("${secondaryMessage}", secondaryMessage ?? '')
