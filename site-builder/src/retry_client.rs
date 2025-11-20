@@ -33,7 +33,6 @@ use sui_sdk::{
     },
     wallet_context::WalletContext,
     SuiClient,
-    SuiClientBuilder,
 };
 use sui_types::{
     base_types::{ObjectID, SuiAddress},
