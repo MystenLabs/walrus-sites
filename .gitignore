@@ -4,7 +4,6 @@ build/
 .zed
 .DS_Store
 **/dist/*
-!examples/vite-react-ts/dist/ws-resources.json
 __pycache__
 single-html/
 inlined.html

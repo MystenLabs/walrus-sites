@@ -19,7 +19,6 @@ use fastcrypto::hash::{HashFunction, Sha256};
 use flate2::{write::GzEncoder, Compression};
 use itertools::Itertools;
 use move_core_types::u256::U256;
-use tracing::debug;
 
 use super::SiteData;
 use crate::{
@@ -451,11 +450,6 @@ impl ResourceManager {
                     .map(|f| f.path.display())
                     .join(", ")
             ))?;
-
-        debug!(
-            "quilt store output: {}",
-            serde_json::to_string_pretty(&store_resp)?
-        );
 
         let blob_id = *store_resp.blob_store_result.blob_id();
         let quilt_patches = &mut store_resp.stored_quilt_blobs;
