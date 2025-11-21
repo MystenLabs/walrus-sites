@@ -25,13 +25,29 @@ export function noObjectIdFound(): Response {
 export function custom404NotFound(): Response {
     return Response404(
         "Oops!",
-        "Page not found. We can’t seem to find the page you’re looking for.",
-        template_404_fallback_if_missing.toString(),
+        "Page not found. We can't seem to find the page you're looking for.",
+        template_404_fallback_if_missing as unknown as string,
     );
 }
 
+/**
+ * Returns 503 Service Unavailable when the Sui full node RPC is unreachable.
+ */
 export function fullNodeFail(): Response {
-    return Response404("Failed to contact the full node.");
+    return Response503(
+        "Service temporarily unavailable",
+        "Failed to contact the full node. Please try again later."
+    );
+}
+
+/**
+ * Returns 503 Service Unavailable when the Walrus aggregator is unreachable or fails.
+ */
+export function aggregatorFail(): Response {
+    return Response503(
+        "Service temporarily unavailable",
+        "Failed to contact the aggregator. Please try again later."
+    );
 }
 
 export function resourceNotFound(): Response {
@@ -41,18 +57,76 @@ export function resourceNotFound(): Response {
     );
 }
 
+/**
+ * Returns 500 Internal Server Error for unhandled exceptions.
+ * This catches unexpected errors that occur during request processing.
+ */
 export function genericError(): Response {
-    return Response404(
-        mainNotFoundErrorMessage
+    return Response500(
+        "Something went wrong",
+        "An unexpected error occurred while processing your request. Please try again later."
     )
 }
 
-function Response404(message: string, secondaryMessage?: string, template: string = template_404.toString()): Response {
-    const interpolated = template
+function Response404(message: string, secondaryMessage?: string, template: string = template_404 as unknown as string): Response {
+    // Handle case where template import returns path instead of content (CI environment issue)
+    let templateContent = template;
+    if (templateContent.startsWith('/') || (templateContent.includes('.html') && templateContent.length < 200)) {
+        // Template import failed, create fallback HTML
+        templateContent = `<!DOCTYPE html><html><head><title>404 Not Found</title></head><body><h1>\${message}</h1><p>\${secondaryMessage}</p></body></html>`;
+    }
+
+    const interpolated = templateContent
         .replace("${message}", message)
         .replace("${secondaryMessage}", secondaryMessage ?? '')
     return new Response(interpolated, {
         status: 404,
+        headers: {
+            "Content-Type": "text/html",
+        },
+    });
+}
+
+/**
+ * Returns a 500 Internal Server Error response.
+ * Used when the portal encounters an unhandled exception or unexpected error.
+ */
+function Response500(message: string, secondaryMessage?: string): Response {
+    let template = template_404 as unknown as string;
+    // Handle case where template import returns path instead of content (CI environment issue)
+    if (template.startsWith('/') || (template.includes('.html') && template.length < 200)) {
+        // Template import failed, create fallback HTML
+        template = `<!DOCTYPE html><html><head><title>500 Internal Server Error</title></head><body><h1>\${message}</h1><p>\${secondaryMessage}</p></body></html>`;
+    }
+
+    const interpolated = template
+        .replace("${message}", message)
+        .replace("${secondaryMessage}", secondaryMessage ?? '')
+    return new Response(interpolated, {
+        status: HttpStatusCodes.INTERNAL_SERVER_ERROR,
+        headers: {
+            "Content-Type": "text/html",
+        },
+    });
+}
+
+/**
+ * Returns a 503 Service Unavailable response.
+ * Used when services (Sui full node RPC, Walrus aggregator) are unavailable or failing.
+ */
+function Response503(message: string, secondaryMessage?: string): Response {
+    let template = template_404 as unknown as string;
+    // Handle case where template import returns path instead of content (CI environment issue)
+    if (template.startsWith('/') || (template.includes('.html') && template.length < 200)) {
+        // Template import failed, create fallback HTML
+        template = `<!DOCTYPE html><html><head><title>503 Service Unavailable</title></head><body><h1>\${message}</h1><p>\${secondaryMessage}</p></body></html>`;
+    }
+
+    const interpolated = template
+        .replace("${message}", message)
+        .replace("${secondaryMessage}", secondaryMessage ?? '')
+    return new Response(interpolated, {
+        status: HttpStatusCodes.SERVICE_UNAVAILABLE,
         headers: {
             "Content-Type": "text/html",
         },
@@ -72,7 +146,7 @@ export function bringYourOwnDomainDoesNotSupportSubdomainsYet(attemptedSite: Str
 * the blob hash (checksum).
 */
 export function generateHashErrorResponse(): Response {
-    return new Response(hash_mismatch.toString(), {
+    return new Response(hash_mismatch as unknown as string, {
         status: HttpStatusCodes.UNPROCESSABLE_CONTENT,
         headers: {
             "Content-Type": "text/html"

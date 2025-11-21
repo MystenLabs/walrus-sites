@@ -16,6 +16,7 @@ import {
     generateHashErrorResponse,
     resourceNotFound,
     custom404NotFound,
+    aggregatorFail,
 } from "@lib/http/http_error_responses";
 import { blobAggregatorEndpoint, quiltAggregatorEndpoint } from "@lib/aggregator";
 import { toBase64 } from "@mysten/bcs";
@@ -203,7 +204,7 @@ export class UrlFetcher {
                 "Failed to fetch resource! Response from aggregator endpoint not ok.",
                 {path: result.path, status: contents.status}
             );
-            return siteNotFound();
+            return aggregatorFail();
         }
         const aggregatorFetchingDuration = Date.now() - aggregatorFetchingStart;
         instrumentationFacade.recordAggregatorTime(aggregatorFetchingDuration, { siteId: objectId, path, blobOrPatchId});
