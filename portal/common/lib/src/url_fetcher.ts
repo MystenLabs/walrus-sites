@@ -61,6 +61,7 @@ export class UrlFetcher {
             }
             resolvedObjectId = resolveObjectResult;
         }
+        instrumentationFacade.increaseRequestsMade(1, resolvedObjectId);
 
         if (blocklistChecker && await blocklistChecker.isBlocked(resolvedObjectId)) {
             return siteNotFound();
