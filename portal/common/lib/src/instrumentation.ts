@@ -18,6 +18,7 @@ export class InstrumentationFacade {
     private num_blocked_requests_counter: Counter;
     private num_resource_not_found_counter: Counter;
     private num_full_node_fail_counter: Counter;
+    private num_aggregator_fail_counter: Counter;
     private num_hash_mismatch_counter: Counter;
     private num_no_object_id_found_counter: Counter;
 
@@ -113,6 +114,13 @@ export class InstrumentationFacade {
             },
         );
 
+        this.num_aggregator_fail_counter = this.meter.createCounter(
+            "ws_num_aggregator_fail_counter",
+            {
+                description: "Number of aggregator fail requests",
+            },
+        );
+
         this.num_hash_mismatch_counter = this.meter.createCounter("ws_num_hash_mismatch_counter", {
             description: "Number of hash mismatch requests",
         });
@@ -140,6 +148,10 @@ export class InstrumentationFacade {
 
     public bumpFullNodeFailRequests() {
         this.num_full_node_fail_counter.add(1);
+    }
+
+    public bumpAggregatorFailRequests() {
+        this.num_aggregator_fail_counter.add(1);
     }
 
     public recordRoutingTime(time: number, siteObjectId: string) {
