@@ -5,6 +5,7 @@ import template_404 from "@templates/404-page.template.html" with { type: "text"
 import hash_mismatch from "@templates/hash-mismatch.html" with { type: "text" }
 import { HttpStatusCodes } from "@lib/http/http_status_codes"
 import template_404_fallback_if_missing from "@templates/404-page-callback-if-missing.template.html" with { type: "text" };
+import { instrumentationFacade } from "@lib/instrumentation";
 
 const mainNotFoundErrorMessage = "Well, this is awkward." //You have reached the end of the internet, please turn back!"
 
@@ -34,6 +35,7 @@ export function custom404NotFound(): Response {
  * Returns 503 Service Unavailable when the Sui full node RPC is unreachable.
  */
 export function fullNodeFail(): Response {
+    instrumentationFacade.bumpFullNodeFailRequests();
     return Response503(
         "Service temporarily unavailable",
         "Failed to contact the full node. Please try again later."
@@ -44,6 +46,7 @@ export function fullNodeFail(): Response {
  * Returns 503 Service Unavailable when the Walrus aggregator is unreachable or fails.
  */
 export function aggregatorFail(): Response {
+    instrumentationFacade.bumpAggregatorFailRequests();
     return Response503(
         "Service temporarily unavailable",
         "Failed to contact the aggregator. Please try again later."
@@ -62,6 +65,7 @@ export function resourceNotFound(): Response {
  * This catches unexpected errors that occur during request processing.
  */
 export function genericError(): Response {
+    instrumentationFacade.bumpGenericErrors();
     return Response500(
         "Something went wrong",
         "An unexpected error occurred while processing your request. Please try again later."

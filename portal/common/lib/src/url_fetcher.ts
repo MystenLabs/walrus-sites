@@ -28,6 +28,7 @@ import BlocklistChecker from "@lib/blocklist_checker";
 import { QuiltPatch } from "@lib/quilt";
 import { instrumentationFacade } from "./instrumentation";
 
+export const QUILT_PATCH_ID_INTERNAL_HEADER = "x-wal-quilt-patch-internal-id";
 /**
 * Includes all the logic for fetching the URL contents of a walrus site.
 */
@@ -60,6 +61,7 @@ export class UrlFetcher {
             }
             resolvedObjectId = resolveObjectResult;
         }
+        instrumentationFacade.increaseRequestsMade(1, resolvedObjectId);
 
         if (blocklistChecker && await blocklistChecker.isBlocked(resolvedObjectId)) {
             return siteNotFound();
@@ -178,7 +180,7 @@ export class UrlFetcher {
 
         logger.info("Successfully fetched resource!", { fetchedResourceResult: JSON.stringify(result) });
 
-        const quilt_patch_internal_id = result.headers.get("x-wal-quilt-patch-internal-id")
+        const quilt_patch_internal_id = result.headers.get(QUILT_PATCH_ID_INTERNAL_HEADER)
         let aggregator_endpoint: URL;
         let blobOrPatchId: string;
         if (quilt_patch_internal_id) {
