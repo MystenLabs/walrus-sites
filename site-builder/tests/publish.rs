@@ -260,7 +260,6 @@ async fn publish_quilts_a_lot_of_headers() -> anyhow::Result<()> {
         .build()?;
 
     site_builder::run(args).await?;
-    cluster.wait_for_user_input().await?;
 
     let site = cluster.last_site_created().await?;
     let resources = cluster.site_resources(*site.id.object_id()).await?;
