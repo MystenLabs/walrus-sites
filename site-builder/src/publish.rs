@@ -22,7 +22,6 @@ use crate::{
     backoff::ExponentialBackoffConfig,
     config::Config,
     display,
-    object_cache::ObjectCache,
     preprocessor::Preprocessor,
     retry_client::RetriableSuiClient,
     site::{
@@ -34,6 +33,7 @@ use crate::{
         SITE_MODULE,
     },
     summary::{SiteDataDiffSummary, Summarizable},
+    types::ObjectCache,
     util::{
         get_site_id_from_response,
         id_to_base36,

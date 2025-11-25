@@ -32,10 +32,9 @@ use walrus_core::{BlobId as BlobIdOriginal, QuiltPatchId};
 
 use crate::{
     display,
-    object_cache::ObjectCache,
     retry_client::RetriableSuiClient,
     site::{config::WSResources, contracts::TypeOriginMap},
-    types::{HttpHeaders, Staking, StakingInnerV1, StakingObjectForDeserialization},
+    types::{HttpHeaders, ObjectCache, Staking, StakingInnerV1, StakingObjectForDeserialization},
     walrus::types::BlobId,
 };
 
