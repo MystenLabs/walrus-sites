@@ -22,6 +22,7 @@ use crate::{
     backoff::ExponentialBackoffConfig,
     config::Config,
     display,
+    object_cache::ObjectCache,
     preprocessor::Preprocessor,
     retry_client::RetriableSuiClient,
     site::{
@@ -150,6 +151,8 @@ impl SiteEditor {
             ptb.finish(),
             gas_coin,
             self.config.gas_budget(),
+            // TODO fix: What happens if more than 1000 resources?
+            &mut ObjectCache::new(),
         )
         .await?;
 

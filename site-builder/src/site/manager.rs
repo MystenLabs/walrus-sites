@@ -34,6 +34,7 @@ use crate::{
     backoff::ExponentialBackoffConfig,
     config::Config,
     display,
+    object_cache::ObjectCache,
     retry_client::RetriableSuiClient,
     site::{
         builder::{SitePtbBuilderResultExt, PTB_MAX_MOVE_CALLS},
@@ -53,6 +54,7 @@ pub struct SiteManager {
     pub backoff_config: ExponentialBackoffConfig,
     pub metadata: Option<Metadata>,
     pub site_name: Option<String>,
+    pub object_cache: ObjectCache,
 }
 
 impl SiteManager {
@@ -71,6 +73,7 @@ impl SiteManager {
             backoff_config: ExponentialBackoffConfig::default(),
             metadata,
             site_name,
+            object_cache: ObjectCache::new(),
         })
     }
 
@@ -143,7 +146,7 @@ impl SiteManager {
 
     /// Executes the updates on Sui.
     async fn execute_sui_updates(
-        &self,
+        &mut self,
         updates: &SiteDataDiff<'_>,
     ) -> Result<SuiTransactionBlockResponse> {
         tracing::debug!(
@@ -216,8 +219,11 @@ impl SiteManager {
         let retry_client = self.sui_client().await?;
         let built_ptb = ptb.finish();
         assert!(built_ptb.commands.len() <= PTB_MAX_MOVE_CALLS as usize);
+        // TODO: Verify gas_ref. Currently, we do not have the last tx the user submitted through
+        // walrus.
+        let gas_ref = self.gas_coin_ref().await?;
         let result = self
-            .sign_and_send_ptb(built_ptb, self.gas_coin_ref().await?, &retry_client)
+            .sign_and_send_ptb(built_ptb, gas_ref, &retry_client)
             .await?;
 
         // Check explicitly for execution failures.
@@ -247,7 +253,10 @@ impl SiteManager {
                 self.config.package,
                 Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
             );
-            let call_arg: CallArg = self.wallet.get_object_ref(site_object_id).await?.into();
+            let site_object_ref = self.wallet.get_object_ref(site_object_id).await?;
+            let call_arg: CallArg = self
+                .verify_object_ref_choose_latest(site_object_ref)?
+                .into();
             let mut ptb = ptb.with_call_arg(&call_arg)?;
 
             ptb.add_resource_operations(&mut resources_iter)
@@ -259,8 +268,9 @@ impl SiteManager {
                     .ok_if_limit_reached()?;
             }
 
+            let gas_ref = self.gas_coin_ref().await?;
             let resource_result = self
-                .sign_and_send_ptb(ptb.finish(), self.gas_coin_ref().await?, &retry_client)
+                .sign_and_send_ptb(ptb.finish(), gas_ref, &retry_client)
                 .await?;
             if let Some(SuiExecutionStatus::Failure { error }) =
                 resource_result.effects.as_ref().map(|e| e.status())
@@ -276,7 +286,7 @@ impl SiteManager {
     }
 
     pub async fn update_resources(&mut self, resources: ResourceSet) -> Result<()> {
-        let Some(site_id) = &self.site_id else {
+        let Some(site_id) = self.site_id else {
             anyhow::bail!("`update_resources` is only supported for existing sites");
         };
 
@@ -299,13 +309,15 @@ impl SiteManager {
                 self.config.package,
                 Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
             );
-            let call_arg: CallArg = self.wallet.get_object_ref(*site_id).await?.into();
+            let site_obj_ref = self.wallet.get_object_ref(site_id).await?;
+            let call_arg: CallArg = self.verify_object_ref_choose_latest(site_obj_ref)?.into();
             let mut ptb = ptb.with_call_arg(&call_arg)?;
 
             ptb.add_resource_operations(&mut operations_iter)
                 .ok_if_limit_reached()?;
 
-            self.sign_and_send_ptb(ptb.finish(), self.gas_coin_ref().await?, &retry_client)
+            let gas_ref = self.gas_coin_ref().await?;
+            self.sign_and_send_ptb(ptb.finish(), gas_ref, &retry_client)
                 .await?;
         }
 
@@ -313,7 +325,7 @@ impl SiteManager {
     }
 
     async fn sign_and_send_ptb(
-        &self,
+        &mut self,
         programmable_transaction: ProgrammableTransaction,
         gas_coin: ObjectRef,
         retry_client: &RetriableSuiClient,
@@ -325,6 +337,7 @@ impl SiteManager {
             programmable_transaction,
             gas_coin,
             self.config.gas_budget(),
+            &mut self.object_cache,
         )
         .await
     }
@@ -353,17 +366,24 @@ impl SiteManager {
 
     /// Returns the [`ObjectRef`] of an arbitrary gas coin owned by the active wallet
     /// with a sufficient balance for the gas budget specified in the config.
-    async fn gas_coin_ref(&self) -> Result<ObjectRef> {
-        Ok(self
+    async fn gas_coin_ref(&mut self) -> Result<ObjectRef> {
+        let gas_coin = self
             .wallet
             .gas_for_owner_budget(
                 self.active_address()?,
                 self.config.gas_budget(),
                 BTreeSet::new(),
             )
-            .await?
-            .1
-            .object_ref())
+            .await?;
+
+        let gas_obj_ref = gas_coin.1.object_ref();
+        let latest = self.verify_object_ref_choose_latest(gas_obj_ref)?;
+        while
+        /* latest != gas_obj_ref && */
+        false {
+            todo!("Use RetriableSuiClient until the latest state of the gas-for-owner-budget is fetched?");
+        }
+        Ok(latest)
     }
 
     /// Returns whether the site needs to be transferred to the active address.
@@ -371,6 +391,29 @@ impl SiteManager {
     /// A new site needs to be transferred to the active address.
     fn needs_transfer(&self) -> bool {
         self.site_id.is_none()
+    }
+
+    fn verify_object_ref_choose_latest(
+        &mut self,
+        object_ref: ObjectRef,
+    ) -> anyhow::Result<ObjectRef> {
+        let cached: Option<&ObjectRef> = self.object_cache.get(&object_ref.0);
+        match cached {
+            // TODO: Will we have a problem if during the execute we use an FN with an older
+            // version? Does RetriableSuiClient mitigate this?
+            // If the cached version is bigger than the fetched, just used the cached.
+            Some(&cached) if cached.1 > object_ref.1 => Ok(cached),
+            Some(&cached) if cached != object_ref => {
+                // This should not happen as long as user is not executing transactions with this
+                // wallet-address in parallel.
+                bail!("Fullnode returned newer object version ({object_ref:?}) than the one cached ({cached:?}");
+            }
+            None => {
+                self.object_cache.insert(object_ref.0, object_ref);
+                Ok(object_ref)
+            }
+            _ => Ok(object_ref),
+        }
     }
 }
 

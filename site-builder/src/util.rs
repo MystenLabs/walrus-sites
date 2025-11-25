@@ -24,6 +24,7 @@ use sui_sdk::{
 };
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
+    object::Owner,
     transaction::{ProgrammableTransaction, TransactionData},
     TypeTag,
 };
@@ -31,6 +32,7 @@ use walrus_core::{BlobId as BlobIdOriginal, QuiltPatchId};
 
 use crate::{
     display,
+    object_cache::ObjectCache,
     retry_client::RetriableSuiClient,
     site::{config::WSResources, contracts::TypeOriginMap},
     types::{HttpHeaders, Staking, StakingInnerV1, StakingObjectForDeserialization},
@@ -48,6 +50,7 @@ pub(crate) async fn sign_and_send_ptb(
     programmable_transaction: ProgrammableTransaction,
     gas_coin: ObjectRef,
     gas_budget: u64,
+    object_cache: &mut ObjectCache,
 ) -> Result<SuiTransactionBlockResponse> {
     let gas_price = wallet.get_reference_gas_price().await?;
     let transaction = TransactionData::new_programmable(
@@ -58,7 +61,21 @@ pub(crate) async fn sign_and_send_ptb(
         gas_price,
     );
     let transaction = wallet.sign_transaction(&transaction).await;
-    retry_client.execute_transaction(transaction).await
+    let resp = retry_client.execute_transaction(transaction).await?;
+    let digest = resp.digest;
+    let effects = resp
+        .effects
+        .as_ref()
+        .ok_or(anyhow!("Expected effects for transaction {}", digest))?;
+    for obj in effects.all_changed_objects() {
+        match obj.0.owner {
+            Owner::ObjectOwner(_) | Owner::AddressOwner(_) => {
+                object_cache.insert(obj.0.object_id(), obj.0.reference.to_object_ref());
+            }
+            _ => {}
+        }
+    }
+    Ok(resp)
 }
 
 pub(crate) async fn handle_pagination<F, T, C, Fut>(
