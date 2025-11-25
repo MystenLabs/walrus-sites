@@ -253,10 +253,9 @@ impl SiteManager {
                 self.config.package,
                 Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
             );
-            let site_object_ref = self.wallet.get_object_ref(site_object_id).await?;
-            let call_arg: CallArg = self
-                .verify_object_ref_choose_latest(site_object_ref)?
-                .into();
+            let mut site_object_ref = self.wallet.get_object_ref(site_object_id).await?;
+            site_object_ref = self.verify_object_ref_choose_latest(site_object_ref)?;
+            let call_arg: CallArg = site_object_ref.into();
             let mut ptb = ptb.with_call_arg(&call_arg)?;
 
             ptb.add_resource_operations(&mut resources_iter)
@@ -309,8 +308,9 @@ impl SiteManager {
                 self.config.package,
                 Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
             );
-            let site_obj_ref = self.wallet.get_object_ref(site_id).await?;
-            let call_arg: CallArg = self.verify_object_ref_choose_latest(site_obj_ref)?.into();
+            let mut site_obj_ref = self.wallet.get_object_ref(site_id).await?;
+            site_obj_ref = self.verify_object_ref_choose_latest(site_obj_ref)?;
+            let call_arg: CallArg = site_obj_ref.into();
             let mut ptb = ptb.with_call_arg(&call_arg)?;
 
             ptb.add_resource_operations(&mut operations_iter)
@@ -364,26 +364,28 @@ impl SiteManager {
             .unwrap_or(*self.wallet.config.keystore.addresses().first().unwrap()))
     }
 
+    // TODO: Why require a **single** gas-coin and not do select_coins?
     /// Returns the [`ObjectRef`] of an arbitrary gas coin owned by the active wallet
     /// with a sufficient balance for the gas budget specified in the config.
     async fn gas_coin_ref(&mut self) -> Result<ObjectRef> {
-        let gas_coin = self
-            .wallet
-            .gas_for_owner_budget(
-                self.active_address()?,
-                self.config.gas_budget(),
-                BTreeSet::new(),
-            )
-            .await?;
+        // Keep re-fetching the coin, until it matches the latest state stored by our cache, as
+        // older versions might show more balance than its actual balance.
+        Ok(loop {
+            let gas_coin = self
+                .wallet
+                .gas_for_owner_budget(
+                    self.active_address()?,
+                    self.config.gas_budget(),
+                    BTreeSet::new(),
+                )
+                .await?;
 
-        let gas_obj_ref = gas_coin.1.object_ref();
-        let latest = self.verify_object_ref_choose_latest(gas_obj_ref)?;
-        while
-        /* latest != gas_obj_ref && */
-        false {
-            todo!("Use RetriableSuiClient until the latest state of the gas-for-owner-budget is fetched?");
-        }
-        Ok(latest)
+            let gas_obj_ref = gas_coin.1.object_ref();
+            let latest = self.verify_object_ref_choose_latest(gas_obj_ref)?;
+            if gas_obj_ref == latest {
+                break gas_obj_ref;
+            }
+        })
     }
 
     /// Returns whether the site needs to be transferred to the active address.
