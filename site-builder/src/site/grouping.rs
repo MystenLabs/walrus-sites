@@ -11,8 +11,6 @@
 //! This module provides a [`group_by_size`] function that partitions files into
 //! size buckets with progressively stricter ratios for larger files.
 
-use std::cmp::Reverse;
-
 use bytesize::ByteSize;
 
 /// Size bucket boundaries (upper limits) for grouping files.
@@ -54,19 +52,15 @@ const BUCKET_BOUNDARIES: &[ByteSize] = &[
 ///
 /// # Returns
 ///
-/// A `Vec` of groups, ordered from largest to smallest files. Items within each
-/// group are sorted by size descending for better bin-packing in subsequent
-/// quilt chunking.
-pub fn group_by_size<T, F>(mut items: Vec<T>, size_fn: F) -> Vec<Vec<T>>
+/// A `Vec` of groups, ordered from largest bucket to smallest bucket.
+/// Items within each group maintain their original input order.
+pub fn group_by_size<T, F>(items: Vec<T>, size_fn: F) -> Vec<Vec<T>>
 where
     F: Fn(&T) -> ByteSize,
 {
     if items.is_empty() {
         return vec![];
     }
-
-    // Sort by size descending.
-    items.sort_by_key(|item| Reverse(size_fn(item)));
 
     let num_buckets = BUCKET_BOUNDARIES.len() + 1;
     let mut buckets: Vec<Vec<T>> = (0..num_buckets).map(|_| Vec::new()).collect();
@@ -153,21 +147,23 @@ mod tests {
         assert_eq!(groups[1].len(), 1);
         assert_eq!(groups[1][0].0, "small");
 
-        // Tiny files last (grouped together)
+        // Tiny files last (grouped together), preserving original order
         assert_eq!(groups[2].len(), 2);
+        assert_eq!(groups[2][0].0, "tiny");
+        assert_eq!(groups[2][1].0, "tiny2");
     }
 
     #[test]
-    fn sorts_items_by_size_descending_within_bucket() {
+    fn preserves_original_order_within_bucket() {
         let items = vec![("a", 100u64), ("b", 500u64), ("c", 200u64)];
 
         let groups = group_by_size(items, |&(_, size)| ByteSize::b(size));
 
-        // All tiny files, should be in one bucket, sorted descending by size
+        // All tiny files, should be in one bucket, preserving original order
         assert_eq!(groups.len(), 1);
-        assert_eq!(groups[0][0].1, 500); // b
-        assert_eq!(groups[0][1].1, 200); // c
-        assert_eq!(groups[0][2].1, 100); // a
+        assert_eq!(groups[0][0].0, "a");
+        assert_eq!(groups[0][1].0, "b");
+        assert_eq!(groups[0][2].0, "c");
     }
 
     #[test]
@@ -212,10 +208,10 @@ mod tests {
         // Should have 2 groups: huge files together, large file separate
         assert_eq!(groups.len(), 2);
 
-        // Huge files (bucket 7) come first
+        // Huge files (bucket 7) come first, preserving original order
         assert_eq!(groups[0].len(), 2);
-        assert_eq!(groups[0][0].0, "huge2"); // 500MB first (descending)
-        assert_eq!(groups[0][1].0, "huge1"); // 200MB second
+        assert_eq!(groups[0][0].0, "huge1"); // original order preserved
+        assert_eq!(groups[0][1].0, "huge2");
 
         // Large file (bucket 6)
         assert_eq!(groups[1].len(), 1);
@@ -274,12 +270,12 @@ mod tests {
         let items = vec![
             FileInfo {
                 name: "a".into(),
-                unencoded_size: 100,
+                unencoded_size: 100, // tiny bucket
                 metadata: vec![1, 2, 3],
             },
             FileInfo {
                 name: "b".into(),
-                unencoded_size: 1_000_000,
+                unencoded_size: 1_000_000, // large bucket (512KB-2MB)
                 metadata: vec![],
             },
         ];
@@ -287,8 +283,9 @@ mod tests {
         // Conversion from usize to ByteSize mirrors the real call site in resource.rs
         let groups = group_by_size(items, |f| ByteSize::b(f.unencoded_size as u64));
 
+        // Two groups: large bucket first (higher bucket index), tiny bucket second
         assert_eq!(groups.len(), 2);
-        assert_eq!(groups[0][0].name, "b"); // Large file first
-        assert_eq!(groups[1][0].name, "a"); // Tiny file second
+        assert_eq!(groups[0][0].name, "b"); // Large file in first group (larger bucket)
+        assert_eq!(groups[1][0].name, "a"); // Tiny file in second group (smaller bucket)
     }
 }
