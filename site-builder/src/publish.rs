@@ -151,7 +151,7 @@ impl SiteEditor {
             ptb.finish(),
             gas_coin,
             self.config.gas_budget(),
-            // TODO fix: What happens if more than 1000 resources?
+            // TODO: #SEW-499 fix: What happens if more than 1000 resources?
             &mut ObjectCache::new(),
         )
         .await?;

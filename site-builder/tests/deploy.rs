@@ -368,6 +368,7 @@ async fn quilts_deploy_updates_site_name() -> anyhow::Result<()> {
 
     // Update the site_name in ws-resources.json
     // TODO(fix): argument should take precedence from ws-resources.json, not the other way around.
+    // Relevant to #SEW-462
     let ws_resources_path = directory.join("ws-resources.json");
     let mut ws_resources: WSResources = serde_json::from_reader(File::open(&ws_resources_path)?)?;
     ws_resources.site_name = Some("Updated Site Name".to_string());
