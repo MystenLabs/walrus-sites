@@ -66,6 +66,15 @@ pub(crate) async fn sign_and_send_ptb(
         .effects
         .as_ref()
         .ok_or(anyhow!("Expected effects for transaction {}", digest))?;
+    update_cache_from_effects(object_cache, effects);
+    Ok(resp)
+}
+
+/// Updates the object cache with the changed objects from transaction effects.
+///
+/// Only objects with `AddressOwner` or `ObjectOwner` ownership are cached,
+/// as shared and immutable objects don't have version conflicts in the same way.
+fn update_cache_from_effects(object_cache: &mut ObjectCache, effects: &SuiTransactionBlockEffects) {
     for obj in effects.all_changed_objects() {
         match obj.0.owner {
             Owner::ObjectOwner(_) | Owner::AddressOwner(_) => {
@@ -74,7 +83,6 @@ pub(crate) async fn sign_and_send_ptb(
             _ => {}
         }
     }
-    Ok(resp)
 }
 
 pub(crate) async fn handle_pagination<F, T, C, Fut>(

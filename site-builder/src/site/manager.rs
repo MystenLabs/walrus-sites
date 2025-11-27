@@ -45,6 +45,10 @@ use crate::{
     walrus::{types::BlobId, Walrus},
 };
 
+#[cfg(test)]
+#[path = "../unit_tests/site.manager.tests.rs"]
+mod manager_tests;
+
 pub struct SiteManager {
     pub config: Config,
     pub walrus: Walrus,
@@ -369,7 +373,8 @@ impl SiteManager {
     async fn gas_coin_ref(&mut self) -> Result<ObjectRef> {
         // Keep re-fetching the coin, until it matches the latest state stored by our cache, as
         // older versions might show more balance than its actual balance.
-        Ok(loop {
+        const MAX_RETRIES: usize = 10;
+        for _ in 0..MAX_RETRIES {
             let gas_coin = self
                 .wallet
                 .gas_for_owner_budget(
@@ -382,9 +387,10 @@ impl SiteManager {
             let gas_obj_ref = gas_coin.1.object_ref();
             let latest = self.verify_object_ref_choose_latest(gas_obj_ref)?;
             if gas_obj_ref == latest {
-                break gas_obj_ref;
+                return Ok(latest);
             }
-        })
+        }
+        bail!("Fullnode returned stale object version after {MAX_RETRIES} retries")
     }
 
     /// Returns whether the site needs to be transferred to the active address.

@@ -56,8 +56,10 @@ gag = "1.0.0"
 # Version constraint for transitive dependency compatibility
 # (sui-tls -> axum-server v0.6.1 requires hyper <1.8)
 hyper = "=1.6.0"
+sui-config = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.60.0" }
 sui-move-build = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.60.0" }
 tempfile = "3.20.0"
+test-cluster = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.60.0" }
 walrus-sdk = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.37.0" }
 walrus-service = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.37.0", features = [
     "test-utils",

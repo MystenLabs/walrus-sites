@@ -214,7 +214,7 @@ async fn publish_quilts_a_lot_of_headers() -> anyhow::Result<()> {
     const N_FILES_IN_SITE: usize = 10;
     const EXTRA_HEADERS_PER_HTML: usize = 200;
 
-    let mut cluster = TestSetup::start_local_test_cluster().await?;
+    let cluster = TestSetup::start_local_test_cluster().await?;
 
     let temp_dir = create_test_site(N_FILES_IN_SITE)?;
     let directory = temp_dir.path();
