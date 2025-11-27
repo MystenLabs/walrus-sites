@@ -149,7 +149,8 @@ async fn test_update_cache_from_effects_with_real_tx() {
     ));
     let pt = ptb.finish();
 
-    let tx_data = TransactionData::new_programmable(address, vec![gas_ref], pt, 10_000_000, gas_price);
+    let tx_data =
+        TransactionData::new_programmable(address, vec![gas_ref], pt, 10_000_000, gas_price);
 
     let tx = cluster.wallet.sign_transaction(&tx_data).await;
     let response = cluster
@@ -170,7 +171,11 @@ async fn test_update_cache_from_effects_with_real_tx() {
     println!("Effects mutated: {:?}", effects.mutated());
 
     // Even unused coin inputs appear in mutated (Sui bumps version of all owned object inputs)
-    let mutated_ids: Vec<_> = effects.mutated().iter().map(|o| o.reference.object_id).collect();
+    let mutated_ids: Vec<_> = effects
+        .mutated()
+        .iter()
+        .map(|o| o.reference.object_id)
+        .collect();
     assert!(
         mutated_ids.contains(&unused_coin_id),
         "Unused coin should still appear in mutated (Sui bumps version of all inputs)"

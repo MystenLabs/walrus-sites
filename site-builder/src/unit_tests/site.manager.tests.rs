@@ -7,9 +7,13 @@ use std::path::PathBuf;
 
 use rand::rngs::OsRng;
 use sui_config::{node::RunWithRange, Config as _};
-use sui_sdk::{sui_client_config::{SuiClientConfig, SuiEnv}, SuiClientBuilder};
+use sui_sdk::{
+    sui_client_config::{SuiClientConfig, SuiEnv},
+    SuiClientBuilder,
+};
 use sui_types::{
-    base_types::ObjectID, programmable_transaction_builder::ProgrammableTransactionBuilder,
+    base_types::ObjectID,
+    programmable_transaction_builder::ProgrammableTransactionBuilder,
 };
 use test_cluster::TestClusterBuilder;
 
@@ -92,7 +96,10 @@ async fn test_site_manager_cache_updated_after_transaction() {
         .object_ref();
 
     let cached = *manager.object_cache.get(&gas_ref.0).unwrap();
-    assert_eq!(cached, new_coin_ref, "Expected cached object reference to match newest object reference");
+    assert_eq!(
+        cached, new_coin_ref,
+        "Expected cached object reference to match newest object reference"
+    );
     assert!(
         cached.1 > gas_ref.1,
         "Cached version {:?} should be > initial {:?}",
@@ -283,4 +290,3 @@ async fn test_site_manager_cache_protects_against_stale_fullnode() {
         cached_gas_ref.1
     );
 }
-
