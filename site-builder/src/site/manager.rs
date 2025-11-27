@@ -21,6 +21,7 @@ use sui_types::{
     transaction::{CallArg, ProgrammableTransaction},
     Identifier,
 };
+use tracing::warn;
 
 use super::{
     builder::SitePtb,
@@ -409,7 +410,10 @@ impl SiteManager {
             // TODO: Will we have a problem if during the execute we use an FN with an older
             // version? Does RetriableSuiClient mitigate this?
             // If the cached version is bigger than the fetched, just used the cached.
-            Some(&cached) if cached.1 > object_ref.1 => Ok(cached),
+            Some(&cached) if cached.1 > object_ref.1 => {
+                warn!("Fullnode returned older object reference ({object_ref:?}) than its latest. Using latest cached ({cached:?}).");
+                Ok(cached)
+            }
             Some(&cached) if cached != object_ref => {
                 // This should not happen as long as user is not executing transactions with this
                 // wallet-address in parallel.
