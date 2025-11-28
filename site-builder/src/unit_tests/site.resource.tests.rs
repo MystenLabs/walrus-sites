@@ -6,7 +6,7 @@ use std::{collections::BTreeMap, num::NonZeroU16, path::PathBuf};
 use bytesize::ByteSize;
 use move_core_types::u256::U256;
 
-use super::{ResourceData, ResourceManager, MAX_IDENTIFIER_SIZE};
+use super::{full_path_to_resource_path, ResourceData, ResourceManager, MAX_IDENTIFIER_SIZE};
 use crate::{
     config::Walrus,
     site_config::WSResources,
@@ -204,4 +204,90 @@ fn test_large_file_among_small_files_creates_correct_chunks() {
         chunks[1].len() > 4,
         "Second chunk should contain multiple small files (more than 4)"
     );
+}
+
+#[test]
+fn test_full_path_to_resource_path_forward_slashes() {
+    // Standard Unix-style paths should work as expected
+    let full_path = std::path::Path::new("/root/site/subdir/file.html");
+    let root = std::path::Path::new("/root/site");
+    let result = full_path_to_resource_path(full_path, root).unwrap();
+    assert_eq!(result, "/subdir/file.html");
+}
+
+#[test]
+fn test_full_path_to_resource_path_backslash_normalization() {
+    // Simulate Windows-style path separators in the relative path portion.
+    // On Windows, Path components use backslashes, and strip_prefix preserves them.
+    // This test verifies that backslashes are normalized to forward slashes.
+
+    // Create a path that would contain backslashes on Windows.
+    // We test the normalization logic directly by using a path string with backslashes.
+    let root = std::path::Path::new("/root/site");
+
+    // Test with a path that, when converted to string, contains backslashes.
+    // On Unix, this creates a single component with literal backslashes.
+    // On Windows, this would be parsed as directory separators.
+    #[cfg(windows)]
+    {
+        let full_path = std::path::Path::new(r"C:\root\site\subdir\file.html");
+        let root = std::path::Path::new(r"C:\root\site");
+        let result = full_path_to_resource_path(full_path, root).unwrap();
+        assert_eq!(result, "/subdir/file.html");
+    }
+
+    // On Unix, verify forward slashes work correctly
+    #[cfg(not(windows))]
+    {
+        let full_path = std::path::Path::new("/root/site/deep/nested/path/file.css");
+        let result = full_path_to_resource_path(full_path, root).unwrap();
+        assert_eq!(result, "/deep/nested/path/file.css");
+    }
+}
+
+#[test]
+fn test_full_path_to_resource_path_root_file() {
+    // File directly in root directory
+    let full_path = std::path::Path::new("/root/site/index.html");
+    let root = std::path::Path::new("/root/site");
+    let result = full_path_to_resource_path(full_path, root).unwrap();
+    assert_eq!(result, "/index.html");
+}
+
+#[test]
+fn test_full_path_to_resource_path_prefix_mismatch() {
+    // When the path doesn't have the expected prefix, it should error
+    let full_path = std::path::Path::new("/other/path/file.html");
+    let root = std::path::Path::new("/root/site");
+    let result = full_path_to_resource_path(full_path, root);
+    assert!(result.is_err());
+}
+
+#[cfg(not(windows))]
+#[test]
+fn test_full_path_to_resource_path_unix_literal_backslash() {
+    // On Unix, backslash is a valid character in filenames (not a separator).
+    // Files with literal backslashes in their names should preserve them.
+    // For example, a file named "file\with\backslashes.txt" should remain as-is.
+
+    // Create a path with a filename containing literal backslashes.
+    // On Unix, Path::new treats backslash as a regular character, not a separator.
+    let full_path = std::path::Path::new("/root/site/file\\with\\backslashes.txt");
+    let root = std::path::Path::new("/root/site");
+    let result = full_path_to_resource_path(full_path, root).unwrap();
+
+    // The backslashes should be preserved since they're part of the filename, not separators.
+    assert_eq!(result, "/file\\with\\backslashes.txt");
+}
+
+#[cfg(not(windows))]
+#[test]
+fn test_full_path_to_resource_path_unix_nested_with_backslash_filename() {
+    // Test a nested path where only the filename contains backslashes.
+    let full_path = std::path::Path::new("/root/site/subdir/file\\name.html");
+    let root = std::path::Path::new("/root/site");
+    let result = full_path_to_resource_path(full_path, root).unwrap();
+
+    // Directory separators (/) should be preserved, and literal backslashes in filename too.
+    assert_eq!(result, "/subdir/file\\name.html");
 }

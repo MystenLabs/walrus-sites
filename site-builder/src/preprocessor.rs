@@ -25,8 +25,7 @@ impl Preprocessor {
         let mut cur_node = DirNode::new(path.to_path_buf());
         for item in items.flatten() {
             let item_path = item.path();
-            let resource_path = full_path_to_resource_path(&item_path, root)
-                .unwrap_or_else(|_| item_path.to_string_lossy().to_string());
+            let resource_path = full_path_to_resource_path(&item_path, root)?;
 
             if Self::should_ignore_item(&item_path, &resource_path, file_patterns_to_ignore) {
                 continue;
@@ -148,34 +147,6 @@ impl DirNode {
     }
 }
 
+#[path = "unit_tests/preprocessor.tests.rs"]
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_dirnode_to_html() {
-        let dir = DirNode {
-            contents: vec![
-                PathBuf::from("/my/sub/path"),
-                PathBuf::from("/my/sub/another"),
-            ],
-            path: PathBuf::from("/my/sub"),
-        };
-        let expected = r#"<!DOCTYPE html>
-<html>
-<head>
-<title>Directory listing for /sub</title>
-</head>
-<body>
-<h1>Directory listing for /sub</h1>
-<hr>
-<ul>
-<li><a href="/sub/another">another</a></li>
-<li><a href="/sub/path">path</a></li>
-</ul>
-<hr>
-</body>
-</html>"#;
-        assert_eq!(dir.to_html(Path::new("/my/")).unwrap(), expected);
-    }
-}
+mod preprocessor_tests;
