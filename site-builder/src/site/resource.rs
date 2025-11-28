@@ -807,15 +807,11 @@ fn compress(content: &[u8]) -> Result<Vec<u8>> {
 /// Converts the full path of the resource to the on-chain resource path.
 pub(crate) fn full_path_to_resource_path(full_path: &Path, root: &Path) -> Result<String> {
     let rel_path = full_path.strip_prefix(root)?;
-    let path_str = match rel_path.to_str() {
-        Some(s) => s.to_owned(),
-        None => {
-            tracing::warn!(
-                "Path contains invalid UTF-8, using lossy conversion: {:?}",
-                rel_path
-            );
-            rel_path.to_string_lossy().into_owned()
-        }
+    let Some(path_str) = rel_path.to_str() else {
+        bail!(
+            "Path contains invalid UTF-8: {:?}. Please rename the file to use valid UTF-8 characters.",
+            rel_path
+        )
     };
     // Normalize Windows path separators to URL-style forward slashes.
     // Only needed on Windows; on Unix, backslash can be a valid filename character.
