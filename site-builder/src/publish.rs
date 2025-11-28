@@ -33,6 +33,7 @@ use crate::{
         SITE_MODULE,
     },
     summary::{SiteDataDiffSummary, Summarizable},
+    types::ObjectCache,
     util::{
         get_site_id_from_response,
         id_to_base36,
@@ -150,6 +151,8 @@ impl SiteEditor {
             ptb.finish(),
             gas_coin,
             self.config.gas_budget(),
+            // TODO: #SEW-499 fix: What happens if more than 1000 resources?
+            &mut ObjectCache::new(),
         )
         .await?;
 

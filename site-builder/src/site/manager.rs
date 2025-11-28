@@ -21,6 +21,7 @@ use sui_types::{
     transaction::{CallArg, ProgrammableTransaction},
     Identifier,
 };
+use tracing::warn;
 
 use super::{
     builder::SitePtb,
@@ -40,10 +41,14 @@ use crate::{
         resource::ResourceSet,
     },
     summary::SiteDataDiffSummary,
-    types::{Metadata, MetadataOp, RouteOps, SiteNameOp},
+    types::{Metadata, MetadataOp, ObjectCache, RouteOps, SiteNameOp},
     util::{get_site_id_from_response, sign_and_send_ptb},
     walrus::{types::BlobId, Walrus},
 };
+
+#[cfg(test)]
+#[path = "../unit_tests/site.manager.tests.rs"]
+mod manager_tests;
 
 pub struct SiteManager {
     pub config: Config,
@@ -53,6 +58,7 @@ pub struct SiteManager {
     pub backoff_config: ExponentialBackoffConfig,
     pub metadata: Option<Metadata>,
     pub site_name: Option<String>,
+    pub object_cache: ObjectCache,
 }
 
 impl SiteManager {
@@ -71,6 +77,7 @@ impl SiteManager {
             backoff_config: ExponentialBackoffConfig::default(),
             metadata,
             site_name,
+            object_cache: ObjectCache::new(),
         })
     }
 
@@ -143,7 +150,7 @@ impl SiteManager {
 
     /// Executes the updates on Sui.
     async fn execute_sui_updates(
-        &self,
+        &mut self,
         updates: &SiteDataDiff<'_>,
     ) -> Result<SuiTransactionBlockResponse> {
         tracing::debug!(
@@ -216,8 +223,11 @@ impl SiteManager {
         let retry_client = self.sui_client().await?;
         let built_ptb = ptb.finish();
         assert!(built_ptb.commands.len() <= PTB_MAX_MOVE_CALLS as usize);
+        // TODO: #SEW-498 Verify gas_ref. Currently, we do not have the last tx the user submitted through
+        // walrus.
+        let gas_ref = self.gas_coin_ref().await?;
         let result = self
-            .sign_and_send_ptb(built_ptb, self.gas_coin_ref().await?, &retry_client)
+            .sign_and_send_ptb(built_ptb, gas_ref, &retry_client)
             .await?;
 
         // Check explicitly for execution failures.
@@ -247,7 +257,9 @@ impl SiteManager {
                 self.config.package,
                 Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
             );
-            let call_arg: CallArg = self.wallet.get_object_ref(site_object_id).await?.into();
+            let mut site_object_ref = self.wallet.get_object_ref(site_object_id).await?;
+            site_object_ref = self.verify_object_ref_choose_latest(site_object_ref)?;
+            let call_arg: CallArg = site_object_ref.into();
             let mut ptb = ptb.with_call_arg(&call_arg)?;
 
             ptb.add_resource_operations(&mut resources_iter)
@@ -259,8 +271,9 @@ impl SiteManager {
                     .ok_if_limit_reached()?;
             }
 
+            let gas_ref = self.gas_coin_ref().await?;
             let resource_result = self
-                .sign_and_send_ptb(ptb.finish(), self.gas_coin_ref().await?, &retry_client)
+                .sign_and_send_ptb(ptb.finish(), gas_ref, &retry_client)
                 .await?;
             if let Some(SuiExecutionStatus::Failure { error }) =
                 resource_result.effects.as_ref().map(|e| e.status())
@@ -276,7 +289,7 @@ impl SiteManager {
     }
 
     pub async fn update_resources(&mut self, resources: ResourceSet) -> Result<()> {
-        let Some(site_id) = &self.site_id else {
+        let Some(site_id) = self.site_id else {
             anyhow::bail!("`update_resources` is only supported for existing sites");
         };
 
@@ -299,13 +312,16 @@ impl SiteManager {
                 self.config.package,
                 Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
             );
-            let call_arg: CallArg = self.wallet.get_object_ref(*site_id).await?.into();
+            let mut site_obj_ref = self.wallet.get_object_ref(site_id).await?;
+            site_obj_ref = self.verify_object_ref_choose_latest(site_obj_ref)?;
+            let call_arg: CallArg = site_obj_ref.into();
             let mut ptb = ptb.with_call_arg(&call_arg)?;
 
             ptb.add_resource_operations(&mut operations_iter)
                 .ok_if_limit_reached()?;
 
-            self.sign_and_send_ptb(ptb.finish(), self.gas_coin_ref().await?, &retry_client)
+            let gas_ref = self.gas_coin_ref().await?;
+            self.sign_and_send_ptb(ptb.finish(), gas_ref, &retry_client)
                 .await?;
         }
 
@@ -313,7 +329,7 @@ impl SiteManager {
     }
 
     async fn sign_and_send_ptb(
-        &self,
+        &mut self,
         programmable_transaction: ProgrammableTransaction,
         gas_coin: ObjectRef,
         retry_client: &RetriableSuiClient,
@@ -325,6 +341,7 @@ impl SiteManager {
             programmable_transaction,
             gas_coin,
             self.config.gas_budget(),
+            &mut self.object_cache,
         )
         .await
     }
@@ -351,19 +368,42 @@ impl SiteManager {
             .unwrap_or(*self.wallet.config.keystore.addresses().first().unwrap()))
     }
 
+    // TODO: Why require a **single** gas-coin and not do select_coins?
     /// Returns the [`ObjectRef`] of an arbitrary gas coin owned by the active wallet
     /// with a sufficient balance for the gas budget specified in the config.
-    async fn gas_coin_ref(&self) -> Result<ObjectRef> {
-        Ok(self
-            .wallet
-            .gas_for_owner_budget(
-                self.active_address()?,
-                self.config.gas_budget(),
-                BTreeSet::new(),
-            )
-            .await?
-            .1
-            .object_ref())
+    async fn gas_coin_ref(&mut self) -> Result<ObjectRef> {
+        // Keep re-fetching the coin, until it matches the latest state stored by our cache, as
+        // older versions might show more balance than its actual balance.
+        let mut backoff = self.backoff_config.get_strategy(rand::random());
+        loop {
+            let gas_coin = self
+                .wallet
+                .gas_for_owner_budget(
+                    self.active_address()?,
+                    self.config.gas_budget(),
+                    BTreeSet::new(),
+                )
+                .await?;
+
+            let gas_obj_ref = gas_coin.1.object_ref();
+            let latest = self.verify_object_ref_choose_latest(gas_obj_ref)?;
+            if gas_obj_ref == latest {
+                return Ok(latest);
+            }
+
+            // Fullnode returned stale version, wait and retry.
+            if let Some(delay) = backoff.next() {
+                warn!(
+                    ?gas_obj_ref,
+                    ?latest,
+                    ?delay,
+                    "fullnode returned stale gas coin version; retrying after delay"
+                );
+                tokio::time::sleep(delay).await;
+            } else {
+                bail!("fullnode returned stale gas coin version after max retries exhausted")
+            }
+        }
     }
 
     /// Returns whether the site needs to be transferred to the active address.
@@ -371,6 +411,32 @@ impl SiteManager {
     /// A new site needs to be transferred to the active address.
     fn needs_transfer(&self) -> bool {
         self.site_id.is_none()
+    }
+
+    fn verify_object_ref_choose_latest(
+        &mut self,
+        object_ref: ObjectRef,
+    ) -> anyhow::Result<ObjectRef> {
+        let cached: Option<&ObjectRef> = self.object_cache.get(&object_ref.0);
+        match cached {
+            // TODO: #SEW-503 Will we have a problem if during the execute we use an FN with an
+            // older version? Does RetriableSuiClient mitigate this?
+            // If the cached version is bigger than the fetched, just used the cached.
+            Some(&cached) if cached.1 > object_ref.1 => {
+                warn!("Fullnode returned older object reference ({object_ref:?}) than its latest. Using latest cached ({cached:?}).");
+                Ok(cached)
+            }
+            Some(&cached) if cached != object_ref => {
+                // This should not happen as long as user is not executing transactions with this
+                // wallet-address in parallel.
+                bail!("Fullnode returned newer object version ({object_ref:?}) than the one cached ({cached:?}");
+            }
+            None => {
+                self.object_cache.insert(object_ref.0, object_ref);
+                Ok(object_ref)
+            }
+            _ => Ok(object_ref),
+        }
     }
 }
 

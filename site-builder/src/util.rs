@@ -24,6 +24,7 @@ use sui_sdk::{
 };
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
+    object::Owner,
     transaction::{ProgrammableTransaction, TransactionData},
     TypeTag,
 };
@@ -33,7 +34,7 @@ use crate::{
     display,
     retry_client::RetriableSuiClient,
     site::{config::WSResources, contracts::TypeOriginMap},
-    types::{HttpHeaders, Staking, StakingInnerV1, StakingObjectForDeserialization},
+    types::{HttpHeaders, ObjectCache, Staking, StakingInnerV1, StakingObjectForDeserialization},
     walrus::types::BlobId,
 };
 
@@ -48,6 +49,7 @@ pub(crate) async fn sign_and_send_ptb(
     programmable_transaction: ProgrammableTransaction,
     gas_coin: ObjectRef,
     gas_budget: u64,
+    object_cache: &mut ObjectCache,
 ) -> Result<SuiTransactionBlockResponse> {
     let gas_price = wallet.get_reference_gas_price().await?;
     let transaction = TransactionData::new_programmable(
@@ -58,7 +60,29 @@ pub(crate) async fn sign_and_send_ptb(
         gas_price,
     );
     let transaction = wallet.sign_transaction(&transaction).await;
-    retry_client.execute_transaction(transaction).await
+    let resp = retry_client.execute_transaction(transaction).await?;
+    let digest = resp.digest;
+    let effects = resp
+        .effects
+        .as_ref()
+        .ok_or(anyhow!("Expected effects for transaction {}", digest))?;
+    update_cache_from_effects(object_cache, effects);
+    Ok(resp)
+}
+
+/// Updates the object cache with the changed objects from transaction effects.
+///
+/// Only objects with `AddressOwner` or `ObjectOwner` ownership are cached,
+/// as shared and immutable objects don't have version conflicts in the same way.
+fn update_cache_from_effects(object_cache: &mut ObjectCache, effects: &SuiTransactionBlockEffects) {
+    for obj in effects.all_changed_objects() {
+        match obj.0.owner {
+            Owner::ObjectOwner(_) | Owner::AddressOwner(_) => {
+                object_cache.insert(obj.0.object_id(), obj.0.reference.to_object_ref());
+            }
+            _ => {}
+        }
+    }
 }
 
 pub(crate) async fn handle_pagination<F, T, C, Fut>(

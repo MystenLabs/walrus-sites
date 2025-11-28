@@ -4,7 +4,7 @@
 //! Collection of types to mirror the Sui move structs.
 use std::{
     borrow::Borrow,
-    collections::{btree_map, BTreeMap},
+    collections::{btree_map, BTreeMap, HashMap},
     num::NonZeroU16,
     ops::Deref,
     str::FromStr,
@@ -13,7 +13,7 @@ use std::{
 use move_core_types::u256::U256;
 use serde::{de::DeserializeOwned, Deserialize, Serialize, Serializer};
 use sui_types::{
-    base_types::{ObjectID, SuiAddress},
+    base_types::{ObjectID, ObjectRef, SuiAddress},
     id::UID,
 };
 
@@ -22,6 +22,8 @@ use crate::{
     util::deserialize_bag_or_table,
     walrus::types::BlobId,
 };
+
+pub type ObjectCache = HashMap<ObjectID, ObjectRef>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SuiDynamicField<N, V> {
