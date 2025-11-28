@@ -374,8 +374,8 @@ impl SiteManager {
     async fn gas_coin_ref(&mut self) -> Result<ObjectRef> {
         // Keep re-fetching the coin, until it matches the latest state stored by our cache, as
         // older versions might show more balance than its actual balance.
-        const MAX_RETRIES: usize = 10;
-        for _ in 0..MAX_RETRIES {
+        let mut backoff = self.backoff_config.get_strategy(rand::random());
+        loop {
             let gas_coin = self
                 .wallet
                 .gas_for_owner_budget(
@@ -390,8 +390,20 @@ impl SiteManager {
             if gas_obj_ref == latest {
                 return Ok(latest);
             }
+
+            // Fullnode returned stale version, wait and retry.
+            if let Some(delay) = backoff.next() {
+                warn!(
+                    ?gas_obj_ref,
+                    ?latest,
+                    ?delay,
+                    "fullnode returned stale gas coin version; retrying after delay"
+                );
+                tokio::time::sleep(delay).await;
+            } else {
+                bail!("fullnode returned stale gas coin version after max retries exhausted")
+            }
         }
-        bail!("Fullnode returned stale object version after {MAX_RETRIES} retries")
     }
 
     /// Returns whether the site needs to be transferred to the active address.
