@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { defineConfig } from 'vitest/config';
+import { loadEnv } from 'vite';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
 
@@ -22,10 +23,11 @@ function rawHtmlPlugin() {
     };
 }
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
     plugins: [rawHtmlPlugin()],
     test: {
         include: ['lib/tests/**/*.test.ts'],
+        env: loadEnv(mode, process.cwd(), ''),
     },
     resolve: {
         alias: {
@@ -33,4 +35,4 @@ export default defineConfig({
             '@templates': resolve(__dirname, 'html_templates'),
         },
     },
-});
+}));
