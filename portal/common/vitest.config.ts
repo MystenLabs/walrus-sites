@@ -28,6 +28,14 @@ export default defineConfig(({ mode }) => ({
     test: {
         include: ['lib/tests/**/*.test.ts'],
         env: loadEnv(mode, process.cwd(), ''),
+        coverage: {
+            provider: 'v8',
+            reporter: [
+                ['lcov', { projectRoot: './src' }],
+                ['json', { file: 'coverage.json' }],
+                ['text'],
+            ],
+        },
     },
     resolve: {
         alias: {
