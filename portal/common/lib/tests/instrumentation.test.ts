@@ -25,6 +25,9 @@ describe('Instrumentation metrics endpoint', () => {
             blobOrPatchId: 'blob456'
         });
 
+        // Allow time for metrics to be collected by the exporter
+        await new Promise(resolve => setTimeout(resolve, 100));
+
         // Fetch metrics
         const port = parseInt(process.env.PROMETHEUS_EXPORTER_PORT!) || 9184;
         const response = await fetch(`http://localhost:${port}/metrics`);
