@@ -64,6 +64,7 @@ export function resourceNotFound(): Response {
  * Returns 500 Internal Server Error for unhandled exceptions.
  * This catches unexpected errors that occur during request processing.
  */
+// TODO: This is returned when wrong site-id (via base36). It shouldn't.
 export function genericError(): Response {
     instrumentationFacade.bumpGenericErrors();
     return Response500(
