@@ -176,6 +176,8 @@ export class UrlFetcher {
     ): Promise<Response> {
         const result = await this.resourceFetcher.fetchResource(objectId, path, new Set<string>());
         if (!isResource(result) || !result.blob_id) {
+            // TODO: #SEW-516 This gets overriden by custom404NotFound from the caller of this
+            // function
             return resourceNotFound();
         }
 
@@ -204,6 +206,8 @@ export class UrlFetcher {
         const response = await this.fetchWithRetry(aggregator_endpoint, { headers: range_header });
         if (!response.ok) {
             if (response.status === 404) {
+                // TODO: #SEW-516 This gets overriden by custom404NotFound from the caller of this
+                // function
                 return resourceNotFound();
             } else if (response.status >= 500 && response.status < 600) {
                 logger.error(
@@ -211,8 +215,8 @@ export class UrlFetcher {
                     { path: result.path, status: response.status }
                 );
                 return aggregatorFail();
-            } else { // If we do not get one of the above, it makes sense to log it and throw another
-                     // error in order to investigate how we to handle this new type of response.
+            } else { // If we do not get one of the above, it makes sense to log it and throw
+                // another error in order to investigate how we to handle this new type of response.
                 let contents = await response.text();
                 logger.warn("Unexpected response from aggregator.", { aggregator_endpoint, status: response.status, contents });
                 // Will return genericError.
@@ -280,7 +284,7 @@ export class UrlFetcher {
 
                 if (response.status === 404) { // If 404 error, log the response status and do not retry.
                     logger.debug("Aggregator responded with NOT_FOUND (404)", { input })
-                } else if (response.status >= 500 || response.status < 600) {
+                } else if (response.status >= 500 && response.status < 600) {
                     if (attempt === retries) {
                         return response;
                     }
