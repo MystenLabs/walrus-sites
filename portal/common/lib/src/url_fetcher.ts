@@ -176,7 +176,7 @@ export class UrlFetcher {
     ): Promise<Response> {
         const result = await this.resourceFetcher.fetchResource(objectId, path, new Set<string>());
         if (!isResource(result) || !result.blob_id) {
-            // TODO: #SEW-516 This gets overriden by custom404NotFound from the caller of this
+            // TODO: #SEW-516 This gets overridden by custom404NotFound from the caller of this
             // function
             return resourceNotFound();
         }
@@ -206,7 +206,7 @@ export class UrlFetcher {
         const response = await this.fetchWithRetry(aggregator_endpoint, { headers: range_header });
         if (!response.ok) {
             if (response.status === 404) {
-                // TODO: #SEW-516 This gets overriden by custom404NotFound from the caller of this
+                // TODO: #SEW-516 This gets overridden by custom404NotFound from the caller of this
                 // function
                 return resourceNotFound();
             } else if (response.status >= 500 && response.status < 600) {
