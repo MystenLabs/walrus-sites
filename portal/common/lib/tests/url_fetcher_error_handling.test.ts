@@ -10,6 +10,15 @@ import { HttpStatusCodes } from '@lib/http/http_status_codes';
 import { createServer } from 'node:http';
 import type { Server } from 'node:http';
 
+// Mock instrumentation to avoid port conflicts with instrumentation.test.ts
+vi.mock('@lib/instrumentation', () => ({
+    instrumentationFacade: {
+        recordAggregatorTime: vi.fn(),
+        bumpAggregatorFailRequests: vi.fn(),
+        increaseRequestsMade: vi.fn(),
+    }
+}));
+
 describe('fetchWithRetry error handling', () => {
     let mockAggregatorServer: Server;
     let aggregatorUrl: string;
