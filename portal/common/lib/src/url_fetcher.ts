@@ -283,7 +283,7 @@ export class UrlFetcher {
                 const response = await fetch(input, init);
 
                 if (response.status === 404) { // If 404 error, log the response status and do not retry.
-                    logger.debug("Aggregator responded with NOT_FOUND (404)", { input })
+                    logger.info("Aggregator responded with NOT_FOUND (404)", { input })
                 } else if (response.status >= 500 && response.status < 600) {
                     if (attempt === retries) {
                         return response;
