@@ -39,7 +39,7 @@ export class UrlFetcher {
         private wsRouter: WalrusSitesRouter,
         private aggregatorUrl: string,
         private b36DomainResolutionSupport: boolean
-    ){}
+    ) { }
 
     /**
      * Resolves the subdomain to an object ID, and gets the corresponding resources.
@@ -106,8 +106,9 @@ export class UrlFetcher {
             } else {
                 logger.warn(
                     `No matching route found for ${parsedUrl.path}`,
-                    {resolvedObjectIdNoMatchingRoute: resolvedObjectId
-                });
+                    {
+                        resolvedObjectIdNoMatchingRoute: resolvedObjectId
+                    });
             }
         }
 
@@ -190,35 +191,45 @@ export class UrlFetcher {
             logger.info("Resource is stored as a quilt patch.", { quilt_patch_id })
             aggregator_endpoint = quiltAggregatorEndpoint(quilt_patch_id, this.aggregatorUrl)
         } else {
-            logger.info("Resource is stored as a blob.", { blob_id:  result.blob_id })
+            logger.info("Resource is stored as a blob.", { blob_id: result.blob_id })
             blobOrPatchId = result.blob_id;
             aggregator_endpoint = blobAggregatorEndpoint(result.blob_id, this.aggregatorUrl)
         }
 
         // We have a resource, get the range header.
         let range_header = optionalRangeToRequestHeaders(result.range);
-        logger.info("Fetching blob from aggregator", {aggregatorUrl: this.aggregatorUrl, blob_id: result.blob_id})
+        logger.info("Fetching blob from aggregator", { aggregatorUrl: this.aggregatorUrl, blob_id: result.blob_id })
 
         const aggregatorFetchingStart = Date.now();
-        const contents = await this.fetchWithRetry(aggregator_endpoint, { headers: range_header });
-        if (!contents.ok) {
-            logger.error(
-                "Failed to fetch resource! Response from aggregator endpoint not ok.",
-                {path: result.path, status: contents.status}
-            );
-            return aggregatorFail();
+        const response = await this.fetchWithRetry(aggregator_endpoint, { headers: range_header });
+        if (!response.ok) {
+            if (response.status === 404) {
+                return resourceNotFound();
+            } else if (response.status >= 500 && response.status < 600) {
+                logger.error(
+                    "Failed to fetch resource! Response from aggregator endpoint not ok.",
+                    { path: result.path, status: response.status }
+                );
+                return aggregatorFail();
+            } else { // If we do not get one of the above, it makes sense to log it and throw another
+                     // error in order to investigate how we to handle this new type of response.
+                let contents = await response.text();
+                logger.warn("Unexpected response from aggregator.", { aggregator_endpoint, status: response.status, contents });
+                // Will return genericError.
+                throw new Error(`Unhandled response status from aggregator. Response status: ${response.status}`);
+            }
         }
         const aggregatorFetchingDuration = Date.now() - aggregatorFetchingStart;
-        instrumentationFacade.recordAggregatorTime(aggregatorFetchingDuration, { siteId: objectId, path, blobOrPatchId});
+        instrumentationFacade.recordAggregatorTime(aggregatorFetchingDuration, { siteId: objectId, path, blobOrPatchId });
 
-        const body = await contents.arrayBuffer();
+        const body = await response.arrayBuffer();
         // Verify the integrity of the aggregator response by hashing
         // the response contents.
         const h10b = toBase64(await sha256(body));
         if (result.blob_hash != h10b) {
             logger.error(
                 "Checksum mismatch! The hash of the fetched resource does not " +
-                "match the hash of the aggregator response.",{
+                "match the hash of the aggregator response.", {
                 path: result.path,
                 blobHash: result.blob_hash,
                 aggrHash: h10b
@@ -260,27 +271,33 @@ export class UrlFetcher {
             logger.warn(
                 `Invalid retries value (${retries}). Falling back to a single fetch call.`
             );
-            return fetch(input, init);
+            retries = 0;
         }
 
         for (let attempt = 0; attempt <= retries; attempt++) {
             try {
                 const response = await fetch(input, init);
-                if (response.status === 500) {
+
+                if (response.status === 404) { // If 404 error, log the response status and do not retry.
+                    logger.debug("Aggregator responded with NOT_FOUND (404)", { input })
+                } else if (response.status >= 500 || response.status < 600) {
                     if (attempt === retries) {
                         return response;
                     }
-                    throw new Error("Server responded with status 500");
+                    throw new Error(`Server responded with status ${response.status}`);
+                } else if (!response.ok) { // If non-5xx error, log the response status and do not retry.
+                    logger.warn("Aggregator responded with unexpected status.", { input, status: response.status });
                 }
+
                 return response;
             } catch (error) {
                 logger.error(
                     "Fetch attempt failed",
                     {
-                    attempt: attempt + 1,
-                    totalAttempts: retries + 1,
-                    error: error instanceof Error ? error.message : error,
-                });
+                        attempt: attempt + 1,
+                        totalAttempts: retries + 1,
+                        error: error instanceof Error ? error.message : error,
+                    });
                 lastError = error;
             }
 
