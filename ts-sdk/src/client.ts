@@ -4,8 +4,11 @@
 import { type WalrusSitesCompatibleClient } from "@types";
 import { MissingRequiredWalrusClient } from "@errors";
 
-
-function walrusSites() {
+/**
+ * A function used to extend a Sui base client.
+ * @returns An instance of the WalrusSitesClient
+ */
+export function walrusSites() {
 	return {
 		name: 'walrus_sites',
 		register: (extendedSuiClient: WalrusSitesCompatibleClient) => {
@@ -17,10 +20,12 @@ function walrusSites() {
 	}
 }
 
+/**
+ * The WalrusSitesClient. Use this to interact with the Walrus Sites smart contract.
+ */
 export class WalrusSitesClient {
     #extendedSuiClient: WalrusSitesCompatibleClient;
     constructor(extendedSuiClient: WalrusSitesCompatibleClient) {
         this.#extendedSuiClient = extendedSuiClient
     }
-
 }
