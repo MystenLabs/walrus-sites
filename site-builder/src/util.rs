@@ -542,35 +542,38 @@ pub(crate) async fn get_site_object_via_graphql(wallet: &WalletContext) -> Optio
     use serde_json::json;
     use std::process::Command;
     
-    // Determine GraphQL endpoint based on wallet context
-    let endpoint = match wallet.config.active_env.as_deref() {
-        Some("mainnet") => "https://graphql.mainnet.sui.io/graphql",
-        Some("testnet") => "https://graphql.testnet.sui.io/graphql", 
-        Some("devnet") => "https://graphql.devnet.sui.io/graphql",
-        _ => {
-            // Default to testnet if no active env or unknown env
-            "https://graphql.testnet.sui.io/graphql"
-        }
+    // Determine GraphQL endpoint and site type based on wallet context
+    let (endpoint, site_type) = match wallet.config.active_env.as_deref() {
+        Some("mainnet") => (
+            "https://graphql.mainnet.sui.io/graphql",
+            "0x26eb7ee8688da02c5f671679524e379f0b837a12f1d1d799f255b7eea260ad27::site::Site" // TODO: Replace with actual mainnet package
+        ),
+        Some("testnet") => (
+            "https://graphql.testnet.sui.io/graphql", 
+            "0xf99aee9f21493e1590e7e5a9aea6f343a1f381031a04a732724871fc294be799::site::Site"
+        ),
+        None => panic!("Wallet active_env is not set"),
+        Some(other) => panic!("Unsupported network: {}. Walrus sites are only available on mainnet and testnet.", other),
     };
     
     // Query for site objects with limit 1
     let site_query = json!({
-        "query": r#"
-            query {
+        "query": format!(r#"
+            query {{
                 objects(
-                    filter: {
-                        type: "0xf99aee9f21493e1590e7e5a9aea6f343a1f381031a04a732724871fc294be799::site::Site"
-                    },
+                    filter: {{
+                        type: "{}"
+                    }},
                     first: 1
-                ) {
-                    nodes {
+                ) {{
+                    nodes {{
                         address
                         version
                         digest
-                    }
-                }
-            }
-        "#
+                    }}
+                }}
+            }}
+        "#, site_type)
     });
     
     let query_json = serde_json::to_string(&site_query).unwrap_or_default();
