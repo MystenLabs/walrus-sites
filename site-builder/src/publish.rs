@@ -198,7 +198,7 @@ impl SiteEditor<EditOptions> {
             self.directory().to_string_lossy(),
             if dry_run { "dry-running storage of" } else { "storing" }
         ));
-        let (local_site_data, _cost) = self.build_site_data(resource_manager, dry_run).await?;
+        let (local_site_data, _cost) = self.execute_quilt_operations(resource_manager, dry_run).await?;
         display::done();
         tracing::debug!(
             ?local_site_data,
@@ -207,8 +207,8 @@ impl SiteEditor<EditOptions> {
         Ok(local_site_data)
     }
 
-    /// Build site data by processing and storing quilts
-    async fn build_site_data(
+    /// Execute quilt operations (dry-run or actual storage) and return site data
+    async fn execute_quilt_operations(
         &self,
         resource_manager: &mut ResourceManager,
         dry_run: bool,
@@ -245,7 +245,7 @@ impl SiteEditor<EditOptions> {
         ));
         
         // compute quilt IDs and estimate FROST storage costs
-        let (_local_site_data, cost) = self.build_site_data(resource_manager, true).await?;
+        let (_local_site_data, cost) = self.execute_quilt_operations(resource_manager, true).await?;
         display::done(); // Complete the dry-run action
         println!(); // Empty line for spacing
         
@@ -284,7 +284,7 @@ impl SiteEditor<EditOptions> {
         println!(); // Empty line before storing action
         // Store quilts for real (dry_run=false)
         display::action("Storing quilts to Walrus");
-        let (local_site_data, _cost) = self.build_site_data(&mut resource_manager, false).await?;
+        let (local_site_data, _cost) = self.execute_quilt_operations(&mut resource_manager, false).await?;
         display::done();
         println!(); // Empty line after completion
         
