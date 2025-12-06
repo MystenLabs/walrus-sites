@@ -417,9 +417,11 @@ pub struct WalrusStoreOptions {
     pub permanent: bool,
     /// Perform a dry run to estimate costs without executing transactions.
     ///
-    /// This is a two-step process:
-    /// Step 1: Shows FROST storage costs for quilts
-    /// Step 2: If confirmed, stores quilts and shows Sui gas costs + total breakdown
+    /// This is a four-step process:
+    /// Step 1: Estimate FROST storage costs for quilts
+    /// Step 2: If confirmed, commit quilts to Walrus (deducts FROST fees)
+    /// Step 3: Estimate Sui gas costs for transactions
+    /// Step 4: If confirmed, execute transactions on Sui (deducts SUI fees)
     ///
     /// Existing quilts are reused automatically without additional FROST spending.
     #[arg(long)]
