@@ -539,17 +539,17 @@ impl ResourceManager {
         epochs: EpochArg,
         dry_run: bool,
         max_quilt_size: ByteSize,
-    ) -> Result<ResourceSet> {
+    ) -> Result<(ResourceSet, Option<u64>)> {
         let resource_file_inputs = self.resource_paths_to_quilt_inputs(resource_args)?;
 
-        let resources_set = self
+        let (resources_set, cost) = self
             .store_into_quilts(resource_file_inputs, epochs, dry_run, max_quilt_size)
             .await?;
         tracing::debug!(
             "Final site data will be created with {} resources",
             resources_set.len()
         );
-        Ok(resources_set)
+        Ok((resources_set, cost))
     }
 
     /// Recursively iterate a directory and load all [`Resources`][Resource] within.
@@ -559,10 +559,10 @@ impl ResourceManager {
         epochs: EpochArg,
         dry_run: bool,
         max_quilt_size: ByteSize,
-    ) -> Result<SiteData> {
+    ) -> Result<(SiteData, Option<u64>)> {
         let resource_paths = Self::iter_dir(root)?;
         if resource_paths.is_empty() {
-            return Ok(SiteData::empty());
+            return Ok((SiteData::empty(), None));
         }
 
         let rel_paths = resource_paths
@@ -577,14 +577,14 @@ impl ResourceManager {
             .collect::<Result<Vec<ResourcePaths>>>()?;
 
         let resource_file_inputs = self.resource_paths_to_quilt_inputs(rel_paths)?;
-        let resources_set = self
+        let (resources_set, cost) = self
             .store_into_quilts(resource_file_inputs, epochs, dry_run, max_quilt_size)
             .await?;
         tracing::debug!(
             "Final site data will be created with {} resources",
             resources_set.len()
         );
-        Ok(self.to_site_data(resources_set))
+        Ok((self.to_site_data(resources_set), cost))
     }
 
     async fn store_into_quilts(
@@ -593,7 +593,7 @@ impl ResourceManager {
         epochs: EpochArg,
         dry_run: bool,
         max_quilt_size: ByteSize,
-    ) -> anyhow::Result<ResourceSet> {
+    ) -> anyhow::Result<(ResourceSet, Option<u64>)> {
         let chunks = self.quilts_chunkify(resource_file_inputs, max_quilt_size)?;
 
         if dry_run {
@@ -606,29 +606,8 @@ impl ResourceManager {
                 total_storage_cost += wal_storage_cost;
             }
 
-            display::action(format!(
-                    "Estimated Storage Cost for this publish/update (Gas Cost Excluded): {total_storage_cost} FROST"
-                ));
-
-            // Add user confirmation prompt.
-            #[cfg(test)]
-            display::action("Waiting for user confirmation...");
-            #[cfg(not(feature = "_testing-dry-run"))]
-            {
-                if !dialoguer::Confirm::new()
-                    .with_prompt("Do you want to proceed with these updates?")
-                    .default(true)
-                    .interact()?
-                {
-                    display::error("Update cancelled by user");
-                    return Err(anyhow!("Update cancelled by user"));
-                }
-            }
-            #[cfg(feature = "_testing-dry-run")]
-            {
-                // In tests, automatically proceed without prompting
-                println!("Test mode: automatically proceeding with updates");
-            }
+            // Return cost for display in publish.rs - don't print here
+            return Ok((ResourceSet::empty(), Some(total_storage_cost)));
         }
 
         let mut resources_set = ResourceSet::empty();
@@ -640,7 +619,8 @@ impl ResourceManager {
                 .await?;
             resources_set.extend(resources);
         }
-        Ok(resources_set)
+
+        Ok((resources_set, None))
     }
 
     /// Filters resource_paths and prepares them as inputs for Quilt creation.

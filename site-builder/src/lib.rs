@@ -150,7 +150,7 @@ async fn run_internal(
                     .await?;
             let mut site_manager = SiteManager::new(config, Some(site_object), None, None).await?;
 
-            let resources = resource_manager
+            let (resources, _cost) = resource_manager
                 .parse_resources_and_store_quilts(
                     resources,
                     common.epoch_arg,

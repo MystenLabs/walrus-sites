@@ -537,6 +537,89 @@ where
 
 // Resolution
 
+/// Gets a site object using GraphQL query
+pub(crate) async fn get_site_object_via_graphql(wallet: &WalletContext) -> Option<ObjectID> {
+    use serde_json::json;
+    use std::process::Command;
+    
+    // Determine GraphQL endpoint based on wallet context
+    let endpoint = match wallet.config.active_env.as_deref() {
+        Some("mainnet") => "https://graphql.mainnet.sui.io/graphql",
+        Some("testnet") => "https://graphql.testnet.sui.io/graphql", 
+        Some("devnet") => "https://graphql.devnet.sui.io/graphql",
+        _ => {
+            // Default to testnet if no active env or unknown env
+            "https://graphql.testnet.sui.io/graphql"
+        }
+    };
+    
+    // Query for site objects with limit 1
+    let site_query = json!({
+        "query": r#"
+            query {
+                objects(
+                    filter: {
+                        type: "0xf99aee9f21493e1590e7e5a9aea6f343a1f381031a04a732724871fc294be799::site::Site"
+                    },
+                    first: 1
+                ) {
+                    nodes {
+                        address
+                        version
+                        digest
+                    }
+                }
+            }
+        "#
+    });
+    
+    let query_json = serde_json::to_string(&site_query).unwrap_or_default();
+    
+    let output = Command::new("curl")
+        .arg("-X")
+        .arg("POST")
+        .arg(endpoint)
+        .arg("-H")
+        .arg("Content-Type: application/json")
+        .arg("-d")
+        .arg(&query_json)
+        .arg("-s")
+        .arg("-m")
+        .arg("10")  // 10 second timeout
+        .output()
+        .ok()?;
+
+    if output.status.success() {
+        if let Ok(text) = String::from_utf8(output.stdout) {
+            // Parse the JSON response
+            if let Ok(json_response) = serde_json::from_str::<serde_json::Value>(&text) {
+                if let Some(data) = json_response.get("data") {
+                    if let Some(objects) = data.get("objects") {
+                        if let Some(nodes) = objects.get("nodes") {
+                            if let Some(nodes_array) = nodes.as_array() {
+                                if !nodes_array.is_empty() {
+                                    // Get the first object
+                                    if let Some(first_object) = nodes_array.first() {
+                                        if let Some(address) = first_object.get("address") {
+                                            if let Some(address_str) = address.as_str() {
+                                                if let Ok(object_id) = ObjectID::from_hex_literal(address_str) {
+                                                    return Some(object_id);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    None
+}
+
 #[cfg(test)]
 mod test_util {
     use sui_types::base_types::ObjectID;

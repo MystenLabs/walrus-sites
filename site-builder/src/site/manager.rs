@@ -3,6 +3,7 @@
 
 use std::{
     collections::{btree_map, BTreeSet, HashSet},
+    iter::Peekable,
     str::FromStr,
 };
 
@@ -18,7 +19,7 @@ use sui_sdk::{
 };
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
-    transaction::{CallArg, ProgrammableTransaction},
+    transaction::{CallArg, ProgrammableTransaction, TransactionData, TransactionDataAPI},
     Identifier,
 };
 use tracing::warn;
@@ -42,7 +43,7 @@ use crate::{
     },
     summary::SiteDataDiffSummary,
     types::{Metadata, MetadataOp, ObjectCache, RouteOps, SiteNameOp},
-    util::{get_site_id_from_response, sign_and_send_ptb},
+    util::{get_site_id_from_response, get_site_object_via_graphql, sign_and_send_ptb},
     walrus::{types::BlobId, Walrus},
 };
 
@@ -106,6 +107,7 @@ impl SiteManager {
 
         // Check if there are any updates to the site on-chain.
         let result = if site_updates.has_updates() {
+            println!(); // Empty line before applying action for consistency
             display::action("Applying the Walrus Site object updates on Sui");
             self.execute_sui_updates(&site_updates)
                 .await
@@ -148,17 +150,15 @@ impl SiteManager {
         Ok(())
     }
 
-    /// Executes the updates on Sui.
-    async fn execute_sui_updates(
-        &mut self,
-        updates: &SiteDataDiff<'_>,
-    ) -> Result<SuiTransactionBlockResponse> {
-        tracing::debug!(
-            address=?self.active_address()?,
-            ?updates,
-            "starting to update site resources on chain",
-        );
-
+    /// Builds the initial PTB for site creation/update with initial resources
+    async fn build_initial_ptb<'a>(
+        &self,
+        updates: &'a SiteDataDiff<'_>,
+    ) -> Result<(
+        ProgrammableTransaction,
+        Peekable<std::slice::Iter<'a, ResourceOp<'a>>>,
+        Peekable<btree_map::Iter<'a, String, String>>,
+    )> {
         // 1st iteration
         // Keep 4 operations for optional update_name + route deletion + creation + site-transfer
         const INITIAL_MAX: u16 = PTB_MAX_MOVE_CALLS - 4;
@@ -220,14 +220,261 @@ impl SiteManager {
             ptb.transfer_site(self.active_address()?)?;
         }
 
+        Ok((ptb.finish(), resources_iter, routes_iter))
+    }
+
+    /// Builds PTBs for remaining resources and routes
+    async fn build_remaining_resources_ptbs<'a>(
+        &self,
+        site_object_id: ObjectID,
+        mut resources_iter: Peekable<std::slice::Iter<'a, ResourceOp<'a>>>,
+        mut routes_iter: Peekable<btree_map::Iter<'a, String, String>>,
+    ) -> Result<Vec<ProgrammableTransaction>> {
+        let mut transactions = Vec::new();
+        
+        while resources_iter.peek().is_some() || routes_iter.peek().is_some() {
+            let ptb: SitePtb<(), { PTB_MAX_MOVE_CALLS }> = SitePtb::new(
+                self.config.package,
+                Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
+            );
+            let site_object_ref = self.wallet.get_object_ref(site_object_id).await?;
+            let call_arg: CallArg = site_object_ref.into();
+            let mut ptb = ptb.with_call_arg(&call_arg)?;
+
+            ptb.add_resource_operations(&mut resources_iter)
+                .ok_if_limit_reached()?;
+
+            // Add routes only if all resources have been added.
+            if resources_iter.peek().is_none() {
+                ptb.add_route_operations(&mut routes_iter)
+                    .ok_if_limit_reached()?;
+            }
+
+            transactions.push(ptb.finish());
+        }
+        
+        Ok(transactions)
+    }
+
+    /// Estimates Sui gas costs for site updates by dry-running transactions
+    pub async fn estimate_sui_gas(&mut self, local_site_data: &SiteData) -> Result<u64> {
+        tracing::debug!(
+            address=?self.active_address()?,
+            "estimating Sui gas for site updates",
+        );
+
         let retry_client = self.sui_client().await?;
-        let built_ptb = ptb.finish();
-        assert!(built_ptb.commands.len() <= PTB_MAX_MOVE_CALLS as usize);
+        
+        // Get existing site data (if any)
+        let existing_site = match &self.site_id {
+            Some(site_id) => {
+                RemoteSiteFactory::new(&retry_client, self.config.package)
+                    .await?
+                    .get_from_chain(*site_id)
+                    .await?
+            }
+            None => SiteData::empty(),
+        };
+
+        // Calculate the diff between current and new site data
+        let updates = local_site_data.diff(&existing_site);
+
+        // Build the initial PTB
+        let (initial_ptb, mut resources_iter, mut routes_iter) = self.build_initial_ptb(&updates).await?;
+
+        let gas_ref = self.gas_coin_ref().await?;
+        
+        // Dry run initial PTB
+        let initial_response = self.dry_run_ptb(initial_ptb.clone(), gas_ref, &retry_client, false).await?;
+        let initial_gas = initial_response.effects.gas_cost_summary().net_gas_usage() as u64;
+        
+        println!(
+            "Initial PTB gas cost: {} MIST ({:.2} SUI) ({} commands)",
+            initial_gas,
+            initial_gas as f64 / 1_000_000_000.0,
+            initial_ptb.commands.len()
+        );
+
+        // Check if we'll need additional PTBs by peeking at the iterators
+        let has_remaining_resources = resources_iter.peek().is_some() || routes_iter.peek().is_some();
+        
+        let site_object_id = if !has_remaining_resources {
+            // No additional PTBs needed - just return the initial PTB gas cost
+            println!(
+                "Total estimated gas cost: {} MIST ({:.2} SUI)",
+                initial_gas,
+                initial_gas as f64 / 1_000_000_000.0
+            );
+            return Ok(initial_gas);
+        } else {
+            // Additional PTBs needed - get site object ID
+            // Since their validation will depend on it
+            match &self.site_id {
+                Some(id) => *id, // Use existing site ID
+                None => {
+                    // For new sites, query for existing site object
+                    // We can use any one but present on the chain
+                    let existing_site_id = get_site_object_via_graphql(&self.wallet).await;
+                    if let Some(existing_id) = existing_site_id {
+                        existing_id
+                    } else {
+                        return Err(anyhow::anyhow!("No existing site object found for gas estimation"));
+                    }
+                }
+            }
+        };
+
+        // Build remaining PTBs
+        let remaining_ptbs = self.build_remaining_resources_ptbs(
+            site_object_id,
+            resources_iter,
+            routes_iter,
+        ).await?;
+
+        // Dry run remaining PTBs
+        let mut total_gas = initial_gas;
+        if remaining_ptbs.is_empty() {
+            println!("Single transaction required for all updates");
+        } else {
+            println!(
+                "Multiple transactions required: {} additional resource PTBs",
+                remaining_ptbs.len()
+            );
+        }
+        
+        for (i, ptb) in remaining_ptbs.iter().enumerate() {
+            let gas_ref = self.gas_coin_ref().await?;
+            let response = self.dry_run_ptb(ptb.clone(), gas_ref, &retry_client, true).await?;
+            
+            // If dev_inspect failed, estimate gas based on command count
+            let gas_cost = if response.error.is_some() {
+                // Use heuristic: scale based on command count compared to initial PTB
+                let command_ratio = ptb.commands.len() as f64 / initial_ptb.commands.len() as f64;
+                (initial_gas as f64 * command_ratio * 0.8) as u64 // Resource PTBs are typically simpler
+            } else {
+                response.effects.gas_cost_summary().net_gas_usage() as u64
+            };
+            
+            total_gas += gas_cost;
+            
+            // Debug: show if there were any errors in dev_inspect
+            if let Some(ref error) = response.error {
+                println!(
+                    "Resource PTB {}/{} had dev_inspect error: {}",
+                    i + 1,
+                    remaining_ptbs.len(),
+                    error
+                );
+                println!(
+                    "Estimated cost based on {} commands", 
+                    ptb.commands.len()
+                );
+            }
+            
+            println!(
+                "Resource PTB {}/{}: {} MIST ({:.2} SUI) ({} commands)",
+                i + 1,
+                remaining_ptbs.len(),
+                gas_cost,
+                gas_cost as f64 / 1_000_000_000.0,
+                ptb.commands.len()
+            );
+        }
+
+        println!(
+            "Total estimated gas cost: {} MIST ({:.2} SUI)",
+            total_gas,
+            total_gas as f64 / 1_000_000_000.0
+        );
+
+        Ok(total_gas)
+    }
+
+    /// Dry runs a PTB and returns the response
+    async fn dry_run_ptb(
+        &mut self,
+        ptb: ProgrammableTransaction,
+        gas_coin: ObjectRef,
+        retry_client: &RetriableSuiClient,
+        use_modified_for_estimation: bool,
+    ) -> Result<sui_sdk::rpc_types::DevInspectResults> {
+        // For new sites and resource PTBs, use modified PTB for estimation
+        let estimation_ptb = if use_modified_for_estimation && self.site_id.is_none() {
+            self.create_estimation_ptb(&ptb)
+        } else {
+            ptb
+        };
+
+        // Get the current reference gas price
+        let gas_price = retry_client
+            .client()
+            .read_api()
+            .get_reference_gas_price()
+            .await?;
+
+        let tx_data = TransactionData::new_programmable(
+            self.wallet.active_address()?,
+            vec![gas_coin],
+            estimation_ptb,
+            self.config.gas_budget(),
+            gas_price, // Use actual reference gas price
+        );
+
+        // It makes sense to use dev_inspect_transaction_block instead of dry_run_transaction_block 
+        // because the latter requires extended validations like 
+        // real object ids present on the chain for quilts and signed transactions.
+        // For our use case we actually need only high level verification
+        // and gas cost estimation.
+        let response = retry_client
+            .client()
+            .read_api()
+            .dev_inspect_transaction_block(
+                self.wallet.active_address()?,
+                tx_data.into_kind(),
+                Some(gas_price.into()),
+                None, // epoch
+                Some(sui_sdk::rpc_types::DevInspectArgs {
+                    skip_checks: Some(true), // Skip validation checks
+                    gas_sponsor: None,
+                    gas_budget: None,
+                    gas_objects: None,
+                    show_raw_txn_data_and_effects: None,
+                }),
+            )
+            .await?;
+
+        Ok(response)
+    }
+
+    /// Creates a modified PTB for estimation - currently just returns the original
+    fn create_estimation_ptb(&self, ptb: &ProgrammableTransaction) -> ProgrammableTransaction {
+        // For now, return the original PTB unchanged
+        // We'll rely on using a real object ID of the right type
+        ptb.clone()
+    }
+
+    /// Executes the updates on Sui.
+    async fn execute_sui_updates(
+        &mut self,
+        updates: &SiteDataDiff<'_>,
+    ) -> Result<SuiTransactionBlockResponse> {
+        tracing::debug!(
+            address=?self.active_address()?,
+            ?updates,
+            "starting to update site resources on chain",
+        );
+
+        // Build the initial PTB
+        let (initial_ptb, resources_iter, routes_iter) = self.build_initial_ptb(updates).await?;
+
+        let retry_client = self.sui_client().await?;
+        assert!(initial_ptb.commands.len() <= PTB_MAX_MOVE_CALLS as usize);
+        
         // TODO: #SEW-498 Verify gas_ref. Currently, we do not have the last tx the user submitted through
         // walrus.
         let gas_ref = self.gas_coin_ref().await?;
         let result = self
-            .sign_and_send_ptb(built_ptb, gas_ref, &retry_client)
+            .sign_and_send_ptb(initial_ptb, gas_ref, &retry_client)
             .await?;
 
         // Check explicitly for execution failures.
@@ -251,29 +498,18 @@ impl SiteManager {
             }
         };
 
-        // Keep iterating to load all resources and routes.
-        while resources_iter.peek().is_some() || routes_iter.peek().is_some() {
-            let ptb: SitePtb<(), { PTB_MAX_MOVE_CALLS }> = SitePtb::new(
-                self.config.package,
-                Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
-            );
-            let mut site_object_ref = self.wallet.get_object_ref(site_object_id).await?;
-            site_object_ref = self.verify_object_ref_choose_latest(site_object_ref)?;
-            let call_arg: CallArg = site_object_ref.into();
-            let mut ptb = ptb.with_call_arg(&call_arg)?;
+        // Build remaining PTBs
+        let remaining_ptbs = self.build_remaining_resources_ptbs(
+            site_object_id,
+            resources_iter,
+            routes_iter,
+        ).await?;
 
-            ptb.add_resource_operations(&mut resources_iter)
-                .ok_if_limit_reached()?;
-
-            // Add routes only if all resources have been added.
-            if resources_iter.peek().is_none() {
-                ptb.add_route_operations(&mut routes_iter)
-                    .ok_if_limit_reached()?;
-            }
-
+        // Execute remaining PTBs
+        for ptb in remaining_ptbs {
             let gas_ref = self.gas_coin_ref().await?;
             let resource_result = self
-                .sign_and_send_ptb(ptb.finish(), gas_ref, &retry_client)
+                .sign_and_send_ptb(ptb, gas_ref, &retry_client)
                 .await?;
             if let Some(SuiExecutionStatus::Failure { error }) =
                 resource_result.effects.as_ref().map(|e| e.status())

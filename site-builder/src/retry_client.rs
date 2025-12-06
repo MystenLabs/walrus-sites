@@ -155,6 +155,11 @@ impl RetriableSuiClient {
         &self.backoff_config
     }
 
+    /// Returns a reference to the inner SuiClient.
+    pub fn client(&self) -> &SuiClient {
+        &self.sui_client
+    }
+
     /// Creates a new retriable client from a wallet context.
     #[tracing::instrument(level = Level::DEBUG, skip_all)]
     pub async fn new_from_wallet(
