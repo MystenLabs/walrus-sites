@@ -402,7 +402,7 @@ impl SiteManager {
         ptb: ProgrammableTransaction,
         gas_coin: ObjectRef,
         retry_client: &RetriableSuiClient,
-        use_modified_for_estimation: bool,
+        _use_modified_for_estimation: bool,
     ) -> Result<sui_sdk::rpc_types::DevInspectResults> {
         // Get the current reference gas price
         let gas_price = retry_client

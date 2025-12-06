@@ -243,10 +243,10 @@ impl SiteEditor<EditOptions> {
             "Parsing the directory {}, computing Quilt IDs, and dry-running storage of quilts",
             self.directory().to_string_lossy()
         ));
-        
         // compute quilt IDs and estimate FROST storage costs
         let (_local_site_data, cost) = self.execute_quilt_operations(resource_manager, true).await?;
         display::done(); // Complete the dry-run action
+        
         println!(); // Empty line for spacing
         
         // Display cost information
@@ -282,10 +282,12 @@ impl SiteEditor<EditOptions> {
         }
 
         println!(); // Empty line before storing action
+        
         // Store quilts for real (dry_run=false)
         display::action("Storing quilts to Walrus");
         let (local_site_data, _cost) = self.execute_quilt_operations(&mut resource_manager, false).await?;
         display::done();
+        
         println!(); // Empty line after completion
         
         // Step 3. Estimate SUI gas
