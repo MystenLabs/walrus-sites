@@ -189,7 +189,7 @@ impl SiteEditor<EditOptions> {
         let dry_run = self.edit_options.publish_options.walrus_options.dry_run;
         
         if dry_run {
-            return self.handle_dry_run_flow(resource_manager).await;
+            return self.dry_run(resource_manager).await;
         }
 
         // Normal (non-dry-run) flow
@@ -230,8 +230,9 @@ impl SiteEditor<EditOptions> {
             .await
     }
 
-    /// Handle the two-step dry run flow: FROST estimation -> Sui gas estimation -> transactions
-    async fn handle_dry_run_flow(
+    /// Execute dry run with 4-step process: 
+    /// estimate FROST → store quilts → estimate SUI → execute transactions
+    async fn dry_run(
         &self,
         resource_manager: &mut ResourceManager,
     ) -> Result<SiteData> {
@@ -243,17 +244,17 @@ impl SiteEditor<EditOptions> {
             self.directory().to_string_lossy()
         ));
         
-        // Step 2: Show FROST storage costs only (dry run)
+        // compute quilt IDs and estimate FROST storage costs
         let (_local_site_data, cost) = self.build_site_data(resource_manager, true).await?;
         display::done(); // Complete the dry-run action
         println!(); // Empty line for spacing
         
-        // Step 3: Display cost information
+        // Display cost information
         if let Some(storage_cost) = cost {
             println!("Dry-run Walrus storage cost: {} FROST (Walrus gas for quilt storage)", storage_cost);
         }
         
-        // Step 4: Ask if user wants to proceed with gas estimation
+        // Ask if user wants to proceed with storing quilts
         #[cfg(not(feature = "_testing-dry-run"))]
         {
             if !dialoguer::Confirm::new()
@@ -270,7 +271,7 @@ impl SiteEditor<EditOptions> {
             println!("Test mode: automatically proceeding with gas estimation");
         }
 
-        // Step 3: Store quilts (actual storage) and estimate gas
+        // Step 2: Store quilts (actual storage)
         // Suppress INFO logs during manager creation to maintain clean flow
         let _guard = tracing::subscriber::set_default(tracing::subscriber::NoSubscriber::default());
         let (mut resource_manager, mut site_manager) = self.create_managers().await?;
@@ -287,12 +288,12 @@ impl SiteEditor<EditOptions> {
         display::done();
         println!(); // Empty line after completion
         
-        // Show Sui gas estimates
+        // Step 3. Estimate SUI gas
         println!("Sui Gas Estimates:");
         let _total_gas = site_manager.estimate_sui_gas(&local_site_data).await?;
         println!(); // Empty line before final question
 
-        // Step 4: Ask if user wants to proceed with Sui transactions
+        // Ask if user wants to proceed with Sui transactions
         #[cfg(not(feature = "_testing-dry-run"))]
         {
             if !dialoguer::Confirm::new()
@@ -309,7 +310,7 @@ impl SiteEditor<EditOptions> {
             println!("Test mode: automatically proceeding with transactions");
         }
 
-        // Proceed with actual Sui transactions
+        // Step 4. Proceed with actual Sui transactions
         let (_response, _summary) = self.update_site_with_resources(&mut site_manager, resource_manager, &local_site_data).await?;
         
         display::action("Sui transactions completed successfully!");

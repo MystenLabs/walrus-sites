@@ -256,7 +256,7 @@ impl SiteManager {
         Ok(transactions)
     }
 
-    /// Estimates Sui gas costs for site updates by dry-running transactions
+    /// Estimates Sui gas costs for site updates by dry-running ptbs
     pub async fn estimate_sui_gas(&mut self, local_site_data: &SiteData) -> Result<u64> {
         tracing::debug!(
             address=?self.active_address()?,
@@ -313,7 +313,9 @@ impl SiteManager {
                 Some(id) => *id, // Use existing site ID
                 None => {
                     // For new sites, query for existing site object
-                    // We can use any one but present on the chain
+                    // We can use any one but it should be real one, present on the chain
+                    // We have to use GraphQL here since the standard rpc api 
+                    // doesn't have such interface for querying site objects
                     let existing_site_id = get_site_object_via_graphql(&self.wallet).await;
                     if let Some(existing_id) = existing_site_id {
                         existing_id
@@ -390,7 +392,11 @@ impl SiteManager {
         Ok(total_gas)
     }
 
-    /// Dry runs a PTB and returns the response
+    /// Dry runs a PTB using DevInspectTransactionBlock and returns the response
+    ///
+    /// It makes sense to use dev_inspect_transaction_block instead of dry_run_transaction_block 
+    /// because the latter requires extended validations like signed transactions.
+    /// For our use case we actually need only high level verification and gas cost estimation.
     async fn dry_run_ptb(
         &mut self,
         ptb: ProgrammableTransaction,
@@ -398,13 +404,6 @@ impl SiteManager {
         retry_client: &RetriableSuiClient,
         use_modified_for_estimation: bool,
     ) -> Result<sui_sdk::rpc_types::DevInspectResults> {
-        // For new sites and resource PTBs, use modified PTB for estimation
-        let estimation_ptb = if use_modified_for_estimation && self.site_id.is_none() {
-            self.create_estimation_ptb(&ptb)
-        } else {
-            ptb
-        };
-
         // Get the current reference gas price
         let gas_price = retry_client
             .client()
@@ -415,16 +414,11 @@ impl SiteManager {
         let tx_data = TransactionData::new_programmable(
             self.wallet.active_address()?,
             vec![gas_coin],
-            estimation_ptb,
+            ptb,
             self.config.gas_budget(),
             gas_price, // Use actual reference gas price
         );
 
-        // It makes sense to use dev_inspect_transaction_block instead of dry_run_transaction_block 
-        // because the latter requires extended validations like 
-        // real object ids present on the chain for quilts and signed transactions.
-        // For our use case we actually need only high level verification
-        // and gas cost estimation.
         let response = retry_client
             .client()
             .read_api()
@@ -444,13 +438,6 @@ impl SiteManager {
             .await?;
 
         Ok(response)
-    }
-
-    /// Creates a modified PTB for estimation - currently just returns the original
-    fn create_estimation_ptb(&self, ptb: &ProgrammableTransaction) -> ProgrammableTransaction {
-        // For now, return the original PTB unchanged
-        // We'll rely on using a real object ID of the right type
-        ptb.clone()
     }
 
     /// Executes the updates on Sui.
