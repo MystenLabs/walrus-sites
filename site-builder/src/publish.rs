@@ -19,9 +19,11 @@ use sui_types::{
 
 use crate::{
     args::PublishOptions,
-    backoff::ExponentialBackoffConfig,
     config::Config,
     display,
+};
+use crate::{
+    backoff::ExponentialBackoffConfig,
     preprocessor::Preprocessor,
     retry_client::RetriableSuiClient,
     site::{
@@ -30,6 +32,7 @@ use crate::{
         manager::SiteManager,
         resource::ResourceManager,
         RemoteSiteFactory,
+        SiteData,
         SITE_MODULE,
     },
     summary::{SiteDataDiffSummary, Summarizable},
@@ -178,20 +181,39 @@ impl SiteEditor<EditOptions> {
         Ok(())
     }
 
-    async fn run_single_edit_quilts(
+    /// Load resources from directory and store quilts (with enhanced dry-run logic)
+    async fn load_and_store_resources(
         &self,
-    ) -> Result<(SuiAddress, SuiTransactionBlockResponse, SiteDataDiffSummary)> {
-        let (mut resource_manager, mut site_manager) = self.create_managers().await?;
-        if self.is_list_directory() {
-            self.preprocess_directory(&resource_manager)?;
+        resource_manager: &mut ResourceManager,
+    ) -> Result<SiteData> {
+        let dry_run = self.edit_options.publish_options.walrus_options.dry_run;
+        
+        if dry_run {
+            return self.dry_run(resource_manager).await;
         }
 
+        // Normal (non-dry-run) flow
         display::action(format!(
-            "Parsing the directory {}, computing Quilt IDs, and storing Quilts",
-            self.directory().to_string_lossy()
+            "Parsing the directory {}, computing Quilt IDs, and {} quilts",
+            self.directory().to_string_lossy(),
+            if dry_run { "dry-running storage of" } else { "storing" }
         ));
-        let dry_run = self.edit_options.publish_options.walrus_options.dry_run;
-        let local_site_data = resource_manager
+        let (local_site_data, _cost) = self.execute_quilt_operations(resource_manager, dry_run).await?;
+        display::done();
+        tracing::debug!(
+            ?local_site_data,
+            "finished loading and storing resources"
+        );
+        Ok(local_site_data)
+    }
+
+    /// Execute quilt operations (dry-run or actual storage) and return site data
+    async fn execute_quilt_operations(
+        &self,
+        resource_manager: &mut ResourceManager,
+        dry_run: bool,
+    ) -> Result<(SiteData, Option<u64>)> {
+        resource_manager
             .read_dir_and_store_quilts(
                 self.directory(),
                 self.edit_options
@@ -205,16 +227,120 @@ impl SiteEditor<EditOptions> {
                     .walrus_options
                     .max_quilt_size,
             )
-            .await?;
+            .await
+    }
+
+    /// Execute dry run with 4-step process: 
+    /// estimate FROST → store quilts → estimate SUI → execute transactions
+    async fn dry_run(
+        &self,
+        resource_manager: &mut ResourceManager,
+    ) -> Result<SiteData> {
+        println!(); // Empty line to separate from initial INFO logs
+        
+        // Step 1: Start the dry-run action
+        display::action(format!(
+            "Parsing the directory {}, computing Quilt IDs, and dry-running storage of quilts",
+            self.directory().to_string_lossy()
+        ));
+        // compute quilt IDs and estimate FROST storage costs
+        let (_local_site_data, cost) = self.execute_quilt_operations(resource_manager, true).await?;
+        display::done(); // Complete the dry-run action
+        
+        println!(); // Empty line for spacing
+        
+        // Display cost information
+        if let Some(storage_cost) = cost {
+            println!("Dry-run Walrus storage cost: {} FROST (Walrus gas for quilt storage)", storage_cost);
+        }
+        
+        // Ask if user wants to proceed with storing quilts
+        #[cfg(not(feature = "_testing-dry-run"))]
+        {
+            if !dialoguer::Confirm::new()
+                .with_prompt("Store quilts to Walrus and estimate Sui gas? (Reuses existing quilts, otherwise deducts FROST fees)")
+                .default(true)
+                .interact()?
+            {
+                display::error("Dry run cancelled");
+                return Err(anyhow!("Dry run cancelled by user"));
+            }
+        }
+        #[cfg(feature = "_testing-dry-run")]
+        {
+            println!("Test mode: automatically proceeding with gas estimation");
+        }
+
+        // Step 2: Store quilts (actual storage)
+        // Suppress INFO logs during manager creation to maintain clean flow
+        let _guard = tracing::subscriber::set_default(tracing::subscriber::NoSubscriber::default());
+        let (mut resource_manager, mut site_manager) = self.create_managers().await?;
+        drop(_guard); // Restore normal logging
+        
+        if self.is_list_directory() {
+            self.preprocess_directory(&resource_manager)?;
+        }
+
+        println!(); // Empty line before storing action
+        
+        // Store quilts for real (dry_run=false)
+        display::action("Storing quilts to Walrus");
+        let (local_site_data, _cost) = self.execute_quilt_operations(&mut resource_manager, false).await?;
         display::done();
-        tracing::debug!(
-            ?local_site_data,
-            "resources loaded and stored from directory"
-        );
+        
+        println!(); // Empty line after completion
+        
+        // Step 3. Estimate SUI gas
+        println!("Sui Gas Estimates:");
+        let _total_gas = site_manager.estimate_sui_gas(&local_site_data).await?;
+        println!(); // Empty line before final question
 
-        let (response, summary) = site_manager.update_site(&local_site_data).await?;
+        // Ask if user wants to proceed with Sui transactions
+        #[cfg(not(feature = "_testing-dry-run"))]
+        {
+            if !dialoguer::Confirm::new()
+                .with_prompt("Execute Sui transactions? (This will deduct fees from your wallet - actual cost may vary from estimate)")
+                .default(true)
+                .interact()?
+            {
+                display::error("Transactions cancelled");
+                return Err(anyhow!("Transactions cancelled by user"));
+            }
+        }
+        #[cfg(feature = "_testing-dry-run")]
+        {
+            println!("Test mode: automatically proceeding with transactions");
+        }
 
-        self.persist_site_identifier(resource_manager, &site_manager, &response)?;
+        // Step 4. Proceed with actual Sui transactions
+        let (_response, _summary) = self.update_site_with_resources(&mut site_manager, resource_manager, &local_site_data).await?;
+        
+        display::action("Sui transactions completed successfully!");
+        Ok(local_site_data)
+    }
+
+    /// Update site with loaded resources
+    async fn update_site_with_resources(
+        &self,
+        site_manager: &mut SiteManager,
+        resource_manager: ResourceManager,
+        local_site_data: &SiteData,
+    ) -> Result<(SuiTransactionBlockResponse, SiteDataDiffSummary)> {
+        let (response, summary) = site_manager.update_site(local_site_data).await?;
+        self.persist_site_identifier(resource_manager, site_manager, &response)?;
+        Ok((response, summary))
+    }
+
+    async fn run_single_edit_quilts(
+        &self,
+    ) -> Result<(SuiAddress, SuiTransactionBlockResponse, SiteDataDiffSummary)> {
+        let (mut resource_manager, mut site_manager) = self.create_managers().await?;
+        if self.is_list_directory() {
+            self.preprocess_directory(&resource_manager)?;
+        }
+
+        let local_site_data = self.load_and_store_resources(&mut resource_manager).await?;
+        let (response, summary) = self.update_site_with_resources(&mut site_manager, resource_manager, &local_site_data).await?;
 
         Ok((site_manager.active_address()?, response, summary))
     }
