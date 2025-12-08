@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, it, expect } from 'bun:test'
-import { parseWsResources } from '../utils/ws_resources_parser'
+import { parseWsResources } from '@utils/ws_resources_parser'
 
 describe('parseWsResources', () => {
     it('should parse valid ws-resources.json', () => {

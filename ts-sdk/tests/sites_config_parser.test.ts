@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, it, expect } from 'bun:test'
-import { parseSitesConfig } from '../utils/sites_config_parser'
+import { parseSitesConfig } from '@utils/sites_config_parser'
 
 describe('parseSitesConfig', () => {
     it('should parse valid sites-config', () => {
