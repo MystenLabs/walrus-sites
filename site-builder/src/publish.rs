@@ -186,7 +186,6 @@ impl SiteEditor {
                 .await?
                 .1
                 .object_ref();
-            print!("Executing destruction PTB...\n");
             sign_and_send_ptb(
                 active_address,
                 &wallet,
