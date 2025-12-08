@@ -13,9 +13,9 @@ use sui_sdk::{rpc_types::{
     SuiTransactionBlockResponse,
 }, wallet_context::WalletContext};
 use sui_types::{
-    base_types::{ObjectID, SuiAddress},
-    Identifier,
+    base_types::{ObjectID, SuiAddress}, quorum_driver_types::ExecuteTransactionRequestType, transaction::Argument, Identifier
 };
+use walrus_sui::wallet::Wallet;
 
 use crate::{
     args::PublishOptions,
@@ -133,87 +133,72 @@ impl SiteEditor {
             .get_from_chain(site_id)
             .await?;
         
-        for batch in site.resources().batch(PTB_MAX_MOVE_CALLS as usize) {
-            self.delete_resource_batch(&retriable_client, &wallet, site_id, active_address, &batch).await?;
+        // Queue of PTBs to batch move calls and execute them later.
+        let mut ptb_queue: Vec<SitePtb::<Argument, PTB_MAX_MOVE_CALLS>> = Vec::new();
+        // Iterate over the resources. When a ptb gets full, it gets added to the 
+        // ptb_queue.
+        let mut resources_iter = site.resources().into_iter().peekable();
+        while resources_iter.peek().is_some() {
+            let ptb = SitePtb::<_, PTB_MAX_MOVE_CALLS>::new(
+                self.config.package,
+                Identifier::new(SITE_MODULE)?,
+            );
+            let mut ptb = ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
+            ptb.destroy(&mut resources_iter)?;
+            ptb_queue.push(ptb);
         }
-        self.finalize_site_deletion(&retriable_client, &wallet, site_id, active_address).await?;
         
-        Ok(())
+        // Finalise the last batch of move calls including calls to `remove_routes` and `burn`.
+        if let Some(last_ptb) = ptb_queue.last_mut() {
+            if last_ptb.remove_routes().is_err() {
+                let ptb = SitePtb::<_, PTB_MAX_MOVE_CALLS>::new(
+                    self.config.package,
+                    Identifier::new(SITE_MODULE)?,
+                );
+                let mut ptb = ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
+                ptb.remove_routes().unwrap();
+                ptb_queue.push(ptb);
+            } else {
+                let ptb = SitePtb::<_, PTB_MAX_MOVE_CALLS>::new(
+                    self.config.package,
+                    Identifier::new(SITE_MODULE)?,
+                );
+                let mut ptb = ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
+                ptb.remove_routes().unwrap();
+                ptb.burn().unwrap();
+                ptb_queue.push(ptb);
+            }
+        }
+        
+        self.execute_ptbs_in_queue(ptb_queue, &wallet, active_address, &retriable_client).await
     }
-
-    /// Deletes a batch of resources by creating and executing a PTB.
-    async fn delete_resource_batch(
+    
+    async fn execute_ptbs_in_queue(
         &self,
-        retriable_client: &RetriableSuiClient,
+        ptb_queue: Vec<SitePtb<Argument, PTB_MAX_MOVE_CALLS>>,
         wallet: &WalletContext,
-        site_id: ObjectID,
         active_address: SuiAddress,
-        batch: &crate::site::resource::ResourceSet,
-    ) -> Result<()> {
-        let ptb = SitePtb::<_, PTB_MAX_MOVE_CALLS>::new(
-            self.config.package,
-            Identifier::new(SITE_MODULE)?,
-        );
-        let mut ptb = ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
-
-        // Add move calls to the PTB that remove resources.
-        ptb.destroy(batch)?;
-
-        let gas_coin = wallet
-            .gas_for_owner_budget(active_address, self.config.gas_budget(), BTreeSet::new())
-            .await?
-            .1
-            .object_ref();
-
-        // Execute the PTB.
-        sign_and_send_ptb(
-            active_address,
-            wallet,
-            retriable_client,
-            ptb.finish(),
-            gas_coin,
-            self.config.gas_budget(),
-            &mut ObjectCache::new(),
-        )
-        .await?;
-
-        Ok(())
-    }
-
-    /// Finalizes site deletion by removing routes and burning the site object.
-    async fn finalize_site_deletion(
-        &self,
         retriable_client: &RetriableSuiClient,
-        wallet: &WalletContext,
-        site_id: ObjectID,
-        active_address: SuiAddress,
     ) -> Result<()> {
-        let ptb = SitePtb::<_, PTB_MAX_MOVE_CALLS>::new(
-            self.config.package,
-            Identifier::new(SITE_MODULE)?,
-        );
-        let mut ptb = ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
-
-        ptb.remove_routes()?;
-        ptb.burn()?;
-
-        let gas_coin = wallet
-            .gas_for_owner_budget(active_address, self.config.gas_budget(), BTreeSet::new())
-            .await?
-            .1
-            .object_ref();
-
-        sign_and_send_ptb(
-            active_address,
-            wallet,
-            retriable_client,
-            ptb.finish(),
-            gas_coin,
-            self.config.gas_budget(),
-            &mut ObjectCache::new(),
-        )
-        .await?;
-
+        // Execute ptbs in queue.
+        for ptb_element in ptb_queue {
+            let gas_coin = wallet
+                .gas_for_owner_budget(active_address, self.config.gas_budget(), BTreeSet::new())
+                .await?
+                .1
+                .object_ref();
+            print!("Executing destruction PTB...\n");
+            sign_and_send_ptb(
+                active_address,
+                &wallet,
+                &retriable_client,
+                ptb_element.finish(),
+                gas_coin,
+                self.config.gas_budget(),
+                &mut ObjectCache::new(),
+            )
+            .await?;
+        }
         Ok(())
     }
 }

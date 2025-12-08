@@ -176,29 +176,6 @@ impl ResourceSet {
         }
     }
 
-    /// Batches the resources into multiple ResourceSets where each batch contains at most `batch_size` resources.
-    /// 
-    /// # Arguments
-    /// * `batch_size` - Maximum number of resources per batch
-    /// 
-    /// # Returns
-    /// A vector of ResourceSet batches. If the set is empty or batch_size is 0, returns an empty vector.
-    pub fn batch(&self, batch_size: usize) -> Vec<ResourceSet> {
-        if batch_size == 0 || self.inner.is_empty() {
-            return vec![];
-        }
-        
-        self.inner
-            .iter()
-            .cloned()
-            .collect::<Vec<_>>()
-            .chunks(batch_size)
-            .map(|chunk| ResourceSet {
-                inner: chunk.iter().cloned().collect(),
-            })
-            .collect()
-    }
-
     /// Returns a vector of deletion and creation operations to move
     /// from the start set to the current set.
     ///
