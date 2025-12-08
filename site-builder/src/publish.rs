@@ -13,7 +13,7 @@ use sui_sdk::{rpc_types::{
     SuiTransactionBlockResponse,
 }, wallet_context::WalletContext};
 use sui_types::{
-    base_types::{ObjectID, SuiAddress}, quorum_driver_types::ExecuteTransactionRequestType, transaction::Argument, Identifier
+    base_types::{ObjectID, SuiAddress}, transaction::Argument, Identifier
 };
 
 use crate::{
