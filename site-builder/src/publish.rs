@@ -7,11 +7,11 @@ use std::{
 };
 
 use anyhow::{anyhow, Result};
-use sui_sdk::rpc_types::{
+use sui_sdk::{rpc_types::{
     SuiExecutionStatus,
     SuiTransactionBlockEffects,
     SuiTransactionBlockResponse,
-};
+}, wallet_context::WalletContext};
 use sui_types::{
     base_types::{ObjectID, SuiAddress},
     Identifier,
@@ -125,62 +125,95 @@ impl SiteEditor {
         }
 
         // Delete objects on SUI blockchain
-        let mut wallet = self.config.load_wallet()?;
+        let mut wallet: WalletContext = self.config.load_wallet()?;
         let active_address = wallet.active_address()?;
         
         let site = RemoteSiteFactory::new(&retriable_client, self.config.package)
             .await?
             .get_from_chain(site_id)
             .await?;
-        for resource in site.resources().batch(998) {
-            let ptb = SitePtb::<_, PTB_MAX_MOVE_CALLS>::new(
-                self.config.package,
-                Identifier::new(SITE_MODULE)?,
-            );
-            let mut ptb = ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
-    
-            ptb.destroy(&resource)?;
-            let gas_coin = wallet
-                .gas_for_owner_budget(active_address, self.config.gas_budget(), BTreeSet::new())
-                .await?
-                .1
-                .object_ref();
-    
-            sign_and_send_ptb(
-                active_address,
-                &wallet,
-                &retriable_client,
-                ptb.finish(),
-                gas_coin,
-                self.config.gas_budget(),
-                &mut ObjectCache::new(),
-            )
-            .await?;
-        }
         
-        let last_ptb = SitePtb::<_, PTB_MAX_MOVE_CALLS>::new(
+        for batch in site.resources().batch(1000) {
+            self.delete_resource_batch(&retriable_client, &wallet, site_id, active_address, &batch).await?;
+        }
+        self.finalize_site_deletion(&retriable_client, &wallet, site_id, active_address).await?;
+        
+        Ok(())
+    }
+
+    /// Deletes a batch of resources by creating and executing a PTB.
+    async fn delete_resource_batch(
+        &self,
+        retriable_client: &RetriableSuiClient,
+        wallet: &WalletContext,
+        site_id: ObjectID,
+        active_address: SuiAddress,
+        batch: &crate::site::resource::ResourceSet,
+    ) -> Result<()> {
+        let ptb = SitePtb::<_, PTB_MAX_MOVE_CALLS>::new(
             self.config.package,
             Identifier::new(SITE_MODULE)?,
-        ); 
-        let mut postprocess_ptb = last_ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
-        postprocess_ptb.burn()?;
-        postprocess_ptb.remove_routes()?;
+        );
+        let mut ptb = ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
+
+        // Add move calls to the PTB that remove resources.
+        ptb.destroy(batch)?;
+
         let gas_coin = wallet
             .gas_for_owner_budget(active_address, self.config.gas_budget(), BTreeSet::new())
             .await?
             .1
             .object_ref();
+
+        // Execute the PTB.
         sign_and_send_ptb(
             active_address,
-            &wallet,
-            &retriable_client,
-            postprocess_ptb.finish(),
+            wallet,
+            retriable_client,
+            ptb.finish(),
             gas_coin,
             self.config.gas_budget(),
             &mut ObjectCache::new(),
         )
         .await?;
-        
+
+        Ok(())
+    }
+
+    /// Finalizes site deletion by removing routes and burning the site object.
+    async fn finalize_site_deletion(
+        &self,
+        retriable_client: &RetriableSuiClient,
+        wallet: &WalletContext,
+        site_id: ObjectID,
+        active_address: SuiAddress,
+    ) -> Result<()> {
+        let ptb = SitePtb::<_, PTB_MAX_MOVE_CALLS>::new(
+            self.config.package,
+            Identifier::new(SITE_MODULE)?,
+        );
+        let mut ptb = ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
+
+        ptb.remove_routes()?;
+        ptb.burn()?;
+
+        let gas_coin = wallet
+            .gas_for_owner_budget(active_address, self.config.gas_budget(), BTreeSet::new())
+            .await?
+            .1
+            .object_ref();
+
+        sign_and_send_ptb(
+            active_address,
+            wallet,
+            retriable_client,
+            ptb.finish(),
+            gas_coin,
+            self.config.gas_budget(),
+            &mut ObjectCache::new(),
+        )
+        .await?;
+
         Ok(())
     }
 }
