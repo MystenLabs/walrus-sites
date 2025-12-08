@@ -15,7 +15,6 @@ use sui_sdk::{rpc_types::{
 use sui_types::{
     base_types::{ObjectID, SuiAddress}, quorum_driver_types::ExecuteTransactionRequestType, transaction::Argument, Identifier
 };
-use walrus_sui::wallet::Wallet;
 
 use crate::{
     args::PublishOptions,
