@@ -5,7 +5,7 @@ import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519'
 import { SuiClient } from '@mysten/sui/client'
 import { walrus } from '@mysten/walrus'
 import { getFullnodeUrl } from '@mysten/sui/client'
-import { loadSitesConfig } from '../utils/file_io'
+import { loadSitesConfig } from '@utils/file_io'
 import type { Transaction } from '@mysten/sui/transactions'
 
 export class SiteBuilder {
