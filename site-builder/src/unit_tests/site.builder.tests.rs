@@ -287,7 +287,7 @@ fn test_destroy_with_resources_respects_limit() {
 
     // destroy needs to: remove_routes (1) + remove_resource_if_exists (1) + burn (1) = 3 calls
     // Should fail with limit of 1
-    let result = ptb.destroy(vec![&resource]);
+    let result = ptb.destroy(&mut vec![&resource].into_iter());
     assert!(result.is_err());
     match result.unwrap_err() {
         SitePtbBuilderError::TooManyMoveCalls(limit) => assert_eq!(limit, 1),

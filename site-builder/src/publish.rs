@@ -7,13 +7,14 @@ use std::{
 };
 
 use anyhow::{anyhow, Result};
-use sui_sdk::{rpc_types::{
-    SuiExecutionStatus,
-    SuiTransactionBlockEffects,
-    SuiTransactionBlockResponse,
-}, wallet_context::WalletContext};
+use sui_sdk::{
+    rpc_types::{SuiExecutionStatus, SuiTransactionBlockEffects, SuiTransactionBlockResponse},
+    wallet_context::WalletContext,
+};
 use sui_types::{
-    base_types::{ObjectID, SuiAddress}, transaction::Argument, Identifier
+    base_types::{ObjectID, SuiAddress},
+    transaction::Argument,
+    Identifier,
 };
 
 use crate::{
@@ -126,15 +127,15 @@ impl SiteEditor {
         // Delete objects on SUI blockchain
         let mut wallet: WalletContext = self.config.load_wallet()?;
         let active_address = wallet.active_address()?;
-        
+
         let site = RemoteSiteFactory::new(&retriable_client, self.config.package)
             .await?
             .get_from_chain(site_id)
             .await?;
-        
+
         // Queue of PTBs to batch move calls and execute them later.
-        let mut ptb_queue: Vec<SitePtb::<Argument, PTB_MAX_MOVE_CALLS>> = Vec::new();
-        // Iterate over the resources. When a ptb gets full, it gets added to the 
+        let mut ptb_queue: Vec<SitePtb<Argument, PTB_MAX_MOVE_CALLS>> = Vec::new();
+        // Iterate over the resources. When a ptb gets full, it gets added to the
         // ptb_queue.
         let mut resources_iter = site.resources().into_iter().peekable();
         while resources_iter.peek().is_some() {
@@ -146,32 +147,34 @@ impl SiteEditor {
             ptb.destroy(&mut resources_iter)?;
             ptb_queue.push(ptb);
         }
-        
+
         // Finalise the last batch of move calls including calls to `remove_routes` and `burn`.
         if let Some(last_ptb) = ptb_queue.last_mut() {
-            if last_ptb.remove_routes().is_err() {
+            // Try to add `remove_routes` to the existing last PTB; if it fails, create a new PTB.
+            if last_ptb.remove_routes_and_burn_site().is_err() {
                 let ptb = SitePtb::<_, PTB_MAX_MOVE_CALLS>::new(
                     self.config.package,
                     Identifier::new(SITE_MODULE)?,
                 );
                 let mut ptb = ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
-                ptb.remove_routes().unwrap();
-                ptb_queue.push(ptb);
-            } else {
-                let ptb = SitePtb::<_, PTB_MAX_MOVE_CALLS>::new(
-                    self.config.package,
-                    Identifier::new(SITE_MODULE)?,
-                );
-                let mut ptb = ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
-                ptb.remove_routes().unwrap();
-                ptb.burn().unwrap();
+                ptb.remove_routes_and_burn_site()?;
                 ptb_queue.push(ptb);
             }
+        } else {
+            // Create a new PTB since there are no ptbs in the queue.
+            let ptb = SitePtb::<_, PTB_MAX_MOVE_CALLS>::new(
+                self.config.package,
+                Identifier::new(SITE_MODULE)?,
+            );
+            let mut ptb = ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
+            ptb.remove_routes_and_burn_site()?;
+            ptb_queue.push(ptb);
         }
-        
-        self.execute_ptbs_in_queue(ptb_queue, &wallet, active_address, &retriable_client).await
+
+        self.execute_ptbs_in_queue(ptb_queue, &wallet, active_address, &retriable_client)
+            .await
     }
-    
+
     async fn execute_ptbs_in_queue(
         &self,
         ptb_queue: Vec<SitePtb<Argument, PTB_MAX_MOVE_CALLS>>,

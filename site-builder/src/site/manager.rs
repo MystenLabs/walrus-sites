@@ -127,7 +127,12 @@ impl SiteManager {
     /// Deletes the resources from Walrus.
     pub async fn delete_from_walrus(&mut self, blob_ids: &[BlobId]) -> Result<()> {
         // Deduplicate blob IDs to avoid redundant delete operations
-        let unique_blob_ids: Vec<BlobId> = blob_ids.iter().copied().collect::<HashSet<_>>().into_iter().collect();
+        let unique_blob_ids: Vec<BlobId> = blob_ids
+            .iter()
+            .copied()
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
         tracing::debug!(?unique_blob_ids, "deleting blob from Walrus");
         display::action("Running the delete commands on Walrus");
         let output = self.walrus.delete(&unique_blob_ids).await?;

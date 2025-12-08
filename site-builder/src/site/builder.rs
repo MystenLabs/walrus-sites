@@ -327,12 +327,9 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
     }
 
     /// Removes all dynamic fields and then burns the site.
-    /// Returns true when the limit reached and a new ptb should be 
-    /// used. 
-    pub fn destroy<'a, I>(
-        &mut self,
-        resources: &mut I,
-    ) -> SitePtbBuilderResult<bool>
+    /// Returns true when the limit reached and a new ptb should be
+    /// used.
+    pub fn destroy<'a, I>(&mut self, resources: &mut I) -> SitePtbBuilderResult<bool>
     where
         I: Iterator<Item = &'a Resource>,
     {
@@ -437,7 +434,6 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
     /// Adds the move calls to remove the routes object.
     // TODO: Remove pub and move RouteOp logic from `manager.rs`?
     pub fn remove_routes(&mut self) -> SitePtbBuilderResult<()> {
-        self.check_counter_in_advance(1)?;
         self.add_programmable_move_call(
             contracts::site::remove_all_routes_if_exist.identifier(),
             vec![],
@@ -470,12 +466,18 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
 
     /// Burns the site.
     pub fn burn(&mut self) -> SitePtbBuilderResult<()> {
-        self.check_counter_in_advance(1)?;
         self.add_programmable_move_call(
             contracts::site::burn.identifier(),
             vec![],
             vec![self.site_argument],
         )?;
+        Ok(())
+    }
+
+    pub fn remove_routes_and_burn_site(&mut self) -> SitePtbBuilderResult<()> {
+        self.check_counter_in_advance(2)?;
+        self.remove_routes()?;
+        self.burn()?;
         Ok(())
     }
 }
