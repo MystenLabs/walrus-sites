@@ -331,12 +331,9 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
         &mut self,
         resources: impl IntoIterator<Item = &'a Resource>,
     ) -> SitePtbBuilderResult<()> {
-        self.remove_routes()?;
         for resource in resources {
             self.remove_resource_if_exists(resource)?;
         }
-
-        self.burn()?;
         Ok(())
     }
 
@@ -458,7 +455,7 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
     }
 
     /// Burns the site.
-    fn burn(&mut self) -> SitePtbBuilderResult<()> {
+    pub fn burn(&mut self) -> SitePtbBuilderResult<()> {
         self.add_programmable_move_call(
             contracts::site::burn.identifier(),
             vec![],

@@ -126,36 +126,61 @@ impl SiteEditor {
 
         // Delete objects on SUI blockchain
         let mut wallet = self.config.load_wallet()?;
-        let ptb = SitePtb::<_, PTB_MAX_MOVE_CALLS>::new(
-            self.config.package,
-            Identifier::new(SITE_MODULE)?,
-        );
-        let mut ptb = ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
+        let active_address = wallet.active_address()?;
+        
         let site = RemoteSiteFactory::new(&retriable_client, self.config.package)
             .await?
             .get_from_chain(site_id)
             .await?;
-
-        ptb.destroy(site.resources())?;
-        let active_address = wallet.active_address()?;
+        for resource in site.resources().batch(998) {
+            let ptb = SitePtb::<_, PTB_MAX_MOVE_CALLS>::new(
+                self.config.package,
+                Identifier::new(SITE_MODULE)?,
+            );
+            let mut ptb = ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
+    
+            ptb.destroy(&resource)?;
+            let gas_coin = wallet
+                .gas_for_owner_budget(active_address, self.config.gas_budget(), BTreeSet::new())
+                .await?
+                .1
+                .object_ref();
+    
+            sign_and_send_ptb(
+                active_address,
+                &wallet,
+                &retriable_client,
+                ptb.finish(),
+                gas_coin,
+                self.config.gas_budget(),
+                &mut ObjectCache::new(),
+            )
+            .await?;
+        }
+        
+        let last_ptb = SitePtb::<_, PTB_MAX_MOVE_CALLS>::new(
+            self.config.package,
+            Identifier::new(SITE_MODULE)?,
+        ); 
+        let mut postprocess_ptb = last_ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
+        postprocess_ptb.burn()?;
+        postprocess_ptb.remove_routes()?;
         let gas_coin = wallet
             .gas_for_owner_budget(active_address, self.config.gas_budget(), BTreeSet::new())
             .await?
             .1
             .object_ref();
-
         sign_and_send_ptb(
             active_address,
             &wallet,
             &retriable_client,
-            ptb.finish(),
+            postprocess_ptb.finish(),
             gas_coin,
             self.config.gas_budget(),
-            // TODO: #SEW-499 fix: What happens if more than 1000 resources?
             &mut ObjectCache::new(),
         )
         .await?;
-
+        
         Ok(())
     }
 }
