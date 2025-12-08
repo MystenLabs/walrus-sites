@@ -133,7 +133,7 @@ impl SiteEditor {
             .get_from_chain(site_id)
             .await?;
         
-        for batch in site.resources().batch(1000) {
+        for batch in site.resources().batch(PTB_MAX_MOVE_CALLS as usize) {
             self.delete_resource_batch(&retriable_client, &wallet, site_id, active_address, &batch).await?;
         }
         self.finalize_site_deletion(&retriable_client, &wallet, site_id, active_address).await?;
