@@ -124,11 +124,11 @@ impl SiteEditor {
             .resources()
             .inner
             .iter()
-            .map(|resource| ResourceOp::Deleted(resource))
+            .map(ResourceOp::Deleted)
             .collect();
         operations.push(ResourceOp::RemovedRoutes);
         operations.push(ResourceOp::BurnedSite);
-
+        // TODO(alex): add operations for remove_routes and burn.
         site_manager.do_operations(operations).await?;
         Ok(())
     }

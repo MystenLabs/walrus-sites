@@ -143,7 +143,7 @@ async fn quilts_deploy_auto_update() -> anyhow::Result<()> {
 /// 2. Publish the site using Deploy command
 /// 3. Verify all 1001 resources were published
 /// 4. Delete the site, the resources and the routes using the Destroy command
-/// 5. Verify that this site no longer exists.
+/// 5. Verify that this site no longer exists..
 #[tokio::test]
 #[ignore]
 async fn deploy_and_destroy_site_with_1001_files() -> anyhow::Result<()> {
@@ -242,10 +242,7 @@ async fn deploy_and_destroy_site_with_1001_files() -> anyhow::Result<()> {
 
     // Verify that blobs were deleted
     let blobs_after_destroy = cluster.get_owned_blobs(wallet_address).await?;
-    println!(
-        "Blob count after destroy: {}",
-        blobs_after_destroy.len()
-    );
+    println!("Blob count after destroy: {}", blobs_after_destroy.len());
     assert!(
         blobs_after_destroy.len() < blobs_before_destroy.len(),
         "Blob count should decrease after destroy. Before: {}, After: {}",
