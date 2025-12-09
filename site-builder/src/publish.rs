@@ -128,8 +128,9 @@ impl SiteEditor {
             .collect();
         operations.push(ResourceOp::RemovedRoutes);
         operations.push(ResourceOp::BurnedSite);
-        // TODO(alex): add operations for remove_routes and burn.
+        display::action("Destroying site...");
         site_manager.do_operations(operations).await?;
+        display::done();
         Ok(())
     }
 }
