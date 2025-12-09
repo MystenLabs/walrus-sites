@@ -28,7 +28,7 @@ use crate::{
         builder::{SitePtb, PTB_MAX_MOVE_CALLS},
         config::WSResources,
         manager::SiteManager,
-        resource::ResourceManager,
+        resource::{ResourceManager, ResourceOp},
         RemoteSiteFactory,
         SITE_MODULE,
     },
@@ -112,94 +112,30 @@ impl SiteEditor {
 
         tracing::debug!(?all_blobs, "retrieved the site for deletion");
 
+        let mut site_manager =
+            SiteManager::new(self.config.clone(), Some(site_id), None, None).await?;
+
         // Add warning if no deletable blobs found.
         if all_blobs.is_empty() {
             println!(
                 "Warning: No deletable resources found. This may be because the site was created with permanent=true"
             );
         } else {
-            let mut site_manager =
-                SiteManager::new(self.config.clone(), Some(site_id), None, None).await?;
-
             site_manager.delete_from_walrus(&all_blobs).await?;
         }
-
-        // Delete objects on SUI blockchain
-        let mut wallet: WalletContext = self.config.load_wallet()?;
-        let active_address = wallet.active_address()?;
 
         let site = RemoteSiteFactory::new(&retriable_client, self.config.package)
             .await?
             .get_from_chain(site_id)
             .await?;
 
-        // Queue of PTBs to batch move calls and execute them later.
-        let mut ptb_queue: Vec<SitePtb<Argument, PTB_MAX_MOVE_CALLS>> = Vec::new();
-        // Iterate over the resources. When a ptb gets full, it gets added to the
-        // ptb_queue.
-        let mut resources_iter = site.resources().into_iter().peekable();
-        while resources_iter.peek().is_some() {
-            let ptb = SitePtb::<_, PTB_MAX_MOVE_CALLS>::new(
-                self.config.package,
-                Identifier::new(SITE_MODULE)?,
-            );
-            let mut ptb = ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
-            ptb.destroy(&mut resources_iter)?;
-            ptb_queue.push(ptb);
-        }
-
-        // Finalise the last batch of move calls including calls to `remove_routes` and `burn`.
-        if let Some(last_ptb) = ptb_queue.last_mut() {
-            // Try to add `remove_routes` to the existing last PTB; if it fails, create a new PTB.
-            if last_ptb.remove_routes_and_burn_site().is_err() {
-                let ptb = SitePtb::<_, PTB_MAX_MOVE_CALLS>::new(
-                    self.config.package,
-                    Identifier::new(SITE_MODULE)?,
-                );
-                let mut ptb = ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
-                ptb.remove_routes_and_burn_site()?;
-                ptb_queue.push(ptb);
-            }
-        } else {
-            // Create a new PTB since there are no ptbs in the queue.
-            let ptb = SitePtb::<_, PTB_MAX_MOVE_CALLS>::new(
-                self.config.package,
-                Identifier::new(SITE_MODULE)?,
-            );
-            let mut ptb = ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
-            ptb.remove_routes_and_burn_site()?;
-            ptb_queue.push(ptb);
-        }
-
-        self.execute_ptbs_in_queue(ptb_queue, &wallet, active_address, &retriable_client)
-            .await
-    }
-
-    async fn execute_ptbs_in_queue(
-        &self,
-        ptb_queue: Vec<SitePtb<Argument, PTB_MAX_MOVE_CALLS>>,
-        wallet: &WalletContext,
-        active_address: SuiAddress,
-        retriable_client: &RetriableSuiClient,
-    ) -> Result<()> {
-        // Execute ptbs in queue.
-        for ptb_element in ptb_queue {
-            let gas_coin = wallet
-                .gas_for_owner_budget(active_address, self.config.gas_budget(), BTreeSet::new())
-                .await?
-                .1
-                .object_ref();
-            sign_and_send_ptb(
-                active_address,
-                &wallet,
-                &retriable_client,
-                ptb_element.finish(),
-                gas_coin,
-                self.config.gas_budget(),
-                &mut ObjectCache::new(),
-            )
-            .await?;
-        }
+        let operations: Vec<_> = site.resources()
+            .inner
+            .iter()
+            .map(|resource| ResourceOp::Deleted(resource))
+            .collect();
+        // TODO(alex): add operations for remove_routes and burn.
+        site_manager.do_operations(operations).await?;
         Ok(())
     }
 }

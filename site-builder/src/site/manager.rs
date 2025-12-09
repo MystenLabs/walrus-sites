@@ -18,7 +18,7 @@ use sui_sdk::{
 };
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
-    transaction::{CallArg, ProgrammableTransaction},
+    transaction::{CallArg, ProgrammableTransaction, Argument},
     Identifier,
 };
 use tracing::warn;
@@ -296,10 +296,6 @@ impl SiteManager {
     }
 
     pub async fn update_resources(&mut self, resources: ResourceSet) -> Result<()> {
-        let Some(site_id) = self.site_id else {
-            anyhow::bail!("`update_resources` is only supported for existing sites");
-        };
-
         // Create operations: for each resource, delete then immediately create it
         // This ensures the delete/create pairs are adjacent, which is better for updates
         let operations: Vec<_> = resources
@@ -307,6 +303,16 @@ impl SiteManager {
             .iter()
             .flat_map(|resource| [ResourceOp::Deleted(resource), ResourceOp::Created(resource)])
             .collect();
+        self.do_operations(operations).await?;
+        Ok(())
+    }
+
+    // Iterate over the a ResourceOperation vector and execute the PTB.
+    // Handles automatically the object versions and gas objects.
+    pub async fn do_operations(&mut self, operations: Vec<ResourceOp<'_>>) -> anyhow::Result<()> {
+        let Some(site_id) = self.site_id else {
+            anyhow::bail!("`update_resources` is only supported for existing sites");
+        };
 
         let mut operations_iter = operations.iter().peekable();
         let retry_client = self.sui_client().await?;
@@ -331,7 +337,6 @@ impl SiteManager {
             self.sign_and_send_ptb(ptb.finish(), gas_ref, &retry_client)
                 .await?;
         }
-
         Ok(())
     }
 
