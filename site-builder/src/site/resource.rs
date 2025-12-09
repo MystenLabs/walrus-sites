@@ -125,6 +125,8 @@ pub enum ResourceOp<'a> {
     Deleted(&'a Resource),
     Created(&'a Resource),
     Unchanged(&'a Resource),
+    RemovedRoutes,
+    BurnedSite
 }
 
 impl fmt::Debug for ResourceOp<'_> {
@@ -133,6 +135,8 @@ impl fmt::Debug for ResourceOp<'_> {
             ResourceOp::Deleted(resource) => ("delete", &resource.info.path),
             ResourceOp::Created(resource) => ("create", &resource.info.path),
             ResourceOp::Unchanged(resource) => ("unchanged", &resource.info.path),
+            ResourceOp::RemovedRoutes => ("remove routes", &"".to_string()),
+            ResourceOp::BurnedSite => ("burn site", &"".to_string()),
         };
         f.debug_struct("ResourceOp")
             .field("operation", &op)
@@ -143,13 +147,16 @@ impl fmt::Debug for ResourceOp<'_> {
 
 impl<'a> ResourceOp<'a> {
     /// Returns the resource for which this operation is defined.
-    pub fn inner(&self) -> &'a Resource {
+    pub fn inner(&self) -> Option<&'a Resource> {
         match self {
-            ResourceOp::Deleted(resource) => resource,
-            ResourceOp::Created(resource) => resource,
-            ResourceOp::Unchanged(resource) => resource,
+            ResourceOp::Deleted(resource) => Some(resource),
+            ResourceOp::Created(resource) => Some(resource),
+            ResourceOp::Unchanged(resource) => Some(resource),
+            ResourceOp::RemovedRoutes => None,
+            ResourceOp::BurnedSite => None,
         }
     }
+
 
     /// Returns if the operation needs to be uploaded to Walrus.
     pub fn is_walrus_update(&self) -> bool {

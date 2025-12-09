@@ -243,6 +243,8 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
             match call {
                 ResourceOp::Deleted(resource) => self.remove_resource_if_exists(resource)?,
                 ResourceOp::Created(resource) => self.add_resource(resource)?,
+                ResourceOp::RemovedRoutes => self.remove_routes()?,
+                ResourceOp::BurnedSite => self.burn()?, 
                 ResourceOp::Unchanged(_) => (),
             }
             calls.next();
@@ -324,27 +326,6 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
         )?;
 
         Ok(())
-    }
-
-    /// Removes all dynamic fields and then burns the site.
-    /// Returns true when the limit reached and a new ptb should be
-    /// used.
-    pub fn destroy<'a, I>(&mut self, resources: &mut I) -> SitePtbBuilderResult<bool>
-    where
-        I: Iterator<Item = &'a Resource>,
-    {
-        for resource in resources.by_ref() {
-            if self
-                .remove_resource_if_exists(resource)
-                .ok_if_limit_reached()?
-                .is_none()
-            {
-                // Move call limit reached, iterator position is preserved
-                return Ok(true);
-            }
-        }
-        // All resources processed
-        Ok(false)
     }
 
     /// Adds the move calls to create a resource.
@@ -471,13 +452,6 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
             vec![],
             vec![self.site_argument],
         )?;
-        Ok(())
-    }
-
-    pub fn remove_routes_and_burn_site(&mut self) -> SitePtbBuilderResult<()> {
-        self.check_counter_in_advance(2)?;
-        self.remove_routes()?;
-        self.burn()?;
         Ok(())
     }
 }

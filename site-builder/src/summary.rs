@@ -30,6 +30,12 @@ impl From<&ResourceOp<'_>> for ResourceOpSummary {
             ResourceOp::Deleted(resource) => ("deleted".to_owned(), &resource.info),
             ResourceOp::Created(resource) => ("created".to_owned(), &resource.info),
             ResourceOp::Unchanged(resource) => ("unchanged".to_owned(), &resource.info),
+            ResourceOp::RemovedRoutes => {
+                unreachable!("RemovedRoutes should not be converted into ResourceOpSummary")
+            }
+            ResourceOp::BurnedSite => {
+                unreachable!("BurnedSite should not be converted into ResourceOpSummary")
+            }
         };
         let quilt_patch_id = parse_quilt_patch_id(&info.blob_id, &info.headers);
         ResourceOpSummary {

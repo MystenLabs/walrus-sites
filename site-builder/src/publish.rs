@@ -116,13 +116,15 @@ impl SiteEditor {
             .get_from_chain(site_id)
             .await?;
 
-        let operations: Vec<_> = site
+        let mut operations: Vec<_> = site
             .resources()
             .inner
             .iter()
             .map(|resource| ResourceOp::Deleted(resource))
             .collect();
-        // TODO(alex): add operations for remove_routes and burn.
+        operations.push(ResourceOp::RemovedRoutes);
+        operations.push(ResourceOp::BurnedSite);
+        
         site_manager.do_operations(operations).await?;
         Ok(())
     }
