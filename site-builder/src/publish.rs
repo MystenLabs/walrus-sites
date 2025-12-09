@@ -1,21 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-
 use std::{
-    collections::{BTreeSet, HashSet},
+    collections::HashSet,
     path::{Path, PathBuf},
 };
 
 use anyhow::{anyhow, Result};
-use sui_sdk::{
-    rpc_types::{SuiExecutionStatus, SuiTransactionBlockEffects, SuiTransactionBlockResponse},
-    wallet_context::WalletContext,
+use sui_sdk::rpc_types::{
+    SuiExecutionStatus, SuiTransactionBlockEffects, SuiTransactionBlockResponse,
 };
-use sui_types::{
-    base_types::{ObjectID, SuiAddress},
-    transaction::Argument,
-    Identifier,
-};
+use sui_types::base_types::{ObjectID, SuiAddress};
 
 use crate::{
     args::PublishOptions,
@@ -25,24 +19,17 @@ use crate::{
     preprocessor::Preprocessor,
     retry_client::RetriableSuiClient,
     site::{
-        builder::{SitePtb, PTB_MAX_MOVE_CALLS},
         config::WSResources,
         manager::SiteManager,
         resource::{ResourceManager, ResourceOp},
         RemoteSiteFactory,
-        SITE_MODULE,
     },
     summary::{SiteDataDiffSummary, Summarizable},
-    types::ObjectCache,
     util::{
-        get_site_id_from_response,
-        id_to_base36,
-        path_or_defaults_if_exist,
+        get_site_id_from_response, id_to_base36, path_or_defaults_if_exist,
         persist_site_id_and_name,
-        sign_and_send_ptb,
     },
 };
-
 const DEFAULT_WS_RESOURCES_FILE: &str = "ws-resources.json";
 
 pub(crate) struct EditOptions {
@@ -129,7 +116,8 @@ impl SiteEditor {
             .get_from_chain(site_id)
             .await?;
 
-        let operations: Vec<_> = site.resources()
+        let operations: Vec<_> = site
+            .resources()
             .inner
             .iter()
             .map(|resource| ResourceOp::Deleted(resource))
