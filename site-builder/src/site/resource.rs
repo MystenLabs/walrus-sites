@@ -126,7 +126,7 @@ pub enum ResourceOp<'a> {
     Created(&'a Resource),
     Unchanged(&'a Resource),
     RemovedRoutes,
-    BurnedSite
+    BurnedSite,
 }
 
 impl fmt::Debug for ResourceOp<'_> {
@@ -156,7 +156,6 @@ impl<'a> ResourceOp<'a> {
             ResourceOp::BurnedSite => None,
         }
     }
-
 
     /// Returns if the operation needs to be uploaded to Walrus.
     pub fn is_walrus_update(&self) -> bool {

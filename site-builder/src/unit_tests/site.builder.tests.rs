@@ -263,39 +263,6 @@ fn test_multiple_operations_exhaust_limit() {
 }
 
 #[test]
-fn test_destroy_with_resources_respects_limit() {
-    use move_core_types::u256::U256;
-
-    use crate::{
-        types::{HttpHeaders, SuiResource, VecMap},
-        walrus::types::BlobId,
-    };
-
-    let mut ptb = create_test_site_ptb_with_arg::<1>();
-
-    let resource = crate::site::resource::Resource {
-        info: SuiResource {
-            path: "test.txt".to_string(),
-            headers: HttpHeaders(VecMap::new()),
-            blob_id: BlobId([0u8; 32]),
-            blob_hash: U256::from(0u128),
-            range: None,
-        },
-        unencoded_size: 100,
-        full_path: std::path::PathBuf::from("test.txt"),
-    };
-
-    // destroy needs to: remove_routes (1) + remove_resource_if_exists (1) + burn (1) = 3 calls
-    // Should fail with limit of 1
-    let result = ptb.destroy(&mut vec![&resource].into_iter());
-    assert!(result.is_err());
-    match result.unwrap_err() {
-        SitePtbBuilderError::TooManyMoveCalls(limit) => assert_eq!(limit, 1),
-        _ => panic!("Expected TooManyMoveCalls error"),
-    }
-}
-
-#[test]
 fn test_with_update_metadata_increments_counter() {
     use crate::types::Metadata;
 

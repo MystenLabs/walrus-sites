@@ -7,7 +7,9 @@ use std::{
 
 use anyhow::{anyhow, Result};
 use sui_sdk::rpc_types::{
-    SuiExecutionStatus, SuiTransactionBlockEffects, SuiTransactionBlockResponse,
+    SuiExecutionStatus,
+    SuiTransactionBlockEffects,
+    SuiTransactionBlockResponse,
 };
 use sui_types::base_types::{ObjectID, SuiAddress};
 
@@ -26,7 +28,9 @@ use crate::{
     },
     summary::{SiteDataDiffSummary, Summarizable},
     util::{
-        get_site_id_from_response, id_to_base36, path_or_defaults_if_exist,
+        get_site_id_from_response,
+        id_to_base36,
+        path_or_defaults_if_exist,
         persist_site_id_and_name,
     },
 };
@@ -124,7 +128,7 @@ impl SiteEditor {
             .collect();
         operations.push(ResourceOp::RemovedRoutes);
         operations.push(ResourceOp::BurnedSite);
-        
+
         site_manager.do_operations(operations).await?;
         Ok(())
     }

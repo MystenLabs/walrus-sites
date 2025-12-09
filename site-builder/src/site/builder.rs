@@ -244,7 +244,7 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
                 ResourceOp::Deleted(resource) => self.remove_resource_if_exists(resource)?,
                 ResourceOp::Created(resource) => self.add_resource(resource)?,
                 ResourceOp::RemovedRoutes => self.remove_routes()?,
-                ResourceOp::BurnedSite => self.burn()?, 
+                ResourceOp::BurnedSite => self.burn()?,
                 ResourceOp::Unchanged(_) => (),
             }
             calls.next();
