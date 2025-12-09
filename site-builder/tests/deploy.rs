@@ -133,6 +133,131 @@ async fn quilts_deploy_auto_update() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Test: Deploy command with 1001 temporary files
+///
+/// This test verifies that the deploy command can handle publishing and deploying
+/// a site with 1001 files and it also deletes it.
+///
+/// Steps:
+/// 1. Create a site with 1001 files
+/// 2. Publish the site using Deploy command
+/// 3. Verify all 1001 resources were published
+/// 4. Delete the site, the resources and the routes using the Destroy command
+/// 5. Verify that this site no longer exists.
+#[tokio::test]
+#[ignore]
+async fn deploy_and_destroy_site_with_1001_files() -> anyhow::Result<()> {
+    let mut cluster = TestSetup::start_local_test_cluster().await?;
+
+    // Create test site with 1001 files
+    let temp_dir = helpers::create_test_site(1001)?;
+    let directory = temp_dir.path().to_path_buf();
+
+    // Step 1: Initial publish with 1001 files
+    println!("Step 1: Publishing initial site with 1001 files...");
+    let publish_args = ArgsBuilder::default()
+        .with_config(Some(cluster.sites_config_path().to_owned()))
+        .with_command(Commands::Deploy {
+            publish_options: PublishOptionsBuilder::default()
+                .with_directory(directory.clone())
+                .with_epoch_count_or_max(EpochCountOrMax::Epochs(1_u32.try_into().unwrap()))
+                .build()?,
+            site_name: Some("1001 Files Test Site".to_string()),
+            object_id: None,
+        })
+        .with_gas_budget(100_000_000_000)
+        .build()?;
+    site_builder::run(publish_args).await?;
+
+    let site_id = *cluster.last_site_created().await?.id.object_id();
+    println!("Published site with object ID: {site_id}");
+
+    // Step 2: Verify all 1001 resources were published
+    println!("Step 2: Verifying all 1001 resources were published...");
+    let resources = cluster.site_resources(site_id).await?;
+    assert_eq!(
+        resources.len(),
+        1001,
+        "Should have exactly 1001 resources published"
+    );
+
+    // Get wallet address for blob verification
+    let wallet_address = cluster.wallet_active_address()?;
+
+    // Get initial blob count before destroy
+    let blobs_before_destroy = cluster.get_owned_blobs(wallet_address).await?;
+    println!(
+        "Step 3: Blob count before destroy: {}",
+        blobs_before_destroy.len()
+    );
+    assert!(
+        !blobs_before_destroy.is_empty(),
+        "Should have blobs before destroy"
+    );
+
+    // Step 3: Destroy the site
+    println!("Step 4: Destroying the site with object ID: {site_id}...");
+    let destroy_args = ArgsBuilder::default()
+        .with_config(Some(cluster.sites_config_path().to_owned()))
+        .with_command(Commands::Destroy { object: site_id })
+        .with_gas_budget(100_000_000_000)
+        .build()?;
+    site_builder::run(destroy_args).await?;
+
+    // Step 4: Verify the site no longer exists
+    println!("Step 5: Verifying the site no longer exists...");
+
+    // Try to get the site object - it should be deleted
+    let site_result = cluster
+        .client
+        .read_api()
+        .get_object_with_options(
+            site_id,
+            sui_sdk::rpc_types::SuiObjectDataOptions::new().with_content(),
+        )
+        .await?;
+
+    // The object should either not exist or be marked as deleted
+    match &site_result.data {
+        None => {
+            println!("Site object no longer exists (None) - verification passed");
+        }
+        Some(obj) => {
+            // Check if the object is deleted
+            assert!(
+                obj.content.is_none(),
+                "Site object should have no content after destroy"
+            );
+            println!("Site object is deleted - verification passed");
+        }
+    }
+
+    // Verify that resources no longer exist
+    let resources_after_destroy = cluster.site_resources(site_id).await?;
+    assert_eq!(
+        resources_after_destroy.len(),
+        0,
+        "Should have no resources after destroy"
+    );
+
+    // Verify that blobs were deleted
+    let blobs_after_destroy = cluster.get_owned_blobs(wallet_address).await?;
+    println!(
+        "Blob count after destroy: {}",
+        blobs_after_destroy.len()
+    );
+    assert!(
+        blobs_after_destroy.len() < blobs_before_destroy.len(),
+        "Blob count should decrease after destroy. Before: {}, After: {}",
+        blobs_before_destroy.len(),
+        blobs_after_destroy.len()
+    );
+
+    println!("deploy_and_destroy_site_with_1001_files completed successfully");
+
+    Ok(())
+}
+
 /// Test 2: Deploy command with explicit object_id
 ///
 /// This test verifies that the deploy command can update a site using an explicitly provided
