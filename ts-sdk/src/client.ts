@@ -1,9 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { type WalrusSitesCompatibleClient } from "@types";
+import { type WalrusSitesCompatibleClient, type Metadata } from "@types";
 import { MissingRequiredWalrusClient } from "@errors";
-import * as contract from "contracts/sites/walrus_site/site";
+import * as site from "contracts/sites/walrus_site/site";
+import * as metadata from "contracts/sites/walrus_site/metadata";
+import { Transaction } from "@mysten/sui/transactions";
 
 /**
  * A function used to extend a Sui base client.
@@ -30,72 +32,102 @@ export class WalrusSitesClient {
         this.#extendedSuiClient = extendedSuiClient
     }
 
+    // Direct move calls to the contract.
     public call = {
-        newSite: (args: contract.NewSiteOptions) => {
-            return contract.newSite(args)
+        newSite: (args: site.NewSiteOptions) => {
+            return site.newSite(args)
         },
-        newRangeOption: (args: contract.NewRangeOptionOptions) => {
-            return contract.newRangeOption(args)
+        newRangeOption: (args: site.NewRangeOptionOptions) => {
+            return site.newRangeOption(args)
         },
-        newRange: (args: contract.NewRangeOptions) => {
-            return contract.newRange(args)
+        newRange: (args: site.NewRangeOptions) => {
+            return site.newRange(args)
         },
-        newResource: (args: contract.NewResourceOptions) => {
-            return contract.newResource(args)
+        newResource: (args: site.NewResourceOptions) => {
+            return site.newResource(args)
         },
-        addHeader: (args: contract.AddHeaderOptions) => {
-            return contract.addHeader(args)
+        addHeader: (args: site.AddHeaderOptions) => {
+            return site.addHeader(args)
         },
-        updateName: (args: contract.UpdateNameOptions) => {
-            return contract.updateName(args)
+        updateName: (args: site.UpdateNameOptions) => {
+            return site.updateName(args)
         },
-        updateMetadata: (args: contract.UpdateMetadataOptions) => {
-            return contract.updateMetadata(args)
+        updateMetadata: (args: site.UpdateMetadataOptions) => {
+            return site.updateMetadata(args)
         },
-        addResource: (args: contract.AddResourceOptions) => {
-            return contract.addResource(args)
+        addResource: (args: site.AddResourceOptions) => {
+            return site.addResource(args)
         },
-        removeResource: (args: contract.RemoveResourceOptions) => {
-            return contract.removeResource(args)
+        removeResource: (args: site.RemoveResourceOptions) => {
+            return site.removeResource(args)
         },
-        removeResourceIfExists: (args: contract.RemoveResourceIfExistsOptions) => {
-            return contract.removeResourceIfExists(args)
+        removeResourceIfExists: (args: site.RemoveResourceIfExistsOptions) => {
+            return site.removeResourceIfExists(args)
         },
-        moveResource: (args: contract.MoveResourceOptions) => {
-            return contract.moveResource(args)
+        moveResource: (args: site.MoveResourceOptions) => {
+            return site.moveResource(args)
         },
-        createRoutes: (args: contract.CreateRoutesOptions) => {
-            return contract.createRoutes(args)
+        createRoutes: (args: site.CreateRoutesOptions) => {
+            return site.createRoutes(args)
         },
-        removeAllRoutesIfExist: (args: contract.RemoveAllRoutesIfExistOptions) => {
-            return contract.removeAllRoutesIfExist(args)
+        removeAllRoutesIfExist: (args: site.RemoveAllRoutesIfExistOptions) => {
+            return site.removeAllRoutesIfExist(args)
         },
-        insertRoute: (args: contract.InsertRouteOptions) => {
-            return contract.insertRoute(args)
+        insertRoute: (args: site.InsertRouteOptions) => {
+            return site.insertRoute(args)
         },
-        removeRoute: (args: contract.RemoveRouteOptions) => {
-            return contract.removeRoute(args)
+        removeRoute: (args: site.RemoveRouteOptions) => {
+            return site.removeRoute(args)
         },
-        burn: (args: contract.BurnOptions) => {
-            return contract.burn(args)
+        burn: (args: site.BurnOptions) => {
+            return site.burn(args)
         },
-        getSiteName: (args: contract.GetSiteNameOptions) => {
-            return contract.getSiteName(args)
+        getSiteName: (args: site.GetSiteNameOptions) => {
+            return site.getSiteName(args)
         },
-        getSiteLink: (args: contract.GetSiteLinkOptions) => {
-            return contract.getSiteLink(args)
+        getSiteLink: (args: site.GetSiteLinkOptions) => {
+            return site.getSiteLink(args)
         },
-        getSiteImageUrl: (args: contract.GetSiteImageUrlOptions) => {
-            return contract.getSiteImageUrl(args)
+        getSiteImageUrl: (args: site.GetSiteImageUrlOptions) => {
+            return site.getSiteImageUrl(args)
         },
-        getSiteDescription: (args: contract.GetSiteDescriptionOptions) => {
-            return contract.getSiteDescription(args)
+        getSiteDescription: (args: site.GetSiteDescriptionOptions) => {
+            return site.getSiteDescription(args)
         },
-        getSiteProjectUrl: (args: contract.GetSiteProjectUrlOptions) => {
-            return contract.getSiteProjectUrl(args)
+        getSiteProjectUrl: (args: site.GetSiteProjectUrlOptions) => {
+            return site.getSiteProjectUrl(args)
         },
-        getSiteCreator: (args: contract.GetSiteCreatorOptions) => {
-            return contract.getSiteCreator(args)
+        getSiteCreator: (args: site.GetSiteCreatorOptions) => {
+            return site.getSiteCreator(args)
         },
+        newMetadata: (args: metadata.NewMetadataOptions) => {
+            return metadata.newMetadata(args)
+        }
     };
+
+    // PTB construction.
+    public tx = {
+        createSite: (transaction = new Transaction(), args: {siteName: string, sendSiteToAddress: string, siteMetadata?: Metadata}) => {
+            const metadataObj = metadata.newMetadata({
+                arguments: {
+                    link: args.siteMetadata?.link ?? null,
+                    imageUrl: args.siteMetadata?.link ?? null,
+                    description: args.siteMetadata?.link ?? null,
+                    projectUrl: args.siteMetadata?.link ?? null,
+                    creator: args.siteMetadata?.link ?? null,
+                },
+            })
+            const site_object = site.newSite({arguments: [transaction.pure.string(args.siteName), metadataObj]})
+            const res = transaction.add(site_object)
+            transaction.transferObjects([res], args.sendSiteToAddress)
+            return transaction
+        }
+    };
+
+    // Data fetching.
+    public view = {
+
+    }
+
+    // Top level methods.
 }
