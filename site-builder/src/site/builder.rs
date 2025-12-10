@@ -446,7 +446,7 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
     }
 
     /// Burns the site.
-    pub fn burn(&mut self) -> SitePtbBuilderResult<()> {
+    fn burn(&mut self) -> SitePtbBuilderResult<()> {
         self.add_programmable_move_call(
             contracts::site::burn.identifier(),
             vec![],
