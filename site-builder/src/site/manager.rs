@@ -305,7 +305,7 @@ impl SiteManager {
     // Handles automatically the object versions and gas objects.
     pub async fn do_operations(&mut self, operations: Vec<SiteOps<'_>>) -> anyhow::Result<()> {
         let Some(site_id) = self.site_id else {
-            anyhow::bail!("`update_resources` is only supported for existing sites");
+            anyhow::bail!("`do_operations` is only supported for existing sites");
         };
 
         let mut operations_iter = operations.iter().peekable();
