@@ -25,7 +25,7 @@ use tracing::warn;
 
 use super::{
     builder::SitePtb,
-    resource::ResourceOp,
+    resource::SiteOps,
     RemoteSiteFactory,
     SiteData,
     SiteDataDiff,
@@ -301,7 +301,7 @@ impl SiteManager {
         let operations: Vec<_> = resources
             .inner
             .iter()
-            .flat_map(|resource| [ResourceOp::Deleted(resource), ResourceOp::Created(resource)])
+            .flat_map(|resource| [SiteOps::Deleted(resource), SiteOps::Created(resource)])
             .collect();
         self.do_operations(operations).await?;
         Ok(())
@@ -309,7 +309,7 @@ impl SiteManager {
 
     // Iterate over the a ResourceOperation vector and execute the PTB.
     // Handles automatically the object versions and gas objects.
-    pub async fn do_operations(&mut self, operations: Vec<ResourceOp<'_>>) -> anyhow::Result<()> {
+    pub async fn do_operations(&mut self, operations: Vec<SiteOps<'_>>) -> anyhow::Result<()> {
         let Some(site_id) = self.site_id else {
             anyhow::bail!("`update_resources` is only supported for existing sites");
         };
@@ -460,7 +460,7 @@ fn collect_deletable_blob_candidates(site_updates: &SiteDataDiff) -> Vec<BlobId>
         .resource_ops
         .iter()
         .filter_map(|op| match op {
-            ResourceOp::Deleted(resource) => Some(resource.info.blob_id),
+            SiteOps::Deleted(resource) => Some(resource.info.blob_id),
             _ => None,
         })
         // Collect first to a hash-set to keep unique blob-ids.
@@ -469,7 +469,7 @@ fn collect_deletable_blob_candidates(site_updates: &SiteDataDiff) -> Vec<BlobId>
         .resource_ops
         .iter()
         .filter_map(|op| match op {
-            ResourceOp::Created(resource) if deleted.contains(&resource.info.blob_id) => {
+            SiteOps::Created(resource) if deleted.contains(&resource.info.blob_id) => {
                 Some(resource.info.blob_id)
             }
             _ => None,

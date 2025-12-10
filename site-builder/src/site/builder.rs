@@ -16,7 +16,7 @@ use thiserror::Error;
 
 use super::{
     contracts::FunctionTag,
-    resource::{Resource, ResourceOp},
+    resource::{Resource, SiteOps},
 };
 use crate::{
     site::contracts,
@@ -237,15 +237,15 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
 impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
     pub fn add_resource_operations<'a>(
         &mut self,
-        calls: &mut std::iter::Peekable<impl Iterator<Item = &'a ResourceOp<'a>>>,
+        calls: &mut std::iter::Peekable<impl Iterator<Item = &'a SiteOps<'a>>>,
     ) -> SitePtbBuilderResult<()> {
         while let Some(call) = calls.peek() {
             match call {
-                ResourceOp::Deleted(resource) => self.remove_resource_if_exists(resource)?,
-                ResourceOp::Created(resource) => self.add_resource(resource)?,
-                ResourceOp::RemovedRoutes => self.remove_routes()?,
-                ResourceOp::BurnedSite => self.burn()?,
-                ResourceOp::Unchanged(_) => (),
+                SiteOps::Deleted(resource) => self.remove_resource_if_exists(resource)?,
+                SiteOps::Created(resource) => self.add_resource(resource)?,
+                SiteOps::RemovedRoutes => self.remove_routes()?,
+                SiteOps::BurnedSite => self.burn()?,
+                SiteOps::Unchanged(_) => (),
             }
             calls.next();
         }

@@ -6,7 +6,7 @@
 use walrus_core::QuiltPatchId;
 
 use crate::{
-    site::{resource::ResourceOp, SiteDataDiff},
+    site::{resource::SiteOps, SiteDataDiff},
     types::RouteOps,
     util::parse_quilt_patch_id,
     walrus::types::BlobId,
@@ -24,16 +24,16 @@ pub struct ResourceOpSummary {
     quilt_patch_id: Option<QuiltPatchId>,
 }
 
-impl From<&ResourceOp<'_>> for ResourceOpSummary {
-    fn from(value: &ResourceOp<'_>) -> Self {
+impl From<&SiteOps<'_>> for ResourceOpSummary {
+    fn from(value: &SiteOps<'_>) -> Self {
         let (operation, info) = match value {
-            ResourceOp::Deleted(resource) => ("deleted".to_owned(), &resource.info),
-            ResourceOp::Created(resource) => ("created".to_owned(), &resource.info),
-            ResourceOp::Unchanged(resource) => ("unchanged".to_owned(), &resource.info),
-            ResourceOp::RemovedRoutes => {
+            SiteOps::Deleted(resource) => ("deleted".to_owned(), &resource.info),
+            SiteOps::Created(resource) => ("created".to_owned(), &resource.info),
+            SiteOps::Unchanged(resource) => ("unchanged".to_owned(), &resource.info),
+            SiteOps::RemovedRoutes => {
                 unreachable!("RemovedRoutes should not be converted into ResourceOpSummary")
             }
-            ResourceOp::BurnedSite => {
+            SiteOps::BurnedSite => {
                 unreachable!("BurnedSite should not be converted into ResourceOpSummary")
             }
         };

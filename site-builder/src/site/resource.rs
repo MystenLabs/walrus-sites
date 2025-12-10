@@ -121,7 +121,7 @@ impl Display for Resource {
 /// resource and adding a new one. Two [`Resources`][Resource] are
 /// different if their respective [`SuiResource`] differ.
 #[derive(Clone)]
-pub enum ResourceOp<'a> {
+pub enum SiteOps<'a> {
     Deleted(&'a Resource),
     Created(&'a Resource),
     Unchanged(&'a Resource),
@@ -129,14 +129,14 @@ pub enum ResourceOp<'a> {
     BurnedSite,
 }
 
-impl fmt::Debug for ResourceOp<'_> {
+impl fmt::Debug for SiteOps<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (op, path) = match self {
-            ResourceOp::Deleted(resource) => ("delete", &resource.info.path),
-            ResourceOp::Created(resource) => ("create", &resource.info.path),
-            ResourceOp::Unchanged(resource) => ("unchanged", &resource.info.path),
-            ResourceOp::RemovedRoutes => ("remove routes", &"".to_string()),
-            ResourceOp::BurnedSite => ("burn site", &"".to_string()),
+            SiteOps::Deleted(resource) => ("delete", &resource.info.path),
+            SiteOps::Created(resource) => ("create", &resource.info.path),
+            SiteOps::Unchanged(resource) => ("unchanged", &resource.info.path),
+            SiteOps::RemovedRoutes => ("remove routes", &"".to_string()),
+            SiteOps::BurnedSite => ("burn site", &"".to_string()),
         };
         f.debug_struct("ResourceOp")
             .field("operation", &op)
@@ -145,26 +145,26 @@ impl fmt::Debug for ResourceOp<'_> {
     }
 }
 
-impl<'a> ResourceOp<'a> {
+impl<'a> SiteOps<'a> {
     /// Returns the resource for which this operation is defined.
     pub fn inner(&self) -> Option<&'a Resource> {
         match self {
-            ResourceOp::Deleted(resource) => Some(resource),
-            ResourceOp::Created(resource) => Some(resource),
-            ResourceOp::Unchanged(resource) => Some(resource),
-            ResourceOp::RemovedRoutes => None,
-            ResourceOp::BurnedSite => None,
+            SiteOps::Deleted(resource) => Some(resource),
+            SiteOps::Created(resource) => Some(resource),
+            SiteOps::Unchanged(resource) => Some(resource),
+            SiteOps::RemovedRoutes => None,
+            SiteOps::BurnedSite => None,
         }
     }
 
     /// Returns if the operation needs to be uploaded to Walrus.
     pub fn is_walrus_update(&self) -> bool {
-        matches!(self, ResourceOp::Created(_))
+        matches!(self, SiteOps::Created(_))
     }
 
     /// Returns true if the operation modifies a resource.
     pub fn is_change(&self) -> bool {
-        matches!(self, ResourceOp::Created(_) | ResourceOp::Deleted(_))
+        matches!(self, SiteOps::Created(_) | SiteOps::Deleted(_))
     }
 }
 
@@ -188,28 +188,28 @@ impl ResourceSet {
     /// The deletions are always before the creation operations, such
     /// that if two resources have the same path but different
     /// contents they are first deleted and then created anew.
-    pub fn diff<'a>(&'a self, start: &'a ResourceSet) -> Vec<ResourceOp<'a>> {
-        let create = self.inner.difference(&start.inner).map(ResourceOp::Created);
-        let delete = start.inner.difference(&self.inner).map(ResourceOp::Deleted);
+    pub fn diff<'a>(&'a self, start: &'a ResourceSet) -> Vec<SiteOps<'a>> {
+        let create = self.inner.difference(&start.inner).map(SiteOps::Created);
+        let delete = start.inner.difference(&self.inner).map(SiteOps::Deleted);
         let unchanged = self
             .inner
             .intersection(&start.inner)
-            .map(ResourceOp::Unchanged);
+            .map(SiteOps::Unchanged);
         delete.chain(create).chain(unchanged).collect()
     }
 
     /// Returns a vector of operations to delete all resources in the set.
-    pub fn delete_all(&self) -> Vec<ResourceOp<'_>> {
-        self.inner.iter().map(ResourceOp::Deleted).collect()
+    pub fn delete_all(&self) -> Vec<SiteOps<'_>> {
+        self.inner.iter().map(SiteOps::Deleted).collect()
     }
 
     /// Returns a vector of operations to create all resources in the set.
-    pub fn create_all(&self) -> Vec<ResourceOp<'_>> {
-        self.inner.iter().map(ResourceOp::Created).collect()
+    pub fn create_all(&self) -> Vec<SiteOps<'_>> {
+        self.inner.iter().map(SiteOps::Created).collect()
     }
 
     /// Returns a vector of operations to replace the resources in `self` with the ones in `other`.
-    pub fn replace_all<'a>(&'a self, other: &'a ResourceSet) -> Vec<ResourceOp<'a>> {
+    pub fn replace_all<'a>(&'a self, other: &'a ResourceSet) -> Vec<SiteOps<'a>> {
         // Delete all the resources already on chain.
         let mut delete_operations = self.delete_all();
         // Create all the resources on disk.

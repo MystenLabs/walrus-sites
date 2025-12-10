@@ -23,7 +23,7 @@ use crate::{
     site::{
         config::WSResources,
         manager::SiteManager,
-        resource::{ResourceManager, ResourceOp},
+        resource::{ResourceManager, SiteOps},
         RemoteSiteFactory,
     },
     summary::{SiteDataDiffSummary, Summarizable},
@@ -124,11 +124,11 @@ impl SiteEditor {
             .resources()
             .inner
             .iter()
-            .map(ResourceOp::Deleted)
+            .map(SiteOps::Deleted)
             .collect();
-        operations.push(ResourceOp::RemovedRoutes);
-        operations.push(ResourceOp::BurnedSite);
-        display::action("Destroying site...");
+        operations.push(SiteOps::RemovedRoutes);
+        operations.push(SiteOps::BurnedSite);
+        display::action("Deleting Sui object data");
         site_manager.do_operations(operations).await?;
         display::done();
         Ok(())
