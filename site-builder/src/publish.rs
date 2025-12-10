@@ -92,14 +92,12 @@ impl SiteEditor {
         .get_from_chain(site_id)
         .await?;
 
-        let all_blobs: Vec<_> = site
+        let all_blobs = site
             .resources()
             .into_iter()
             .map(|resource| resource.info.blob_id)
             // Collect first to a hash-set to keep unique blob-ids.
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .collect();
+            .collect::<HashSet<_>>();
 
         tracing::debug!(?all_blobs, "retrieved the site for deletion");
 

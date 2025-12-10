@@ -115,7 +115,7 @@ impl SiteManager {
         };
 
         // Extract the BlobIDs from deleted resources for Walrus cleanup
-        let blobs_to_delete: Vec<BlobId> = collect_deletable_blob_candidates(&site_updates);
+        let blobs_to_delete = collect_deletable_blob_candidates(&site_updates);
 
         if !blobs_to_delete.is_empty() {
             self.delete_from_walrus(&blobs_to_delete).await?;
@@ -125,22 +125,16 @@ impl SiteManager {
     }
 
     /// Deletes the resources from Walrus.
-    pub async fn delete_from_walrus(&mut self, blob_ids: &[BlobId]) -> Result<()> {
+    pub async fn delete_from_walrus(&mut self, blob_ids: &HashSet<BlobId>) -> Result<()> {
         // Deduplicate blob IDs to avoid redundant delete operations
-        let unique_blob_ids: Vec<BlobId> = blob_ids
-            .iter()
-            .copied()
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .collect();
-        tracing::debug!(?unique_blob_ids, "deleting blob from Walrus");
         display::action("Running the delete commands on Walrus");
-        let output = self.walrus.delete(&unique_blob_ids).await?;
+        let blob_ids_vec: Vec<BlobId> = blob_ids.iter().cloned().collect();
+        let output = self.walrus.delete(&blob_ids_vec).await?;
         display::done();
 
         for blob_output in output {
             if let Some(blob_id) = blob_output.blob_identity.blob_id {
-                if unique_blob_ids.contains(&blob_id) {
+                if blob_ids.contains(&blob_id) {
                     tracing::debug!(%blob_id, "blob deleted successfully");
                 } else {
                     display::error(format!(
@@ -455,7 +449,7 @@ impl SiteManager {
 /// Collects the `BlobId`s from the site_updates Deleted ResourceOps.
 /// These are candidates for deletion from Walrus.
 /// Resources that have been deleted but also created are excluded.
-fn collect_deletable_blob_candidates(site_updates: &SiteDataDiff) -> Vec<BlobId> {
+fn collect_deletable_blob_candidates(site_updates: &SiteDataDiff) -> HashSet<BlobId> {
     let mut deleted = site_updates
         .resource_ops
         .iter()
@@ -476,5 +470,5 @@ fn collect_deletable_blob_candidates(site_updates: &SiteDataDiff) -> Vec<BlobId>
         })
         .collect::<HashSet<_>>();
     deleted.retain(|blob_id| !resource_deleted_but_blob_extended.contains(blob_id));
-    deleted.into_iter().collect()
+    deleted
 }
