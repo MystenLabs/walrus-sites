@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { type WalrusSitesCompatibleClient, type Metadata } from "@types";
-import { MissingRequiredWalrusClient } from "@errors";
+import { MissingRequiredWalrusClient, NotImplemented } from "@errors";
 import * as site from "contracts/sites/walrus_site/site";
 import * as metadata from "contracts/sites/walrus_site/metadata";
 import { Transaction } from "@mysten/sui/transactions";
@@ -122,11 +122,12 @@ export class WalrusSitesClient {
             transaction.transferObjects([res], args.sendSiteToAddress)
             return transaction
         }
+
     };
 
     // Data fetching.
     public view = {
-
+        sitemap: () => { throw new NotImplemented() }
     }
 
     // Top level methods.

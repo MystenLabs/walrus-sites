@@ -5,3 +5,4 @@
 export class WalrusSitesClientError extends Error {}
 
 export class MissingRequiredWalrusClient extends WalrusSitesClientError {}
+export class NotImplemented extends WalrusSitesClientError {}
