@@ -3,7 +3,8 @@
 
 import {
     type WalrusSitesCompatibleClient,
-    type CreateSiteOptions
+    type CreateSiteOptions,
+    type CreateAndAddResourceOptions,
 } from "@types";
 import { MissingRequiredWalrusClient, NotImplemented } from "@errors";
 import * as site from "contracts/sites/walrus_site/site";
@@ -39,7 +40,13 @@ export class WalrusSitesClient {
     }
 
     // Top level methods.
-    public publish() {throw new NotImplemented()}
+    public publish() {
+        // Steps:
+        // 1. create site
+        // 2. attach routes
+        // 3. create_resource
+        throw new NotImplemented()
+    }
 
     public update() {
         throw new NotImplemented()
@@ -82,9 +89,19 @@ export class WalrusSitesClient {
             return transaction
         },
         // Create a resource with ranges, create headers and attach to resource, add_resource to site.
-        createResource: () => { throw new NotImplemented() },
-        createRoutes: () => { throw new NotImplemented() },
+        createAndAddResource: (
+            transaction = new Transaction(),
+            args: CreateAndAddResourceOptions
+        ) => {
+            // TODO(alex): We must call the Walrus SDK here.
+            // 0. Get a buffer, save it to Walrus and get the blobId.
+            // 1. create_range
+            // 2. create_resource using the range object from step 1.
+            // 3. based on a hashmap in the arguments make add_headers calls to the created resource.
+            transaction
+        },
         removeResource: () => { throw new NotImplemented() },
+        createRoutes: () => { throw new NotImplemented() },
         removeRoutes: () => { throw new NotImplemented() },
         destroySite: () => { throw new NotImplemented() }
     };
