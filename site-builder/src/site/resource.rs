@@ -147,7 +147,7 @@ impl fmt::Debug for SiteOps<'_> {
 
 impl<'a> SiteOps<'a> {
     /// Returns the resource for which this operation is defined.
-    pub fn inner(&self) -> Option<&'a Resource> {
+    pub fn resource(&self) -> Option<&'a Resource> {
         match self {
             SiteOps::Deleted(resource) => Some(resource),
             SiteOps::Created(resource) => Some(resource),
