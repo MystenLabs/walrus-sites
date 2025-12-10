@@ -1,8 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-
 use std::{
-    collections::{BTreeSet, HashSet},
+    collections::HashSet,
     path::{Path, PathBuf},
 };
 
@@ -12,10 +11,7 @@ use sui_sdk::rpc_types::{
     SuiTransactionBlockEffects,
     SuiTransactionBlockResponse,
 };
-use sui_types::{
-    base_types::{ObjectID, SuiAddress},
-    Identifier,
-};
+use sui_types::base_types::{ObjectID, SuiAddress};
 
 use crate::{
     args::PublishOptions,
@@ -27,25 +23,19 @@ use crate::{
     preprocessor::Preprocessor,
     retry_client::RetriableSuiClient,
     site::{
-        builder::{SitePtb, PTB_MAX_MOVE_CALLS},
         config::WSResources,
         manager::SiteManager,
-        resource::ResourceManager,
+        resource::{ResourceManager, SiteOps},
         RemoteSiteFactory,
-        SiteData,
-        SITE_MODULE,
     },
     summary::{SiteDataDiffSummary, Summarizable},
-    types::ObjectCache,
     util::{
         get_site_id_from_response,
         id_to_base36,
         path_or_defaults_if_exist,
         persist_site_id_and_name,
-        sign_and_send_ptb,
     },
 };
-
 const DEFAULT_WS_RESOURCES_FILE: &str = "ws-resources.json";
 
 pub(crate) struct EditOptions {
@@ -104,16 +94,17 @@ impl SiteEditor {
         .get_from_chain(site_id)
         .await?;
 
-        let all_blobs: Vec<_> = site
+        let all_blobs = site
             .resources()
             .into_iter()
             .map(|resource| resource.info.blob_id)
             // Collect first to a hash-set to keep unique blob-ids.
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .collect();
+            .collect::<HashSet<_>>();
 
         tracing::debug!(?all_blobs, "retrieved the site for deletion");
+
+        let mut site_manager =
+            SiteManager::new(self.config.clone(), Some(site_id), None, None).await?;
 
         // Add warning if no deletable blobs found.
         if all_blobs.is_empty() {
@@ -121,44 +112,25 @@ impl SiteEditor {
                 "Warning: No deletable resources found. This may be because the site was created with permanent=true"
             );
         } else {
-            let mut site_manager =
-                SiteManager::new(self.config.clone(), Some(site_id), None, None).await?;
-
             site_manager.delete_from_walrus(&all_blobs).await?;
         }
 
-        // Delete objects on SUI blockchain
-        let mut wallet = self.config.load_wallet()?;
-        let ptb = SitePtb::<_, PTB_MAX_MOVE_CALLS>::new(
-            self.config.package,
-            Identifier::new(SITE_MODULE)?,
-        );
-        let mut ptb = ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
         let site = RemoteSiteFactory::new(&retriable_client, self.config.package)
             .await?
             .get_from_chain(site_id)
             .await?;
 
-        ptb.destroy(site.resources())?;
-        let active_address = wallet.active_address()?;
-        let gas_coin = wallet
-            .gas_for_owner_budget(active_address, self.config.gas_budget(), BTreeSet::new())
-            .await?
-            .1
-            .object_ref();
-
-        sign_and_send_ptb(
-            active_address,
-            &wallet,
-            &retriable_client,
-            ptb.finish(),
-            gas_coin,
-            self.config.gas_budget(),
-            // TODO: #SEW-499 fix: What happens if more than 1000 resources?
-            &mut ObjectCache::new(),
-        )
-        .await?;
-
+        let mut operations: Vec<_> = site
+            .resources()
+            .inner
+            .iter()
+            .map(SiteOps::Deleted)
+            .collect();
+        operations.push(SiteOps::RemovedRoutes);
+        operations.push(SiteOps::BurnedSite);
+        display::action("Deleting Sui object data");
+        site_manager.execute_operations(operations).await?;
+        display::done();
         Ok(())
     }
 }

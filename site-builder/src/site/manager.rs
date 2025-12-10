@@ -26,7 +26,7 @@ use tracing::warn;
 
 use super::{
     builder::SitePtb,
-    resource::ResourceOp,
+    resource::SiteOps,
     RemoteSiteFactory,
     SiteData,
     SiteDataDiff,
@@ -117,7 +117,7 @@ impl SiteManager {
         };
 
         // Extract the BlobIDs from deleted resources for Walrus cleanup
-        let blobs_to_delete: Vec<BlobId> = collect_deletable_blob_candidates(&site_updates);
+        let blobs_to_delete = collect_deletable_blob_candidates(&site_updates);
 
         if !blobs_to_delete.is_empty() {
             self.delete_from_walrus(&blobs_to_delete).await?;
@@ -127,10 +127,11 @@ impl SiteManager {
     }
 
     /// Deletes the resources from Walrus.
-    pub async fn delete_from_walrus(&mut self, blob_ids: &[BlobId]) -> Result<()> {
-        tracing::debug!(?blob_ids, "deleting blob from Walrus");
+    pub async fn delete_from_walrus(&mut self, blob_ids: &HashSet<BlobId>) -> Result<()> {
+        // Deduplicate blob IDs to avoid redundant delete operations
         display::action("Running the delete commands on Walrus");
-        let output = self.walrus.delete(blob_ids).await?;
+        let blob_ids_vec: Vec<BlobId> = blob_ids.iter().cloned().collect();
+        let output = self.walrus.delete(&blob_ids_vec).await?;
         display::done();
 
         for blob_output in output {
@@ -512,17 +513,23 @@ impl SiteManager {
     }
 
     pub async fn update_resources(&mut self, resources: ResourceSet) -> Result<()> {
-        let Some(site_id) = self.site_id else {
-            anyhow::bail!("`update_resources` is only supported for existing sites");
-        };
-
         // Create operations: for each resource, delete then immediately create it
         // This ensures the delete/create pairs are adjacent, which is better for updates
         let operations: Vec<_> = resources
             .inner
             .iter()
-            .flat_map(|resource| [ResourceOp::Deleted(resource), ResourceOp::Created(resource)])
+            .flat_map(|resource| [SiteOps::Deleted(resource), SiteOps::Created(resource)])
             .collect();
+        self.execute_operations(operations).await?;
+        Ok(())
+    }
+
+    // Iterate over the a ResourceOperation vector and execute the PTB.
+    // Handles automatically the object versions and gas objects.
+    pub async fn execute_operations(&mut self, operations: Vec<SiteOps<'_>>) -> anyhow::Result<()> {
+        let Some(site_id) = self.site_id else {
+            anyhow::bail!("`execute_operations` is only supported for existing sites");
+        };
 
         let mut operations_iter = operations.iter().peekable();
         let retry_client = self.sui_client().await?;
@@ -547,7 +554,6 @@ impl SiteManager {
             self.sign_and_send_ptb(ptb.finish(), gas_ref, &retry_client)
                 .await?;
         }
-
         Ok(())
     }
 
@@ -666,12 +672,12 @@ impl SiteManager {
 /// Collects the `BlobId`s from the site_updates Deleted ResourceOps.
 /// These are candidates for deletion from Walrus.
 /// Resources that have been deleted but also created are excluded.
-fn collect_deletable_blob_candidates(site_updates: &SiteDataDiff) -> Vec<BlobId> {
+fn collect_deletable_blob_candidates(site_updates: &SiteDataDiff) -> HashSet<BlobId> {
     let mut deleted = site_updates
         .resource_ops
         .iter()
         .filter_map(|op| match op {
-            ResourceOp::Deleted(resource) => Some(resource.info.blob_id),
+            SiteOps::Deleted(resource) => Some(resource.info.blob_id),
             _ => None,
         })
         // Collect first to a hash-set to keep unique blob-ids.
@@ -680,12 +686,12 @@ fn collect_deletable_blob_candidates(site_updates: &SiteDataDiff) -> Vec<BlobId>
         .resource_ops
         .iter()
         .filter_map(|op| match op {
-            ResourceOp::Created(resource) if deleted.contains(&resource.info.blob_id) => {
+            SiteOps::Created(resource) if deleted.contains(&resource.info.blob_id) => {
                 Some(resource.info.blob_id)
             }
             _ => None,
         })
         .collect::<HashSet<_>>();
     deleted.retain(|blob_id| !resource_deleted_but_blob_extended.contains(blob_id));
-    deleted.into_iter().collect()
+    deleted
 }

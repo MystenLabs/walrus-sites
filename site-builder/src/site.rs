@@ -13,7 +13,7 @@ use std::{collections::HashMap, time::Duration};
 use anyhow::Result;
 use contracts::TypeOriginMap;
 use futures::future::try_join_all;
-use resource::{ResourceOp, ResourceSet};
+use resource::{ResourceSet, SiteOps};
 use sui_sdk::rpc_types::DynamicFieldInfo;
 use sui_types::{base_types::ObjectID, TypeTag};
 
@@ -44,7 +44,7 @@ const DF_REQ_DELAY_MS: u64 = 100;
 #[derive(Debug, Clone)]
 pub struct SiteDataDiff<'a> {
     /// The operations to perform on the resources.
-    pub resource_ops: Vec<ResourceOp<'a>>,
+    pub resource_ops: Vec<SiteOps<'a>>,
     pub route_ops: RouteOps,
     pub metadata_op: MetadataOp,
     pub site_name_op: SiteNameOp,
