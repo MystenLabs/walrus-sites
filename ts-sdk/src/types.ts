@@ -30,5 +30,6 @@ export type CreateSiteOptions = { siteName: string, sendSiteToAddress: string, s
 export type CreateAndAddResourceOptions = {
     newRangeOptions: siteContract.NewRangeOptions,
     newResourceArguments: siteContract.NewResourceArguments,
+    addResourceArguments: siteContract.AddResourceArguments,
     resourceHeaders?: Map<string, string>
 };

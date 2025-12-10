@@ -106,6 +106,7 @@ export class WalrusSitesClient {
                     range,
                 },
             })
+            transaction.add(resource);
             for (const [key, value] of Object.entries(args.resourceHeaders ?? {})) {
                 const header = this.call.addHeader({
                     arguments: {
@@ -116,7 +117,8 @@ export class WalrusSitesClient {
                 });
                 transaction.add(header);
             }
-            transaction
+            transaction.add(this.call.addResource({arguments:{...args.addResourceArguments, resource}}))
+            return transaction
         },
         removeResource: () => { throw new NotImplemented() },
         createRoutes: () => { throw new NotImplemented() },
