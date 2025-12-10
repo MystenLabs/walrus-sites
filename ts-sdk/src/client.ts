@@ -34,8 +34,7 @@ export class WalrusSitesClient {
 
     // Top level methods.
     public publish() {
-        // 1. Create site.
-        // 2. Parse resources.
+
         throw new NotImplemented()
     }
 
