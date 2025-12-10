@@ -42,6 +42,7 @@ export class WalrusSitesClient {
     // Top level methods.
     public publish() {
         // Steps:
+        // 0. publish files to Walrus as quilts pseudocode: files == [LocalResources {buffer: Bytes, metadata...})].
         // 1. create site
         // 2. attach routes
         // 3. create_resource
