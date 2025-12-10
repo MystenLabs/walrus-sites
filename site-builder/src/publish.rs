@@ -127,7 +127,7 @@ impl SiteEditor {
         operations.push(SiteOps::RemovedRoutes);
         operations.push(SiteOps::BurnedSite);
         display::action("Deleting Sui object data");
-        site_manager.do_operations(operations).await?;
+        site_manager.execute_operations(operations).await?;
         display::done();
         Ok(())
     }

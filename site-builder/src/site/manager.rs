@@ -297,15 +297,15 @@ impl SiteManager {
             .iter()
             .flat_map(|resource| [SiteOps::Deleted(resource), SiteOps::Created(resource)])
             .collect();
-        self.do_operations(operations).await?;
+        self.execute_operations(operations).await?;
         Ok(())
     }
 
     // Iterate over the a ResourceOperation vector and execute the PTB.
     // Handles automatically the object versions and gas objects.
-    pub async fn do_operations(&mut self, operations: Vec<SiteOps<'_>>) -> anyhow::Result<()> {
+    pub async fn execute_operations(&mut self, operations: Vec<SiteOps<'_>>) -> anyhow::Result<()> {
         let Some(site_id) = self.site_id else {
-            anyhow::bail!("`do_operations` is only supported for existing sites");
+            anyhow::bail!("`execute_operations` is only supported for existing sites");
         };
 
         let mut operations_iter = operations.iter().peekable();
