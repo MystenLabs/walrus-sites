@@ -93,8 +93,7 @@ export class WalrusSitesClient {
             transaction = new Transaction(),
             args: CreateAndAddResourceOptions
         ) => {
-            // TODO(alex): We must call the Walrus SDK here.
-            // 0. Get a buffer, save it to Walrus and get the blobId.
+            // TODO(alex):
             // 1. create_range
             // 2. create_resource using the range object from step 1.
             // 3. based on a hashmap in the arguments make add_headers calls to the created resource.
