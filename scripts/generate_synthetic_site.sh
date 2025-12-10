@@ -55,7 +55,7 @@ done
 mkdir -p "$OUTPUT_DIR"
 
 fallocate_file() {
-    head -c $1 /dev/zero > "$2"
+    head -c $1 /dev/urandom > "$2"
 }
 
 NUM_FILES=${#FILE_SIZES[@]}
