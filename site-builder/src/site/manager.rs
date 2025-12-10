@@ -157,7 +157,7 @@ impl SiteManager {
         updates: &'a SiteDataDiff<'_>,
     ) -> Result<(
         ProgrammableTransaction,
-        Peekable<std::slice::Iter<'a, ResourceOp<'a>>>,
+        Peekable<std::slice::Iter<'a, SiteOps<'a>>>,
         Peekable<btree_map::Iter<'a, String, String>>,
     )> {
         // 1st iteration
@@ -228,7 +228,7 @@ impl SiteManager {
     async fn build_remaining_resources_ptbs<'a>(
         &self,
         site_object_id: ObjectID,
-        mut resources_iter: Peekable<std::slice::Iter<'a, ResourceOp<'a>>>,
+        mut resources_iter: Peekable<std::slice::Iter<'a, SiteOps<'a>>>,
         mut routes_iter: Peekable<btree_map::Iter<'a, String, String>>,
     ) -> Result<Vec<ProgrammableTransaction>> {
         let mut transactions = Vec::new();
@@ -524,7 +524,7 @@ impl SiteManager {
         Ok(())
     }
 
-    // Iterate over the a ResourceOperation vector and execute the PTB.
+    // Iterate over the a SiteOps vector and execute the PTB.
     // Handles automatically the object versions and gas objects.
     pub async fn execute_operations(&mut self, operations: Vec<SiteOps<'_>>) -> anyhow::Result<()> {
         let Some(site_id) = self.site_id else {
@@ -669,7 +669,7 @@ impl SiteManager {
     }
 }
 
-/// Collects the `BlobId`s from the site_updates Deleted ResourceOps.
+/// Collects the `BlobId`s from the site_updates Deleted SiteOps.
 /// These are candidates for deletion from Walrus.
 /// Resources that have been deleted but also created are excluded.
 fn collect_deletable_blob_candidates(site_updates: &SiteDataDiff) -> HashSet<BlobId> {

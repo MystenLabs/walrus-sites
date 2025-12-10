@@ -27,6 +27,7 @@ use crate::{
         manager::SiteManager,
         resource::{ResourceManager, SiteOps},
         RemoteSiteFactory,
+        SiteData,
     },
     summary::{SiteDataDiffSummary, Summarizable},
     util::{
