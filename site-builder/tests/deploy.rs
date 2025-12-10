@@ -243,9 +243,10 @@ async fn deploy_and_destroy_site_with_1001_files() -> anyhow::Result<()> {
     // Verify that blobs were deleted
     let blobs_after_destroy = cluster.get_owned_blobs(wallet_address).await?;
     println!("Blob count after destroy: {}", blobs_after_destroy.len());
-    assert!(
-        blobs_after_destroy.len() < blobs_before_destroy.len(),
-        "Blob count should decrease after destroy. Before: {}, After: {}",
+    assert_eq!(
+        blobs_after_destroy.len(),
+        0,
+        "Blob count should be zero after destroy. Before: {}, After: {}",
         blobs_before_destroy.len(),
         blobs_after_destroy.len()
     );
