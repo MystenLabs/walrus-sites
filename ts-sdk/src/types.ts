@@ -29,5 +29,6 @@ export type SiteBurnedEvent = (typeof eventsContract.SiteBurnedEvent)['$inferTyp
 export type CreateSiteOptions = { siteName: string, sendSiteToAddress: string, siteMetadata?: Metadata };
 export type CreateAndAddResourceOptions = {
     newRangeOptions: siteContract.NewRangeOptions,
-    newResourceOptions: siteContract.NewResourceOptions
+    newResourceArguments: siteContract.NewResourceArguments,
+    resourceHeaders?: Map<string, string>
 };

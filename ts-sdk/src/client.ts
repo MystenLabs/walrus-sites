@@ -88,15 +88,34 @@ export class WalrusSitesClient {
             transaction.transferObjects([res], args.sendSiteToAddress)
             return transaction
         },
-        // Create a resource with ranges, create headers and attach to resource, add_resource to site.
+        /**
+         * Adds commands to create a site resource (and optional headers) to a
+         * `Transaction` (or a new one if none is provided).
+         * @param transaction Existing `Transaction` or a new one is created.
+         * @param args Options for the resource: range, resource fields, and headers.
+         * @returns The `Transaction` with all resource-related commands added.
+         */
         createAndAddResource: (
             transaction = new Transaction(),
             args: CreateAndAddResourceOptions
         ) => {
-            // TODO(alex):
-            // 1. create_range
-            // 2. create_resource using the range object from step 1.
-            // 3. based on a hashmap in the arguments make add_headers calls to the created resource.
+            const range = this.call.newRange(args.newRangeOptions)
+            const resource = this.call.newResource({
+                arguments: {
+                    ...args.newResourceArguments,
+                    range,
+                },
+            })
+            for (const [key, value] of Object.entries(args.resourceHeaders ?? {})) {
+                const header = this.call.addHeader({
+                    arguments: {
+                        resource,
+                        name: key,
+                        value,
+                    },
+                });
+                transaction.add(header);
+            }
             transaction
         },
         removeResource: () => { throw new NotImplemented() },
