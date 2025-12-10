@@ -1,15 +1,21 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { type WalrusSitesCompatibleClient, type Metadata } from "@types";
+import {
+    type WalrusSitesCompatibleClient,
+    type CreateSiteOptions
+} from "@types";
 import { MissingRequiredWalrusClient, NotImplemented } from "@errors";
 import * as site from "contracts/sites/walrus_site/site";
 import * as metadata from "contracts/sites/walrus_site/metadata";
 import { Transaction } from "@mysten/sui/transactions";
 
 /**
- * A function used to extend a Sui base client.
- * @returns An instance of the WalrusSitesClient
+ * Factory for extending a Sui client with Walrus Sites functionality.
+ * Used along with `SuiClient.$extend(walrusSites())`.
+ *
+ * @returns An extension descriptor with a `name` and a `register` function
+ * that produces a `WalrusSitesClient` when given a `WalrusSitesCompatibleClient`.
  */
 export function walrusSites() {
 	return {
@@ -33,10 +39,7 @@ export class WalrusSitesClient {
     }
 
     // Top level methods.
-    public publish() {
-
-        throw new NotImplemented()
-    }
+    public publish() {throw new NotImplemented()}
 
     public update() {
         throw new NotImplemented()
@@ -57,7 +60,13 @@ export class WalrusSitesClient {
 
     // PTB construction.
     public tx = {
-        createSite: (transaction = new Transaction(), args: {siteName: string, sendSiteToAddress: string, siteMetadata?: Metadata}) => {
+        /**
+         * Generates a Transaction that creates a site and sends it to an address.
+         * @param transaction Optional existing Transaction instance to add commands to. If not provided, a new Transaction will be created.
+         * @param args Arguments for site creation, including the site name, recipient address, and optional metadata.
+         * @returns The Transaction containing all commands necessary to create and transfer the site object.
+         */
+        createSite: (transaction = new Transaction(), args: CreateSiteOptions) => {
             const metadataObj = metadata.newMetadata({
                 arguments: {
                     link: args.siteMetadata?.link ?? null,

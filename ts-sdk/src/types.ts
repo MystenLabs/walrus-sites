@@ -24,3 +24,6 @@ export type Metadata = (typeof metadataContract.Metadata)['$inferType'];
 // Events module types
 export type SiteCreatedEvent = (typeof eventsContract.SiteCreatedEvent)['$inferType'];
 export type SiteBurnedEvent = (typeof eventsContract.SiteBurnedEvent)['$inferType'];
+
+// Walrus Sites Client types
+export type CreateSiteOptions = {siteName: string, sendSiteToAddress: string, siteMetadata?: Metadata}
