@@ -32,6 +32,55 @@ export class WalrusSitesClient {
         this.#extendedSuiClient = extendedSuiClient
     }
 
+    // Top level methods.
+    public publish() {
+        // 1. Create site.
+        // 2. Parse resources.
+        throw new NotImplemented()
+    }
+
+    public update() {
+        throw new NotImplemented()
+    }
+
+    public destroy() {
+        throw new NotImplemented()
+    }
+
+    public updateResources() {
+        throw new NotImplemented()
+    }
+
+    // Data fetching functions.
+    public view = {
+        sitemap: () => { throw new NotImplemented() }
+    }
+
+    // PTB construction.
+    public tx = {
+        createSite: (transaction = new Transaction(), args: {siteName: string, sendSiteToAddress: string, siteMetadata?: Metadata}) => {
+            const metadataObj = metadata.newMetadata({
+                arguments: {
+                    link: args.siteMetadata?.link ?? null,
+                    imageUrl: args.siteMetadata?.link ?? null,
+                    description: args.siteMetadata?.link ?? null,
+                    projectUrl: args.siteMetadata?.link ?? null,
+                    creator: args.siteMetadata?.link ?? null,
+                },
+            })
+            const site_object = site.newSite({arguments: [transaction.pure.string(args.siteName), metadataObj]})
+            const res = transaction.add(site_object)
+            transaction.transferObjects([res], args.sendSiteToAddress)
+            return transaction
+        },
+        // Create a resource with ranges, create headers and attach to resource, add_resource to site.
+        createResource: () => { throw new NotImplemented() },
+        createRoutes: () => { throw new NotImplemented() },
+        removeResource: () => { throw new NotImplemented() },
+        removeRoutes: () => { throw new NotImplemented() },
+        destroySite: () => { throw new NotImplemented() }
+    };
+
     // Direct move calls to the contract.
     public call = {
         newSite: (args: site.NewSiteOptions) => {
@@ -82,53 +131,8 @@ export class WalrusSitesClient {
         burn: (args: site.BurnOptions) => {
             return site.burn(args)
         },
-        getSiteName: (args: site.GetSiteNameOptions) => {
-            return site.getSiteName(args)
-        },
-        getSiteLink: (args: site.GetSiteLinkOptions) => {
-            return site.getSiteLink(args)
-        },
-        getSiteImageUrl: (args: site.GetSiteImageUrlOptions) => {
-            return site.getSiteImageUrl(args)
-        },
-        getSiteDescription: (args: site.GetSiteDescriptionOptions) => {
-            return site.getSiteDescription(args)
-        },
-        getSiteProjectUrl: (args: site.GetSiteProjectUrlOptions) => {
-            return site.getSiteProjectUrl(args)
-        },
-        getSiteCreator: (args: site.GetSiteCreatorOptions) => {
-            return site.getSiteCreator(args)
-        },
         newMetadata: (args: metadata.NewMetadataOptions) => {
             return metadata.newMetadata(args)
         }
     };
-
-    // PTB construction.
-    public tx = {
-        createSite: (transaction = new Transaction(), args: {siteName: string, sendSiteToAddress: string, siteMetadata?: Metadata}) => {
-            const metadataObj = metadata.newMetadata({
-                arguments: {
-                    link: args.siteMetadata?.link ?? null,
-                    imageUrl: args.siteMetadata?.link ?? null,
-                    description: args.siteMetadata?.link ?? null,
-                    projectUrl: args.siteMetadata?.link ?? null,
-                    creator: args.siteMetadata?.link ?? null,
-                },
-            })
-            const site_object = site.newSite({arguments: [transaction.pure.string(args.siteName), metadataObj]})
-            const res = transaction.add(site_object)
-            transaction.transferObjects([res], args.sendSiteToAddress)
-            return transaction
-        }
-
-    };
-
-    // Data fetching.
-    public view = {
-        sitemap: () => { throw new NotImplemented() }
-    }
-
-    // Top level methods.
 }
