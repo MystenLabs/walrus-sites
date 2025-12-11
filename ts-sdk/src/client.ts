@@ -14,6 +14,8 @@ import * as metadataModule from 'contracts/sites/walrus_site/metadata'
 import { Transaction } from '@mysten/sui/transactions'
 import { WalrusFile } from '@mysten/walrus'
 import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519'
+import { toBase64 } from '@mysten/bcs'
+import { sha256, toQuiltPatchIdHex, QUILT_PATCH_ID_INTERNAL_HEADER } from '@utils'
 
 /**
  * Factory for extending a Sui client with Walrus Sites functionality.
@@ -43,7 +45,6 @@ export class WalrusSitesClient {
         this.#extendedSuiClient = extendedSuiClient
     }
 
-    // Top level methods.
     // WARNING: When using the walrus SDK without an upload relay, it is important to understand that reading and
     // writing walrus blobs requires a lot of requests (~2200 to write a blob, ~335 to read a blob).
     public async publish(
@@ -100,20 +101,30 @@ export class WalrusSitesClient {
             this.tx.createAndAddResource(transaction, {
                 site,
                 newResourceArguments: {
-                    path: file!.path, // TODO
-                    blobId: Number(blob.blobId), //TODO
-                    blobHash: 1234, // TODO
-                    range: '', // TODO
+                    path: file!.path,
+                    blobId: Number(blob.blobId),
+                    blobHash: BigInt(toBase64(await sha256(Buffer.from(file.contents)))), // Hash the contents of the file.
+                    range: null, // TODO: Find a clean way to do this.
                 },
                 newRangeOptions: {
+                    // This newRangeOptions overwrites the range above.
                     arguments: {
                         rangeStart: 0, // TODO
                         rangeEnd: 0, // TODO
                     },
                 },
+                resourceHeaders: file.headers?.set(
+                    QUILT_PATCH_ID_INTERNAL_HEADER,
+                    toQuiltPatchIdHex(blob.id)
+                ),
             })
         }
-        // throw new NotImplemented()
+        const bytes = await transaction.build()
+        const signature = await transaction.sign({ signer: keypair })
+        return await this.#extendedSuiClient.core.executeTransaction({
+            transaction: bytes,
+            signatures: [signature.bytes],
+        })
     }
 
     public update() {

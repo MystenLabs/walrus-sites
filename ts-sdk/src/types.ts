@@ -38,7 +38,12 @@ export type CreateAndAddResourceOptions = {
     site: RawTransactionArgument<string>
     resourceHeaders?: Map<string, string>
 }
-export type File = { path: string; contents: Uint8Array }
+export type File = {
+    path: string
+    contents: Uint8Array
+    headers?: Map<string, string>
+    range?: Range
+}
 export type QuiltPatch = {
     id: string
     blobId: string
