@@ -78,10 +78,10 @@ export class WalrusSitesClient {
             const metadataObj = metadata.newMetadata({
                 arguments: {
                     link: args.siteMetadata?.link ?? null,
-                    imageUrl: args.siteMetadata?.link ?? null,
-                    description: args.siteMetadata?.link ?? null,
-                    projectUrl: args.siteMetadata?.link ?? null,
-                    creator: args.siteMetadata?.link ?? null,
+                    imageUrl: args.siteMetadata?.image_url ?? null,
+                    description: args.siteMetadata?.description ?? null,
+                    projectUrl: args.siteMetadata?.project_url ?? null,
+                    creator: args.siteMetadata?.creator ?? null,
                 },
             })
             const site_object = site.newSite({arguments: [transaction.pure.string(args.siteName), metadataObj]})
