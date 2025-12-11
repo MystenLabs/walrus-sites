@@ -5,10 +5,12 @@ import {
     type WalrusSitesCompatibleClient,
     type CreateSiteOptions,
     type CreateAndAddResourceOptions,
+    type File,
+    type QuiltPatch,
 } from '@types'
 import { MissingRequiredWalrusClient, NotImplemented } from '@errors'
-import * as site from 'contracts/sites/walrus_site/site'
-import * as metadata from 'contracts/sites/walrus_site/metadata'
+import * as siteModule from 'contracts/sites/walrus_site/site'
+import * as metadataModule from 'contracts/sites/walrus_site/metadata'
 import { Transaction } from '@mysten/sui/transactions'
 import { WalrusFile } from '@mysten/walrus'
 import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519'
@@ -46,9 +48,10 @@ export class WalrusSitesClient {
     // writing walrus blobs requires a lot of requests (~2200 to write a blob, ~335 to read a blob).
     public async publish(
         args: {
-            files: { path: string; contents: Uint8Array }[]
+            files: File[]
             siteOptions: CreateSiteOptions
         },
+        epochs: number,
         keypair: Ed25519Keypair
     ) {
         // TODO(alex): Maybe we should add an upper limit to avoid moveCall PTB overflow.
@@ -61,19 +64,55 @@ export class WalrusSitesClient {
                 identifier: file.path,
             })
         )
-        console.log('walrus files created')
-        const storeOnWalrusResult = await this.#extendedSuiClient.walrus.writeFiles({
+        const blobs = await this.#extendedSuiClient.walrus.writeFiles({
             files: walrusFiles,
-            epochs: 3,
+            epochs,
             deletable: true,
             signer: keypair,
         })
-        console.log(storeOnWalrusResult)
-        // Steps:
-        // 0. publish files to Walrus as quilts pseudocode: files == [LocalResources {buffer: Bytes, metadata...})].
-        // 1. create site
-        // 2. attach routes
-        // 3. create_resource
+        if (blobs.length != args.files.length) {
+            throw new Error() // TODO Add custom error
+        }
+        const transaction = new Transaction()
+        const metadataObj = this.call.newMetadata({
+            arguments: {
+                link: args.siteOptions.siteMetadata?.link ?? null,
+                imageUrl: args.siteOptions.siteMetadata?.image_url ?? null,
+                description: args.siteOptions.siteMetadata?.description ?? null,
+                projectUrl: args.siteOptions.siteMetadata?.project_url ?? null,
+                creator: args.siteOptions.siteMetadata?.creator ?? null,
+            },
+        })
+        const site = this.call.newSite({
+            arguments: {
+                name: args.siteOptions.siteName,
+                metadata: metadataObj,
+            },
+        })
+        const zipped = args.files.map((file, i): [File, QuiltPatch] => {
+            const blob = blobs[i]
+            if (file && blob) {
+                return [file, blob]
+            }
+            throw new Error() // TODO Add custom error
+        })
+        for (const [file, blob] of zipped) {
+            this.tx.createAndAddResource(transaction, {
+                site,
+                newResourceArguments: {
+                    path: file!.path, // TODO
+                    blobId: Number(blob.blobId), //TODO
+                    blobHash: 1234, // TODO
+                    range: '', // TODO
+                },
+                newRangeOptions: {
+                    arguments: {
+                        rangeStart: 0, // TODO
+                        rangeEnd: 0, // TODO
+                    },
+                },
+            })
+        }
         // throw new NotImplemented()
     }
 
@@ -107,7 +146,7 @@ export class WalrusSitesClient {
          * @returns The Transaction containing all commands necessary to create and transfer the site object.
          */
         createSite: (transaction = new Transaction(), args: CreateSiteOptions) => {
-            const metadataObj = metadata.newMetadata({
+            const metadataObj = this.call.newMetadata({
                 arguments: {
                     link: args.siteMetadata?.link ?? null,
                     imageUrl: args.siteMetadata?.image_url ?? null,
@@ -116,7 +155,7 @@ export class WalrusSitesClient {
                     creator: args.siteMetadata?.creator ?? null,
                 },
             })
-            const site_object = site.newSite({
+            const site_object = this.call.newSite({
                 arguments: [transaction.pure.string(args.siteName), metadataObj],
             })
             const res = transaction.add(site_object)
@@ -152,9 +191,7 @@ export class WalrusSitesClient {
                 })
                 transaction.add(header)
             }
-            transaction.add(
-                this.call.addResource({ arguments: { ...args.addResourceArguments, resource } })
-            )
+            transaction.add(this.call.addResource({ arguments: { site: args.site, resource } }))
             return transaction
         },
         removeResource: () => {
@@ -173,56 +210,56 @@ export class WalrusSitesClient {
 
     // Direct move calls to the contract.
     public call = {
-        newSite: (args: site.NewSiteOptions) => {
-            return site.newSite(args)
+        newSite: (args: siteModule.NewSiteOptions) => {
+            return siteModule.newSite(args)
         },
-        newRangeOption: (args: site.NewRangeOptionOptions) => {
-            return site.newRangeOption(args)
+        newRangeOption: (args: siteModule.NewRangeOptionOptions) => {
+            return siteModule.newRangeOption(args)
         },
-        newRange: (args: site.NewRangeOptions) => {
-            return site.newRange(args)
+        newRange: (args: siteModule.NewRangeOptions) => {
+            return siteModule.newRange(args)
         },
-        newResource: (args: site.NewResourceOptions) => {
-            return site.newResource(args)
+        newResource: (args: siteModule.NewResourceOptions) => {
+            return siteModule.newResource(args)
         },
-        addHeader: (args: site.AddHeaderOptions) => {
-            return site.addHeader(args)
+        addHeader: (args: siteModule.AddHeaderOptions) => {
+            return siteModule.addHeader(args)
         },
-        updateName: (args: site.UpdateNameOptions) => {
-            return site.updateName(args)
+        updateName: (args: siteModule.UpdateNameOptions) => {
+            return siteModule.updateName(args)
         },
-        updateMetadata: (args: site.UpdateMetadataOptions) => {
-            return site.updateMetadata(args)
+        updateMetadata: (args: siteModule.UpdateMetadataOptions) => {
+            return siteModule.updateMetadata(args)
         },
-        addResource: (args: site.AddResourceOptions) => {
-            return site.addResource(args)
+        addResource: (args: siteModule.AddResourceOptions) => {
+            return siteModule.addResource(args)
         },
-        removeResource: (args: site.RemoveResourceOptions) => {
-            return site.removeResource(args)
+        removeResource: (args: siteModule.RemoveResourceOptions) => {
+            return siteModule.removeResource(args)
         },
-        removeResourceIfExists: (args: site.RemoveResourceIfExistsOptions) => {
-            return site.removeResourceIfExists(args)
+        removeResourceIfExists: (args: siteModule.RemoveResourceIfExistsOptions) => {
+            return siteModule.removeResourceIfExists(args)
         },
-        moveResource: (args: site.MoveResourceOptions) => {
-            return site.moveResource(args)
+        moveResource: (args: siteModule.MoveResourceOptions) => {
+            return siteModule.moveResource(args)
         },
-        createRoutes: (args: site.CreateRoutesOptions) => {
-            return site.createRoutes(args)
+        createRoutes: (args: siteModule.CreateRoutesOptions) => {
+            return siteModule.createRoutes(args)
         },
-        removeAllRoutesIfExist: (args: site.RemoveAllRoutesIfExistOptions) => {
-            return site.removeAllRoutesIfExist(args)
+        removeAllRoutesIfExist: (args: siteModule.RemoveAllRoutesIfExistOptions) => {
+            return siteModule.removeAllRoutesIfExist(args)
         },
-        insertRoute: (args: site.InsertRouteOptions) => {
-            return site.insertRoute(args)
+        insertRoute: (args: siteModule.InsertRouteOptions) => {
+            return siteModule.insertRoute(args)
         },
-        removeRoute: (args: site.RemoveRouteOptions) => {
-            return site.removeRoute(args)
+        removeRoute: (args: siteModule.RemoveRouteOptions) => {
+            return siteModule.removeRoute(args)
         },
-        burn: (args: site.BurnOptions) => {
-            return site.burn(args)
+        burn: (args: siteModule.BurnOptions) => {
+            return siteModule.burn(args)
         },
-        newMetadata: (args: metadata.NewMetadataOptions) => {
-            return metadata.newMetadata(args)
+        newMetadata: (args: metadataModule.NewMetadataOptions) => {
+            return metadataModule.newMetadata(args)
         },
     }
 }

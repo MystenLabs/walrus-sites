@@ -5,6 +5,7 @@ import { WalrusClient } from '@mysten/walrus'
 import * as siteContract from 'contracts/sites/walrus_site/site'
 import * as metadataContract from 'contracts/sites/walrus_site/metadata'
 import * as eventsContract from 'contracts/sites/walrus_site/events'
+import { type RawTransactionArgument } from 'contracts/sites/utils'
 
 export type WalrusSitesCompatibleClient = ClientWithExtensions<{
     core: Experimental_CoreClient
@@ -34,6 +35,30 @@ export type CreateSiteOptions = {
 export type CreateAndAddResourceOptions = {
     newRangeOptions: siteContract.NewRangeOptions
     newResourceArguments: siteContract.NewResourceArguments
-    addResourceArguments: siteContract.AddResourceArguments
+    site: RawTransactionArgument<string>
     resourceHeaders?: Map<string, string>
+}
+export type File = { path: string; contents: Uint8Array }
+export type QuiltPatch = {
+    id: string
+    blobId: string
+    blobObject: {
+        id: {
+            id: string
+        }
+        registered_epoch: number
+        blob_id: string
+        size: string
+        encoding_type: number
+        certified_epoch: number | null
+        storage: {
+            id: {
+                id: string
+            }
+            start_epoch: number
+            end_epoch: number
+            storage_size: string
+        }
+        deletable: boolean
+    }
 }

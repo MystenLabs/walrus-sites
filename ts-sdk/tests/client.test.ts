@@ -8,6 +8,7 @@ import { walrusSites } from '@client'
 import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519'
 
 const NETWORK = 'testnet'
+const EPOCHS = 2
 const TESTNET_RPC_URL = 'https://fullnode.testnet.sui.io:443'
 
 describe('walrusSitesClientShouldBeInitialisable', () => {
@@ -52,8 +53,8 @@ describe('walrusSitesClientShouldBeInitialisable', () => {
 
         // Prepare
         const files = [
-            { path: 'file1.txt', contents: new TextEncoder().encode('example string') },
-            { path: 'file2.txt', contents: new TextEncoder().encode('example string 2') },
+            { path: 'file1.txt', contents: new TextEncoder().encode('<div>First</div>') },
+            { path: 'file2.txt', contents: new TextEncoder().encode('<div>Second</div>') },
         ]
         const keypair = Ed25519Keypair.fromSecretKey(process.env.TEST_SIGNER!)
         const siteOptions = {
@@ -73,6 +74,7 @@ describe('walrusSitesClientShouldBeInitialisable', () => {
                 files,
                 siteOptions,
             },
+            EPOCHS,
             keypair
         )
     })
