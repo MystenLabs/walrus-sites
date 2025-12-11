@@ -8,7 +8,7 @@ import {
     type File,
     type QuiltPatch,
 } from '@types'
-import { MissingRequiredWalrusClient, NotImplemented } from '@errors'
+import { MissingRequiredWalrusClientError, NotImplementedError } from '@errors'
 import * as siteModule from 'contracts/sites/walrus_site/site'
 import * as metadataModule from 'contracts/sites/walrus_site/metadata'
 import { Transaction } from '@mysten/sui/transactions'
@@ -29,7 +29,7 @@ export function walrusSites() {
         name: 'walrus_sites',
         register: (extendedSuiClient: WalrusSitesCompatibleClient) => {
             if (!extendedSuiClient.walrus) {
-                throw MissingRequiredWalrusClient
+                throw MissingRequiredWalrusClientError
             }
             return new WalrusSitesClient(extendedSuiClient)
         },
@@ -128,15 +128,15 @@ export class WalrusSitesClient {
     }
 
     public update() {
-        throw new NotImplemented()
+        throw new NotImplementedError()
     }
 
     public destroy() {
-        throw new NotImplemented()
+        throw new NotImplementedError()
     }
 
     public updateResources() {
-        throw new NotImplemented()
+        throw new NotImplementedError()
     }
 
     // Data fetching functions.
@@ -144,7 +144,7 @@ export class WalrusSitesClient {
     // the walrus SDK will still require a lot of requests.
     public view = {
         sitemap: () => {
-            throw new NotImplemented()
+            throw new NotImplementedError()
         },
     }
 
@@ -206,16 +206,16 @@ export class WalrusSitesClient {
             return transaction
         },
         removeResource: () => {
-            throw new NotImplemented()
+            throw new NotImplementedError()
         },
         createRoutes: () => {
-            throw new NotImplemented()
+            throw new NotImplementedError()
         },
         removeRoutes: () => {
-            throw new NotImplemented()
+            throw new NotImplementedError()
         },
         destroySite: () => {
-            throw new NotImplemented()
+            throw new NotImplementedError()
         },
     }
 
