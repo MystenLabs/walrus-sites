@@ -5,11 +5,11 @@ import {
     type WalrusSitesCompatibleClient,
     type CreateSiteOptions,
     type CreateAndAddResourceOptions,
-} from "@types";
-import { MissingRequiredWalrusClient, NotImplemented } from "@errors";
-import * as site from "contracts/sites/walrus_site/site";
-import * as metadata from "contracts/sites/walrus_site/metadata";
-import { Transaction } from "@mysten/sui/transactions";
+} from '@types'
+import { MissingRequiredWalrusClient, NotImplemented } from '@errors'
+import * as site from 'contracts/sites/walrus_site/site'
+import * as metadata from 'contracts/sites/walrus_site/metadata'
+import { Transaction } from '@mysten/sui/transactions'
 
 /**
  * Factory for extending a Sui client with Walrus Sites functionality.
@@ -19,22 +19,22 @@ import { Transaction } from "@mysten/sui/transactions";
  * that produces a `WalrusSitesClient` when given a `WalrusSitesCompatibleClient`.
  */
 export function walrusSites() {
-	return {
-		name: 'walrus_sites',
-		register: (extendedSuiClient: WalrusSitesCompatibleClient) => {
-		    if (!extendedSuiClient.walrus) {
-				throw MissingRequiredWalrusClient
-			}
-			return new WalrusSitesClient(extendedSuiClient);
-		}
-	}
+    return {
+        name: 'walrus_sites',
+        register: (extendedSuiClient: WalrusSitesCompatibleClient) => {
+            if (!extendedSuiClient.walrus) {
+                throw MissingRequiredWalrusClient
+            }
+            return new WalrusSitesClient(extendedSuiClient)
+        },
+    }
 }
 
 /**
  * The WalrusSitesClient. Use this to interact with the Walrus Sites smart contract.
  */
 export class WalrusSitesClient {
-    #extendedSuiClient: WalrusSitesCompatibleClient;
+    #extendedSuiClient: WalrusSitesCompatibleClient
     constructor(extendedSuiClient: WalrusSitesCompatibleClient) {
         this.#extendedSuiClient = extendedSuiClient
     }
@@ -63,7 +63,9 @@ export class WalrusSitesClient {
 
     // Data fetching functions.
     public view = {
-        sitemap: () => { throw new NotImplemented() }
+        sitemap: () => {
+            throw new NotImplemented()
+        },
     }
 
     // PTB construction.
@@ -84,7 +86,9 @@ export class WalrusSitesClient {
                     creator: args.siteMetadata?.creator ?? null,
                 },
             })
-            const site_object = site.newSite({arguments: [transaction.pure.string(args.siteName), metadataObj]})
+            const site_object = site.newSite({
+                arguments: [transaction.pure.string(args.siteName), metadataObj],
+            })
             const res = transaction.add(site_object)
             transaction.transferObjects([res], args.sendSiteToAddress)
             return transaction
@@ -107,7 +111,7 @@ export class WalrusSitesClient {
                     range,
                 },
             })
-            transaction.add(resource);
+            transaction.add(resource)
             for (const [key, value] of Object.entries(args.resourceHeaders ?? {})) {
                 const header = this.call.addHeader({
                     arguments: {
@@ -115,17 +119,27 @@ export class WalrusSitesClient {
                         name: key,
                         value,
                     },
-                });
-                transaction.add(header);
+                })
+                transaction.add(header)
             }
-            transaction.add(this.call.addResource({arguments:{...args.addResourceArguments, resource}}))
+            transaction.add(
+                this.call.addResource({ arguments: { ...args.addResourceArguments, resource } })
+            )
             return transaction
         },
-        removeResource: () => { throw new NotImplemented() },
-        createRoutes: () => { throw new NotImplemented() },
-        removeRoutes: () => { throw new NotImplemented() },
-        destroySite: () => { throw new NotImplemented() }
-    };
+        removeResource: () => {
+            throw new NotImplemented()
+        },
+        createRoutes: () => {
+            throw new NotImplemented()
+        },
+        removeRoutes: () => {
+            throw new NotImplemented()
+        },
+        destroySite: () => {
+            throw new NotImplemented()
+        },
+    }
 
     // Direct move calls to the contract.
     public call = {
@@ -179,6 +193,6 @@ export class WalrusSitesClient {
         },
         newMetadata: (args: metadata.NewMetadataOptions) => {
             return metadata.newMetadata(args)
-        }
-    };
+        },
+    }
 }

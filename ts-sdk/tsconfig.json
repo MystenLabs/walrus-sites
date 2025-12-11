@@ -1,9 +1,7 @@
 {
     "compilerOptions": {
         // Environment setup & latest features
-        "lib": [
-            "ESNext"
-        ],
+        "lib": ["ESNext"],
         "target": "ESNext",
         "module": "Preserve",
         "moduleDetection": "force",
@@ -26,12 +24,8 @@
         "noPropertyAccessFromIndexSignature": false,
         "baseUrl": "./",
         "paths": {
-            "@*": [
-                "./src/*"
-            ]
+            "@*": ["./src/*"]
         },
-        "types": [
-            "@types/bun"
-        ]
+        "types": ["@types/bun"]
     }
 }
