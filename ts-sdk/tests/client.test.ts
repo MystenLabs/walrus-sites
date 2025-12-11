@@ -53,14 +53,14 @@ describe('walrusSitesClientShouldBeInitialisable', () => {
 
         // Prepare
         const files = [
-            { path: 'file1.txt', contents: new TextEncoder().encode('<div>First</div>') },
-            { path: 'file2.txt', contents: new TextEncoder().encode('<div>Second</div>') },
+            { path: 'file1.txt', contents: new TextEncoder().encode('<div>AAAFirst</div>') },
+            { path: 'file2.txt', contents: new TextEncoder().encode('<div>BBBSecond</div>') },
         ]
         const keypair = Ed25519Keypair.fromSecretKey(process.env.TEST_SIGNER!)
         const siteOptions = {
             siteName: 'DefinitelyNotABuggyTestSite',
             owner: keypair.toSuiAddress(),
-            metadata: {
+            siteMetadata: {
                 link: 'https://example.com',
                 image_url: 'https://example.com/image.png',
                 description: 'example',
@@ -69,7 +69,7 @@ describe('walrusSitesClientShouldBeInitialisable', () => {
             },
         }
         // Execute
-        await extendedClientWithWalrusAndWalrusSites.walrus_sites?.publish(
+        let res = await extendedClientWithWalrusAndWalrusSites.walrus_sites?.publish(
             {
                 files,
                 siteOptions,
@@ -77,5 +77,6 @@ describe('walrusSitesClientShouldBeInitialisable', () => {
             EPOCHS,
             keypair
         )
+        console.log(res)
     })
 })

@@ -14,7 +14,6 @@ import * as metadataModule from 'contracts/sites/walrus_site/metadata'
 import { Transaction } from '@mysten/sui/transactions'
 import { WalrusFile } from '@mysten/walrus'
 import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519'
-import { toBase64 } from '@mysten/bcs'
 import { sha256, toQuiltPatchIdHex, QUILT_PATCH_ID_INTERNAL_HEADER } from '@utils'
 
 /**
@@ -84,12 +83,18 @@ export class WalrusSitesClient {
                 creator: args.siteOptions.siteMetadata?.creator ?? null,
             },
         })
+
+        // TODO: If we can get the site object from inside a transaction,
+        // we can call this.tx.createSite instead of this.call.newSite.
         const site = this.call.newSite({
             arguments: {
                 name: args.siteOptions.siteName,
                 metadata: metadataObj,
             },
         })
+        // TODO: do we want to send it to the sender's address?
+        transaction.transferObjects([site], keypair.toSuiAddress())
+
         const zipped = args.files.map((file, i): [File, QuiltPatch] => {
             const blob = blobs[i]
             if (file && blob) {
@@ -98,13 +103,16 @@ export class WalrusSitesClient {
             throw new Error() // TODO Add custom error
         })
         for (const [file, blob] of zipped) {
+            const blobHash = await sha256(Buffer.from(file.contents))
+            // TODO: Find a clean way to construct null ranges.
+            const range = this.call.newRange({ arguments: { rangeStart: 0, rangeEnd: 1 } })
             this.tx.createAndAddResource(transaction, {
                 site,
                 newResourceArguments: {
                     path: file!.path,
                     blobId: Number(blob.blobId),
-                    blobHash: BigInt(toBase64(await sha256(Buffer.from(file.contents)))), // Hash the contents of the file.
-                    range: null, // TODO: Find a clean way to do this.
+                    blobHash: 123, // TODO: Buffer.from(blobHash).readBigInt64BE(),
+                    range,
                 },
                 newRangeOptions: {
                     // This newRangeOptions overwrites the range above.
