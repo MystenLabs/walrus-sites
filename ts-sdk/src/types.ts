@@ -28,7 +28,7 @@ export type SiteBurnedEvent = (typeof eventsContract.SiteBurnedEvent)['$inferTyp
 // Walrus Sites Client types
 export type CreateSiteOptions = {
     siteName: string
-    sendSiteToAddress: string
+    owner: string
     siteMetadata?: Metadata
 }
 export type CreateAndAddResourceOptions = {

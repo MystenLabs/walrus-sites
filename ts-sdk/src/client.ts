@@ -10,6 +10,8 @@ import { MissingRequiredWalrusClient, NotImplemented } from '@errors'
 import * as site from 'contracts/sites/walrus_site/site'
 import * as metadata from 'contracts/sites/walrus_site/metadata'
 import { Transaction } from '@mysten/sui/transactions'
+import { WalrusFile } from '@mysten/walrus'
+import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519'
 
 /**
  * Factory for extending a Sui client with Walrus Sites functionality.
@@ -40,13 +42,38 @@ export class WalrusSitesClient {
     }
 
     // Top level methods.
-    public publish() {
+    // WARNING: When using the walrus SDK without an upload relay, it is important to understand that reading and
+    // writing walrus blobs requires a lot of requests (~2200 to write a blob, ~335 to read a blob).
+    public async publish(
+        args: {
+            files: { path: string; contents: Uint8Array }[]
+            siteOptions: CreateSiteOptions
+        },
+        keypair: Ed25519Keypair
+    ) {
+        // TODO(alex): Maybe we should add an upper limit to avoid moveCall PTB overflow.
+        // Currently, the provided files will all be written into a single quilt.
+        // Future versions of the Walrus SDK may optimize how files are stored to be more efficient
+        // by splitting files into multiple quilts.
+        const walrusFiles = args.files.map((file) =>
+            WalrusFile.from({
+                contents: file.contents,
+                identifier: file.path,
+            })
+        )
+        const storeOnWalrusResult = await this.#extendedSuiClient.walrus.writeFiles({
+            files: walrusFiles,
+            epochs: 3,
+            deletable: true,
+            signer: keypair,
+        })
+        console.log(storeOnWalrusResult)
         // Steps:
         // 0. publish files to Walrus as quilts pseudocode: files == [LocalResources {buffer: Bytes, metadata...})].
         // 1. create site
         // 2. attach routes
         // 3. create_resource
-        throw new NotImplemented()
+        // throw new NotImplemented()
     }
 
     public update() {
@@ -62,6 +89,8 @@ export class WalrusSitesClient {
     }
 
     // Data fetching functions.
+    // The upload relay will reduce the number of requests needed to write a blob, but reads through
+    // the walrus SDK will still require a lot of requests.
     public view = {
         sitemap: () => {
             throw new NotImplemented()
@@ -90,7 +119,7 @@ export class WalrusSitesClient {
                 arguments: [transaction.pure.string(args.siteName), metadataObj],
             })
             const res = transaction.add(site_object)
-            transaction.transferObjects([res], args.sendSiteToAddress)
+            transaction.transferObjects([res], args.owner)
             return transaction
         },
         /**
