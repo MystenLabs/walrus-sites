@@ -61,6 +61,7 @@ export class WalrusSitesClient {
                 identifier: file.path,
             })
         )
+        console.log('walrus files created')
         const storeOnWalrusResult = await this.#extendedSuiClient.walrus.writeFiles({
             files: walrusFiles,
             epochs: 3,

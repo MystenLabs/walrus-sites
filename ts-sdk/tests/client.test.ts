@@ -16,7 +16,17 @@ describe('walrusSitesClientShouldBeInitialisable', () => {
             network: NETWORK,
             url: TESTNET_RPC_URL,
         })
-        const extendedClientWithWalrus = client.$extend(walrus({ network: NETWORK }))
+        const extendedClientWithWalrus = client.$extend(
+            walrus({
+                uploadRelay: {
+                    host: 'https://upload-relay.testnet.walrus.space',
+                    sendTip: {
+                        max: 1_000,
+                    },
+                },
+                network: NETWORK,
+            })
+        )
         const extendedClientWithWalrusAndWalrusSites =
             extendedClientWithWalrus.$extend(walrusSites())
         expect(extendedClientWithWalrusAndWalrusSites.base.network).toEqual(NETWORK)
@@ -24,7 +34,9 @@ describe('walrusSitesClientShouldBeInitialisable', () => {
         expect(extendedClientWithWalrusAndWalrusSites.walrus_sites).toBeDefined()
     })
 
-    // bun test --test-name-pattern publishesASmallSite
+    // Note: To run this test you should specify a big timeout. Otherwise, the test
+    // will fail with a timeout error. To run it use this command:
+    // $ bun test --test-name-pattern publishesASmallSite --timeout 120000
     it('publishesASmallSite', async () => {
         // Setup client
         const client = new SuiClient({
