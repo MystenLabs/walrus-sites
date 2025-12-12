@@ -58,6 +58,10 @@ describe('walrusClientTests', () => {
         expect(client.walrus_sites).toBeDefined()
     })
 
+    // This test would be much shorter if we use
+    // `client.tx.createAndAddResource` but I expanded its' internal
+    // steps here in order to debug it. For some reason I get the following
+    // error a ValiError: Invalid input: Received "0x000000000000000000000000000000000000000000000000000@walrus/sites"
     it('createNewResourcePTB', async () => {
         const tx = new Transaction()
         tx.setSender(KEYPAIR.toSuiAddress())
@@ -85,7 +89,7 @@ describe('walrusClientTests', () => {
             },
         })!
         tx.add(site)
-        // tx.transferObjects([site], KEYPAIR.toSuiAddress())
+        tx.transferObjects([site], KEYPAIR.toSuiAddress()) // <- ValiError: Invalid input: Received "0x000000000000000000000000000000000000000000000000000@walrus/sites"
         const resource = client.walrus_sites?.call.newResource({
             arguments: {
                 path: 'path',
@@ -97,7 +101,7 @@ describe('walrusClientTests', () => {
         const addResource = client.walrus_sites?.call.addResource({
             arguments: { site, resource },
         })!
-        tx.add(addResource)
+        tx.add(addResource) // <- ValiError: Invalid input: Received "0x000000000000000000000000000000000000000000000000000@walrus/sites"
         tx.setGasBudget(1000000000)
         const res = await executor.executeTransaction(tx, {
             showEvents: true,
