@@ -103,7 +103,7 @@ impl SiteEditor {
         tracing::debug!(?all_blobs, "retrieved the site for deletion");
 
         let mut site_manager =
-            SiteManager::new(self.config.clone(), Some(site_id), None, None).await?;
+            SiteManager::new(self.config.clone(), Some(site_id), None, None, None).await?;
 
         // Add warning if no deletable blobs found.
         if all_blobs.is_empty() {
@@ -242,6 +242,13 @@ impl SiteEditor<EditOptions> {
             self.edit_options.site_id,
             site_metadata,
             self.edit_options.site_name.clone().or(site_name),
+            Some(
+                self.edit_options
+                    .publish_options
+                    .walrus_options
+                    .epoch_arg
+                    .clone(),
+            ),
         )
         .await?;
 

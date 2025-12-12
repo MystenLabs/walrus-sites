@@ -3,7 +3,7 @@
 
 //! Utilities to create the site map of a site.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, fs};
 
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::{DateTime, Duration, NaiveDate};
@@ -13,7 +13,9 @@ use prettytable::{
     Cell,
     Table,
 };
-use sui_types::base_types::{ObjectID, SuiAddress};
+use serde::Deserialize;
+use sui_sdk::rpc_types::SuiObjectDataOptions;
+use sui_types::base_types::{ObjectID, ObjectType, SuiAddress};
 
 use crate::{
     args::ObjectIdOrName,
@@ -71,6 +73,76 @@ pub(crate) async fn display_sitemap(
     Ok(())
 }
 
+// TODO(sew-495): Move it move it
+// #[serde_as]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+/// Configuration for the contract packages and shared objects.
+pub struct WalrusContractConfig {
+    /// Object ID of the Walrus system object.
+    pub system_object: ObjectID,
+    /// Object ID of the Walrus staking object.
+    pub staking_object: ObjectID,
+    /// Object ID of the credits object.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub credits_object: Option<ObjectID>,
+    /// Object ID of the walrus subsidies object.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub walrus_subsidies_object: Option<ObjectID>,
+    // /// The TTL for cached system and staking objects.
+    // #[serde(default = "defaults::default_cache_ttl", rename = "cache_ttl_secs")]
+    // #[serde_as(as = "DurationSeconds")]
+    // pub cache_ttl: Duration,
+}
+
+// TODO(sew-495): Move it somewhere else
+pub async fn get_owned_blobs(
+    sui_client: &RetriableSuiClient,
+    config: &Config,
+    owner_address: SuiAddress,
+) -> anyhow::Result<HashMap<BlobId, SuiBlob>> {
+    let walrus_package = match config.general.walrus_package {
+        Some(pkg) => pkg,
+        None => {
+            // TODO: Maybe we want to parse from the walrus-config everywhere, not just for site-map and
+            // when this is called.
+            let walrus_config_path = config.general.walrus_config.as_ref().ok_or_else(|| {
+                anyhow!("no walrus package, or walrus config specified; please add either")
+            })?; // TODO(sew-495)
+            let config_contents = fs::read_to_string(walrus_config_path)
+                .context("Failed to read walrus config file")?;
+            let walrus_contract_config: WalrusContractConfig =
+                serde_yaml::from_str(&config_contents)
+                    .context("Failed to parse walrus config file")?;
+
+            let staking_obj = sui_client
+                .get_object_with_options(
+                    walrus_contract_config.staking_object,
+                    SuiObjectDataOptions::new().with_type(),
+                )
+                .await
+                .context("Failed to fetch staking object data")?;
+            let ObjectType::Struct(move_object_type) = staking_obj
+                .data
+                .ok_or(anyhow!(
+                    "Expected data in get-object response for staking-object"
+                ))?
+                .object_type()?
+            else {
+                bail!("Staking object ID points to a package") // TODO(sew-495): Improve
+            };
+            ObjectID::from_address(move_object_type.address())
+        }
+    };
+
+    let type_map = type_origin_map_for_package(sui_client, walrus_package).await?;
+    let blobs = sui_client
+        .get_owned_objects_of_type::<SuiBlob>(owner_address, &type_map, &[])
+        .await?
+        .map(|blob| (blob.blob_id, blob))
+        .collect();
+    Ok(blobs)
+}
+
 async fn get_site_resources_and_blobs(
     sui_client: &RetriableSuiClient,
     config: &Config,
@@ -78,20 +150,7 @@ async fn get_site_resources_and_blobs(
     site_object_id: ObjectID,
 ) -> Result<(SiteData, HashMap<BlobId, SuiBlob>)> {
     // Get all the blobs owned by the owner.
-    let type_map = type_origin_map_for_package(
-        sui_client,
-        config.general.walrus_package.ok_or(anyhow!(
-            "no walrus package specified; please add it to the config or \
-            pass it with `--walrus-package`"
-        ))?,
-    )
-    .await?;
-
-    let owned_blobs = sui_client
-        .get_owned_objects_of_type::<SuiBlob>(owner_address, &type_map, &[])
-        .await?
-        .map(|blob| (blob.blob_id, blob))
-        .collect::<HashMap<_, _>>();
+    let owned_blobs = get_owned_blobs(sui_client, config, owner_address).await?;
 
     let site = RemoteSiteFactory::new(sui_client, config.package)
         .await?

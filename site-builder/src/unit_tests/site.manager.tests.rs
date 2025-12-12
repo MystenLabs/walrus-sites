@@ -47,7 +47,9 @@ async fn test_site_manager_cache_updated_after_transaction() {
     let config = create_test_config(wallet_path, fake_package_id);
 
     // Create SiteManager
-    let mut manager = SiteManager::new(config, None, None, None).await.unwrap();
+    let mut manager = SiteManager::new(config, None, None, None, None)
+        .await
+        .unwrap();
     assert!(manager.object_cache.is_empty());
 
     // Get a gas coin and execute a simple transaction
@@ -125,7 +127,9 @@ async fn test_site_manager_cache_protects_against_stale_fullnode() {
     let config = create_test_config(wallet_path.clone(), fake_package_id);
 
     // Create SiteManager with main fullnode
-    let mut manager = SiteManager::new(config, None, None, None).await.unwrap();
+    let mut manager = SiteManager::new(config, None, None, None, None)
+        .await
+        .unwrap();
     let address = manager.active_address().unwrap();
 
     // Get initial gas coin version (V0)
@@ -238,7 +242,7 @@ async fn test_site_manager_cache_protects_against_stale_fullnode() {
 
     // Create new SiteManager with stale wallet config, but copy the cache
     let stale_config = create_test_config(stale_wallet_path, fake_package_id);
-    let mut stale_manager = SiteManager::new(stale_config, None, None, None)
+    let mut stale_manager = SiteManager::new(stale_config, None, None, None, None)
         .await
         .unwrap();
 

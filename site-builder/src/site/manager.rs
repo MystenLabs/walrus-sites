@@ -32,6 +32,7 @@ use super::{
     SITE_MODULE,
 };
 use crate::{
+    args::{EpochArg, EpochCountOrMax},
     backoff::ExponentialBackoffConfig,
     config::Config,
     display,
@@ -40,9 +41,10 @@ use crate::{
         builder::{SitePtbBuilderResultExt, PTB_MAX_MOVE_CALLS},
         resource::ResourceSet,
     },
+    sitemap::get_owned_blobs,
     summary::SiteDataDiffSummary,
     types::{Metadata, MetadataOp, ObjectCache, RouteOps, SiteNameOp},
-    util::{get_site_id_from_response, sign_and_send_ptb},
+    util::{get_epochs_ahead, get_site_id_from_response, sign_and_send_ptb},
     walrus::{types::BlobId, Walrus},
 };
 
@@ -59,6 +61,7 @@ pub struct SiteManager {
     pub metadata: Option<Metadata>,
     pub site_name: Option<String>,
     pub object_cache: ObjectCache,
+    pub epochs: Option<EpochArg>,
 }
 
 impl SiteManager {
@@ -68,6 +71,7 @@ impl SiteManager {
         site_id: Option<ObjectID>,
         metadata: Option<Metadata>,
         site_name: Option<String>,
+        epochs: Option<EpochArg>,
     ) -> Result<Self> {
         Ok(SiteManager {
             walrus: config.walrus_client(),
@@ -78,9 +82,11 @@ impl SiteManager {
             metadata,
             site_name,
             object_cache: ObjectCache::new(),
+            epochs,
         })
     }
 
+    // TODO(sew-495): quilts are partly stored in ResourceManager and partly in SiteManager. Fix.
     /// Updates the site with the given [`Resource`].
     ///
     /// If the site does not exist, it is created and updated. The resources that need to be updated
@@ -90,6 +96,10 @@ impl SiteManager {
         local_site_data: &SiteData,
     ) -> Result<(SuiTransactionBlockResponse, SiteDataDiffSummary)> {
         tracing::debug!(?self.site_id, "creating or updating site");
+        let Some(epoch_arg) = self.epochs.clone() else {
+            // TODO(sew-495): We should have already checked for this.
+            bail!("Cannot publish or update a site without passing epochs");
+        };
         let retriable_client = self.sui_client().await?;
         let existing_site = match &self.site_id {
             Some(site_id) => {
@@ -100,6 +110,46 @@ impl SiteManager {
             }
             None => SiteData::empty(),
         };
+
+        let epoch_info = self.walrus.epoch_info().await?;
+        let current_epoch = epoch_info.current_epoch;
+        let epochs_ahead = match (
+            epoch_arg.epochs,
+            epoch_arg.earliest_expiry_time,
+            epoch_arg.end_epoch,
+        ) {
+            (Some(EpochCountOrMax::Epochs(epochs)), None, None) => epochs.into(),
+            (Some(EpochCountOrMax::Max), None, None) => epoch_info.max_epochs_ahead,
+            (None, Some(earliest), None) => get_epochs_ahead(earliest, epoch_info)?,
+            (None, None, Some(end_epoch)) => {
+                let end_epoch: u32 = end_epoch.into();
+                if end_epoch <= current_epoch {
+                    bail!("TODO(sew-495): Error message");
+                }
+                end_epoch - current_epoch
+            }
+            _ => bail!("TODO(sew-495): Error message"),
+        };
+        let new_end_epoch = current_epoch + epochs_ahead;
+
+        let to_extend = get_owned_blobs(&retriable_client, &self.config, self.active_address()?)
+            .await?
+            .into_iter()
+            .filter(|(blob_id, sui_blob)| {
+                // blob-id exists in resources currently in directory and end_epoch is less than
+                // epochs to update to.
+                local_site_data
+                    .resources
+                    .into_iter()
+                    .any(|r| r.info.blob_id == *blob_id)
+                    && sui_blob.storage.end_epoch < new_end_epoch
+            });
+
+        for (_, sui_blob_obj) in to_extend {
+            let epochs_extended = new_end_epoch - sui_blob_obj.storage.end_epoch;
+            let _out = self.walrus.extend(sui_blob_obj.id, epochs_extended).await?;
+        }
+
         tracing::debug!(?existing_site, "checked existing site");
 
         let site_updates = local_site_data.diff(&existing_site);

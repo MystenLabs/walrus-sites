@@ -16,6 +16,7 @@ use output::{
     StorageInfoOutput,
     StoreOutput,
 };
+use sui_types::base_types::ObjectID;
 use tokio::process::Command as CliCommand;
 
 use self::types::BlobId;
@@ -23,7 +24,13 @@ use crate::{
     args::EpochArg,
     walrus::{
         command::{CommonStoreOptions, ExtendInput, StoreQuiltInput, WalrusCmdBuilder},
-        output::{DestroyOutput, ExtendBlobOutput, QuiltStoreResult, StoreQuiltDryRunOutput},
+        output::{
+            DestroyOutput,
+            EpochCount,
+            ExtendBlobOutput,
+            QuiltStoreResult,
+            StoreQuiltDryRunOutput,
+        },
     },
 };
 pub mod command;
@@ -140,8 +147,16 @@ impl Walrus {
     }
 
     /// Issues an `extend` JSON command to the Walrus CLI to extend a blob's storage duration.
-    pub async fn extend(&mut self, extend_input: ExtendInput) -> Result<ExtendBlobOutput> {
-        create_command!(self, extend, extend_input)
+    pub async fn extend(
+        &mut self,
+        blob_obj_id: ObjectID,
+        extend_epochs: EpochCount,
+    ) -> Result<ExtendBlobOutput> {
+        create_command!(
+            self,
+            extend,
+            ExtendInput::non_shared(blob_obj_id, extend_epochs)
+        )
     }
 
     /// Issues a `delete` JSON command to the Walrus CLI, returning the parsed output.
@@ -215,6 +230,10 @@ impl Walrus {
         let n_shards: StorageInfoOutput =
             create_command!(self, info, self.rpc_arg(), Some(InfoCommands::Storage))?;
         Ok(n_shards.n_shards)
+    }
+
+    pub async fn epoch_info(&self) -> Result<InfoEpochOutput> {
+        create_command!(self, info, self.rpc_arg(), Some(InfoCommands::Epoch))
     }
 
     /// Returns the current Walrus epoch number.

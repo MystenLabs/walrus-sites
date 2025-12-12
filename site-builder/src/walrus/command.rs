@@ -85,6 +85,16 @@ pub struct ExtendInput {
     epochs_extended: u32,
 }
 
+impl ExtendInput {
+    pub fn non_shared(blob_obj_id: ObjectID, epochs_extended: u32) -> Self {
+        Self {
+            blob_obj_id,
+            shared: false,
+            epochs_extended,
+        }
+    }
+}
+
 /// Represents a command to be run on the Walrus CLI.
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize)]
