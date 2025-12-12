@@ -11,6 +11,7 @@ use output::{
     try_from_output,
     BlobIdOutput,
     DryRunOutput,
+    InfoEpochOutput,
     ReadOutput,
     StorageInfoOutput,
     StoreOutput,
@@ -21,8 +22,8 @@ use self::types::BlobId;
 use crate::{
     args::EpochArg,
     walrus::{
-        command::{CommonStoreOptions, StoreQuiltInput, WalrusCmdBuilder},
-        output::{DestroyOutput, QuiltStoreResult, StoreQuiltDryRunOutput},
+        command::{CommonStoreOptions, ExtendInput, StoreQuiltInput, WalrusCmdBuilder},
+        output::{DestroyOutput, ExtendBlobOutput, QuiltStoreResult, StoreQuiltDryRunOutput},
     },
 };
 pub mod command;
@@ -138,6 +139,11 @@ impl Walrus {
         )
     }
 
+    /// Issues an `extend` JSON command to the Walrus CLI to extend a blob's storage duration.
+    pub async fn extend(&mut self, extend_input: ExtendInput) -> Result<ExtendBlobOutput> {
+        create_command!(self, extend, extend_input)
+    }
+
     /// Issues a `delete` JSON command to the Walrus CLI, returning the parsed output.
     pub async fn delete(&mut self, blob_ids: &[BlobId]) -> Result<Vec<DestroyOutput>> {
         create_command!(self, delete, blob_ids)
@@ -209,6 +215,14 @@ impl Walrus {
         let n_shards: StorageInfoOutput =
             create_command!(self, info, self.rpc_arg(), Some(InfoCommands::Storage))?;
         Ok(n_shards.n_shards)
+    }
+
+    /// Returns the current Walrus epoch number.
+    // TODO?(sew-495): Make info all?
+    pub async fn current_epoch(&self) -> Result<u32> {
+        let epoch_info: InfoEpochOutput =
+            create_command!(self, info, self.rpc_arg(), Some(InfoCommands::Epoch))?;
+        Ok(epoch_info.current_epoch)
     }
 
     /// Returns the number of columns available to fill with files in a Quilt.

@@ -104,10 +104,15 @@ impl Resource {
         }
     }
 
+    /// Returns the quilt patch ID from the resource's internal headers, if present.
     pub fn patch_id(&self) -> Option<&String> {
         self.info.headers.get(Self::QUILT_PATCH_ID_INTERNAL_HEADER)
     }
 
+    /// Creates a [`Resource`] from local file data and blob storage information.
+    ///
+    /// Used when an unchanged file is reused from an existing site, preserving its
+    /// blob ID and quilt patch ID rather than re-uploading.
     pub fn from_resource_data(
         ResourceData {
             unencoded_size,
@@ -311,7 +316,10 @@ impl Display for ResourceSet {
     }
 }
 
-// Struct used for grouping resource local data.
+/// Local file data for a resource before it is uploaded to Walrus.
+///
+/// Contains the file's metadata (path, size, headers, hash) but not the blob ID,
+/// which is only assigned after upload.
 #[derive(Debug)]
 pub struct ResourceData {
     unencoded_size: usize,
@@ -322,6 +330,10 @@ pub struct ResourceData {
 }
 
 impl ResourceData {
+    /// Reads a local file and creates [`ResourceData`] from it.
+    ///
+    /// Returns `None` if the file should be ignored (matches ignore patterns or is
+    /// the ws-resources.json config file itself).
     pub fn from_file(
         ws_resources_path: Option<&Path>,
         ws_resources: Option<&WSResources>,
@@ -478,6 +490,7 @@ impl ResourceData {
     */
 }
 
+/// Converts [`ResourceData`] to a [`QuiltBlobInput`] for the Walrus CLI.
 impl From<&ResourceData> for QuiltBlobInput {
     fn from(value: &ResourceData) -> QuiltBlobInput {
         QuiltBlobInput {
@@ -731,7 +744,6 @@ impl ResourceManager {
         let (file_changed, file_unchanged) = local_resources.into_iter().fold(
             (vec![], vec![]),
             |(mut changed, mut unchanged), local| {
-                println!("local.full_path: {}", local.full_path.to_string_lossy());
                 let site_resource = existing_site
                     .resources()
                     .inner

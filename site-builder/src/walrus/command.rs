@@ -9,6 +9,7 @@ use anyhow::Result;
 use clap::Args;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
+use sui_types::base_types::ObjectID;
 
 use super::types::BlobId;
 use crate::args::EpochArg;
@@ -69,6 +70,21 @@ pub enum StoreQuiltInput {
     Blobs(Vec<QuiltBlobInput>),
 }
 
+/// Represents the mutually exclusive input for a store-quilt command.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ExtendInput {
+    /// The object ID of the blob to extend.
+    blob_obj_id: ObjectID,
+    /// If the blob_obj_id refers to a shared blob object, this flag must be present.
+    shared: bool,
+    /// The number of epochs to extend the blob for.
+    // TODO (WAL-614): Offer multiple options similar to the `store` command:
+    // `--extended-epochs`, `--epochs-ahead`, `--max`, `--end-epoch`,
+    // `--earliest-expiration-time`.
+    epochs_extended: u32,
+}
+
 /// Represents a command to be run on the Walrus CLI.
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -90,6 +106,11 @@ pub enum Command {
         /// Common options shared between store and store-quilt commands.
         #[serde(flatten)]
         common_options: CommonStoreOptions,
+    },
+    // TODO(sew-495): test
+    Extend {
+        #[serde(flatten)]
+        input: ExtendInput,
     },
     /// Reads a blob from Walrus.
     Read {
@@ -297,6 +318,13 @@ impl WalrusCmdBuilder {
         let command = Command::StoreQuilt {
             input: store_quilt_input,
             common_options: common_store_options,
+        };
+        self.with_command(command)
+    }
+
+    pub fn extend(self, extend_input: ExtendInput) -> WalrusCmdBuilder<Command> {
+        let command = Command::Extend {
+            input: extend_input,
         };
         self.with_command(command)
     }

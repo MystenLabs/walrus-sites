@@ -103,7 +103,7 @@ impl SiteManager {
         tracing::debug!(?existing_site, "checked existing site");
 
         let site_updates = local_site_data.diff(&existing_site);
-        println!("site_updates: {site_updates:#?}");
+        tracing::debug!(?site_updates, "computed site updates");
 
         // Check if there are any updates to the site on-chain.
         let result = if site_updates.has_updates() {
@@ -456,10 +456,7 @@ fn collect_deletable_blob_candidates(site_updates: &SiteDataDiff) -> HashSet<Blo
         .resource_ops
         .iter()
         .filter_map(|op| match op {
-            SiteOps::Deleted(resource) => {
-                println!("delete: {}", resource.info.path);
-                Some(resource.info.blob_id)
-            }
+            SiteOps::Deleted(resource) => Some(resource.info.blob_id),
             _ => None,
         })
         // Collect first to a hash-set to keep unique blob-ids.
