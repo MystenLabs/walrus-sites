@@ -3,9 +3,10 @@
 
 //! The output of running commands on the Walrus CLI.
 
-use std::{num::NonZeroU16, path::PathBuf, process::Output};
+use std::{num::NonZeroU16, path::PathBuf, process::Output, time::Duration};
 
 use anyhow::{anyhow, Context, Result};
+use chrono::{DateTime, Utc};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_with::{base64::Base64, serde_as, DisplayFromStr};
 use sui_types::{base_types::ObjectID, event::EventID};
@@ -212,6 +213,14 @@ impl AssociatedContractStruct for SuiBlob {
 #[serde(rename_all = "camelCase")]
 pub struct StoreOutput(pub Vec<BlobStoreResultWithPath>);
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+/// The output of the `walrus extend` command.
+pub struct ExtendBlobOutput {
+    /// The number of epochs extended by.
+    pub epochs_extended: EpochCount,
+}
+
 // The output of the `store --dry-run` command.
 #[serde_as]
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -336,6 +345,23 @@ pub struct StorageInfoOutput {
     pub(crate) n_nodes: usize,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
+pub(crate) enum EpochTimeOrMessage {
+    DateTime(DateTime<Utc>),
+    Message(String),
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
+pub(crate) struct InfoEpochOutput {
+    pub(crate) current_epoch: Epoch,
+    pub(crate) start_of_current_epoch: EpochTimeOrMessage,
+    pub(crate) epoch_duration: Duration,
+    pub(crate) max_epochs_ahead: EpochCount,
+}
+
 /// Result when attempting to store a quilt.
 #[derive(Deserialize, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -347,7 +373,6 @@ pub struct QuiltStoreResult {
 }
 
 /// The output of the `store-quilt --dry-run` command.
-#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StoreQuiltDryRunOutput {
