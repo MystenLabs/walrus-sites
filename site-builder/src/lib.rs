@@ -165,7 +165,7 @@ async fn run_internal(
                     common.max_quilt_size,
                 )
                 .await?;
-            // TODO(sew-495): Extend the rest?
+            // TODO(sew-604): Extend the rest?
             site_manager.update_resources(resources).await?;
         }
     };

@@ -117,7 +117,6 @@ pub enum Command {
         #[serde(flatten)]
         common_options: CommonStoreOptions,
     },
-    // TODO(sew-495): test
     Extend {
         #[serde(flatten)]
         input: ExtendInput,
