@@ -355,7 +355,7 @@ pub(crate) enum EpochTimeOrMessage {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[allow(dead_code)]
-pub(crate) struct InfoEpochOutput {
+pub struct InfoEpochOutput {
     pub(crate) current_epoch: Epoch,
     pub(crate) start_of_current_epoch: EpochTimeOrMessage,
     pub(crate) epoch_duration: Duration,

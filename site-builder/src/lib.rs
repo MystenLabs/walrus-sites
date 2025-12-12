@@ -148,7 +148,14 @@ async fn run_internal(
             let mut resource_manager =
                 ResourceManager::new(config.walrus_client(), ws_res, common.ws_resources.clone())
                     .await?;
-            let mut site_manager = SiteManager::new(config, Some(site_object), None, None).await?;
+            let mut site_manager = SiteManager::new(
+                config,
+                Some(site_object),
+                None,
+                None,
+                Some(common.epoch_arg.clone()),
+            )
+            .await?;
 
             let resources = resource_manager
                 .parse_resources_and_store_quilts(
@@ -158,6 +165,7 @@ async fn run_internal(
                     common.max_quilt_size,
                 )
                 .await?;
+            // TODO(sew-495): Extend the rest?
             site_manager.update_resources(resources).await?;
         }
     };
