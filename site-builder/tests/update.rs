@@ -25,8 +25,8 @@ use helpers::{create_test_site, verify_resource_and_get_content};
 
 #[tokio::test]
 #[ignore]
-async fn quilts_update_snake() -> anyhow::Result<()> {
-    let cluster = TestSetup::start_local_test_cluster().await?;
+async fn update_snake() -> anyhow::Result<()> {
+    let mut cluster = TestSetup::start_local_test_cluster().await?;
     let directory = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
@@ -87,6 +87,18 @@ async fn quilts_update_snake() -> anyhow::Result<()> {
         })
         .build()?;
     site_builder::run(update_args).await?;
+
+    // TODO: Update only stores new blobs
+    // Verify that the user now has 2 blob objects:
+    // - One from the old site (unchanged resources)
+    // - One with only the updated index.html
+    let wallet_address = cluster.wallet_active_address()?;
+    let owned_blobs = cluster.get_owned_blobs(wallet_address).await?;
+    assert_eq!(
+        owned_blobs.len(),
+        2,
+        "After update, user should have exactly 2 blob objects: one from the old site and one with the updated index.html"
+    );
 
     // Verify the update worked
     let updated_site = cluster.last_site_created().await?;
