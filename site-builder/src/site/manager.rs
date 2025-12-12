@@ -41,10 +41,9 @@ use crate::{
         builder::{SitePtbBuilderResultExt, PTB_MAX_MOVE_CALLS},
         resource::ResourceSet,
     },
-    sitemap::get_owned_blobs,
     summary::SiteDataDiffSummary,
     types::{Metadata, MetadataOp, ObjectCache, RouteOps, SiteNameOp},
-    util::{get_epochs_ahead, get_site_id_from_response, sign_and_send_ptb},
+    util::{get_epochs_ahead, get_owned_blobs, get_site_id_from_response, sign_and_send_ptb},
     walrus::{types::BlobId, Walrus},
 };
 

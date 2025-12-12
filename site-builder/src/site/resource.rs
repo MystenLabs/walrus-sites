@@ -769,8 +769,6 @@ impl ResourceManager {
             },
         );
 
-        // TODO(sew-495) extend blobs from unchanged
-
         // changed files need to be stored into new quilts
         let mut resources_set = self
             .store_into_quilts(file_changed, epochs, dry_run, max_quilt_size)
