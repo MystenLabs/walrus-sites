@@ -25,6 +25,7 @@ use crate::{
         manager::SiteManager,
         resource::{ResourceManager, SiteOps},
         RemoteSiteFactory,
+        SiteData,
     },
     summary::{SiteDataDiffSummary, Summarizable},
     util::{
@@ -102,7 +103,7 @@ impl SiteEditor {
         tracing::debug!(?all_blobs, "retrieved the site for deletion");
 
         let mut site_manager =
-            SiteManager::new(self.config.clone(), Some(site_id), None, None).await?;
+            SiteManager::new(self.config.clone(), Some(site_id), None, None, None).await?;
 
         // Add warning if no deletable blobs found.
         if all_blobs.is_empty() {
@@ -164,6 +165,18 @@ impl SiteEditor<EditOptions> {
             self.directory().to_string_lossy()
         ));
         let dry_run = self.edit_options.publish_options.walrus_options.dry_run;
+        // Existing site:
+        let retriable_client = site_manager.sui_client().await?;
+        let existing_site = match &self.edit_options.site_id {
+            Some(site_id) => {
+                RemoteSiteFactory::new(&retriable_client, self.config.package)
+                    .await?
+                    .get_from_chain(*site_id)
+                    .await?
+            }
+            None => SiteData::empty(),
+        };
+
         let local_site_data = resource_manager
             .read_dir_and_store_quilts(
                 self.directory(),
@@ -177,6 +190,7 @@ impl SiteEditor<EditOptions> {
                     .publish_options
                     .walrus_options
                     .max_quilt_size,
+                existing_site,
             )
             .await?;
         display::done();
@@ -228,6 +242,13 @@ impl SiteEditor<EditOptions> {
             self.edit_options.site_id,
             site_metadata,
             self.edit_options.site_name.clone().or(site_name),
+            Some(
+                self.edit_options
+                    .publish_options
+                    .walrus_options
+                    .epoch_arg
+                    .clone(),
+            ),
         )
         .await?;
 
