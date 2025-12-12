@@ -199,16 +199,14 @@ export class WalrusSitesClient {
                     range,
                 },
             })
-            transaction.add(resource)
             for (const [key, value] of Object.entries(args.resourceHeaders ?? {})) {
-                const header = this.call.addHeader({
+                this.call.addHeader({
                     arguments: {
                         resource,
                         name: key,
                         value,
                     },
                 })
-                transaction.add(header)
             }
             transaction.add(this.call.addResource({ arguments: { site: args.site, resource } }))
             return transaction

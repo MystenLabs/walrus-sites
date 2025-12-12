@@ -10,6 +10,7 @@ import { walrusSites, WalrusSitesClient } from '@client'
 import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519'
 
 const NETWORK = 'testnet'
+const PACKAGE_ADDRESS = '0xf99aee9f21493e1590e7e5a9aea6f343a1f381031a04a732724871fc294be799'
 const EPOCHS = 2
 const TESTNET_RPC_URL = 'https://fullnode.testnet.sui.io:443'
 const KEYPAIR = Ed25519Keypair.fromSecretKey(process.env.TEST_SIGNER!)
@@ -25,6 +26,13 @@ describe('walrusClientTests', () => {
         const baseClient = new SuiClient({
             network: NETWORK,
             url: TESTNET_RPC_URL,
+            mvr: {
+                overrides: {
+                    packages: {
+                        '@walrus/sites': PACKAGE_ADDRESS,
+                    },
+                },
+            },
         })
         const extendedClientWithWalrus = baseClient.$extend(
             walrus({
@@ -59,6 +67,7 @@ describe('walrusClientTests', () => {
                 rangeEnd: 1,
             },
         })!
+        tx.add(range)
         const metadata = client.walrus_sites?.call.newMetadata({
             arguments: {
                 link: 'https://example.com',
@@ -68,25 +77,34 @@ describe('walrusClientTests', () => {
                 creator: 'Example Creator',
             },
         })!
+        tx.add(metadata)
         const site = client.walrus_sites?.call.newSite({
             arguments: {
                 name: 'Example Site',
                 metadata,
             },
         })!
-        client.walrus_sites?.tx.createAndAddResource(tx, {
-            newRangeOptions: { arguments: { rangeStart: 0, rangeEnd: 1 } },
-            newResourceArguments: {
+        tx.add(site)
+        // tx.transferObjects([site], KEYPAIR.toSuiAddress())
+        const resource = client.walrus_sites?.call.newResource({
+            arguments: {
                 path: 'path',
-                blobId: 123,
-                blobHash: 3219229,
+                blobId: 123n,
+                blobHash: 3219229n,
                 range,
             },
-            site,
-            resourceHeaders: new Map([['Content-Type', 'text/html']]),
-        })
+        })!
+        const addResource = client.walrus_sites?.call.addResource({
+            arguments: { site, resource },
+        })!
+        tx.add(addResource)
         tx.setGasBudget(1000000000)
-        executor.executeTransaction(tx)
+        const res = await executor.executeTransaction(tx, {
+            showEvents: true,
+            showEffects: true,
+            showObjectChanges: true,
+        })
+        console.log(res.digest)
     })
 
     // Note: To run this test you should specify a big timeout. Otherwise, the test
