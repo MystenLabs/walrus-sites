@@ -12,7 +12,7 @@ const NETWORK = 'testnet'
 const EPOCHS = 2
 const TESTNET_RPC_URL = 'https://fullnode.testnet.sui.io:443'
 
-describe('walrusSitesClientShouldBeInitialisable', () => {
+describe('walrusClientTests', () => {
     let client: ClientWithExtensions<
         { [x: string]: WalrusSitesClient },
         ClientWithExtensions<{ walrus: WalrusClient }, SuiClient>
@@ -37,7 +37,7 @@ describe('walrusSitesClientShouldBeInitialisable', () => {
         client = extendedClientWithWalrus.$extend(walrusSites())
     })
 
-    it('initialises the walrus sites client', () => {
+    it('initialisesTheWalrusSitesClient', () => {
         expect(client.base.network).toEqual(NETWORK)
         expect(client.walrus).toBeDefined()
         expect(client.walrus_sites).toBeDefined()
