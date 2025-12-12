@@ -11,7 +11,6 @@ use crate::{
     config::Walrus,
     site_config::WSResources,
     types::{HttpHeaders, VecMap},
-    walrus::command::QuiltBlobInput,
 };
 
 #[test]
@@ -27,7 +26,7 @@ fn test_derive_http_headers() {
     ];
     let ws_resources = mock_ws_resources();
     for (path, expected) in test_paths {
-        let result = ResourceManager::derive_http_headers(&ws_resources, path);
+        let result = ResourceData::derive_http_headers(ws_resources.as_ref(), path);
         assert_eq!(result.len(), 1);
         assert!(result.contains_key(expected));
     }
@@ -56,26 +55,14 @@ fn mock_ws_resources() -> Option<WSResources> {
 }
 
 /// Helper function to create a mock resource for testing.
-fn create_mock_resource(
-    file_name: String,
-    file_size: usize,
-    index: u64,
-) -> (ResourceData, QuiltBlobInput) {
-    let resource_data = ResourceData {
+fn create_mock_resource(file_name: String, file_size: usize, index: u64) -> ResourceData {
+    ResourceData {
         unencoded_size: file_size,
         full_path: PathBuf::from(format!("/test/{}", file_name)),
         resource_path: format!("/{}", file_name),
         headers: HttpHeaders(VecMap::new()),
         blob_hash: U256::from(index),
-    };
-
-    let quilt_input = QuiltBlobInput {
-        path: PathBuf::from(format!("/test/{}", file_name)),
-        identifier: Some(format!("/{}", file_name)),
-        tags: BTreeMap::new(),
-    };
-
-    (resource_data, quilt_input)
+    }
 }
 
 #[test]

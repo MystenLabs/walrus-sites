@@ -25,6 +25,7 @@ use crate::{
         manager::SiteManager,
         resource::{ResourceManager, SiteOps},
         RemoteSiteFactory,
+        SiteData,
     },
     summary::{SiteDataDiffSummary, Summarizable},
     util::{
@@ -164,6 +165,18 @@ impl SiteEditor<EditOptions> {
             self.directory().to_string_lossy()
         ));
         let dry_run = self.edit_options.publish_options.walrus_options.dry_run;
+        // Existing site:
+        let retriable_client = site_manager.sui_client().await?;
+        let existing_site = match &self.edit_options.site_id {
+            Some(site_id) => {
+                RemoteSiteFactory::new(&retriable_client, self.config.package)
+                    .await?
+                    .get_from_chain(*site_id)
+                    .await?
+            }
+            None => SiteData::empty(),
+        };
+
         let local_site_data = resource_manager
             .read_dir_and_store_quilts(
                 self.directory(),
@@ -177,6 +190,7 @@ impl SiteEditor<EditOptions> {
                     .publish_options
                     .walrus_options
                     .max_quilt_size,
+                existing_site,
             )
             .await?;
         display::done();

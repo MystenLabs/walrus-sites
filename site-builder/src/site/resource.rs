@@ -103,6 +103,40 @@ impl Resource {
             full_path,
         }
     }
+
+    pub fn patch_id(&self) -> Option<&String> {
+        self.info.headers.get(Self::QUILT_PATCH_ID_INTERNAL_HEADER)
+    }
+
+    pub fn from_resource_data(
+        ResourceData {
+            unencoded_size,
+            full_path,
+            resource_path,
+            mut headers,
+            blob_hash,
+        }: ResourceData,
+        blob_id: BlobId,
+        x_wal_quilt_patch_id: Option<String>,
+    ) -> Self {
+        if let Some(patch_id) = x_wal_quilt_patch_id {
+            headers
+                .0
+                .insert(Self::QUILT_PATCH_ID_INTERNAL_HEADER.to_owned(), patch_id);
+        };
+
+        Resource {
+            info: SuiResource {
+                path: resource_path,
+                headers,
+                blob_id,
+                blob_hash,
+                range: None,
+            },
+            unencoded_size,
+            full_path,
+        }
+    }
 }
 
 impl Display for Resource {
@@ -279,7 +313,7 @@ impl Display for ResourceSet {
 
 // Struct used for grouping resource local data.
 #[derive(Debug)]
-struct ResourceData {
+pub struct ResourceData {
     unencoded_size: usize,
     full_path: PathBuf,
     resource_path: String,
@@ -287,57 +321,25 @@ struct ResourceData {
     blob_hash: U256,
 }
 
-/// Loads and manages the set of resources composing the site.
-#[derive(Debug)]
-pub(crate) struct ResourceManager {
-    /// The controller for the Walrus CLI.
-    pub walrus: Walrus,
-    /// The ws-resources.json contents.
-    pub ws_resources: Option<WSResources>,
-    /// The ws-resource file path.
-    pub ws_resources_path: Option<PathBuf>,
-    /// The number of shards of the Walrus system.
-    pub n_shards: NonZeroU16,
-}
-
-impl ResourceManager {
-    pub async fn new(
-        walrus: Walrus,
-        ws_resources: Option<WSResources>,
-        ws_resources_path: Option<PathBuf>,
-    ) -> Result<Self> {
-        let n_shards = walrus.n_shards().await?;
-
-        // Cast the keys to lowercase because http headers
-        //  are case-insensitive: RFC7230 sec. 2.7.3
-        if let Some(resources) = ws_resources.as_ref() {
-            if let Some(ref headers) = resources.headers {
-                for (_, header_map) in headers.clone().iter_mut() {
-                    header_map.0 = header_map
-                        .0
-                        .iter()
-                        .map(|(k, v)| (k.to_lowercase(), v.clone()))
-                        .collect();
-                }
-            }
-        }
-
-        Ok(ResourceManager {
-            walrus,
-            ws_resources,
-            ws_resources_path,
-            n_shards,
-        })
-    }
-
-    /// Returns None when file is the ws-resources.json file parsed, or when it matches any of the
-    /// ignore patterns
-    fn read_local_resource(
-        &self,
+impl ResourceData {
+    pub fn from_file(
+        ws_resources_path: Option<&Path>,
+        ws_resources: Option<&WSResources>,
         full_path: &Path,
         resource_path: String,
-    ) -> Result<Option<ResourceData>> {
-        if let Some(ws_path) = &self.ws_resources_path {
+    ) -> anyhow::Result<Option<ResourceData>> {
+        // Validate identifier size (BCS serialized) should be just 1 + str.len(), but
+        // this is cleaner
+        let identifier_size =
+            bcs::serialized_size(&resource_path).context("Failed to compute identifier size")?;
+        if identifier_size > MAX_IDENTIFIER_SIZE {
+            bail!(
+                "Identifier for '{resource_path}' is too long: {identifier_size} bytes (max: {MAX_IDENTIFIER_SIZE} bytes). \
+                Consider using a shorter path name.",
+            );
+        }
+
+        if let Some(ws_path) = ws_resources_path {
             if full_path == ws_path {
                 tracing::debug!(?full_path, "ignoring the ws-resources config file");
                 return Ok(None);
@@ -345,7 +347,7 @@ impl ResourceManager {
         }
 
         // Skip if resource matches ignore patterns/
-        if let Some(ws_resources) = &self.ws_resources {
+        if let Some(ws_resources) = ws_resources {
             let mut ignore_iter = ws_resources
                 .ignore
                 .as_deref()
@@ -359,7 +361,7 @@ impl ResourceManager {
         }
 
         let mut http_headers: VecMap<String, String> =
-            ResourceManager::derive_http_headers(&self.ws_resources, &resource_path);
+            Self::derive_http_headers(ws_resources, &resource_path);
         let extension = full_path
             .extension()
             .unwrap_or(
@@ -411,12 +413,11 @@ impl ResourceManager {
     ///
     ///  Matches the path of the resource to the wildcard paths in the configuration to
     ///  determine the headers to be added to the HTTP response.
-    pub fn derive_http_headers(
-        ws_resources: &Option<WSResources>,
+    fn derive_http_headers(
+        ws_resources: Option<&WSResources>,
         resource_path: &str,
     ) -> VecMap<String, String> {
         ws_resources
-            .as_ref()
             .and_then(|config| config.headers.as_ref())
             .and_then(|headers| {
                 headers
@@ -426,6 +427,108 @@ impl ResourceManager {
                     .map(|(_, header_map)| header_map.0.clone())
             })
             .unwrap_or_default()
+    }
+
+    /*
+    pub fn try_into_resource(self, patch: StoredQuiltPatch) -> anyhow::Result<Resource> {
+        let ResourceData {
+            unencoded_size,
+            full_path,
+            resource_path,
+            mut headers,
+            blob_hash,
+        } = self;
+        let bytes = BASE64_URL_SAFE_NO_PAD.decode(patch.quilt_patch_id.as_str())?;
+
+        // Must have at least BlobId.LENGTH + 1 bytes (quilt_id + version).
+        if bytes.len() != Walrus::QUILT_PATCH_ID_SIZE {
+            anyhow::bail!(
+                "Expected {} bytes when decoding quilt-patch-id version 1.",
+                Walrus::QUILT_PATCH_ID_SIZE
+            );
+        }
+
+        // Extract blob_id and patch_id (bytes after the blob_id).
+        let (blob_id, patch_bytes): (BlobId, [u8; Walrus::QUILT_PATCH_SIZE]) = (
+            BlobId(bytes[..BlobId::LENGTH].try_into().unwrap()),
+            bytes[BlobId::LENGTH..Walrus::QUILT_PATCH_ID_SIZE]
+                .try_into()
+                .unwrap(),
+        );
+
+        let version = patch_bytes[0];
+        if version != Walrus::QUILT_PATCH_VERSION_1 {
+            anyhow::bail!("Quilt patch version {version} is not implemented");
+        }
+
+        let patch_hex = format!("0x{}", hex::encode(patch_bytes));
+        headers.0.insert(
+            Resource::QUILT_PATCH_ID_INTERNAL_HEADER.to_string(),
+            patch_hex,
+        );
+        Ok(Resource::new(
+            resource_path,
+            full_path,
+            headers,
+            blob_id,
+            blob_hash,
+            unencoded_size,
+        ))
+    }
+    */
+}
+
+impl From<&ResourceData> for QuiltBlobInput {
+    fn from(value: &ResourceData) -> QuiltBlobInput {
+        QuiltBlobInput {
+            path: value.full_path.clone(),
+            identifier: Some(value.resource_path.clone()),
+            tags: BTreeMap::new(),
+        }
+    }
+}
+
+/// Loads and manages the set of resources composing the site.
+#[derive(Debug)]
+pub(crate) struct ResourceManager {
+    /// The controller for the Walrus CLI.
+    pub walrus: Walrus,
+    /// The ws-resources.json contents.
+    pub ws_resources: Option<WSResources>,
+    /// The ws-resource file path.
+    pub ws_resources_path: Option<PathBuf>,
+    /// The number of shards of the Walrus system.
+    pub n_shards: NonZeroU16,
+}
+
+impl ResourceManager {
+    pub async fn new(
+        walrus: Walrus,
+        ws_resources: Option<WSResources>,
+        ws_resources_path: Option<PathBuf>,
+    ) -> Result<Self> {
+        let n_shards = walrus.n_shards().await?;
+
+        // Cast the keys to lowercase because http headers
+        //  are case-insensitive: RFC7230 sec. 2.7.3
+        if let Some(resources) = ws_resources.as_ref() {
+            if let Some(ref headers) = resources.headers {
+                for (_, header_map) in headers.clone().iter_mut() {
+                    header_map.0 = header_map
+                        .0
+                        .iter()
+                        .map(|(k, v)| (k.to_lowercase(), v.clone()))
+                        .collect();
+                }
+            }
+        }
+
+        Ok(ResourceManager {
+            walrus,
+            ws_resources,
+            ws_resources_path,
+            n_shards,
+        })
     }
 
     // Extracts Blob-id and Quilt-patch-id from the walrus store response, in order to combine
@@ -546,10 +649,28 @@ impl ResourceManager {
         dry_run: bool,
         max_quilt_size: ByteSize,
     ) -> Result<ResourceSet> {
-        let resource_file_inputs = self.resource_paths_to_quilt_inputs(resource_args)?;
+        let resource_data = resource_args
+            .into_iter()
+            .map(
+                |ResourcePaths {
+                     file_path,
+                     url_path,
+                 }| {
+                    ResourceData::from_file(
+                        self.ws_resources_path.as_deref(),
+                        self.ws_resources.as_ref(),
+                        file_path.as_path(),
+                        url_path,
+                    )
+                },
+            )
+            .collect::<Result<Vec<Option<_>>>>()?
+            .into_iter()
+            .flatten()
+            .collect();
 
         let resources_set = self
-            .store_into_quilts(resource_file_inputs, epochs, dry_run, max_quilt_size)
+            .store_into_quilts(resource_data, epochs, dry_run, max_quilt_size)
             .await?;
         tracing::debug!(
             "Final site data will be created with {} resources",
@@ -565,12 +686,14 @@ impl ResourceManager {
         epochs: EpochArg,
         dry_run: bool,
         max_quilt_size: ByteSize,
+        existing_site: SiteData,
     ) -> Result<SiteData> {
         let resource_paths = Self::iter_dir(root)?;
         if resource_paths.is_empty() {
             return Ok(SiteData::empty());
         }
 
+        // TODO(sew-495): Remove the multiple collects
         let rel_paths = resource_paths
             .into_iter()
             .map(|file_path| {
@@ -582,10 +705,66 @@ impl ResourceManager {
             })
             .collect::<Result<Vec<ResourcePaths>>>()?;
 
-        let resource_file_inputs = self.resource_paths_to_quilt_inputs(rel_paths)?;
-        let resources_set = self
-            .store_into_quilts(resource_file_inputs, epochs, dry_run, max_quilt_size)
+        let local_resources = rel_paths
+            .into_iter()
+            .map(
+                |ResourcePaths {
+                     file_path,
+                     url_path,
+                 }| {
+                    ResourceData::from_file(
+                        self.ws_resources_path.as_deref(),
+                        self.ws_resources.as_ref(),
+                        file_path.as_path(),
+                        url_path,
+                    )
+                },
+            )
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>();
+
+        // TODO(sew-495): Extend old Quilts
+        // TODO(sew-495): What about files stored as blobs? It doesn't make much business
+        // sense to keep them as blobs.
+        let (file_changed, file_unchanged) = local_resources.into_iter().fold(
+            (vec![], vec![]),
+            |(mut changed, mut unchanged), local| {
+                println!("local.full_path: {}", local.full_path.to_string_lossy());
+                let site_resource = existing_site
+                    .resources()
+                    .inner
+                    .iter()
+                    .find(|res| res.info.path == local.resource_path);
+
+                match site_resource {
+                    Some(res) if res.info.blob_hash == local.blob_hash => {
+                        // Even if data is the same, other things might have changed.
+                        let updated_resource = Resource::from_resource_data(
+                            local,
+                            res.info.blob_id,
+                            res.patch_id().cloned(),
+                        );
+                        unchanged.push(updated_resource);
+                    }
+                    _ => {
+                        changed.push(local);
+                    }
+                }
+
+                (changed, unchanged)
+            },
+        );
+
+        // TODO(sew-495) extend blobs from unchanged
+
+        // changed files need to be stored into new quilts
+        let mut resources_set = self
+            .store_into_quilts(file_changed, epochs, dry_run, max_quilt_size)
             .await?;
+        resources_set.extend(file_unchanged.into_iter());
+
         tracing::debug!(
             "Final site data will be created with {} resources",
             resources_set.len()
@@ -593,9 +772,10 @@ impl ResourceManager {
         Ok(self.to_site_data(resources_set))
     }
 
+    // TODO: Accept iterator?
     async fn store_into_quilts(
         &mut self,
-        resource_file_inputs: Vec<(ResourceData, QuiltBlobInput)>,
+        resource_file_inputs: Vec<ResourceData>,
         epochs: EpochArg,
         dry_run: bool,
         max_quilt_size: ByteSize,
@@ -649,47 +829,9 @@ impl ResourceManager {
         Ok(resources_set)
     }
 
-    /// Filters resource_paths and prepares them as inputs for Quilt creation.
-    fn resource_paths_to_quilt_inputs(
-        &self,
-        resources: impl IntoIterator<Item = ResourcePaths>,
-    ) -> Result<Vec<(ResourceData, QuiltBlobInput)>> {
-        let res = resources
-            .into_iter()
-            .map(|ResourcePaths{file_path, url_path}| {
-                // Validate identifier size (BCS serialized) should be just 1 + str.len(), but
-                // this is cleaner
-                let identifier_size = bcs::serialized_size(&url_path)
-                    .context("Failed to compute identifier size")?;
-                if identifier_size > MAX_IDENTIFIER_SIZE {
-                    bail!(
-                        "Identifier for '{url_path}' is too long: {identifier_size} bytes (max: {MAX_IDENTIFIER_SIZE} bytes). \
-                        Consider using a shorter path name.",
-                    );
-                }
-
-                let Some(res_data) = self.read_local_resource(&file_path, url_path.clone())?
-                else {
-                    return Ok(None);
-                };
-                let quilt_blob_input = QuiltBlobInput {
-                    path: file_path.clone(),
-                    identifier: Some(url_path),
-                    tags: BTreeMap::new(),
-                };
-                Ok(Some((res_data, quilt_blob_input)))
-            })
-            .collect::<Result<Vec<Option<(ResourceData, QuiltBlobInput)>>>>()?
-            .into_iter()
-            .flatten()
-            .collect();
-
-        Ok(res)
-    }
-
     fn quilts_chunkify(
         &self,
-        resources: Vec<(ResourceData, QuiltBlobInput)>,
+        resources: Vec<ResourceData>,
         max_quilt_size: ByteSize,
     ) -> Result<Vec<Vec<(ResourceData, QuiltBlobInput)>>> {
         let max_quilt_size = max_quilt_size.as_u64() as usize;
@@ -718,7 +860,8 @@ impl ResourceManager {
         let mut chunks = vec![];
         let mut current_chunk = vec![];
 
-        for (res_data, quilt_input) in resources.into_iter() {
+        for res_data in resources.into_iter() {
+            let quilt_input = (&res_data).into();
             // Calculate total size including overhead
             let file_size_with_overhead =
                 res_data.unencoded_size + MAX_IDENTIFIER_SIZE + FIXED_OVERHEAD;

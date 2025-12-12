@@ -103,6 +103,7 @@ impl SiteManager {
         tracing::debug!(?existing_site, "checked existing site");
 
         let site_updates = local_site_data.diff(&existing_site);
+        println!("site_updates: {site_updates:#?}");
 
         // Check if there are any updates to the site on-chain.
         let result = if site_updates.has_updates() {
@@ -120,6 +121,7 @@ impl SiteManager {
         if !blobs_to_delete.is_empty() {
             self.delete_from_walrus(&blobs_to_delete).await?;
         }
+        // TODO(sew-495): Extend unchanged blob-ids
 
         Ok((result, site_updates.summary()))
     }
@@ -352,7 +354,7 @@ impl SiteManager {
         .await
     }
 
-    async fn sui_client(&self) -> Result<RetriableSuiClient> {
+    pub async fn sui_client(&self) -> Result<RetriableSuiClient> {
         RetriableSuiClient::new_from_wallet(&self.wallet, self.backoff_config.clone()).await
     }
 
@@ -454,21 +456,27 @@ fn collect_deletable_blob_candidates(site_updates: &SiteDataDiff) -> HashSet<Blo
         .resource_ops
         .iter()
         .filter_map(|op| match op {
-            SiteOps::Deleted(resource) => Some(resource.info.blob_id),
+            SiteOps::Deleted(resource) => {
+                println!("delete: {}", resource.info.path);
+                Some(resource.info.blob_id)
+            }
             _ => None,
         })
         // Collect first to a hash-set to keep unique blob-ids.
         .collect::<HashSet<_>>();
-    let resource_deleted_but_blob_extended = site_updates
+    let resource_deleted_but_blob_still_used = site_updates
         .resource_ops
         .iter()
         .filter_map(|op| match op {
             SiteOps::Created(resource) if deleted.contains(&resource.info.blob_id) => {
                 Some(resource.info.blob_id)
             }
+            SiteOps::Unchanged(resource) if deleted.contains(&resource.info.blob_id) => {
+                Some(resource.info.blob_id)
+            }
             _ => None,
         })
         .collect::<HashSet<_>>();
-    deleted.retain(|blob_id| !resource_deleted_but_blob_extended.contains(blob_id));
+    deleted.retain(|blob_id| !resource_deleted_but_blob_still_used.contains(blob_id));
     deleted
 }
