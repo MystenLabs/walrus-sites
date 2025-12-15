@@ -1,0 +1,28 @@
+name: Build Service Worker
+permissions:
+  contents: read
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    name: Build service worker with webpack
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+
+      - name: Install dependencies
+        working-directory: portal
+        run: bun install
+
+      - name: Copy environment file
+        working-directory: portal/worker
+        run: cp .env.mainnet.example .env.local
+
+      - name: Build service worker
+        working-directory: portal/worker
+        run: bun run build:prod
