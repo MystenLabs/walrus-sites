@@ -1,11 +1,17 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { bcs, BcsType, TypeTagSerializer, BcsStruct, BcsEnum, BcsTuple } from '@mysten/sui/bcs'
-import type { TypeTag } from '@mysten/sui/bcs'
+import {
+    bcs,
+    BcsType,
+    TypeTag,
+    TypeTagSerializer,
+    BcsStruct,
+    BcsEnum,
+    BcsTuple,
+} from '@mysten/sui/bcs'
 import { normalizeSuiAddress } from '@mysten/sui/utils'
-import { isArgument } from '@mysten/sui/transactions'
-import type { TransactionArgument } from '@mysten/sui/transactions'
+import { TransactionArgument, isArgument } from '@mysten/sui/transactions'
 
 const MOVE_STDLIB_ADDRESS = normalizeSuiAddress('0x1')
 const SUI_FRAMEWORK_ADDRESS = normalizeSuiAddress('0x2')

@@ -103,11 +103,9 @@ describe('walrusClientTests', () => {
         })!
         tx.add(addResource) // <- ValiError: Invalid input: Received "0x000000000000000000000000000000000000000000000000000@walrus/sites"
         tx.setGasBudget(1000000000)
-        const res = await executor.executeTransaction(tx, {
-            showEvents: true,
-            showEffects: true,
-            showObjectChanges: true,
-        })
+
+        const res = await KEYPAIR.signAndExecuteTransaction({ transaction: tx, client })
+
         console.log(res.digest)
     })
 
