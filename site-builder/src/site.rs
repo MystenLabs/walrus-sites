@@ -30,7 +30,7 @@ use crate::{
         SiteNameOp,
         SuiDynamicField,
     },
-    util::{handle_pagination, type_origin_map_for_package},
+    util::handle_pagination,
 };
 
 pub const SITE_MODULE: &str = "site";
@@ -166,7 +166,7 @@ impl RemoteSiteFactory<'_> {
         sui_client: &RetriableSuiClient,
         package_id: ObjectID,
     ) -> Result<RemoteSiteFactory<'_>> {
-        let type_origin_map = type_origin_map_for_package(sui_client, package_id).await?;
+        let type_origin_map = sui_client.type_origin_map_for_package(package_id).await?;
         Ok(RemoteSiteFactory {
             sui_client,
             type_origin_map,
