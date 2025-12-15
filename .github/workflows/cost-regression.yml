@@ -87,8 +87,8 @@ jobs:
           WAL_COIN: "0x8270feb7375eee355e64fdb69c50abb6b5f9393a722883c1cf45f8e26048810a::wal::WAL"
         run: |
           BALANCE_JSON=$(sui client balance --json)
-          SUI_BALANCE=$(echo "$BALANCE_JSON" | jq -r --arg coin "$SUI_COIN" '[.[0][0][] | select(.coinType == $coin) | .balance | tonumber] | add // 0')
-          WAL_BALANCE=$(echo "$BALANCE_JSON" | jq -r --arg coin "$WAL_COIN" '[.[0][0][] | select(.coinType == $coin) | .balance | tonumber] | add // 0')
+          SUI_BALANCE=$(echo "$BALANCE_JSON" | jq -r --arg coin "$SUI_COIN" '[.[0][][1][] | select(.coinType == $coin) | .balance | tonumber] | add // 0')
+          WAL_BALANCE=$(echo "$BALANCE_JSON" | jq -r --arg coin "$WAL_COIN" '[.[0][][1][] | select(.coinType == $coin) | .balance | tonumber] | add // 0')
           echo "sui=$SUI_BALANCE" >> $GITHUB_OUTPUT
           echo "wal=$WAL_BALANCE" >> $GITHUB_OUTPUT
           echo "Initial SUI: $SUI_BALANCE MIST"
@@ -110,8 +110,8 @@ jobs:
           WAL_COIN: "0x8270feb7375eee355e64fdb69c50abb6b5f9393a722883c1cf45f8e26048810a::wal::WAL"
         run: |
           BALANCE_JSON=$(sui client balance --json)
-          SUI_BALANCE=$(echo "$BALANCE_JSON" | jq -r --arg coin "$SUI_COIN" '[.[0][0][] | select(.coinType == $coin) | .balance | tonumber] | add // 0')
-          WAL_BALANCE=$(echo "$BALANCE_JSON" | jq -r --arg coin "$WAL_COIN" '[.[0][0][] | select(.coinType == $coin) | .balance | tonumber] | add // 0')
+          SUI_BALANCE=$(echo "$BALANCE_JSON" | jq -r --arg coin "$SUI_COIN" '[.[0][][1][] | select(.coinType == $coin) | .balance | tonumber] | add // 0')
+          WAL_BALANCE=$(echo "$BALANCE_JSON" | jq -r --arg coin "$WAL_COIN" '[.[0][][1][] | select(.coinType == $coin) | .balance | tonumber] | add // 0')
           echo "sui=$SUI_BALANCE" >> $GITHUB_OUTPUT
           echo "wal=$WAL_BALANCE" >> $GITHUB_OUTPUT
 
@@ -139,8 +139,8 @@ jobs:
           WAL_COIN: "0x8270feb7375eee355e64fdb69c50abb6b5f9393a722883c1cf45f8e26048810a::wal::WAL"
         run: |
           BALANCE_JSON=$(sui client balance --json)
-          SUI_BALANCE=$(echo "$BALANCE_JSON" | jq -r --arg coin "$SUI_COIN" '[.[0][0][] | select(.coinType == $coin) | .balance | tonumber] | add // 0')
-          WAL_BALANCE=$(echo "$BALANCE_JSON" | jq -r --arg coin "$WAL_COIN" '[.[0][0][] | select(.coinType == $coin) | .balance | tonumber] | add // 0')
+          SUI_BALANCE=$(echo "$BALANCE_JSON" | jq -r --arg coin "$SUI_COIN" '[.[0][][1][] | select(.coinType == $coin) | .balance | tonumber] | add // 0')
+          WAL_BALANCE=$(echo "$BALANCE_JSON" | jq -r --arg coin "$WAL_COIN" '[.[0][][1][] | select(.coinType == $coin) | .balance | tonumber] | add // 0')
           echo "sui=$SUI_BALANCE" >> $GITHUB_OUTPUT
           echo "wal=$WAL_BALANCE" >> $GITHUB_OUTPUT
 
