@@ -14,9 +14,6 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  # WAL coin type (testnet)
-  WAL_COIN_TYPE: "0x8270feb7375eee355e64fdb69c50abb6b5f9393a722883c1cf45f8e26048810a::wal::WAL"
-  SUI_COIN_TYPE: "0x2::sui::SUI"
 
 jobs:
   cost-regression:
@@ -52,6 +49,12 @@ jobs:
           active_address: "${{ vars.SUI_ADDRESS_TESTNET }}"
           EOF
 
+      - name: Setup Walrus config
+        run: |
+          mkdir -p ~/.config/walrus
+          curl -sSL https://raw.githubusercontent.com/MystenLabs/walrus/main/setup/client_config.yaml \
+            -o ~/.config/walrus/client_config.yaml
+
       - name: Verify wallet setup
         run: |
           sui client active-address
@@ -80,13 +83,13 @@ jobs:
       - name: Get initial balances
         id: initial_balance
         run: |
-          BALANCE_JSON=$(sui client balance --json)
-          SUI_BALANCE=$(echo "$BALANCE_JSON" | jq -r ".[][] | select(.coinType == \"$SUI_COIN_TYPE\") | .totalBalance" | head -1)
-          WAL_BALANCE=$(echo "$BALANCE_JSON" | jq -r ".[][] | select(.coinType == \"$WAL_COIN_TYPE\") | .totalBalance" | head -1)
-          echo "sui=$SUI_BALANCE" >> $GITHUB_OUTPUT
-          echo "wal=$WAL_BALANCE" >> $GITHUB_OUTPUT
-          echo "Initial SUI: $SUI_BALANCE MIST"
-          echo "Initial WAL: $WAL_BALANCE units"
+          sui client balance
+          SUI_BALANCE=$(sui client balance | grep -w "Sui" | awk '{print $3}')
+          WAL_BALANCE=$(sui client balance | grep -w "WAL Token" | awk '{print $3}')
+          echo "sui=${SUI_BALANCE:-0}" >> $GITHUB_OUTPUT
+          echo "wal=${WAL_BALANCE:-0}" >> $GITHUB_OUTPUT
+          echo "Initial SUI: ${SUI_BALANCE:-0} MIST"
+          echo "Initial WAL: ${WAL_BALANCE:-0} units"
 
       - name: Deploy site
         id: deploy
@@ -100,11 +103,10 @@ jobs:
       - name: Get post-deploy balances
         id: post_deploy_balance
         run: |
-          BALANCE_JSON=$(sui client balance --json)
-          SUI_BALANCE=$(echo "$BALANCE_JSON" | jq -r ".[][] | select(.coinType == \"$SUI_COIN_TYPE\") | .totalBalance" | head -1)
-          WAL_BALANCE=$(echo "$BALANCE_JSON" | jq -r ".[][] | select(.coinType == \"$WAL_COIN_TYPE\") | .totalBalance" | head -1)
-          echo "sui=$SUI_BALANCE" >> $GITHUB_OUTPUT
-          echo "wal=$WAL_BALANCE" >> $GITHUB_OUTPUT
+          SUI_BALANCE=$(sui client balance | grep -w "Sui" | awk '{print $3}')
+          WAL_BALANCE=$(sui client balance | grep -w "WAL Token" | awk '{print $3}')
+          echo "sui=${SUI_BALANCE:-0}" >> $GITHUB_OUTPUT
+          echo "wal=${WAL_BALANCE:-0}" >> $GITHUB_OUTPUT
 
       - name: Simulate code update (regenerate only JS/CSS/HTML)
         run: |
@@ -126,11 +128,10 @@ jobs:
       - name: Get final balances
         id: final_balance
         run: |
-          BALANCE_JSON=$(sui client balance --json)
-          SUI_BALANCE=$(echo "$BALANCE_JSON" | jq -r ".[][] | select(.coinType == \"$SUI_COIN_TYPE\") | .totalBalance" | head -1)
-          WAL_BALANCE=$(echo "$BALANCE_JSON" | jq -r ".[][] | select(.coinType == \"$WAL_COIN_TYPE\") | .totalBalance" | head -1)
-          echo "sui=$SUI_BALANCE" >> $GITHUB_OUTPUT
-          echo "wal=$WAL_BALANCE" >> $GITHUB_OUTPUT
+          SUI_BALANCE=$(sui client balance | grep -w "Sui" | awk '{print $3}')
+          WAL_BALANCE=$(sui client balance | grep -w "WAL Token" | awk '{print $3}')
+          echo "sui=${SUI_BALANCE:-0}" >> $GITHUB_OUTPUT
+          echo "wal=${WAL_BALANCE:-0}" >> $GITHUB_OUTPUT
 
       - name: Calculate and report costs
         run: |
