@@ -7,10 +7,6 @@ on:
         description: 'Git ref (branch, tag, or commit SHA) to test'
         required: false
         default: ''
-  # TODO: Remove push trigger after testing
-  push:
-    branches:
-      - synthetic-site-redeploy-cost-regression-test
 
 env:
   CARGO_TERM_COLOR: always
@@ -67,18 +63,20 @@ jobs:
 
       - name: Generate synthetic dApp site (~870KB)
         run: |
-          ./scripts/generate_synthetic_site.sh --output-dir ./test-site \
-            --file index.html:5000 \
-            --file vendor.js:320000 \
-            --file app.js:80000 \
-            --file wallet-ui.js:60000 \
-            --file styles.css:30000 \
-            --file components.css:20000 \
-            --file assets/logo.png:50000 \
-            --file assets/icon-192.png:30000 \
-            --file assets/icon-512.png:80000 \
-            --file fonts/inter-regular.woff2:45000 \
-            --file fonts/inter-bold.woff2:48000
+          mkdir -p ./test-site/assets ./test-site/fonts
+          head -c 5000 /dev/urandom > ./test-site/index.html
+          head -c 320000 /dev/urandom > ./test-site/vendor.js
+          head -c 80000 /dev/urandom > ./test-site/app.js
+          head -c 60000 /dev/urandom > ./test-site/wallet-ui.js
+          head -c 30000 /dev/urandom > ./test-site/styles.css
+          head -c 20000 /dev/urandom > ./test-site/components.css
+          head -c 50000 /dev/urandom > ./test-site/assets/logo.png
+          head -c 30000 /dev/urandom > ./test-site/assets/icon-192.png
+          head -c 80000 /dev/urandom > ./test-site/assets/icon-512.png
+          head -c 45000 /dev/urandom > ./test-site/fonts/inter-regular.woff2
+          head -c 48000 /dev/urandom > ./test-site/fonts/inter-bold.woff2
+          echo "Generated synthetic site:"
+          du -sh ./test-site
 
       - name: Get initial balances
         id: initial_balance
