@@ -1,4 +1,6 @@
 name: Build Service Worker
+permissions:
+  contents: read
 
 on:
   push:
