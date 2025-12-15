@@ -2,6 +2,11 @@ name: Cost Regression Test
 
 on:
   workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git ref (branch, tag, or commit SHA) to test'
+        required: false
+        default: ''
 
 env:
   CARGO_TERM_COLOR: always
@@ -15,6 +20,8 @@ jobs:
     runs-on: ubuntu-ghcloud
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Install suiup, sui, and walrus
         env:
