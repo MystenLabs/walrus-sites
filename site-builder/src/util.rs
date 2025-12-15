@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 use std::{
     collections::HashMap,
-    fs,
     path::{Path, PathBuf},
     str,
     time::SystemTime,
@@ -18,8 +17,6 @@ use sui_sdk::{
     rpc_types::{
         Page,
         SuiExecutionStatus,
-        SuiObjectDataOptions,
-        SuiRawData,
         SuiTransactionBlockEffects,
         SuiTransactionBlockEffectsAPI,
         SuiTransactionBlockResponse,
@@ -27,7 +24,7 @@ use sui_sdk::{
     wallet_context::WalletContext,
 };
 use sui_types::{
-    base_types::{ObjectID, ObjectRef, ObjectType, SuiAddress},
+    base_types::{ObjectID, ObjectRef, SuiAddress},
     object::Owner,
     transaction::{ProgrammableTransaction, TransactionData},
     TypeTag,
@@ -38,7 +35,7 @@ use crate::{
     config::Config,
     display,
     retry_client::RetriableSuiClient,
-    site::{config::WSResources, contracts::TypeOriginMap},
+    site::config::WSResources,
     types::{HttpHeaders, ObjectCache, Staking, StakingInnerV1, StakingObjectForDeserialization},
     walrus::{
         output::{EpochCount, EpochTimeOrMessage, InfoEpochOutput, SuiBlob},
@@ -208,29 +205,6 @@ pub(crate) fn path_or_defaults_if_exist(
         path = default.exists().then_some(default.clone());
     }
     path
-}
-
-/// Gets the type origin map for a given package.
-pub(crate) async fn type_origin_map_for_package(
-    sui_client: &RetriableSuiClient,
-    package_id: ObjectID,
-) -> Result<TypeOriginMap> {
-    let Ok(Some(SuiRawData::Package(raw_package))) = sui_client
-        .get_object_with_options(
-            package_id,
-            SuiObjectDataOptions::default().with_type().with_bcs(),
-        )
-        .await?
-        .into_object()
-        .map(|object| object.bcs)
-    else {
-        bail!("no package foundwith ID {package_id}");
-    };
-    Ok(raw_package
-        .type_origin_table
-        .into_iter()
-        .map(|origin| ((origin.module_name, origin.datatype_name), origin.package))
-        .collect())
 }
 
 /// Loads the wallet context from the given optional wallet config (optional path and optional
@@ -602,76 +576,16 @@ pub fn get_epochs_ahead(
     Ok(epochs_ahead)
 }
 
-// TODO(sew-495): Handle commented out code if necessary
-// #[serde_as]
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-/// Configuration for the contract packages and shared objects.
-pub struct WalrusContractConfig {
-    /// Object ID of the Walrus system object.
-    pub system_object: ObjectID,
-    /// Object ID of the Walrus staking object.
-    pub staking_object: ObjectID,
-    /// Object ID of the credits object.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub credits_object: Option<ObjectID>,
-    /// Object ID of the walrus subsidies object.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub walrus_subsidies_object: Option<ObjectID>,
-    // /// The TTL for cached system and staking objects.
-    // #[serde(default = "defaults::default_cache_ttl", rename = "cache_ttl_secs")]
-    // #[serde_as(as = "DurationSeconds")]
-    // pub cache_ttl: Duration,
-}
-
-pub async fn extract_walrus_package_from_config(
-    sui_client: &RetriableSuiClient,
-    walrus_config_path: &Path,
-) -> anyhow::Result<ObjectID> {
-    let config_contents =
-        fs::read_to_string(walrus_config_path).context("Failed to read walrus config file")?;
-    let walrus_contract_config: WalrusContractConfig =
-        serde_yaml::from_str(&config_contents).context("Failed to parse walrus config file")?;
-
-    let staking_obj = sui_client
-        .get_object_with_options(
-            walrus_contract_config.staking_object,
-            SuiObjectDataOptions::new().with_type(),
-        )
-        .await
-        .context("Failed to fetch staking object data")?;
-    let ObjectType::Struct(move_object_type) = staking_obj
-        .data
-        .ok_or(anyhow!(
-            "Expected data in get-object response for staking-object"
-        ))?
-        .object_type()?
-    else {
-        bail!(
-            "staking object ID ({}) points to a package, not an object",
-            walrus_contract_config.staking_object
-        )
-    };
-    Ok(ObjectID::from_address(move_object_type.address()))
-}
-
 pub async fn get_owned_blobs(
     sui_client: &RetriableSuiClient,
     config: &Config,
     owner_address: SuiAddress,
 ) -> anyhow::Result<HashMap<BlobId, SuiBlob>> {
-    let walrus_package = match config.general.walrus_package {
-        Some(pkg) => pkg,
-        None => {
-            let walrus_config_path = config.general.walrus_config.as_ref().ok_or_else(|| {
-                anyhow!("no walrus package, or walrus config specified; please add either")
-            })?;
-            // TODO: Maybe we want to parse from the walrus-config everywhere, not just for site-map and
-            // when this is called.
-            extract_walrus_package_from_config(sui_client, walrus_config_path).await?
-        }
-    };
+    let walrus_package = config.general.resolve_walrus_package(sui_client).await?;
 
-    let type_map = type_origin_map_for_package(sui_client, walrus_package).await?;
+    let type_map = sui_client
+        .type_origin_map_for_package(walrus_package)
+        .await?;
     let blobs = sui_client
         .get_owned_objects_of_type::<SuiBlob>(owner_address, &type_map, &[])
         .await?

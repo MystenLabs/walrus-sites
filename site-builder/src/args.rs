@@ -16,7 +16,7 @@ use crate::{
     retry_client::RetriableSuiClient,
     suins::SuiNsClient,
     util::load_wallet_context,
-    walrus::output::EpochCount,
+    walrus::{config::WalrusContractConfig, output::EpochCount},
 };
 
 #[cfg(test)]
@@ -133,6 +133,30 @@ impl GeneralArgs {
             self.wallet_env.as_deref(),
             self.wallet_address.as_ref(),
         )
+    }
+
+    /// Resolves the walrus package ID.
+    ///
+    /// Returns `walrus_package` if provided, otherwise loads the walrus config file
+    /// and extracts the original package ID from the staking object.
+    // TODO: Maybe we want to parse from the walrus-config everywhere, not just for site-map
+    // and when get-owned-blobs is called.
+    pub async fn resolve_walrus_package(
+        &self,
+        sui_client: &RetriableSuiClient,
+    ) -> Result<ObjectID> {
+        match self.walrus_package {
+            Some(pkg) => Ok(pkg),
+            None => {
+                let walrus_config_path = self.walrus_config.as_ref().ok_or_else(|| {
+                    anyhow!("no walrus package, or walrus config specified; please add either")
+                })?;
+                let walrus_config = WalrusContractConfig::from_file(walrus_config_path)?;
+                sui_client
+                    .get_object_original_package(walrus_config.staking_object)
+                    .await
+            }
+        }
     }
 }
 
@@ -515,6 +539,8 @@ impl EpochCountOrMax {
 }
 
 pub mod default {
+    use std::time::Duration;
+
     use bytesize::ByteSize;
 
     pub const DEFAULT_SITE_NAME: &str = "My Walrus Site";
@@ -528,5 +554,8 @@ pub mod default {
     }
     pub fn max_quilt_size() -> ByteSize {
         ByteSize::mib(512) // 512 MiB
+    }
+    pub const fn cache_ttl() -> Duration {
+        Duration::from_secs(10)
     }
 }

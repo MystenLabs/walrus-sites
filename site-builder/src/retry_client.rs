@@ -35,7 +35,7 @@ use sui_sdk::{
     SuiClient,
 };
 use sui_types::{
-    base_types::{ObjectID, SuiAddress},
+    base_types::{ObjectID, ObjectType, SuiAddress},
     dynamic_field::derive_dynamic_field_id,
     quorum_driver_types::ExecuteTransactionRequestType::WaitForLocalExecution,
     transaction::Transaction,
@@ -288,6 +288,24 @@ impl RetriableSuiClient {
         .await
     }
 
+    /// Returns the original package ID for the given object's type.
+    ///
+    /// The original package ID is the runtime ID used by Move - the first version of the package,
+    /// shared across all upgrades.
+    #[tracing::instrument(level = Level::DEBUG, skip_all)]
+    pub async fn get_object_original_package(&self, object_id: ObjectID) -> Result<ObjectID> {
+        let response = self
+            .get_object_with_options(object_id, SuiObjectDataOptions::new().with_type())
+            .await?;
+        let object_data = response
+            .data
+            .ok_or_else(|| anyhow!("object {object_id} not found"))?;
+        let ObjectType::Struct(move_object_type) = object_data.object_type()? else {
+            bail!("object ID ({object_id}) points to a package, not an object");
+        };
+        Ok(ObjectID::from_address(move_object_type.address()))
+    }
+
     /// Return a list of [SuiObjectResponse] from the given vector of [ObjectID]s.
     ///
     /// Calls [`sui_sdk::apis::ReadApi::multi_get_object_with_options`] internally.
@@ -337,7 +355,6 @@ impl RetriableSuiClient {
     }
 
     /// Gets the type origin map for a given package.
-    #[allow(dead_code)]
     pub(crate) async fn type_origin_map_for_package(
         &self,
         package_id: ObjectID,

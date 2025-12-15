@@ -738,9 +738,6 @@ impl ResourceManager {
             .flatten()
             .collect::<Vec<_>>();
 
-        // TODO(sew-495): Extend old Quilts
-        // TODO(sew-495): What about files stored as blobs? It doesn't make much business
-        // sense to keep them as blobs.
         let (file_changed, file_unchanged) = local_resources.into_iter().fold(
             (vec![], vec![]),
             |(mut changed, mut unchanged), local| {
@@ -768,6 +765,19 @@ impl ResourceManager {
                 (changed, unchanged)
             },
         );
+
+        // Warn about unchanged resources stored as legacy blobs (without quilt patch IDs).
+        let legacy_blob_count = file_unchanged
+            .iter()
+            .filter(|r| r.patch_id().is_none())
+            .count();
+        if legacy_blob_count > 0 {
+            display::warning(format!(
+                "Found {legacy_blob_count} resource(s) stored as individual blobs (legacy format). \
+                To benefit from quilt optimizations, re-publish the site or use `update-resources` \
+                to migrate specific files."
+            ));
+        }
 
         // changed files need to be stored into new quilts
         let mut resources_set = self
