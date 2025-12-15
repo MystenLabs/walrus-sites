@@ -1,0 +1,164 @@
+name: Cost Regression Test
+
+on:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  # WAL coin type (testnet)
+  WAL_COIN_TYPE: "0x8270feb7375eee355e64fdb69c50abb6b5f9393a722883c1cf45f8e26048810a::wal::WAL"
+  SUI_COIN_TYPE: "0x2::sui::SUI"
+
+jobs:
+  cost-regression:
+    name: Measure deploy/redeploy costs on testnet
+    runs-on: ubuntu-ghcloud
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install suiup, sui, and walrus
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/MystenLabs/suiup/main/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          export PATH="$HOME/.local/bin:$PATH"
+          suiup install sui -y
+          suiup install walrus -y
+
+      - name: Setup Sui wallet from keystore
+        run: |
+          mkdir -p ~/.sui/sui_config
+          echo '${{ secrets.SUI_KEYSTORE_TESTNET }}' > ~/.sui/sui_config/sui.keystore
+          cat > ~/.sui/sui_config/client.yaml << EOF
+          keystore:
+            File: $HOME/.sui/sui_config/sui.keystore
+          envs:
+            - alias: testnet
+              rpc: "https://fullnode.testnet.sui.io:443"
+              ws: ~
+          active_env: testnet
+          active_address: "${{ vars.SUI_ADDRESS_TESTNET }}"
+          EOF
+
+      - name: Verify wallet setup
+        run: |
+          sui client active-address
+          sui client balance
+
+      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+
+      - name: Build site-builder
+        run: cargo build --release -p site-builder
+
+      - name: Generate synthetic dApp site (~870KB)
+        run: |
+          ./scripts/generate_synthetic_site.sh --output-dir ./test-site \
+            --file index.html:5000 \
+            --file vendor.js:320000 \
+            --file app.js:80000 \
+            --file wallet-ui.js:60000 \
+            --file styles.css:30000 \
+            --file components.css:20000 \
+            --file assets/logo.png:50000 \
+            --file assets/icon-192.png:30000 \
+            --file assets/icon-512.png:80000 \
+            --file fonts/inter-regular.woff2:45000 \
+            --file fonts/inter-bold.woff2:48000
+
+      - name: Get initial balances
+        id: initial_balance
+        run: |
+          BALANCE_JSON=$(sui client balance --json)
+          SUI_BALANCE=$(echo "$BALANCE_JSON" | jq -r ".[][] | select(.coinType == \"$SUI_COIN_TYPE\") | .totalBalance" | head -1)
+          WAL_BALANCE=$(echo "$BALANCE_JSON" | jq -r ".[][] | select(.coinType == \"$WAL_COIN_TYPE\") | .totalBalance" | head -1)
+          echo "sui=$SUI_BALANCE" >> $GITHUB_OUTPUT
+          echo "wal=$WAL_BALANCE" >> $GITHUB_OUTPUT
+          echo "Initial SUI: $SUI_BALANCE MIST"
+          echo "Initial WAL: $WAL_BALANCE units"
+
+      - name: Deploy site
+        id: deploy
+        run: |
+          OUTPUT=$(./target/release/site-builder deploy ./test-site --epochs 1 2>&1) || true
+          echo "$OUTPUT"
+          SITE_ID=$(echo "$OUTPUT" | grep -oE '0x[a-fA-F0-9]{64}' | tail -1)
+          echo "site_id=$SITE_ID" >> $GITHUB_OUTPUT
+          echo "Deployed site ID: $SITE_ID"
+
+      - name: Get post-deploy balances
+        id: post_deploy_balance
+        run: |
+          BALANCE_JSON=$(sui client balance --json)
+          SUI_BALANCE=$(echo "$BALANCE_JSON" | jq -r ".[][] | select(.coinType == \"$SUI_COIN_TYPE\") | .totalBalance" | head -1)
+          WAL_BALANCE=$(echo "$BALANCE_JSON" | jq -r ".[][] | select(.coinType == \"$WAL_COIN_TYPE\") | .totalBalance" | head -1)
+          echo "sui=$SUI_BALANCE" >> $GITHUB_OUTPUT
+          echo "wal=$WAL_BALANCE" >> $GITHUB_OUTPUT
+
+      - name: Simulate code update (regenerate only JS/CSS/HTML)
+        run: |
+          # Only regenerate files that would change in a typical code update
+          # Images and fonts stay UNCHANGED
+          head -c 5100 /dev/urandom > ./test-site/index.html
+          head -c 321000 /dev/urandom > ./test-site/vendor.js
+          head -c 82000 /dev/urandom > ./test-site/app.js
+          head -c 61000 /dev/urandom > ./test-site/wallet-ui.js
+          head -c 31000 /dev/urandom > ./test-site/styles.css
+          # components.css unchanged
+          # assets/ unchanged
+          # fonts/ unchanged
+
+      - name: Redeploy site
+        run: |
+          ./target/release/site-builder deploy ./test-site --epochs 1 --object-id ${{ steps.deploy.outputs.site_id }}
+
+      - name: Get final balances
+        id: final_balance
+        run: |
+          BALANCE_JSON=$(sui client balance --json)
+          SUI_BALANCE=$(echo "$BALANCE_JSON" | jq -r ".[][] | select(.coinType == \"$SUI_COIN_TYPE\") | .totalBalance" | head -1)
+          WAL_BALANCE=$(echo "$BALANCE_JSON" | jq -r ".[][] | select(.coinType == \"$WAL_COIN_TYPE\") | .totalBalance" | head -1)
+          echo "sui=$SUI_BALANCE" >> $GITHUB_OUTPUT
+          echo "wal=$WAL_BALANCE" >> $GITHUB_OUTPUT
+
+      - name: Calculate and report costs
+        run: |
+          DEPLOY_SUI_COST=$(( ${{ steps.initial_balance.outputs.sui }} - ${{ steps.post_deploy_balance.outputs.sui }} ))
+          DEPLOY_WAL_COST=$(( ${{ steps.initial_balance.outputs.wal }} - ${{ steps.post_deploy_balance.outputs.wal }} ))
+          REDEPLOY_SUI_COST=$(( ${{ steps.post_deploy_balance.outputs.sui }} - ${{ steps.final_balance.outputs.sui }} ))
+          REDEPLOY_WAL_COST=$(( ${{ steps.post_deploy_balance.outputs.wal }} - ${{ steps.final_balance.outputs.wal }} ))
+
+          DEPLOY_SUI_HUMAN=$(echo "scale=4; $DEPLOY_SUI_COST / 1000000000" | bc)
+          DEPLOY_WAL_HUMAN=$(echo "scale=4; $DEPLOY_WAL_COST / 1000000000" | bc)
+          REDEPLOY_SUI_HUMAN=$(echo "scale=4; $REDEPLOY_SUI_COST / 1000000000" | bc)
+          REDEPLOY_WAL_HUMAN=$(echo "scale=4; $REDEPLOY_WAL_COST / 1000000000" | bc)
+
+          echo "=============================================="
+          echo "COST REGRESSION TEST RESULTS"
+          echo "=============================================="
+          echo ""
+          echo "Deploy costs (fresh site ~870KB):"
+          echo "  SUI: $DEPLOY_SUI_HUMAN ($DEPLOY_SUI_COST MIST)"
+          echo "  WAL: $DEPLOY_WAL_HUMAN ($DEPLOY_WAL_COST units)"
+          echo ""
+          echo "Redeploy costs (code update - JS/CSS changed, images/fonts unchanged):"
+          echo "  SUI: $REDEPLOY_SUI_HUMAN ($REDEPLOY_SUI_COST MIST)"
+          echo "  WAL: $REDEPLOY_WAL_HUMAN ($REDEPLOY_WAL_COST units)"
+
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## Cost Regression Test Results
+
+          ### Deploy costs (fresh site ~870KB)
+          | Currency | Amount | Raw |
+          |----------|--------|-----|
+          | SUI | $DEPLOY_SUI_HUMAN | $DEPLOY_SUI_COST MIST |
+          | WAL | $DEPLOY_WAL_HUMAN | $DEPLOY_WAL_COST units |
+
+          ### Redeploy costs (code update)
+          | Currency | Amount | Raw |
+          |----------|--------|-----|
+          | SUI | $REDEPLOY_SUI_HUMAN | $REDEPLOY_SUI_COST MIST |
+          | WAL | $REDEPLOY_WAL_HUMAN | $REDEPLOY_WAL_COST units |
+
+          **Note:** Redeploy simulates a typical code update where JS/CSS/HTML change but images/fonts stay the same.
+          EOF
