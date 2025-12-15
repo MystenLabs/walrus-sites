@@ -9,13 +9,13 @@ use site_builder::{
     args::{Commands, EpochCountOrMax},
     site_config::WSResources,
 };
-use walrus_sdk::core::{metadata::QuiltMetadata, BlobId};
+use walrus_sdk::core::BlobId;
 
 #[allow(dead_code)]
 mod helpers;
 #[allow(dead_code)]
 mod localnode;
-use helpers::copy_dir;
+use helpers::{copy_dir, get_quilt_identifiers};
 use localnode::{
     args_builder::{ArgsBuilder, PublishOptionsBuilder},
     TestSetup,
@@ -300,13 +300,8 @@ async fn deploy_quilts_with_list_directory_updates_ignored_files() -> anyhow::Re
         .expect("Should have at least one quilt resource");
 
     let quilt_blob_id_first = BlobId(quilt_resource_first.blob_id.0);
-    let QuiltMetadata::V1(metadata_v1) = cluster.read_quilt_metadata(&quilt_blob_id_first).await?;
-    let quilt_identifiers_first: Vec<_> = metadata_v1
-        .index
-        .quilt_patches
-        .iter()
-        .map(|p| p.identifier.as_str())
-        .collect();
+    let metadata_first = cluster.read_quilt_metadata(&quilt_blob_id_first).await?;
+    let quilt_identifiers_first = get_quilt_identifiers(&metadata_first);
 
     // Verify count
     assert_eq!(
@@ -416,14 +411,8 @@ async fn deploy_quilts_with_list_directory_updates_ignored_files() -> anyhow::Re
         "index.html should reference Quilt B (regenerated)"
     );
 
-    let QuiltMetadata::V1(metadata_v1_second) =
-        cluster.read_quilt_metadata(&quilt_blob_id_second).await?;
-    let quilt_identifiers_second: Vec<_> = metadata_v1_second
-        .index
-        .quilt_patches
-        .iter()
-        .map(|p| p.identifier.as_str())
-        .collect();
+    let metadata_second = cluster.read_quilt_metadata(&quilt_blob_id_second).await?;
+    let quilt_identifiers_second = get_quilt_identifiers(&metadata_second);
 
     // Quilt B should have 3 files: file_2, file_3, and regenerated index.html
     const EXPECTED_QUILT_B_SIZE: usize = 3;
@@ -600,13 +589,8 @@ async fn deploy_quilts_with_list_directory_handles_ws_resources() -> anyhow::Res
         .expect("Should have at least one quilt resource");
 
     let quilt_blob_id = BlobId(quilt_resource.blob_id.0);
-    let QuiltMetadata::V1(metadata_v1) = cluster.read_quilt_metadata(&quilt_blob_id).await?;
-    let quilt_identifiers: Vec<_> = metadata_v1
-        .index
-        .quilt_patches
-        .iter()
-        .map(|p| p.identifier.as_str())
-        .collect();
+    let metadata = cluster.read_quilt_metadata(&quilt_blob_id).await?;
+    let quilt_identifiers = get_quilt_identifiers(&metadata);
 
     let ws_resources_json_identifier = "/ws-resources.json";
     let ws_resources_override_identifier = "/ws-resources-override.json";
