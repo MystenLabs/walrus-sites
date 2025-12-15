@@ -10,7 +10,9 @@ use serde::Deserialize;
 use serde_with::{serde_as, DurationSeconds};
 use sui_types::base_types::ObjectID;
 
-use crate::args::default;
+const fn default_cache_ttl() -> Duration {
+    Duration::from_secs(10)
+}
 
 #[serde_as]
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -27,7 +29,7 @@ pub struct WalrusContractConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub walrus_subsidies_object: Option<ObjectID>,
     /// The TTL for cached system and staking objects.
-    #[serde(default = "default::cache_ttl", rename = "cache_ttl_secs")]
+    #[serde(default = "default_cache_ttl", rename = "cache_ttl_secs")]
     #[serde_as(as = "DurationSeconds")]
     pub cache_ttl: Duration,
 }
