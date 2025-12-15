@@ -539,8 +539,6 @@ impl EpochCountOrMax {
 }
 
 pub mod default {
-    use std::time::Duration;
-
     use bytesize::ByteSize;
 
     pub const DEFAULT_SITE_NAME: &str = "My Walrus Site";
@@ -554,8 +552,5 @@ pub mod default {
     }
     pub fn max_quilt_size() -> ByteSize {
         ByteSize::mib(512) // 512 MiB
-    }
-    pub const fn cache_ttl() -> Duration {
-        Duration::from_secs(10)
     }
 }
