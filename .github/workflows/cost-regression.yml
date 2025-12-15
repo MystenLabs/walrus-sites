@@ -63,20 +63,18 @@ jobs:
 
       - name: Generate synthetic dApp site (~870KB)
         run: |
-          mkdir -p ./test-site/assets ./test-site/fonts
-          head -c 5000 /dev/urandom > ./test-site/index.html
-          head -c 320000 /dev/urandom > ./test-site/vendor.js
-          head -c 80000 /dev/urandom > ./test-site/app.js
-          head -c 60000 /dev/urandom > ./test-site/wallet-ui.js
-          head -c 30000 /dev/urandom > ./test-site/styles.css
-          head -c 20000 /dev/urandom > ./test-site/components.css
-          head -c 50000 /dev/urandom > ./test-site/assets/logo.png
-          head -c 30000 /dev/urandom > ./test-site/assets/icon-192.png
-          head -c 80000 /dev/urandom > ./test-site/assets/icon-512.png
-          head -c 45000 /dev/urandom > ./test-site/fonts/inter-regular.woff2
-          head -c 48000 /dev/urandom > ./test-site/fonts/inter-bold.woff2
-          echo "Generated synthetic site:"
-          du -sh ./test-site
+          ./scripts/generate_synthetic_site.sh --output-dir ./test-site \
+            --file index.html:5000 \
+            --file vendor.js:320000 \
+            --file app.js:80000 \
+            --file wallet-ui.js:60000 \
+            --file styles.css:30000 \
+            --file components.css:20000 \
+            --file assets/logo.png:50000 \
+            --file assets/icon-192.png:30000 \
+            --file assets/icon-512.png:80000 \
+            --file fonts/inter-regular.woff2:45000 \
+            --file fonts/inter-bold.woff2:48000
 
       - name: Get initial balances
         id: initial_balance
@@ -116,15 +114,13 @@ jobs:
       - name: Simulate code update (regenerate only JS/CSS/HTML)
         run: |
           # Only regenerate files that would change in a typical code update
-          # Images and fonts stay UNCHANGED
-          head -c 5100 /dev/urandom > ./test-site/index.html
-          head -c 321000 /dev/urandom > ./test-site/vendor.js
-          head -c 82000 /dev/urandom > ./test-site/app.js
-          head -c 61000 /dev/urandom > ./test-site/wallet-ui.js
-          head -c 31000 /dev/urandom > ./test-site/styles.css
-          # components.css unchanged
-          # assets/ unchanged
-          # fonts/ unchanged
+          # Images and fonts stay UNCHANGED (components.css also unchanged)
+          ./scripts/generate_synthetic_site.sh --output-dir ./test-site \
+            --file index.html:5100 \
+            --file vendor.js:321000 \
+            --file app.js:82000 \
+            --file wallet-ui.js:61000 \
+            --file styles.css:31000
 
       - name: Redeploy site
         run: |
