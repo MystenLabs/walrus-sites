@@ -82,14 +82,17 @@ jobs:
 
       - name: Get initial balances
         id: initial_balance
+        env:
+          SUI_COIN: "0x2::sui::SUI"
+          WAL_COIN: "0x8270feb7375eee355e64fdb69c50abb6b5f9393a722883c1cf45f8e26048810a::wal::WAL"
         run: |
-          sui client balance
-          SUI_BALANCE=$(sui client balance | grep -w "Sui" | awk '{print $3}')
-          WAL_BALANCE=$(sui client balance | grep -w "WAL Token" | awk '{print $3}')
-          echo "sui=${SUI_BALANCE:-0}" >> $GITHUB_OUTPUT
-          echo "wal=${WAL_BALANCE:-0}" >> $GITHUB_OUTPUT
-          echo "Initial SUI: ${SUI_BALANCE:-0} MIST"
-          echo "Initial WAL: ${WAL_BALANCE:-0} units"
+          BALANCE_JSON=$(sui client balance --json)
+          SUI_BALANCE=$(echo "$BALANCE_JSON" | jq -r --arg coin "$SUI_COIN" '[.[0][0][] | select(.coinType == $coin) | .balance | tonumber] | add // 0')
+          WAL_BALANCE=$(echo "$BALANCE_JSON" | jq -r --arg coin "$WAL_COIN" '[.[0][0][] | select(.coinType == $coin) | .balance | tonumber] | add // 0')
+          echo "sui=$SUI_BALANCE" >> $GITHUB_OUTPUT
+          echo "wal=$WAL_BALANCE" >> $GITHUB_OUTPUT
+          echo "Initial SUI: $SUI_BALANCE MIST"
+          echo "Initial WAL: $WAL_BALANCE units"
 
       - name: Deploy site
         id: deploy
@@ -102,11 +105,15 @@ jobs:
 
       - name: Get post-deploy balances
         id: post_deploy_balance
+        env:
+          SUI_COIN: "0x2::sui::SUI"
+          WAL_COIN: "0x8270feb7375eee355e64fdb69c50abb6b5f9393a722883c1cf45f8e26048810a::wal::WAL"
         run: |
-          SUI_BALANCE=$(sui client balance | grep -w "Sui" | awk '{print $3}')
-          WAL_BALANCE=$(sui client balance | grep -w "WAL Token" | awk '{print $3}')
-          echo "sui=${SUI_BALANCE:-0}" >> $GITHUB_OUTPUT
-          echo "wal=${WAL_BALANCE:-0}" >> $GITHUB_OUTPUT
+          BALANCE_JSON=$(sui client balance --json)
+          SUI_BALANCE=$(echo "$BALANCE_JSON" | jq -r --arg coin "$SUI_COIN" '[.[0][0][] | select(.coinType == $coin) | .balance | tonumber] | add // 0')
+          WAL_BALANCE=$(echo "$BALANCE_JSON" | jq -r --arg coin "$WAL_COIN" '[.[0][0][] | select(.coinType == $coin) | .balance | tonumber] | add // 0')
+          echo "sui=$SUI_BALANCE" >> $GITHUB_OUTPUT
+          echo "wal=$WAL_BALANCE" >> $GITHUB_OUTPUT
 
       - name: Simulate code update (regenerate only JS/CSS/HTML)
         run: |
@@ -127,11 +134,15 @@ jobs:
 
       - name: Get final balances
         id: final_balance
+        env:
+          SUI_COIN: "0x2::sui::SUI"
+          WAL_COIN: "0x8270feb7375eee355e64fdb69c50abb6b5f9393a722883c1cf45f8e26048810a::wal::WAL"
         run: |
-          SUI_BALANCE=$(sui client balance | grep -w "Sui" | awk '{print $3}')
-          WAL_BALANCE=$(sui client balance | grep -w "WAL Token" | awk '{print $3}')
-          echo "sui=${SUI_BALANCE:-0}" >> $GITHUB_OUTPUT
-          echo "wal=${WAL_BALANCE:-0}" >> $GITHUB_OUTPUT
+          BALANCE_JSON=$(sui client balance --json)
+          SUI_BALANCE=$(echo "$BALANCE_JSON" | jq -r --arg coin "$SUI_COIN" '[.[0][0][] | select(.coinType == $coin) | .balance | tonumber] | add // 0')
+          WAL_BALANCE=$(echo "$BALANCE_JSON" | jq -r --arg coin "$WAL_COIN" '[.[0][0][] | select(.coinType == $coin) | .balance | tonumber] | add // 0')
+          echo "sui=$SUI_BALANCE" >> $GITHUB_OUTPUT
+          echo "wal=$WAL_BALANCE" >> $GITHUB_OUTPUT
 
       - name: Calculate and report costs
         run: |
