@@ -94,7 +94,7 @@ jobs:
       - name: Deploy site
         id: deploy
         run: |
-          OUTPUT=$(./target/release/site-builder deploy ./test-site --epochs 1 2>&1) || true
+          OUTPUT=$(./target/release/site-builder --context testnet deploy ./test-site --epochs 1 2>&1) || true
           echo "$OUTPUT"
           SITE_ID=$(echo "$OUTPUT" | grep -oE '0x[a-fA-F0-9]{64}' | tail -1)
           echo "site_id=$SITE_ID" >> $GITHUB_OUTPUT
@@ -123,7 +123,7 @@ jobs:
 
       - name: Redeploy site
         run: |
-          ./target/release/site-builder deploy ./test-site --epochs 1 --object-id ${{ steps.deploy.outputs.site_id }}
+          ./target/release/site-builder --context testnet deploy ./test-site --epochs 1 --object-id ${{ steps.deploy.outputs.site_id }}
 
       - name: Get final balances
         id: final_balance
