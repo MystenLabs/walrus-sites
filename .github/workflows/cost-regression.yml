@@ -7,6 +7,10 @@ on:
         description: 'Git ref (branch, tag, or commit SHA) to test'
         required: false
         default: ''
+  # TODO: Remove push trigger after testing
+  push:
+    branches:
+      - synthetic-site-redeploy-cost-regression-test
 
 env:
   CARGO_TERM_COLOR: always
