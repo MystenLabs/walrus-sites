@@ -575,8 +575,7 @@ pub fn get_epochs_ahead(
     }: InfoEpochOutput,
 ) -> anyhow::Result<EpochCount> {
     let estimated_start_of_current_epoch = match start_of_current_epoch {
-        EpochTimeOrMessage::Message(_) => Utc::now(), // TODO(sew-495): Check if this is indeed
-        // worst case scenario?
+        EpochTimeOrMessage::Message(_) => Utc::now(),
         EpochTimeOrMessage::DateTime(start) => start,
     };
     let epoch_duration_millis: u64 = epoch_duration
@@ -647,7 +646,10 @@ pub async fn extract_walrus_package_from_config(
         ))?
         .object_type()?
     else {
-        bail!("Staking object ID points to a package") // TODO(sew-495): Improve
+        bail!(
+            "staking object ID ({}) points to a package, not an object",
+            walrus_contract_config.staking_object
+        )
     };
     Ok(ObjectID::from_address(move_object_type.address()))
 }

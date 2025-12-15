@@ -85,7 +85,7 @@ impl SiteManager {
         })
     }
 
-    // TODO(sew-495): quilts are partly stored in ResourceManager and partly in SiteManager. Fix.
+    // TODO: #SEW-605 quilts are stored in ResourceManager and extended in SiteManager.
     /// Updates the site with the given [`Resource`].
     ///
     /// If the site does not exist, it is created and updated. The resources that need to be updated
@@ -123,11 +123,13 @@ impl SiteManager {
             (None, None, Some(end_epoch)) => {
                 let end_epoch: u32 = end_epoch.into();
                 if end_epoch <= current_epoch {
-                    bail!("TODO(sew-495): Error message");
+                    bail!(
+                        "end epoch ({end_epoch}) must be greater than the current epoch ({current_epoch})"
+                    );
                 }
                 end_epoch - current_epoch
             }
-            _ => bail!("TODO(sew-495): Error message"),
+            _ => bail!("exactly one of --epochs, --end-epoch, or --expiry-time must be specified"),
         };
         let new_end_epoch = current_epoch + epochs_ahead;
 
@@ -170,7 +172,6 @@ impl SiteManager {
         if !blobs_to_delete.is_empty() {
             self.delete_from_walrus(&blobs_to_delete).await?;
         }
-        // TODO(sew-495): Extend unchanged blob-ids
 
         Ok((result, site_updates.summary()))
     }
