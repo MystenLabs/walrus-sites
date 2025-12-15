@@ -236,14 +236,6 @@ impl Walrus {
         create_command!(self, info, self.rpc_arg(), Some(InfoCommands::Epoch))
     }
 
-    /// Returns the current Walrus epoch number.
-    // TODO?(sew-495): Make info all?
-    pub async fn current_epoch(&self) -> Result<u32> {
-        let epoch_info: InfoEpochOutput =
-            create_command!(self, info, self.rpc_arg(), Some(InfoCommands::Epoch))?;
-        Ok(epoch_info.current_epoch)
-    }
-
     /// Returns the number of columns available to fill with files in a Quilt.
     ///
     /// (All columns minus one for the index.)
