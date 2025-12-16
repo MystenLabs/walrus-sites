@@ -1,4 +1,6 @@
 name: Cost Regression Test
+permissions:
+  contents: read
 
 on:
   workflow_dispatch:
