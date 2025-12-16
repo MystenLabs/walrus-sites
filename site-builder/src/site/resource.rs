@@ -631,8 +631,7 @@ impl ResourceManager {
             )
             .collect::<Result<Vec<Option<_>>>>()?
             .into_iter()
-            .flatten()
-            .collect();
+            .flatten();
 
         let resources_set = self
             .store_into_quilts(resource_data, epochs, dry_run, max_quilt_size)
@@ -688,9 +687,8 @@ impl ResourceManager {
             .into_iter()
             .flatten();
 
-        let (file_changed, file_unchanged) = local_resources.fold(
-            (vec![], vec![]),
-            |(mut changed, mut unchanged), local| {
+        let (file_changed, file_unchanged) =
+            local_resources.fold((vec![], vec![]), |(mut changed, mut unchanged), local| {
                 let site_resource = existing_site
                     .resources()
                     .inner
@@ -713,8 +711,7 @@ impl ResourceManager {
                 }
 
                 (changed, unchanged)
-            },
-        );
+            });
 
         // Warn about unchanged resources stored as legacy blobs (without quilt patch IDs).
         let legacy_blob_count = file_unchanged
@@ -742,10 +739,9 @@ impl ResourceManager {
         Ok(self.to_site_data(resources_set))
     }
 
-    // TODO: Accept iterator?
     async fn store_into_quilts(
         &mut self,
-        resource_file_inputs: Vec<ResourceData>,
+        resource_file_inputs: impl IntoIterator<Item = ResourceData>,
         epochs: EpochArg,
         dry_run: bool,
         max_quilt_size: ByteSize,
@@ -801,7 +797,7 @@ impl ResourceManager {
 
     fn quilts_chunkify(
         &self,
-        resources: Vec<ResourceData>,
+        resources: impl IntoIterator<Item = ResourceData>,
         max_quilt_size: ByteSize,
     ) -> Result<Vec<Vec<(ResourceData, QuiltBlobInput)>>> {
         let max_quilt_size = max_quilt_size.as_u64() as usize;
