@@ -440,54 +440,6 @@ impl ResourceData {
             })
             .unwrap_or_default()
     }
-
-    /*
-    pub fn try_into_resource(self, patch: StoredQuiltPatch) -> anyhow::Result<Resource> {
-        let ResourceData {
-            unencoded_size,
-            full_path,
-            resource_path,
-            mut headers,
-            blob_hash,
-        } = self;
-        let bytes = BASE64_URL_SAFE_NO_PAD.decode(patch.quilt_patch_id.as_str())?;
-
-        // Must have at least BlobId.LENGTH + 1 bytes (quilt_id + version).
-        if bytes.len() != Walrus::QUILT_PATCH_ID_SIZE {
-            anyhow::bail!(
-                "Expected {} bytes when decoding quilt-patch-id version 1.",
-                Walrus::QUILT_PATCH_ID_SIZE
-            );
-        }
-
-        // Extract blob_id and patch_id (bytes after the blob_id).
-        let (blob_id, patch_bytes): (BlobId, [u8; Walrus::QUILT_PATCH_SIZE]) = (
-            BlobId(bytes[..BlobId::LENGTH].try_into().unwrap()),
-            bytes[BlobId::LENGTH..Walrus::QUILT_PATCH_ID_SIZE]
-                .try_into()
-                .unwrap(),
-        );
-
-        let version = patch_bytes[0];
-        if version != Walrus::QUILT_PATCH_VERSION_1 {
-            anyhow::bail!("Quilt patch version {version} is not implemented");
-        }
-
-        let patch_hex = format!("0x{}", hex::encode(patch_bytes));
-        headers.0.insert(
-            Resource::QUILT_PATCH_ID_INTERNAL_HEADER.to_string(),
-            patch_hex,
-        );
-        Ok(Resource::new(
-            resource_path,
-            full_path,
-            headers,
-            blob_id,
-            blob_hash,
-            unencoded_size,
-        ))
-    }
-    */
 }
 
 /// Converts [`ResourceData`] to a [`QuiltBlobInput`] for the Walrus CLI.
