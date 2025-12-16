@@ -706,7 +706,6 @@ impl ResourceManager {
             return Ok(SiteData::empty());
         }
 
-        // TODO(sew-495): Remove the multiple collects
         let rel_paths = resource_paths
             .into_iter()
             .map(|file_path| {
@@ -735,10 +734,9 @@ impl ResourceManager {
             )
             .collect::<Result<Vec<_>>>()?
             .into_iter()
-            .flatten()
-            .collect::<Vec<_>>();
+            .flatten();
 
-        let (file_changed, file_unchanged) = local_resources.into_iter().fold(
+        let (file_changed, file_unchanged) = local_resources.fold(
             (vec![], vec![]),
             |(mut changed, mut unchanged), local| {
                 let site_resource = existing_site
