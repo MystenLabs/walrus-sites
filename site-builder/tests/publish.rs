@@ -538,3 +538,205 @@ async fn publish_quilts_with_weird_filenames() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+/// Test that size-based grouping separates small files from large files into different quilts.
+///
+/// When a site has many small files and one large file, the grouping algorithm should
+/// place them in separate quilts. This prevents small files from being penalized by
+/// the large file's column allocation overhead in Walrus quilt encoding.
+///
+/// This test creates:
+/// - 10 small HTML files (~100 bytes each) -> bucket 0 (0-16KB)
+/// - 1 large file (sized to fill most of a quilt) -> bucket 3 (512KB-2MB)
+///
+/// Expected: The large file is in a different quilt than all small files.
+#[tokio::test]
+#[ignore]
+async fn publish_quilts_size_grouping_separates_disparate_sizes() -> anyhow::Result<()> {
+    const N_SMALL_FILES: usize = 10;
+    const MAX_SYMBOL_SIZE: usize = 65534;
+
+    let cluster = TestSetup::start_local_test_cluster().await?;
+
+    // Calculate large file size based on cluster configuration (similar to two_large_files test)
+    let n_shards = cluster.cluster_state.walrus_cluster.n_shards;
+    let (n_rows, n_cols) = walrus_core::encoding::source_symbols_for_n_shards(n_shards);
+    // Use ~80% of max quilt size for the large file
+    let large_file_size =
+        (n_rows.get() as usize * (n_cols.get() as usize - 1) * MAX_SYMBOL_SIZE * 8) / 10;
+
+    let temp_dir = tempfile::tempdir()?;
+    let directory = temp_dir.path();
+
+    // Create small HTML files in a subdirectory (bucket 0: 0-16KB)
+    let small_dir = directory.join("small");
+    fs::create_dir(&small_dir)?;
+    for i in 0..N_SMALL_FILES {
+        let file_path = small_dir.join(format!("file_{i:03}.html"));
+        let mut file = File::create(file_path)?;
+        writeln!(file, "<html><body><h1>Small File {i}</h1></body></html>")?;
+    }
+
+    // Create one large file in a subdirectory (bucket 3: 512KB-2MB)
+    let large_dir = directory.join("large");
+    fs::create_dir(&large_dir)?;
+    create_large_test_site(&large_dir, 1, large_file_size)?;
+
+    let args = ArgsBuilder::default()
+        .with_config(Some(cluster.sites_config_path().to_owned()))
+        .with_command(Commands::Publish {
+            publish_options: PublishOptionsBuilder::default()
+                .with_directory(directory.to_owned())
+                .with_epoch_count_or_max(EpochCountOrMax::Max)
+                .build()?,
+            site_name: None,
+        })
+        .with_gas_budget(50_000_000_000)
+        .build()?;
+
+    site_builder::run(args).await?;
+
+    let site = cluster.last_site_created().await?;
+    let resources = cluster.site_resources(*site.id.object_id()).await?;
+
+    let expected_count = N_SMALL_FILES + 1;
+    assert_eq!(resources.len(), expected_count);
+
+    for resource in &resources {
+        verify_resource_and_get_content(&cluster, resource).await?;
+    }
+
+    // Verify size grouping: the large file should be in a different quilt than small files
+    let small_blob_ids: std::collections::HashSet<_> = resources
+        .iter()
+        .filter(|r| r.path.contains("small"))
+        .map(|r| r.blob_id.0)
+        .collect();
+
+    let large_blob_ids: std::collections::HashSet<_> = resources
+        .iter()
+        .filter(|r| r.path.contains("large"))
+        .map(|r| r.blob_id.0)
+        .collect();
+
+    // Large file should be in exactly one quilt
+    assert_eq!(
+        large_blob_ids.len(),
+        1,
+        "Large file should be in exactly one quilt"
+    );
+
+    // Small files and large file should be in different quilts
+    assert!(
+        small_blob_ids.is_disjoint(&large_blob_ids),
+        "Small files and large file should be in different quilts due to size grouping"
+    );
+
+    println!(
+        "Successfully verified size grouping: {} small files separated from 1 large file ({}KB)",
+        N_SMALL_FILES,
+        large_file_size / 1024
+    );
+
+    Ok(())
+}
+
+/// Test that size-based grouping correctly separates files by size bucket,
+/// ensuring files from different buckets never share a quilt.
+///
+/// This test creates:
+/// - 5 small files (8KB each) -> bucket 0 (0-16KB)
+/// - 5 medium files (200KB each) -> bucket 2 (128-512KB)
+///
+/// Expected: Small and medium files are in completely separate quilts (no overlap).
+#[tokio::test]
+#[ignore]
+async fn publish_quilts_size_grouping_two_buckets_correct_assignment() -> anyhow::Result<()> {
+    const N_SMALL_FILES: usize = 5;
+    const N_MEDIUM_FILES: usize = 5;
+    const SMALL_FILE_SIZE: usize = 8 * 1024; // 8KB -> bucket 0 (0-16KB)
+    const MEDIUM_FILE_SIZE: usize = 200 * 1024; // 200KB -> bucket 2 (128-512KB)
+
+    let cluster = TestSetup::start_local_test_cluster().await?;
+
+    let temp_dir = tempfile::tempdir()?;
+    let directory = temp_dir.path();
+
+    // Create small files in subdirectory (bucket 0: 0-16KB)
+    let small_dir = directory.join("small");
+    fs::create_dir(&small_dir)?;
+    create_large_test_site(&small_dir, N_SMALL_FILES, SMALL_FILE_SIZE)?;
+
+    // Create medium files in subdirectory (bucket 2: 128-512KB)
+    let medium_dir = directory.join("medium");
+    fs::create_dir(&medium_dir)?;
+    create_large_test_site(&medium_dir, N_MEDIUM_FILES, MEDIUM_FILE_SIZE)?;
+
+    let args = ArgsBuilder::default()
+        .with_config(Some(cluster.sites_config_path().to_owned()))
+        .with_command(Commands::Publish {
+            publish_options: PublishOptionsBuilder::default()
+                .with_directory(directory.to_owned())
+                .with_epoch_count_or_max(EpochCountOrMax::Max)
+                .build()?,
+            site_name: None,
+        })
+        .with_gas_budget(50_000_000_000)
+        .build()?;
+
+    site_builder::run(args).await?;
+
+    let site = cluster.last_site_created().await?;
+    let resources = cluster.site_resources(*site.id.object_id()).await?;
+
+    let expected_count = N_SMALL_FILES + N_MEDIUM_FILES;
+    assert_eq!(resources.len(), expected_count);
+
+    // Verify all resources are readable
+    for resource in &resources {
+        verify_resource_and_get_content(&cluster, resource).await?;
+    }
+
+    // Verify correct grouping: collect blob_ids for small vs medium files
+    let small_blob_ids: std::collections::HashSet<_> = resources
+        .iter()
+        .filter(|r| r.path.contains("small"))
+        .map(|r| r.blob_id.0)
+        .collect();
+
+    let medium_blob_ids: std::collections::HashSet<_> = resources
+        .iter()
+        .filter(|r| r.path.contains("medium"))
+        .map(|r| r.blob_id.0)
+        .collect();
+
+    // The key assertion: small and medium files must be in completely separate quilts.
+    // Size grouping ensures files from different buckets never share a quilt.
+    assert!(
+        small_blob_ids.is_disjoint(&medium_blob_ids),
+        "Small and medium files should be in different quilts due to size grouping. \
+        Small blob_ids: {:?}, Medium blob_ids: {:?}",
+        small_blob_ids,
+        medium_blob_ids
+    );
+
+    // At minimum, we need at least 2 quilts (one for each size bucket)
+    let total_quilts = small_blob_ids.len() + medium_blob_ids.len();
+    assert!(
+        total_quilts >= 2,
+        "Expected at least 2 quilts (one per size bucket), got {}",
+        total_quilts
+    );
+
+    println!(
+        "Successfully verified size grouping: {} small files ({}KB) in {} quilt(s), {} medium files ({}KB) in {} quilt(s)",
+        N_SMALL_FILES,
+        SMALL_FILE_SIZE / 1024,
+        small_blob_ids.len(),
+        N_MEDIUM_FILES,
+        MEDIUM_FILE_SIZE / 1024,
+        medium_blob_ids.len()
+    );
+
+    Ok(())
+}
