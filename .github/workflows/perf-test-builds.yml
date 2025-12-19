@@ -67,7 +67,6 @@ jobs:
     secrets:
       SUI_ADDRESS: ${{ vars.PERF_TEST_SUI_ADDRESS }}
       SUI_KEYSTORE: ${{ secrets.PERF_TEST_SUI_KEYSTORE }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   publish-seal-docs:
     needs: [build-seal-docs, publish-walrus-docs]
@@ -79,7 +78,6 @@ jobs:
     secrets:
       SUI_ADDRESS: ${{ vars.PERF_TEST_SUI_ADDRESS }}
       SUI_KEYSTORE: ${{ secrets.PERF_TEST_SUI_KEYSTORE }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # TODO: Add publish jobs for stake-wal and landing-page (chain after seal-docs)
 

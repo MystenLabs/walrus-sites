@@ -29,8 +29,6 @@ on:
         required: true
       SUI_KEYSTORE:
         required: true
-      GITHUB_TOKEN:
-        required: true
 
 permissions:
   contents: write
@@ -54,7 +52,7 @@ jobs:
           SUI_ADDRESS: ${{ secrets.SUI_ADDRESS }}
           SUI_KEYSTORE: ${{ secrets.SUI_KEYSTORE }}
           DIST: site
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
           EPOCHS: ${{ inputs.epochs }}
 
       # TODO: Capture and report costs (WAL, SUI, time, memory)
