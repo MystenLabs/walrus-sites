@@ -50,12 +50,12 @@ jobs:
 
       - name: Build documentation
         working-directory: seal
-        run: mkdocs build --strict
+        run: mkdocs build --strict --site-dir docs/site/build
 
       - name: Upload build artifact
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: ${{ inputs.artifact_name }}
-          path: seal/site
+          path: seal/docs/site/build
           retention-days: 1
           if-no-files-found: error

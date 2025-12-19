@@ -1,0 +1,60 @@
+name: "Perf: Publish Site"
+
+# Reusable workflow to publish a built site to Walrus Sites.
+# Downloads the build artifact and deploys using the walrus-sites-github-actions.
+
+on:
+  workflow_call:
+    inputs:
+      artifact_name:
+        description: "Name of the build artifact to download"
+        required: true
+        type: string
+      site_name:
+        description: "Human-readable name for logging"
+        required: true
+        type: string
+      sui_network:
+        description: "Sui network to deploy to"
+        required: false
+        type: string
+        default: testnet
+      epochs:
+        description: "Number of epochs to keep the site alive"
+        required: false
+        type: number
+        default: 1
+    secrets:
+      SUI_ADDRESS:
+        required: true
+      SUI_KEYSTORE:
+        required: true
+      GITHUB_TOKEN:
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  publish:
+    name: Publish ${{ inputs.site_name }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: site
+
+      - name: Deploy to Walrus Sites
+        uses: MystenLabs/walrus-sites-github-actions/deploy@v1
+        with:
+          SUI_NETWORK: ${{ inputs.sui_network }}
+          SUI_ADDRESS: ${{ secrets.SUI_ADDRESS }}
+          SUI_KEYSTORE: ${{ secrets.SUI_KEYSTORE }}
+          DIST: site
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EPOCHS: ${{ inputs.epochs }}
+
+      # TODO: Capture and report costs (WAL, SUI, time, memory)

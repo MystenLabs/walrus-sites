@@ -1,34 +1,104 @@
-name: "Perf: Test Doc Builds"
+name: "Perf: Regression Tests"
 
-# Manual trigger to test the doc builder workflows
+# Orchestrator workflow for performance regression testing.
+# - Build phase: All builds run in parallel
+# - Publish phase: Sequential execution
+#
+# Test sites:
+#   - walrus-docs (Docusaurus)
+#   - seal-docs (MkDocs)
+#   - stake-wal (dist-generator) - TODO
+#   - walrus-sites-landing-page (dist-generator) - TODO
+#
+# Measurements (TODO):
+#   - Costs: WAL, SUI, time, memory for publish and update
+#   - Update scenarios: page edit, page edit + addition, code edit, code edit + image
 
 on:
   workflow_dispatch:
     inputs:
-      build_target:
-        description: "Which docs to build"
+      test_sites:
+        description: "Which sites to test"
         required: true
         type: choice
         options:
+          - all
           - walrus-docs
           - seal-docs
-          - both
-        default: both
+          # - stake-wal        # TODO: implement with dist-generator
+          # - landing-page     # TODO: implement with dist-generator
+        default: all
 
 permissions:
   contents: read
 
 jobs:
+  # =============================================================================
+  # Build Phase - All builds run in parallel
+  # =============================================================================
+
   build-walrus-docs:
-    if: ${{ inputs.build_target == 'walrus-docs' || inputs.build_target == 'both' }}
+    if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'walrus-docs' }}
     uses: ./.github/workflows/perf-build-walrus-docs.yml
     with:
       walrus_ref: main
       artifact_name: walrus-docs-build
 
   build-seal-docs:
-    if: ${{ inputs.build_target == 'seal-docs' || inputs.build_target == 'both' }}
+    if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'seal-docs' }}
     uses: ./.github/workflows/perf-build-seal-docs.yml
     with:
       seal_ref: main
       artifact_name: seal-docs-build
+
+  # TODO: Add dist-generator builds for stake-wal and landing-page
+
+  # =============================================================================
+  # Publish Phase - Sequential
+  # =============================================================================
+
+  publish-walrus-docs:
+    needs: [build-walrus-docs]
+    if: ${{ !cancelled() && needs.build-walrus-docs.result == 'success' }}
+    uses: ./.github/workflows/perf-publish-site.yml
+    with:
+      artifact_name: walrus-docs-build
+      site_name: walrus-docs
+    secrets:
+      SUI_ADDRESS: ${{ vars.PERF_TEST_SUI_ADDRESS }}
+      SUI_KEYSTORE: ${{ secrets.PERF_TEST_SUI_KEYSTORE }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-seal-docs:
+    needs: [build-seal-docs, publish-walrus-docs]
+    if: ${{ !cancelled() && needs.build-seal-docs.result == 'success' }}
+    uses: ./.github/workflows/perf-publish-site.yml
+    with:
+      artifact_name: seal-docs-build
+      site_name: seal-docs
+    secrets:
+      SUI_ADDRESS: ${{ vars.PERF_TEST_SUI_ADDRESS }}
+      SUI_KEYSTORE: ${{ secrets.PERF_TEST_SUI_KEYSTORE }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # TODO: Add publish jobs for stake-wal and landing-page (chain after seal-docs)
+
+  # =============================================================================
+  # Summary Phase
+  # =============================================================================
+
+  summary:
+    needs: [build-walrus-docs, build-seal-docs, publish-walrus-docs, publish-seal-docs]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## Performance Regression Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Site | Build | Publish |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| walrus-docs | ${{ needs.build-walrus-docs.result }} | ${{ needs.publish-walrus-docs.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| seal-docs | ${{ needs.build-seal-docs.result }} | ${{ needs.publish-seal-docs.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "TODO: Add cost measurements (WAL, SUI, time, memory)" >> $GITHUB_STEP_SUMMARY
