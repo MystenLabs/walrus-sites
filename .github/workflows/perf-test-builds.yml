@@ -15,8 +15,15 @@ name: "Perf: Regression Tests"
 #   - Update scenarios: page edit, page edit + addition, code edit, code edit + image
 
 on:
+  push:
+    branches:
+      - sew-728-implement-docs-builder-script-walrus-docs-and-seal-docs
   workflow_dispatch:
     inputs:
+      ref:
+        description: "Git ref (branch, tag, or commit SHA) of walrus-sites to test"
+        required: false
+        default: ""
       test_sites:
         description: "Which sites to test"
         required: true
@@ -54,39 +61,25 @@ jobs:
   # TODO: Add dist-generator builds for stake-wal and landing-page
 
   # =============================================================================
-  # Publish Phase - Sequential
+  # Publish Phase - Sequential steps in a single job
   # =============================================================================
 
-  publish-walrus-docs:
-    needs: [build-walrus-docs]
-    if: ${{ !cancelled() && needs.build-walrus-docs.result == 'success' }}
+  publish:
+    needs: [build-walrus-docs, build-seal-docs]
+    if: ${{ !cancelled() && (needs.build-walrus-docs.result == 'success' || needs.build-seal-docs.result == 'success') }}
     uses: ./.github/workflows/perf-publish-site.yml
     with:
-      artifact_name: walrus-docs-build
-      site_name: walrus-docs
+      ref: ${{ inputs.ref }}
+      test_sites: ${{ inputs.test_sites }}
     secrets:
-      SUI_ADDRESS: ${{ vars.PERF_TEST_SUI_ADDRESS }}
-      SUI_KEYSTORE: ${{ secrets.PERF_TEST_SUI_KEYSTORE }}
-
-  publish-seal-docs:
-    needs: [build-seal-docs, publish-walrus-docs]
-    if: ${{ !cancelled() && needs.build-seal-docs.result == 'success' }}
-    uses: ./.github/workflows/perf-publish-site.yml
-    with:
-      artifact_name: seal-docs-build
-      site_name: seal-docs
-    secrets:
-      SUI_ADDRESS: ${{ vars.PERF_TEST_SUI_ADDRESS }}
-      SUI_KEYSTORE: ${{ secrets.PERF_TEST_SUI_KEYSTORE }}
-
-  # TODO: Add publish jobs for stake-wal and landing-page (chain after seal-docs)
+      SUI_KEYSTORE_TESTNET: ${{ secrets.SUI_KEYSTORE_TESTNET }}
 
   # =============================================================================
   # Summary Phase
   # =============================================================================
 
   summary:
-    needs: [build-walrus-docs, build-seal-docs, publish-walrus-docs, publish-seal-docs]
+    needs: [build-walrus-docs, build-seal-docs, publish]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
@@ -96,7 +89,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Site | Build | Publish |" >> $GITHUB_STEP_SUMMARY
           echo "|------|-------|---------|" >> $GITHUB_STEP_SUMMARY
-          echo "| walrus-docs | ${{ needs.build-walrus-docs.result }} | ${{ needs.publish-walrus-docs.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| seal-docs | ${{ needs.build-seal-docs.result }} | ${{ needs.publish-seal-docs.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| walrus-docs | ${{ needs.build-walrus-docs.result }} | ${{ needs.publish.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| seal-docs | ${{ needs.build-seal-docs.result }} | ${{ needs.publish.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "TODO: Add cost measurements (WAL, SUI, time, memory)" >> $GITHUB_STEP_SUMMARY
