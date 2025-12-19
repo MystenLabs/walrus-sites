@@ -15,9 +15,6 @@ name: "Perf: Regression Tests"
 #   - Update scenarios: page edit, page edit + addition, code edit, code edit + image
 
 on:
-  push:
-    branches:
-      - sew-728-implement-docs-builder-script-walrus-docs-and-seal-docs
   workflow_dispatch:
     inputs:
       ref:
