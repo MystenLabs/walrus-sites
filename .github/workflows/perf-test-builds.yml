@@ -1,0 +1,34 @@
+name: "Perf: Test Doc Builds"
+
+# Manual trigger to test the doc builder workflows
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_target:
+        description: "Which docs to build"
+        required: true
+        type: choice
+        options:
+          - walrus-docs
+          - seal-docs
+          - both
+        default: both
+
+permissions:
+  contents: read
+
+jobs:
+  build-walrus-docs:
+    if: ${{ inputs.build_target == 'walrus-docs' || inputs.build_target == 'both' }}
+    uses: ./.github/workflows/perf-build-walrus-docs.yml
+    with:
+      walrus_ref: main
+      artifact_name: walrus-docs-build
+
+  build-seal-docs:
+    if: ${{ inputs.build_target == 'seal-docs' || inputs.build_target == 'both' }}
+    uses: ./.github/workflows/perf-build-seal-docs.yml
+    with:
+      seal_ref: main
+      artifact_name: seal-docs-build
