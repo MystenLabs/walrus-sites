@@ -50,12 +50,15 @@ jobs:
 
       - name: Build documentation
         working-directory: seal
-        run: mkdocs build --strict --site-dir docs/site/build
+        run: mkdocs build --strict
+
+      - name: Move to unified output path
+        run: mkdir -p output/docs/site && mv seal/site output/docs/site/build
 
       - name: Upload build artifact
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: ${{ inputs.artifact_name }}
-          path: seal/docs/site/build
+          path: output/docs/site/build
           retention-days: 1
           if-no-files-found: error
