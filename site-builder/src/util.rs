@@ -538,23 +538,21 @@ where
 // Resolution
 
 /// Gets a site object using GraphQL query
-pub(crate) async fn get_site_object_via_graphql(wallet: &WalletContext) -> Option<ObjectID> {
+pub(crate) async fn get_site_object_via_graphql(wallet: &WalletContext, package: ObjectID) -> Option<ObjectID> {
     use serde_json::json;
     use std::process::Command;
     
-    // Determine GraphQL endpoint and site type based on wallet context
-    let (endpoint, site_type) = match wallet.config.active_env.as_deref() {
-        Some("mainnet") => (
-            "https://graphql.mainnet.sui.io/graphql",
-            "0x26eb7ee8688da02c5f671679524e379f0b837a12f1d1d799f255b7eea260ad27::site::Site" // TODO: Replace with actual mainnet package
-        ),
-        Some("testnet") => (
-            "https://graphql.testnet.sui.io/graphql", 
-            "0xf99aee9f21493e1590e7e5a9aea6f343a1f381031a04a732724871fc294be799::site::Site"
-        ),
+    // Determine GraphQL endpoint based on wallet context
+    let endpoint = match wallet.config.active_env.as_deref() {
+        Some("mainnet") => "https://graphql.mainnet.sui.io/graphql",
+        Some("testnet") => "https://graphql.testnet.sui.io/graphql", 
         None => panic!("Wallet active_env is not set"),
         Some(other) => panic!("Unsupported network: {}. Walrus sites are only available on mainnet and testnet.", other),
     };
+    
+    let site_type = format!("{}::site::Site", package);
+    tracing::debug!(?package, ?site_type, "Constructed site type for GraphQL query");
+    tracing::debug!(?endpoint, "Using GraphQL endpoint");
     
     // Query for site objects with limit 1
     let site_query = json!({

@@ -317,7 +317,11 @@ impl SiteManager {
                     // We can use any one but it should be real one, present on the chain
                     // We have to use GraphQL here since the standard rpc api 
                     // doesn't have such interface for querying site objects
-                    let existing_site_id = get_site_object_via_graphql(&self.wallet).await;
+                    let existing_site_id = {
+                        let package = self.config.package;
+                        tracing::debug!(?package, "Using package from config for GraphQL query");
+                        get_site_object_via_graphql(&self.wallet, package).await
+                    };
                     if let Some(existing_id) = existing_site_id {
                         existing_id
                     } else {
