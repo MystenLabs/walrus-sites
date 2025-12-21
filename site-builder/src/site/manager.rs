@@ -290,7 +290,7 @@ impl SiteManager {
         let initial_gas = initial_response.effects.gas_cost_summary().net_gas_usage() as u64;
         
         println!(
-            "Initial PTB gas cost: {} MIST ({:.2} SUI) ({} commands)",
+            "Initial PTB gas cost: {} MIST ({:.3} SUI) ({} commands)",
             initial_gas,
             initial_gas as f64 / 1_000_000_000.0,
             initial_ptb.commands.len()
@@ -375,7 +375,7 @@ impl SiteManager {
             }
             
             println!(
-                "Resource PTB {}/{}: {} MIST ({:.2} SUI) ({} commands)",
+                "Resource PTB {}/{}: {} MIST ({:.3} SUI) ({} commands)",
                 i + 1,
                 remaining_ptbs.len(),
                 gas_cost,
@@ -385,7 +385,7 @@ impl SiteManager {
         }
 
         println!(
-            "Total estimated gas cost: {} MIST ({:.2} SUI)",
+            "Total estimated gas cost: {} MIST ({:.3} SUI)",
             total_gas,
             total_gas as f64 / 1_000_000_000.0
         );
