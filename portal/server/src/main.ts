@@ -8,7 +8,6 @@ import { siteNotFound } from "@lib/http/http_error_responses";
 import blocklistChecker from "src/blocklist_checker";
 import { config } from "src/configuration_loader";
 import { standardUrlFetcher, premiumUrlFetcher } from "src/url_fetcher_factory";
-import { sendToAmplitude } from "src/amplitude";
 import { Base36toHex } from "@lib/objectId_operations";
 import { instrumentationFacade } from "@lib/instrumentation";
 import { bringYourOwnDomainDoesNotSupportSubdomainsYet } from "@lib/http/http_error_responses";
@@ -36,9 +35,6 @@ export default async function main(req: Request) {
 
 		if (requestDomain == portalDomain && parsedUrl.subdomain) {
 			const res = await urlFetcher.resolveDomainAndFetchUrl(parsedUrl, null, blocklistChecker);
-			if (config.amplitudeApiKey && res.status >= 200 && res.status < 400) {
-				await sendToAmplitude(req, url);
-			}
 			return res
 		}
 	}
@@ -58,9 +54,6 @@ export default async function main(req: Request) {
 			Base36toHex(config.landingPageOidB36),
 			blocklistChecker
 		);
-		if (config.amplitudeApiKey && response.status >= 200 && response.status < 400) {
-			await sendToAmplitude(req, url);
-		}
 		return response;
 	}
 
