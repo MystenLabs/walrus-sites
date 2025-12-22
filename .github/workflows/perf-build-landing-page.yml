@@ -1,0 +1,86 @@
+name: "Perf: Build Landing Page"
+
+# Reusable workflow to generate a synthetic site mimicking walrus-sites-landing-page.
+# Uses generate_synthetic_site.sh to create files matching the real site's profile.
+#
+# Real landing page site profile (22 files, ~4.8 MB total):
+#   Root: index.html (524 B), 404.html (278 KB), favicon.ico (15 KB), ws-resources.json (278 B)
+#   Images: globe_big.png (426 KB), projects1-4.png (178-613 KB)
+#   Assets: JS (34-956 KB), CSS (28 KB), fonts (39-121 KB)
+
+on:
+  workflow_call:
+    inputs:
+      artifact_name:
+        description: "Name for the uploaded build artifact"
+        required: false
+        type: string
+        default: "landing-page-build"
+    outputs:
+      artifact_name:
+        description: "Name of the uploaded artifact containing the build"
+        value: ${{ jobs.build.outputs.artifact_name }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Landing Page (synthetic)
+    runs-on: ubuntu-latest
+    outputs:
+      artifact_name: ${{ inputs.artifact_name }}
+    steps:
+      - name: Checkout walrus-sites repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Generate synthetic site mimicking landing page
+        run: |
+          ./scripts/generate_synthetic_site.sh \
+            --output-dir ./landing-page-site \
+            --file index.html:524 \
+            --file 404.html:284672 \
+            --file favicon.ico:15360 \
+            --file globe_big.png:436224 \
+            --file projects1.png:507904 \
+            --file projects2.png:182272 \
+            --file projects3.png:183296 \
+            --file projects4.png:627712 \
+            --file assets/BuiltOnDesktop-AaBbCc1x.js:83968 \
+            --file assets/BuiltOnMobile-BbCcDd2y.js:86016 \
+            --file assets/ComparisonDesktop-CcDdEe3z.js:434176 \
+            --file assets/ComparisonMobile-DdEeFf4a.js:432128 \
+            --file assets/CreateDesktop-EeFfGg5b.js:68608 \
+            --file assets/CreateMobile-FfGgHh6c.js:34816 \
+            --file assets/index-GgHhIi7d.css:28672 \
+            --file assets/index-HhIiJj8e.js:978944 \
+            --file assets/PPNeueBit-Bold-IiJjKk9f.woff2:47104 \
+            --file assets/PPNeueBit-Regular-JjKkLl0g.woff2:39936 \
+            --file assets/PPNeueMontreal-Medium-KkLlMm1h.otf:123904 \
+            --file assets/PPNeueMontreal-Thin-LlMmNn2i.otf:112640
+
+      - name: Create ws-resources.json
+        run: |
+          cat > ./landing-page-site/ws-resources.json << 'EOF'
+          {
+            "routes": {
+              "/*": "/index.html"
+            }
+          }
+          EOF
+
+      - name: List generated files
+        run: |
+          echo "Root files:"
+          ls -la ./landing-page-site
+          echo ""
+          echo "Asset files:"
+          ls -la ./landing-page-site/assets
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: landing-page-site
+          retention-days: 1
+          if-no-files-found: error

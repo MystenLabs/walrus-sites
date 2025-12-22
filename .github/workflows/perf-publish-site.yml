@@ -12,7 +12,7 @@ on:
         type: string
         default: ""
       test_sites:
-        description: "Which sites to publish (all, walrus-docs, seal-docs)"
+        description: "Which sites to publish (all, walrus-docs, seal-docs, stake-wal, landing-page)"
         required: true
         type: string
     secrets:
@@ -98,4 +98,24 @@ jobs:
         if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'seal-docs' }}
         run: ./target/release/site-builder --context testnet --gas-budget 1000000000 deploy ./seal-docs-site --epochs 1
 
-      # TODO: Add deploy steps for stake-wal and landing-page
+      - name: Download stake-wal artifact
+        if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'stake-wal' }}
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: stake-wal-build
+          path: stake-wal-site
+
+      - name: Deploy stake-wal
+        if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'stake-wal' }}
+        run: ./target/release/site-builder --context testnet --gas-budget 1000000000 deploy ./stake-wal-site --epochs 1
+
+      - name: Download landing-page artifact
+        if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'landing-page' }}
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: landing-page-build
+          path: landing-page-site
+
+      - name: Deploy landing-page
+        if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'landing-page' }}
+        run: ./target/release/site-builder --context testnet --gas-budget 1000000000 deploy ./landing-page-site --epochs 1
