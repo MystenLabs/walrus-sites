@@ -85,7 +85,7 @@ jobs:
 
       - name: Deploy walrus-docs
         if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'walrus-docs' }}
-        run: ./target/release/site-builder --context testnet deploy ./walrus-docs-site --epochs 1
+        run: ./target/release/site-builder --context testnet deploy ./walrus-docs-site --epochs 1 --gas-budget 1000000000
 
       - name: Download seal-docs artifact
         if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'seal-docs' }}
@@ -96,6 +96,6 @@ jobs:
 
       - name: Deploy seal-docs
         if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'seal-docs' }}
-        run: ./target/release/site-builder --context testnet deploy ./seal-docs-site --epochs 1
+        run: ./target/release/site-builder --context testnet deploy ./seal-docs-site --epochs 1 --gas-budget 1000000000
 
       # TODO: Add deploy steps for stake-wal and landing-page
