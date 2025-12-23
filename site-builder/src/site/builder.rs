@@ -5,10 +5,19 @@ use std::collections::btree_map;
 
 use anyhow::Result;
 use serde::Serialize;
+use sui_sdk::rpc_types::{Coin, SuiObjectData};
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
+    object::Owner,
     programmable_transaction_builder::ProgrammableTransactionBuilder,
-    transaction::{Argument, CallArg, ObjectArg, ProgrammableTransaction},
+    transaction::{
+        Argument,
+        CallArg,
+        Command,
+        ObjectArg,
+        ProgrammableTransaction,
+        SharedObjectMutability,
+    },
     Identifier,
     TypeTag,
 };
@@ -166,6 +175,37 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
         )
     }
 
+    pub fn fill_walrus_system_and_coin(
+        &mut self,
+        coins: Vec<Coin>,
+        system_obj: SuiObjectData,
+    ) -> SitePtbBuilderResult<()> {
+        if self.system_obj_arg.is_some() {
+            return Err(anyhow::anyhow!("Tried to set walrus System argument twice.").into());
+        }
+        if self.wal_coin_arg.is_some() {
+            return Err(anyhow::anyhow!("Tried to set WAL coin argument twice.").into());
+        }
+
+        let system_arg = self.extract_system_arg(system_obj)?;
+        self.system_obj_arg.replace(system_arg);
+        let wal_coin_arg = self.create_wal_coin(coins)?;
+        self.wal_coin_arg.replace(wal_coin_arg);
+        Ok(())
+    }
+
+    pub fn add_extend_operations(
+        &mut self,
+        blobs_to_extend: impl IntoIterator<Item = (ObjectRef, u32), IntoIter: ExactSizeIterator>,
+    ) -> SitePtbBuilderResult<()> {
+        let blobs_to_extend = blobs_to_extend.into_iter();
+        self.check_counter_in_advance(blobs_to_extend.len() as u16)?;
+        for (blob_ref, epochs) in blobs_to_extend {
+            self.extend_blob(blob_ref, epochs)?;
+        }
+        Ok(())
+    }
+
     fn new_metadata(&mut self, metadata: Metadata) -> SitePtbBuilderResult<Argument> {
         let defaults = Metadata::default();
         let args = [
@@ -252,6 +292,43 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
         Ok(())
     }
 
+    fn create_wal_coin(&mut self, coins: Vec<Coin>) -> SitePtbBuilderResult<Argument> {
+        // Add the first coin to the PTB
+        // Note: Extreme edge case: If a user has A LOT of dust coins only and we end up
+        // selecting more than 1000 coins, we will hit a transaction-limit.
+        let mut coin_args: Vec<Argument> = coins
+            .iter()
+            .map(|coin| {
+                self.pt_builder
+                    .obj(ObjectArg::ImmOrOwnedObject(coin.object_ref()))
+            })
+            .collect::<anyhow::Result<Vec<_>, _>>()?;
+        let wal_coin_arg = coin_args.remove(0);
+        Ok(if !coin_args.is_empty() {
+            self.increment_counter()?;
+            self.pt_builder
+                .command(Command::MergeCoins(wal_coin_arg, coin_args))
+        } else {
+            wal_coin_arg
+        })
+    }
+
+    fn extract_system_arg(&mut self, system_obj: SuiObjectData) -> anyhow::Result<Argument> {
+        let Owner::Shared {
+            initial_shared_version,
+        } = system_obj
+            .owner
+            .ok_or(anyhow::anyhow!("Requested object with owner option"))?
+        else {
+            anyhow::bail!("Expect walrus System object to be shared");
+        };
+        self.pt_builder.obj(ObjectArg::SharedObject {
+            id: system_obj.object_id,
+            initial_shared_version,
+            mutability: SharedObjectMutability::Mutable,
+        })
+    }
+
     fn check_counter_in_advance(&self, move_calls_needed: u16) -> Result<(), SitePtbBuilderError> {
         match move_calls_needed + self.move_call_counter {
             c if c > MAX_MOVE_CALLS => Err(SitePtbBuilderError::TooManyMoveCalls(MAX_MOVE_CALLS)),
@@ -294,18 +371,6 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
         while let Some((name, value)) = new_routes_iter.peek() {
             self.add_route(name, value)?;
             new_routes_iter.next();
-        }
-        Ok(())
-    }
-
-    pub fn add_extend_operations(
-        &mut self,
-        blobs_to_extend: &mut std::iter::Peekable<impl Iterator<Item = (ObjectRef, u32)>>, // Blob-ref,
-                                                                                           // epochs-extend
-    ) -> SitePtbBuilderResult<()> {
-        while let Some((blob_ref, epochs)) = blobs_to_extend.peek() {
-            self.extend_blob(*blob_ref, *epochs)?;
-            blobs_to_extend.next();
         }
         Ok(())
     }
