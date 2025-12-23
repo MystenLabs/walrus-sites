@@ -15,11 +15,12 @@
 #   --context <ctx>      Sui context (default: testnet)
 #
 # Outputs (to GITHUB_OUTPUT if set):
-#   <site_name>_site_id       - Deployed site object ID
-#   <site_name>_sui_cost      - SUI cost in MIST
-#   <site_name>_wal_cost      - WAL cost in units
+#   <site_name>_site_id        - Deployed site object ID
+#   <site_name>_sui_cost       - SUI cost in MIST
+#   <site_name>_wal_cost       - WAL cost in units
 #   <site_name>_sui_cost_human - SUI cost in human readable format
 #   <site_name>_wal_cost_human - WAL cost in human readable format
+#   <site_name>_deploy_time    - Deploy duration in seconds
 #
 # Example:
 #   ./deploy_with_cost.sh --site-name walrus-docs --site-dir ./walrus-docs-site
@@ -82,13 +83,17 @@ BEFORE_JSON=$("$SCRIPT_DIR/get_balance.sh" --json)
 BEFORE_SUI=$(echo "$BEFORE_JSON" | jq -r '.sui.balance')
 BEFORE_WAL=$(echo "$BEFORE_JSON" | jq -r '.wal.balance')
 
-# Deploy site
+# Deploy site with timing
 echo "Deploying $SITE_NAME..."
+START_TIME=$(date +%s.%N)
 ./target/release/site-builder --context "$CONTEXT" --gas-budget "$GAS_BUDGET" deploy "$SITE_DIR" --epochs "$EPOCHS"
+END_TIME=$(date +%s.%N)
+DEPLOY_TIME=$(echo "$END_TIME - $START_TIME" | bc)
 
 # Extract site ID from ws-resources.json (deploy adds object_id field)
 SITE_ID=$(jq -r '.object_id // empty' "$SITE_DIR/ws-resources.json")
 echo "Site ID: $SITE_ID"
+echo "Deploy time: ${DEPLOY_TIME}s"
 
 # Get balance after deploy
 echo "Getting balance after $SITE_NAME deploy..."
@@ -104,13 +109,15 @@ WAL_COST_HUMAN=$(echo "scale=9; $WAL_COST / 1000000000" | bc | sed 's/^\./0./')
 
 # Output results
 echo ""
-echo "=== $SITE_NAME Deploy Cost ==="
+echo "=== $SITE_NAME Deploy Results ==="
+echo "Time: ${DEPLOY_TIME}s"
 echo "SUI: $SUI_COST_HUMAN ($SUI_COST MIST)"
 echo "WAL: $WAL_COST_HUMAN ($WAL_COST units)"
 
 # Write to GitHub Actions output if GITHUB_OUTPUT is set
 if [ -n "$GITHUB_OUTPUT" ]; then
     echo "${SITE_NAME}_site_id=$SITE_ID" >> "$GITHUB_OUTPUT"
+    echo "${SITE_NAME}_deploy_time=$DEPLOY_TIME" >> "$GITHUB_OUTPUT"
     echo "${SITE_NAME}_sui_cost=$SUI_COST" >> "$GITHUB_OUTPUT"
     echo "${SITE_NAME}_wal_cost=$WAL_COST" >> "$GITHUB_OUTPUT"
     echo "${SITE_NAME}_sui_cost_human=$SUI_COST_HUMAN" >> "$GITHUB_OUTPUT"

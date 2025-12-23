@@ -130,20 +130,20 @@ jobs:
         run: |
           echo "## Deploy Cost Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Site | SUI Cost | WAL Cost |" >> $GITHUB_STEP_SUMMARY
-          echo "|------|----------|----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Site | Time (s) | SUI Cost | WAL Cost |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|----------|----------|----------|" >> $GITHUB_STEP_SUMMARY
 
           [ -n "${{ steps.deploy_walrus_docs.outputs.walrus_docs_sui_cost_human }}" ] && \
-            echo "| walrus-docs | ${{ steps.deploy_walrus_docs.outputs.walrus_docs_sui_cost_human }} SUI | ${{ steps.deploy_walrus_docs.outputs.walrus_docs_wal_cost_human }} WAL |" >> $GITHUB_STEP_SUMMARY
+            echo "| walrus-docs | ${{ steps.deploy_walrus_docs.outputs.walrus_docs_deploy_time }} | ${{ steps.deploy_walrus_docs.outputs.walrus_docs_sui_cost_human }} SUI | ${{ steps.deploy_walrus_docs.outputs.walrus_docs_wal_cost_human }} WAL |" >> $GITHUB_STEP_SUMMARY
 
           [ -n "${{ steps.deploy_seal_docs.outputs.seal_docs_sui_cost_human }}" ] && \
-            echo "| seal-docs | ${{ steps.deploy_seal_docs.outputs.seal_docs_sui_cost_human }} SUI | ${{ steps.deploy_seal_docs.outputs.seal_docs_wal_cost_human }} WAL |" >> $GITHUB_STEP_SUMMARY
+            echo "| seal-docs | ${{ steps.deploy_seal_docs.outputs.seal_docs_deploy_time }} | ${{ steps.deploy_seal_docs.outputs.seal_docs_sui_cost_human }} SUI | ${{ steps.deploy_seal_docs.outputs.seal_docs_wal_cost_human }} WAL |" >> $GITHUB_STEP_SUMMARY
 
           [ -n "${{ steps.deploy_stake_wal.outputs.stake_wal_sui_cost_human }}" ] && \
-            echo "| stake-wal | ${{ steps.deploy_stake_wal.outputs.stake_wal_sui_cost_human }} SUI | ${{ steps.deploy_stake_wal.outputs.stake_wal_wal_cost_human }} WAL |" >> $GITHUB_STEP_SUMMARY
+            echo "| stake-wal | ${{ steps.deploy_stake_wal.outputs.stake_wal_deploy_time }} | ${{ steps.deploy_stake_wal.outputs.stake_wal_sui_cost_human }} SUI | ${{ steps.deploy_stake_wal.outputs.stake_wal_wal_cost_human }} WAL |" >> $GITHUB_STEP_SUMMARY
 
           [ -n "${{ steps.deploy_landing_page.outputs.landing_page_sui_cost_human }}" ] && \
-            echo "| landing-page | ${{ steps.deploy_landing_page.outputs.landing_page_sui_cost_human }} SUI | ${{ steps.deploy_landing_page.outputs.landing_page_wal_cost_human }} WAL |" >> $GITHUB_STEP_SUMMARY
+            echo "| landing-page | ${{ steps.deploy_landing_page.outputs.landing_page_deploy_time }} | ${{ steps.deploy_landing_page.outputs.landing_page_sui_cost_human }} SUI | ${{ steps.deploy_landing_page.outputs.landing_page_wal_cost_human }} WAL |" >> $GITHUB_STEP_SUMMARY
 
       # --- Cleanup: Destroy deployed sites ---
       - name: Destroy walrus-docs site
