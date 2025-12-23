@@ -20,6 +20,7 @@ on:
       - sew-728-implement-docs-builder-script-walrus-docs-and-seal-docs
       - sew-729-implement-script-that-uses-dist-generator-with-stake-wal-and
       - sew-732-balance-checker-script
+      - sew-609-create-test-cases-for-performance-regression-tests
   workflow_dispatch:
     inputs:
       ref:
