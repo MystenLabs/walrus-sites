@@ -144,3 +144,20 @@ jobs:
 
           [ -n "${{ steps.deploy_landing_page.outputs.landing_page_sui_cost_human }}" ] && \
             echo "| landing-page | ${{ steps.deploy_landing_page.outputs.landing_page_sui_cost_human }} SUI | ${{ steps.deploy_landing_page.outputs.landing_page_wal_cost_human }} WAL |" >> $GITHUB_STEP_SUMMARY
+
+      # --- Cleanup: Destroy deployed sites ---
+      - name: Destroy walrus-docs site
+        if: ${{ always() && steps.deploy_walrus_docs.outputs.walrus_docs_site_id }}
+        run: ./target/release/site-builder --context testnet destroy ${{ steps.deploy_walrus_docs.outputs.walrus_docs_site_id }}
+
+      - name: Destroy seal-docs site
+        if: ${{ always() && steps.deploy_seal_docs.outputs.seal_docs_site_id }}
+        run: ./target/release/site-builder --context testnet destroy ${{ steps.deploy_seal_docs.outputs.seal_docs_site_id }}
+
+      - name: Destroy stake-wal site
+        if: ${{ always() && steps.deploy_stake_wal.outputs.stake_wal_site_id }}
+        run: ./target/release/site-builder --context testnet destroy ${{ steps.deploy_stake_wal.outputs.stake_wal_site_id }}
+
+      - name: Destroy landing-page site
+        if: ${{ always() && steps.deploy_landing_page.outputs.landing_page_site_id }}
+        run: ./target/release/site-builder --context testnet destroy ${{ steps.deploy_landing_page.outputs.landing_page_site_id }}

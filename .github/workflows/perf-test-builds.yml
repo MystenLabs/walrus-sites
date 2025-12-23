@@ -106,4 +106,3 @@ jobs:
           echo "| stake-wal | ${{ needs.build-stake-wal.result }} | ${{ needs.publish.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| landing-page | ${{ needs.build-landing-page.result }} | ${{ needs.publish.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "TODO: Add cost measurements (WAL, SUI, time, memory)" >> $GITHUB_STEP_SUMMARY

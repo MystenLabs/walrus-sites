@@ -15,6 +15,7 @@
 #   --context <ctx>      Sui context (default: testnet)
 #
 # Outputs (to GITHUB_OUTPUT if set):
+#   <site_name>_site_id       - Deployed site object ID
 #   <site_name>_sui_cost      - SUI cost in MIST
 #   <site_name>_wal_cost      - WAL cost in units
 #   <site_name>_sui_cost_human - SUI cost in human readable format
@@ -85,6 +86,10 @@ BEFORE_WAL=$(echo "$BEFORE_JSON" | jq -r '.wal.balance')
 echo "Deploying $SITE_NAME..."
 ./target/release/site-builder --context "$CONTEXT" --gas-budget "$GAS_BUDGET" deploy "$SITE_DIR" --epochs "$EPOCHS"
 
+# Extract site ID from ws-resources.json (deploy adds object_id field)
+SITE_ID=$(jq -r '.object_id // empty' "$SITE_DIR/ws-resources.json")
+echo "Site ID: $SITE_ID"
+
 # Get balance after deploy
 echo "Getting balance after $SITE_NAME deploy..."
 AFTER_JSON=$("$SCRIPT_DIR/get_balance.sh" --json)
@@ -105,6 +110,7 @@ echo "WAL: $WAL_COST_HUMAN ($WAL_COST units)"
 
 # Write to GitHub Actions output if GITHUB_OUTPUT is set
 if [ -n "$GITHUB_OUTPUT" ]; then
+    echo "${SITE_NAME}_site_id=$SITE_ID" >> "$GITHUB_OUTPUT"
     echo "${SITE_NAME}_sui_cost=$SUI_COST" >> "$GITHUB_OUTPUT"
     echo "${SITE_NAME}_wal_cost=$WAL_COST" >> "$GITHUB_OUTPUT"
     echo "${SITE_NAME}_sui_cost_human=$SUI_COST_HUMAN" >> "$GITHUB_OUTPUT"
