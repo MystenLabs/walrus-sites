@@ -72,13 +72,14 @@ pub struct SitePtb<T = (), const MAX_MOVE_CALLS: u16 = PTB_MAX_MOVE_CALLS> {
     site_argument: T,
     package: ObjectID,
     module: Identifier,
+    walrus_package: ObjectID,
     system_obj_arg: Option<Argument>,
     wal_coin_arg: Option<Argument>,
 }
 
 /// A PTB to update a site.
 impl<const MAX_MOVE_CALLS: u16> SitePtb<(), MAX_MOVE_CALLS> {
-    pub fn new(package: ObjectID, module: Identifier) -> Self {
+    pub fn new(package: ObjectID, module: Identifier, walrus_package: ObjectID) -> Self {
         let pt_builder = ProgrammableTransactionBuilder::new();
         SitePtb {
             pt_builder,
@@ -86,6 +87,7 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<(), MAX_MOVE_CALLS> {
             site_argument: (),
             package,
             module,
+            walrus_package,
             system_obj_arg: None,
             wal_coin_arg: None,
         }
@@ -97,6 +99,7 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<(), MAX_MOVE_CALLS> {
             move_call_counter,
             package,
             module,
+            walrus_package,
             system_obj_arg,
             wal_coin_arg,
             ..
@@ -108,6 +111,7 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<(), MAX_MOVE_CALLS> {
             site_argument,
             package,
             module,
+            walrus_package,
             system_obj_arg,
             wal_coin_arg,
         })
@@ -119,6 +123,7 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<(), MAX_MOVE_CALLS> {
             move_call_counter,
             package,
             module,
+            walrus_package,
             system_obj_arg,
             wal_coin_arg,
             ..
@@ -129,6 +134,7 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<(), MAX_MOVE_CALLS> {
             site_argument,
             package,
             module,
+            walrus_package,
             system_obj_arg,
             wal_coin_arg,
         }
@@ -260,6 +266,7 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
             site_argument,
             package,
             module,
+            walrus_package,
             system_obj_arg,
             wal_coin_arg,
         } = self;
@@ -269,6 +276,7 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
             site_argument,
             package,
             module,
+            walrus_package,
             system_obj_arg,
             wal_coin_arg,
         }
@@ -277,7 +285,13 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
     fn extend_blob(&mut self, blob_ref: ObjectRef, epochs: u32) -> SitePtbBuilderResult<()> {
         let blob_obj_arg = self.pt_builder.obj(ObjectArg::ImmOrOwnedObject(blob_ref))?;
         let epochs_move_arg = self.pt_builder.pure(epochs)?;
-        self.add_programmable_move_call(
+        self.increment_counter()?;
+        // Call walrus::system::extend_blob directly using the walrus package,
+        // since add_programmable_move_call uses the sites package.
+        self.pt_builder.programmable_move_call(
+            self.walrus_package,
+            Identifier::new(contracts::walrus::extend_blob.module)
+                .expect("module name is a valid identifier"),
             contracts::walrus::extend_blob.identifier(),
             vec![],
             vec![
@@ -288,7 +302,7 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
                 self.wal_coin_arg
                     .ok_or(anyhow::anyhow!("WAL coin not initialized"))?,
             ],
-        )?;
+        );
         Ok(())
     }
 
