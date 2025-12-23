@@ -233,6 +233,8 @@ pub mod walrus {
     use super::*;
 
     contract_ident!(struct blob::Blob);
+
+    contract_ident!(fn system::extend_blob);
 }
 
 pub mod dynamic_field {
