@@ -241,7 +241,7 @@ impl Walrus {
     ///
     /// (All columns minus one for the index.)
     pub fn max_slots_in_quilt(n_shards: NonZeroU16) -> u16 {
-        let (_n_rows, n_cols) = walrus_core::encoding::source_symbols_for_n_shards(n_shards);
+        let (_n_rows, n_cols) = walrus_sdk::core::encoding::source_symbols_for_n_shards(n_shards);
         n_cols.get() - 1
     }
 
@@ -250,8 +250,8 @@ impl Walrus {
     /// This is calculated as `MAX_SYMBOL_SIZE × n_rows`, representing the capacity
     /// of one column in the quilt matrix.
     pub fn max_slot_size(n_shards: NonZeroU16) -> usize {
-        let (n_rows, _n_cols) = walrus_core::encoding::source_symbols_for_n_shards(n_shards);
-        let max_symbol_size = walrus_core::DEFAULT_ENCODING.max_symbol_size() as usize;
+        let (n_rows, _n_cols) = walrus_sdk::core::encoding::source_symbols_for_n_shards(n_shards);
+        let max_symbol_size = walrus_sdk::core::DEFAULT_ENCODING.max_symbol_size() as usize;
         max_symbol_size * n_rows.get() as usize
     }
 

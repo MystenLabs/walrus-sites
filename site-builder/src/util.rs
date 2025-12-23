@@ -29,7 +29,7 @@ use sui_types::{
     transaction::{ProgrammableTransaction, TransactionData},
     TypeTag,
 };
-use walrus_core::{BlobId as BlobIdOriginal, QuiltPatchId};
+use walrus_sdk::core::{BlobId as BlobIdOriginal, QuiltPatchId};
 
 use crate::{
     display,

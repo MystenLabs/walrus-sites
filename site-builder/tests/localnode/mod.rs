@@ -51,13 +51,17 @@ use walrus_sdk::{
         QuiltPatchId,
     },
     error::ClientResult,
+    sui::{
+        client::{contract_config::ContractConfig, SuiContractClient},
+        test_utils::{
+            new_wallet_on_sui_test_cluster,
+            system_setup::SystemContext,
+            TestClusterHandle,
+        },
+        wallet::Wallet,
+    },
 };
 use walrus_service::test_utils::{test_cluster, StorageNodeHandle, TestCluster};
-use walrus_sui::{
-    client::{contract_config::ContractConfig, SuiContractClient},
-    test_utils::{new_wallet_on_sui_test_cluster, system_setup::SystemContext, TestClusterHandle},
-    wallet::Wallet,
-};
 use walrus_test_utils::WithTempDir;
 
 pub mod args_builder;
@@ -347,7 +351,7 @@ impl TestSetup {
     /// Get the epoch start timestamp from the Walrus staking object.
     /// Returns the estimated start time of the current Walrus epoch.
     pub async fn epoch_start_timestamp(&self) -> anyhow::Result<chrono::DateTime<chrono::Utc>> {
-        use walrus_sui::types::move_structs::EpochState;
+        use walrus_sdk::sui::types::move_structs::EpochState;
 
         let staking_object = self
             .cluster_state

@@ -3,7 +3,7 @@
 
 //! Summaries of the run results.
 
-use walrus_core::QuiltPatchId;
+use walrus_sdk::core::QuiltPatchId;
 
 use crate::{
     site::{resource::SiteOps, SiteDataDiff},
