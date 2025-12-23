@@ -135,6 +135,13 @@ impl GeneralArgs {
         )
     }
 
+    pub fn walrus_config(&self) -> Result<WalrusContractConfig> {
+        let walrus_config_path = self.walrus_config.as_ref().ok_or_else(|| {
+            anyhow!("no walrus package, or walrus config specified; please add either")
+        })?;
+        WalrusContractConfig::from_file(walrus_config_path)
+    }
+
     /// Resolves the walrus package ID.
     ///
     /// Returns `walrus_package` if provided, otherwise loads the walrus config file
@@ -148,10 +155,7 @@ impl GeneralArgs {
         match self.walrus_package {
             Some(pkg) => Ok(pkg),
             None => {
-                let walrus_config_path = self.walrus_config.as_ref().ok_or_else(|| {
-                    anyhow!("no walrus package, or walrus config specified; please add either")
-                })?;
-                let walrus_config = WalrusContractConfig::from_file(walrus_config_path)?;
+                let walrus_config = self.walrus_config()?;
                 sui_client
                     .get_object_original_package(walrus_config.staking_object)
                     .await

@@ -11,6 +11,8 @@ use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{
     rpc_types::{
         SuiExecutionStatus,
+        SuiObjectDataOptions,
+        SuiObjectResponse,
         SuiTransactionBlockEffectsAPI as _,
         SuiTransactionBlockResponse,
     },
@@ -18,10 +20,20 @@ use sui_sdk::{
 };
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
-    transaction::{CallArg, ProgrammableTransaction},
+    object::Owner,
+    programmable_transaction_builder::ProgrammableTransactionBuilder,
+    transaction::{
+        Argument,
+        CallArg,
+        Command,
+        ObjectArg,
+        ProgrammableTransaction,
+        SharedObjectMutability,
+    },
     Identifier,
 };
 use tracing::warn;
+use walrus_sdk::sui::utils::price_for_encoded_length;
 
 use super::{
     builder::SitePtb,
@@ -133,10 +145,32 @@ impl SiteManager {
         };
         let new_end_epoch = current_epoch + epochs_ahead;
 
-        let to_extend = get_owned_blobs(&retriable_client, &self.config, self.active_address()?)
+        // TODO(sew-495): Move to SitePtb
+        let walrus_config = self.config.general.walrus_config()?;
+        let system_obj_id = walrus_config.system_object;
+        let system_obj: SuiObjectResponse = retriable_client
+            .get_object_with_options(system_obj_id, SuiObjectDataOptions::new().with_owner())
+            .await?;
+        let Owner::Shared {
+            initial_shared_version,
+        } = system_obj
+            .data
+            .ok_or(anyhow!("Expected data in walrus System object response"))?
+            .owner
+            .ok_or(anyhow!("Requested object with owner option"))?
+        else {
+            bail!("Expect walrus System object to be shared");
+        };
+
+        let walrus_pkg = self
+            .config
+            .general
+            .resolve_walrus_package(&retriable_client)
+            .await?;
+        let to_extend = get_owned_blobs(&retriable_client, walrus_pkg, self.active_address()?)
             .await?
             .into_iter()
-            .filter(|(blob_id, sui_blob)| {
+            .filter(|(blob_id, (sui_blob, _obj_ref))| {
                 // blob-id exists in resources currently in directory and end_epoch is less than
                 // epochs to update to.
                 local_site_data
@@ -146,10 +180,85 @@ impl SiteManager {
                     && sui_blob.storage.end_epoch < new_end_epoch
             });
 
-        for (_, sui_blob_obj) in to_extend {
-            let epochs_extended = new_end_epoch - sui_blob_obj.storage.end_epoch;
-            let _out = self.walrus.extend(sui_blob_obj.id, epochs_extended).await?;
+        // Collect blobs to extend first (need to consume the iterator)
+        let to_extend: Vec<_> = to_extend.collect();
+
+        let mut walrus_ptb = ProgrammableTransactionBuilder::new();
+
+        if !to_extend.is_empty() {
+            let walrus_client = retriable_client.to_walrus_retriable_client().await?;
+
+            // Get the WAL coin type from the walrus contract
+            let wal_coin_type = walrus_config.wal_coin_type(walrus_client.clone()).await?;
+
+            // Get storage price to compute required WAL amount
+            let storage_price = walrus_config
+                .storage_price_per_unit_size(walrus_client)
+                .await?;
+
+            // Compute total WAL needed for all blob extensions
+            let total_wal_needed: u64 = to_extend
+                .iter()
+                .map(|(_, (sui_blob, _))| {
+                    let epochs_extended = new_end_epoch - sui_blob.storage.end_epoch;
+                    price_for_encoded_length(
+                        sui_blob.storage.storage_size,
+                        storage_price,
+                        epochs_extended,
+                    )
+                })
+                .sum();
+
+            let coins = retriable_client
+                .select_coins(
+                    self.active_address()?,
+                    Some(wal_coin_type),
+                    total_wal_needed as u128,
+                    vec![],
+                )
+                .await?;
+
+            if coins.is_empty() {
+                bail!("No WAL coins available to pay for blob extension");
+            }
+
+            // Add the first coin to the PTB
+            // Note: Extreme edge case: If a user has A LOT of dust coins only and we end up
+            // selecting more than 1000 coins, we will hit a transaction-limit.
+            let mut coin_args: Vec<Argument> = coins
+                .iter()
+                .map(|coin| walrus_ptb.obj(ObjectArg::ImmOrOwnedObject(coin.object_ref())))
+                .collect::<Result<Vec<_>, _>>()?;
+
+            // Merge all coins into the first one if there are multiple
+            let wal_coin_arg = coin_args.remove(0);
+            if !coin_args.is_empty() {
+                walrus_ptb.command(Command::MergeCoins(wal_coin_arg, coin_args));
+            }
+
+            for (_, (sui_blob_obj, obj_ref)) in to_extend {
+                let epochs_extended = new_end_epoch - sui_blob_obj.storage.end_epoch;
+                let system_obj_arg = walrus_ptb.obj(ObjectArg::SharedObject {
+                    id: system_obj_id,
+                    initial_shared_version,
+                    mutability: SharedObjectMutability::Mutable,
+                })?;
+                let blob_obj_arg = walrus_ptb.obj(ObjectArg::ImmOrOwnedObject(obj_ref))?;
+                let epochs_move_arg = walrus_ptb.pure(epochs_extended)?;
+
+                walrus_ptb.command(Command::move_call(
+                    walrus_pkg,
+                    Identifier::from_str("system")?,
+                    Identifier::from_str("extend_blob")?,
+                    vec![],
+                    vec![system_obj_arg, blob_obj_arg, epochs_move_arg, wal_coin_arg],
+                ));
+            }
         }
+
+        let gas_ref = self.gas_coin_ref().await?;
+        self.sign_and_send_ptb(walrus_ptb.finish(), gas_ref, &retriable_client)
+            .await?;
 
         tracing::debug!(?existing_site, "checked existing site");
 

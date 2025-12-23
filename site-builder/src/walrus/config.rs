@@ -9,6 +9,12 @@ use anyhow::Context;
 use serde::Deserialize;
 use serde_with::{serde_as, DurationSeconds};
 use sui_types::base_types::ObjectID;
+use walrus_sdk::sui::client::{
+    contract_config::ContractConfig,
+    retry_client::RetriableSuiClient,
+    ReadClient,
+    SuiReadClient,
+};
 
 const fn default_cache_ttl() -> Duration {
     Duration::from_secs(10)
@@ -40,5 +46,41 @@ impl WalrusContractConfig {
         let contents =
             std::fs::read_to_string(path).context("Failed to read walrus config file")?;
         serde_yaml::from_str(&contents).context("Failed to parse walrus config file")
+    }
+
+    /// Creates a walrus-sdk `ContractConfig` from this config.
+    pub fn to_sdk_contract_config(&self) -> ContractConfig {
+        ContractConfig {
+            system_object: self.system_object,
+            staking_object: self.staking_object,
+            credits_object: self.credits_object,
+            walrus_subsidies_object: self.walrus_subsidies_object,
+            cache_ttl: self.cache_ttl,
+        }
+    }
+
+    // TODO(SEW-734): Migrate more functionality to use the walrus-sdk instead of duplicating
+    // code from walrus-sui. Currently only `wal_coin_type` uses the SDK.
+    /// Retrieves the WAL coin type string (e.g., `0x...::wal::WAL`) using the walrus SDK.
+    ///
+    /// This creates a `SuiReadClient` from the walrus SDK which fetches the WAL type
+    /// from the walrus package's `StakedWal` struct definition on-chain.
+    pub async fn wal_coin_type(
+        &self,
+        retriable_client: RetriableSuiClient,
+    ) -> anyhow::Result<String> {
+        let contract_config = self.to_sdk_contract_config();
+        let sui_read_client = SuiReadClient::new(retriable_client, &contract_config).await?;
+        Ok(sui_read_client.wal_coin_type().to_owned())
+    }
+
+    /// Retrieves the storage price per unit size (1 MiB) per epoch in FROST.
+    pub async fn storage_price_per_unit_size(
+        &self,
+        retriable_client: RetriableSuiClient,
+    ) -> anyhow::Result<u64> {
+        let contract_config = self.to_sdk_contract_config();
+        let sui_read_client = SuiReadClient::new(retriable_client, &contract_config).await?;
+        Ok(sui_read_client.storage_price_per_unit_size().await?)
     }
 }

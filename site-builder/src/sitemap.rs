@@ -78,7 +78,12 @@ async fn get_site_resources_and_blobs(
     site_object_id: ObjectID,
 ) -> Result<(SiteData, HashMap<BlobId, SuiBlob>)> {
     // Get all the blobs owned by the owner.
-    let owned_blobs = get_owned_blobs(sui_client, config, owner_address).await?;
+    let walrus_package = config.general.resolve_walrus_package(sui_client).await?;
+    let owned_blobs = get_owned_blobs(sui_client, walrus_package, owner_address)
+        .await?
+        .into_iter()
+        .map(|(blob_id, (sui_blob, _obj_ref))| (blob_id, sui_blob))
+        .collect();
 
     let site = RemoteSiteFactory::new(sui_client, config.package)
         .await?
