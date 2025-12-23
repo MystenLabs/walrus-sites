@@ -19,6 +19,7 @@ on:
     branches:
       - sew-728-implement-docs-builder-script-walrus-docs-and-seal-docs
       - sew-729-implement-script-that-uses-dist-generator-with-stake-wal-and
+      - sew-732-balance-checker-script
   workflow_dispatch:
     inputs:
       ref:

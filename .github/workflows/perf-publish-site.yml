@@ -74,7 +74,7 @@ jobs:
       - name: Build site-builder
         run: cargo build --release -p site-builder
 
-      # --- Sequential publish steps ---
+      # --- Sequential publish steps with cost tracking ---
 
       - name: Download walrus-docs artifact
         if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'walrus-docs' }}
@@ -85,7 +85,8 @@ jobs:
 
       - name: Deploy walrus-docs
         if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'walrus-docs' }}
-        run: ./target/release/site-builder --context testnet --gas-budget 1000000000 deploy ./walrus-docs-site --epochs 1
+        id: deploy_walrus_docs
+        run: ./scripts/deploy_with_cost.sh --site-name walrus_docs --site-dir ./walrus-docs-site
 
       - name: Download seal-docs artifact
         if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'seal-docs' }}
@@ -96,7 +97,8 @@ jobs:
 
       - name: Deploy seal-docs
         if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'seal-docs' }}
-        run: ./target/release/site-builder --context testnet --gas-budget 1000000000 deploy ./seal-docs-site --epochs 1
+        id: deploy_seal_docs
+        run: ./scripts/deploy_with_cost.sh --site-name seal_docs --site-dir ./seal-docs-site
 
       - name: Download stake-wal artifact
         if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'stake-wal' }}
@@ -107,7 +109,8 @@ jobs:
 
       - name: Deploy stake-wal
         if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'stake-wal' }}
-        run: ./target/release/site-builder --context testnet --gas-budget 1000000000 deploy ./stake-wal-site --epochs 1
+        id: deploy_stake_wal
+        run: ./scripts/deploy_with_cost.sh --site-name stake_wal --site-dir ./stake-wal-site
 
       - name: Download landing-page artifact
         if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'landing-page' }}
@@ -118,4 +121,26 @@ jobs:
 
       - name: Deploy landing-page
         if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'landing-page' }}
-        run: ./target/release/site-builder --context testnet --gas-budget 1000000000 deploy ./landing-page-site --epochs 1
+        id: deploy_landing_page
+        run: ./scripts/deploy_with_cost.sh --site-name landing_page --site-dir ./landing-page-site
+
+      # --- Cost Summary ---
+      - name: Generate cost summary
+        if: ${{ always() }}
+        run: |
+          echo "## Deploy Cost Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Site | SUI Cost | WAL Cost |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|----------|----------|" >> $GITHUB_STEP_SUMMARY
+
+          [ -n "${{ steps.deploy_walrus_docs.outputs.walrus_docs_sui_cost_human }}" ] && \
+            echo "| walrus-docs | ${{ steps.deploy_walrus_docs.outputs.walrus_docs_sui_cost_human }} SUI | ${{ steps.deploy_walrus_docs.outputs.walrus_docs_wal_cost_human }} WAL |" >> $GITHUB_STEP_SUMMARY
+
+          [ -n "${{ steps.deploy_seal_docs.outputs.seal_docs_sui_cost_human }}" ] && \
+            echo "| seal-docs | ${{ steps.deploy_seal_docs.outputs.seal_docs_sui_cost_human }} SUI | ${{ steps.deploy_seal_docs.outputs.seal_docs_wal_cost_human }} WAL |" >> $GITHUB_STEP_SUMMARY
+
+          [ -n "${{ steps.deploy_stake_wal.outputs.stake_wal_sui_cost_human }}" ] && \
+            echo "| stake-wal | ${{ steps.deploy_stake_wal.outputs.stake_wal_sui_cost_human }} SUI | ${{ steps.deploy_stake_wal.outputs.stake_wal_wal_cost_human }} WAL |" >> $GITHUB_STEP_SUMMARY
+
+          [ -n "${{ steps.deploy_landing_page.outputs.landing_page_sui_cost_human }}" ] && \
+            echo "| landing-page | ${{ steps.deploy_landing_page.outputs.landing_page_sui_cost_human }} SUI | ${{ steps.deploy_landing_page.outputs.landing_page_wal_cost_human }} WAL |" >> $GITHUB_STEP_SUMMARY
