@@ -103,7 +103,7 @@ jobs:
         run: |
           ./scripts/site_builder_with_cost.sh \
             --output-prefix walrus_docs_update \
-            -- update ./walrus-docs-site --epochs 1
+            -- update ./walrus-docs-site ${{ steps.deploy_walrus_docs.outputs.walrus_docs_deploy_site_id }} --epochs 1
 
       # =============================================================================
       # seal-docs: MkDocs site (page-edit-add update scenario)
@@ -133,7 +133,7 @@ jobs:
         run: |
           ./scripts/site_builder_with_cost.sh \
             --output-prefix seal_docs_update \
-            -- update ./seal-docs-site --epochs 1
+            -- update ./seal-docs-site ${{ steps.deploy_seal_docs.outputs.seal_docs_deploy_site_id }} --epochs 1
 
       # =============================================================================
       # stake-wal: Vite/React app (code-edit update scenario)
@@ -163,7 +163,7 @@ jobs:
         run: |
           ./scripts/site_builder_with_cost.sh \
             --output-prefix stake_wal_update \
-            -- update ./stake-wal-site --epochs 1
+            -- update ./stake-wal-site ${{ steps.deploy_stake_wal.outputs.stake_wal_deploy_site_id }} --epochs 1
 
       # =============================================================================
       # landing-page: Vite/React app (code-edit-image update scenario)
@@ -193,7 +193,7 @@ jobs:
         run: |
           ./scripts/site_builder_with_cost.sh \
             --output-prefix landing_page_update \
-            -- update ./landing-page-site --epochs 1
+            -- update ./landing-page-site ${{ steps.deploy_landing_page.outputs.landing_page_deploy_site_id }} --epochs 1
 
       # =============================================================================
       # Cost Summary
