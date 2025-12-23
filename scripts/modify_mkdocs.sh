@@ -49,6 +49,15 @@ fi
 TIMESTAMP=$(date +%s)
 NEW_PAGE_NAME="perf-test-page-$TIMESTAMP"
 
+# Helper function for portable sed -i
+sed_inplace() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i '' "$@"
+    else
+        sed -i "$@"
+    fi
+}
+
 echo "=== Simulating MkDocs page edit + add ==="
 
 # 1. Find and modify an existing HTML file (index.html or any page)
@@ -90,7 +99,7 @@ if [ -f "$SEARCH_INDEX" ]; then
     echo "Updating: $SEARCH_INDEX"
     # Add a new entry to the search index (simple append before closing bracket)
     # First, remove the trailing ] and add new entry
-    sed -i '' 's/\]$//' "$SEARCH_INDEX"
+    sed_inplace 's/\]$//' "$SEARCH_INDEX"
     cat >> "$SEARCH_INDEX" << EOF
 ,{"location":"$NEW_PAGE_NAME/","text":"Performance Test Page. This page was created at $TIMESTAMP for update testing.","title":"Performance Test Page"}]
 EOF
@@ -101,7 +110,7 @@ SITEMAP="$SITE_DIR/sitemap.xml"
 if [ -f "$SITEMAP" ]; then
     echo "Updating: $SITEMAP"
     # Add new URL entry before </urlset>
-    sed -i '' "s|</urlset>|<url><loc>https://example.com/$NEW_PAGE_NAME/</loc></url></urlset>|" "$SITEMAP"
+    sed_inplace "s|</urlset>|<url><loc>https://example.com/$NEW_PAGE_NAME/</loc></url></urlset>|" "$SITEMAP"
 fi
 
 # 5. Regenerate sitemap.xml.gz if it exists
@@ -115,6 +124,12 @@ echo "=== MkDocs modification complete ==="
 echo "Files affected:"
 echo "  - 1 HTML file modified"
 echo "  - 1 HTML file created ($NEW_PAGE_NAME/index.html)"
-[ -f "$SEARCH_INDEX" ] && echo "  - search_index.json updated"
-[ -f "$SITEMAP" ] && echo "  - sitemap.xml updated"
-[ -f "$SITEMAP_GZ" ] && echo "  - sitemap.xml.gz regenerated"
+if [ -f "$SEARCH_INDEX" ]; then
+    echo "  - search_index.json updated"
+fi
+if [ -f "$SITEMAP" ]; then
+    echo "  - sitemap.xml updated"
+fi
+if [ -f "$SITEMAP_GZ" ]; then
+    echo "  - sitemap.xml.gz regenerated"
+fi

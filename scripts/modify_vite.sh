@@ -57,8 +57,22 @@ if [ ! -d "$ASSETS_DIR" ]; then
 fi
 
 # Generate a new hash suffix (8 characters)
-NEW_HASH=$(head -c 100 /dev/urandom | md5 | head -c 8)
+# Use md5sum on Linux, md5 on macOS
+if command -v md5sum &> /dev/null; then
+    NEW_HASH=$(head -c 100 /dev/urandom | md5sum | head -c 8)
+else
+    NEW_HASH=$(head -c 100 /dev/urandom | md5 | head -c 8)
+fi
 TIMESTAMP=$(date +%s)
+
+# Helper function for portable sed -i
+sed_inplace() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i '' "$@"
+    else
+        sed -i "$@"
+    fi
+}
 
 echo "=== Simulating Vite code edit ==="
 echo "New hash suffix: $NEW_HASH"
@@ -94,28 +108,38 @@ if [ -n "$MAIN_JS" ]; then
 fi
 
 # 2. Find and rename other JS chunks (lazy-loaded modules)
+# Track used prefixes to avoid naming conflicts (using a simple string)
+# Start with 'index' as used since we handled the main entry above
+USED_PREFIXES="|index|"
 CHUNK_COUNT=0
 for js_file in "$ASSETS_DIR"/*.js; do
     [ -f "$js_file" ] || continue
-    basename=$(basename "$js_file")
+    js_basename=$(basename "$js_file")
 
     # Skip if already processed
-    if [[ " ${OLD_NAMES[*]} " =~ " ${basename} " ]]; then
+    if [[ " ${OLD_NAMES[*]} " =~ " ${js_basename} " ]]; then
         continue
     fi
 
-    # Only process files that look like chunks (contain a hash)
-    if [[ "$basename" =~ ^[a-zA-Z]+-[A-Za-z0-9]+\.js$ ]]; then
+    # Only process files that look like chunks (contain a hash pattern like name-HASH.js)
+    if [[ "$js_basename" =~ ^([a-zA-Z]+)-[A-Za-z0-9]+\.js$ ]]; then
         # Extract the chunk name prefix
-        CHUNK_PREFIX=$(echo "$basename" | sed 's/-[^-]*\.js$//')
+        CHUNK_PREFIX="${BASH_REMATCH[1]}"
+
+        # Skip if we already processed a file with this prefix (avoid conflicts)
+        if [[ "$USED_PREFIXES" == *"|$CHUNK_PREFIX|"* ]]; then
+            continue
+        fi
+        USED_PREFIXES="$USED_PREFIXES|$CHUNK_PREFIX|"
+
         NEW_CHUNK="${CHUNK_PREFIX}-${NEW_HASH}.js"
         NEW_CHUNK_PATH="$ASSETS_DIR/$NEW_CHUNK"
 
-        echo "Renaming: $basename -> $NEW_CHUNK"
+        echo "Renaming: $js_basename -> $NEW_CHUNK"
         mv "$js_file" "$NEW_CHUNK_PATH"
         echo "// Modified at $TIMESTAMP for perf test" >> "$NEW_CHUNK_PATH"
 
-        OLD_NAMES+=("$basename")
+        OLD_NAMES+=("$js_basename")
         NEW_NAMES+=("$NEW_CHUNK")
         CHUNK_COUNT=$((CHUNK_COUNT + 1))
 
@@ -127,7 +151,7 @@ done
 # 3. Update index.html with new filenames
 echo "Updating index.html with new references..."
 for i in "${!OLD_NAMES[@]}"; do
-    sed -i '' "s|${OLD_NAMES[$i]}|${NEW_NAMES[$i]}|g" "$INDEX_HTML"
+    sed_inplace "s|${OLD_NAMES[$i]}|${NEW_NAMES[$i]}|g" "$INDEX_HTML"
 done
 
 # 4. If this is the code-edit-image scenario, add an image
@@ -144,4 +168,6 @@ echo "=== Vite modification complete ==="
 echo "Files affected:"
 echo "  - ${#NEW_NAMES[@]} JS files renamed and modified"
 echo "  - index.html updated"
-[ "$ADD_IMAGE" = true ] && echo "  - 1 image file added"
+if [ "$ADD_IMAGE" = true ]; then
+    echo "  - 1 image file added"
+fi

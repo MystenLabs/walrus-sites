@@ -52,7 +52,12 @@ if [ ! -d "$JS_DIR" ]; then
 fi
 
 # Generate a new hash suffix (8 characters)
-NEW_HASH=$(head -c 100 /dev/urandom | md5 | head -c 8)
+# Use md5sum on Linux, md5 on macOS
+if command -v md5sum &> /dev/null; then
+    NEW_HASH=$(head -c 100 /dev/urandom | md5sum | head -c 8)
+else
+    NEW_HASH=$(head -c 100 /dev/urandom | md5 | head -c 8)
+fi
 TIMESTAMP=$(date +%s)
 
 echo "=== Simulating Docusaurus page edit ==="
@@ -90,12 +95,21 @@ if [ -n "$PAGE_CHUNK_OLD" ]; then
     echo "// Modified at $TIMESTAMP for perf test" >> "$PAGE_CHUNK_NEW_PATH"
 fi
 
+# Helper function for portable sed -i
+sed_inplace() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i '' "$@"
+    else
+        sed -i "$@"
+    fi
+}
+
 # 3. Update all HTML files to reference the new runtime filename
 echo "Updating HTML files with new runtime reference..."
 HTML_COUNT=0
 for html_file in $(find "$SITE_DIR" -name "*.html" -type f); do
     if grep -q "$RUNTIME_OLD_BASENAME" "$html_file" 2>/dev/null; then
-        sed -i '' "s|$RUNTIME_OLD_BASENAME|$RUNTIME_NEW|g" "$html_file"
+        sed_inplace "s|$RUNTIME_OLD_BASENAME|$RUNTIME_NEW|g" "$html_file"
         HTML_COUNT=$((HTML_COUNT + 1))
     fi
 done
@@ -105,7 +119,7 @@ echo "Updated $HTML_COUNT HTML files"
 if [ -n "$PAGE_CHUNK_OLD" ]; then
     for html_file in $(find "$SITE_DIR" -name "*.html" -type f); do
         if grep -q "$PAGE_CHUNK_OLD_BASENAME" "$html_file" 2>/dev/null; then
-            sed -i '' "s|$PAGE_CHUNK_OLD_BASENAME|$PAGE_CHUNK_NEW|g" "$html_file"
+            sed_inplace "s|$PAGE_CHUNK_OLD_BASENAME|$PAGE_CHUNK_NEW|g" "$html_file"
         fi
     done
 fi
@@ -113,5 +127,7 @@ fi
 echo "=== Docusaurus modification complete ==="
 echo "Files affected:"
 echo "  - 1 runtime JS file renamed and modified"
-[ -n "$PAGE_CHUNK_OLD" ] && echo "  - 1 page chunk JS file renamed and modified"
+if [ -n "$PAGE_CHUNK_OLD" ]; then
+    echo "  - 1 page chunk JS file renamed and modified"
+fi
 echo "  - $HTML_COUNT HTML files updated"
