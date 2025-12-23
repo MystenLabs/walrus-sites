@@ -540,8 +540,8 @@ async fn deploy_quilts_with_slot_sized_files() -> anyhow::Result<()> {
     let n_shards = cluster.cluster_state.walrus_cluster.n_shards;
 
     // Calculate capacity per column (slot) in bytes
-    let (n_rows, n_cols) = walrus_core::encoding::source_symbols_for_n_shards(n_shards);
-    let max_symbol_size = walrus_core::DEFAULT_ENCODING.max_symbol_size() as usize;
+    let (n_rows, n_cols) = walrus_sdk::core::encoding::source_symbols_for_n_shards(n_shards);
+    let max_symbol_size = walrus_sdk::core::DEFAULT_ENCODING.max_symbol_size() as usize;
     let column_capacity = max_symbol_size * n_rows.get() as usize;
 
     // Available columns: n_cols - 1 (reserve 1 for quilt index)

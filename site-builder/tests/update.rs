@@ -274,7 +274,7 @@ async fn quilts_update_check_quilt_lifetime() -> anyhow::Result<()> {
     // Calculate n_slots_in_quilts based on the cluster's n_shards
     let n_shards = cluster.cluster_state.walrus_cluster.n_shards;
     let n_slots_in_quilts =
-        u16::from(walrus_core::encoding::source_symbols_for_n_shards(n_shards).1) as usize - 1;
+        u16::from(walrus_sdk::core::encoding::source_symbols_for_n_shards(n_shards).1) as usize - 1;
 
     let n_files = n_slots_in_quilts + 1;
     // Create a temporary directory for our test site
