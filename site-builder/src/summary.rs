@@ -86,6 +86,7 @@ pub struct SiteDataDiffSummary {
     pub route_ops: RouteOps,
     pub metadata_updated: bool,
     pub site_name_updated: bool,
+    // TODO(sew-495): extend summary
 }
 
 impl From<&SiteDataDiff<'_>> for SiteDataDiffSummary {

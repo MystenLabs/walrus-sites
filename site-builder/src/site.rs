@@ -15,7 +15,11 @@ use contracts::TypeOriginMap;
 use futures::future::try_join_all;
 use resource::{ResourceSet, SiteOps};
 use sui_sdk::rpc_types::DynamicFieldInfo;
-use sui_types::{base_types::ObjectID, TypeTag};
+use sui_types::{
+    base_types::{ObjectID, ObjectRef},
+    TypeTag,
+};
+use walrus_sdk::sui::utils::price_for_encoded_length;
 
 use crate::{
     retry_client::RetriableSuiClient,
@@ -31,6 +35,7 @@ use crate::{
         SuiDynamicField,
     },
     util::handle_pagination,
+    walrus::output::SuiBlob,
 };
 
 pub const SITE_MODULE: &str = "site";
@@ -48,6 +53,8 @@ pub struct SiteDataDiff<'a> {
     pub route_ops: RouteOps,
     pub metadata_op: MetadataOp,
     pub site_name_op: SiteNameOp,
+    /// Blob references, epochs to extend, WAL cost
+    pub extend_ops: (u64, Vec<(ObjectRef, u32)>),
 }
 
 impl SiteDataDiff<'_> {
@@ -57,6 +64,7 @@ impl SiteDataDiff<'_> {
             || !self.route_ops.is_unchanged()
             || !self.metadata_op.is_noop()
             || !self.site_name_op.is_noop()
+            || !self.extend_ops.1.is_empty()
     }
 
     /// Returns the summary of the operations in the diff.
@@ -71,10 +79,12 @@ impl SiteDataDiff<'_> {
             route_ops: self.route_ops.clone(),
             metadata_updated: !self.metadata_op.is_noop(),
             site_name_updated: !self.site_name_op.is_noop(),
+            // TODO(sew-495): extend summary
         }
     }
 }
 
+// TODO(sew-495): Blobs make sense to exist as a field instead of just fetched.
 /// The site on chain.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SiteData {
@@ -84,6 +94,9 @@ pub struct SiteData {
     site_name: Option<String>,
 }
 
+// TODO(sew-495): This struct was made to compare sites.
+// Now we also do some basic blob-lifetime-management.
+// It might make more sense to track the blob-id here as well?
 impl SiteData {
     /// SiteData constructor.
     pub fn new(
@@ -112,13 +125,20 @@ impl SiteData {
 
     // TODO(giac): rename start and reorder the direction of the diff.
     /// Returns the operations to perform to transform the start set into self.
-    pub fn diff<'a>(&'a self, start: &'a SiteData) -> SiteDataDiff<'a> {
-        SiteDataDiff {
+    pub fn diff<'a>(
+        &'a self,
+        start: &'a SiteData,
+        blobs_to_extend: impl IntoIterator<Item = (SuiBlob, ObjectRef), IntoIter: ExactSizeIterator>,
+        new_end_epoch: u32,
+        storage_price: Option<u64>,
+    ) -> anyhow::Result<SiteDataDiff<'a>> {
+        Ok(SiteDataDiff {
             resource_ops: self.resources.diff(&start.resources),
             route_ops: self.routes_diff(start),
             metadata_op: self.metadata_diff(start),
             site_name_op: self.site_name_diff(start),
-        }
+            extend_ops: self.blobs_to_extend(blobs_to_extend, new_end_epoch, storage_price)?,
+        })
     }
 
     fn routes_diff(&self, start: &Self) -> RouteOps {
@@ -151,6 +171,38 @@ impl SiteData {
 
     pub fn resources(&self) -> &ResourceSet {
         &self.resources
+    }
+
+    // TODO(sew-495): We pass Option as storage_price, in order to not do the extra call to Fullnode
+    // for getting the storage_price when there is no blob to extend.
+    // This smells a bit.
+    fn blobs_to_extend(
+        &self,
+        blobs_to_extend: impl IntoIterator<Item = (SuiBlob, ObjectRef), IntoIter: ExactSizeIterator>,
+        new_end_epoch: u32,
+        storage_price: Option<u64>,
+    ) -> anyhow::Result<(u64, Vec<(ObjectRef, u32)>)> {
+        let blobs_to_extend = blobs_to_extend.into_iter();
+        let Some(storage_price) = storage_price else {
+            anyhow::ensure!(
+                blobs_to_extend.len() == 0,
+                "No storage_price available to compute extend operations"
+            );
+            return Ok((0, vec![]));
+        };
+        Ok(blobs_to_extend.fold(
+            (0_u64, vec![]),
+            |(mut cost, mut blobs), (sui_blob, obj_ref)| {
+                let epochs_extended = new_end_epoch - sui_blob.storage.end_epoch;
+                cost += price_for_encoded_length(
+                    sui_blob.storage.storage_size,
+                    storage_price,
+                    epochs_extended,
+                );
+                blobs.push((obj_ref, epochs_extended));
+                (cost, blobs)
+            },
+        ))
     }
 }
 
@@ -332,7 +384,7 @@ mod tests {
         for (this_routes, other_routes, has_updates) in cases {
             let this = SiteData::new(ResourceSet::empty(), this_routes, None, None);
             let other = SiteData::new(ResourceSet::empty(), other_routes, None, None);
-            let diff = this.diff(&other);
+            let diff = this.diff(&other, [], 100, None).unwrap();
             assert_eq!(diff.has_updates(), has_updates);
         }
     }
@@ -371,7 +423,10 @@ mod tests {
         for (this_metadata, other_metadata, has_updates) in cases {
             let this = SiteData::new(ResourceSet::empty(), None, this_metadata, None);
             let other = SiteData::new(ResourceSet::empty(), None, other_metadata, None);
-            assert_eq!(this.diff(&other).has_updates(), has_updates);
+            assert_eq!(
+                this.diff(&other, vec![], 100, None).unwrap().has_updates(),
+                has_updates
+            );
         }
     }
 
@@ -399,7 +454,10 @@ mod tests {
         for (this_site_name, other_site_name, has_updates) in cases {
             let this = SiteData::new(ResourceSet::empty(), None, None, this_site_name);
             let other = SiteData::new(ResourceSet::empty(), None, None, other_site_name);
-            assert_eq!(this.diff(&other).has_updates(), has_updates);
+            assert_eq!(
+                this.diff(&other, vec![], 100, None).unwrap().has_updates(),
+                has_updates
+            );
         }
     }
 }
