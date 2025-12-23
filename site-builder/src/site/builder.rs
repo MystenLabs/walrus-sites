@@ -6,9 +6,9 @@ use std::collections::btree_map;
 use anyhow::Result;
 use serde::Serialize;
 use sui_types::{
-    base_types::{ObjectID, SuiAddress},
+    base_types::{ObjectID, ObjectRef, SuiAddress},
     programmable_transaction_builder::ProgrammableTransactionBuilder,
-    transaction::{Argument, CallArg, ProgrammableTransaction},
+    transaction::{Argument, CallArg, ObjectArg, ProgrammableTransaction},
     Identifier,
     TypeTag,
 };
@@ -63,6 +63,8 @@ pub struct SitePtb<T = (), const MAX_MOVE_CALLS: u16 = PTB_MAX_MOVE_CALLS> {
     site_argument: T,
     package: ObjectID,
     module: Identifier,
+    system_obj_arg: Option<Argument>,
+    wal_coin_arg: Option<Argument>,
 }
 
 /// A PTB to update a site.
@@ -75,6 +77,8 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<(), MAX_MOVE_CALLS> {
             site_argument: (),
             package,
             module,
+            system_obj_arg: None,
+            wal_coin_arg: None,
         }
     }
 
@@ -84,6 +88,8 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<(), MAX_MOVE_CALLS> {
             move_call_counter,
             package,
             module,
+            system_obj_arg,
+            wal_coin_arg,
             ..
         } = self;
         let site_argument = pt_builder.input(site_arg.clone())?;
@@ -93,6 +99,8 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<(), MAX_MOVE_CALLS> {
             site_argument,
             package,
             module,
+            system_obj_arg,
+            wal_coin_arg,
         })
     }
 
@@ -102,6 +110,8 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<(), MAX_MOVE_CALLS> {
             move_call_counter,
             package,
             module,
+            system_obj_arg,
+            wal_coin_arg,
             ..
         } = self;
         SitePtb {
@@ -110,6 +120,8 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<(), MAX_MOVE_CALLS> {
             site_argument,
             package,
             module,
+            system_obj_arg,
+            wal_coin_arg,
         }
     }
 
@@ -208,6 +220,8 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
             site_argument,
             package,
             module,
+            system_obj_arg,
+            wal_coin_arg,
         } = self;
         SitePtb {
             pt_builder,
@@ -215,7 +229,27 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
             site_argument,
             package,
             module,
+            system_obj_arg,
+            wal_coin_arg,
         }
+    }
+
+    fn extend_blob(&mut self, blob_ref: ObjectRef, epochs: u32) -> SitePtbBuilderResult<()> {
+        let blob_obj_arg = self.pt_builder.obj(ObjectArg::ImmOrOwnedObject(blob_ref))?;
+        let epochs_move_arg = self.pt_builder.pure(epochs)?;
+        self.add_programmable_move_call(
+            contracts::walrus::extend_blob.identifier(),
+            vec![],
+            vec![
+                self.system_obj_arg
+                    .ok_or(anyhow::anyhow!("walrus System object not initialized"))?,
+                blob_obj_arg,
+                epochs_move_arg,
+                self.wal_coin_arg
+                    .ok_or(anyhow::anyhow!("WAL coin not initialized"))?,
+            ],
+        )?;
+        Ok(())
     }
 
     fn check_counter_in_advance(&self, move_calls_needed: u16) -> Result<(), SitePtbBuilderError> {
@@ -260,6 +294,18 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
         while let Some((name, value)) = new_routes_iter.peek() {
             self.add_route(name, value)?;
             new_routes_iter.next();
+        }
+        Ok(())
+    }
+
+    pub fn add_extend_operations(
+        &mut self,
+        blobs_to_extend: &mut std::iter::Peekable<impl Iterator<Item = (ObjectRef, u32)>>, // Blob-ref,
+                                                                                           // epochs-extend
+    ) -> SitePtbBuilderResult<()> {
+        while let Some((blob_ref, epochs)) = blobs_to_extend.peek() {
+            self.extend_blob(*blob_ref, *epochs)?;
+            blobs_to_extend.next();
         }
         Ok(())
     }
