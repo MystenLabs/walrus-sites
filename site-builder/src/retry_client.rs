@@ -35,13 +35,17 @@ use sui_sdk::{
     SuiClient,
 };
 use sui_types::{
-    base_types::{ObjectID, ObjectType, SuiAddress},
+    base_types::{ObjectID, ObjectRef, ObjectType, SuiAddress},
     dynamic_field::derive_dynamic_field_id,
     quorum_driver_types::ExecuteTransactionRequestType::WaitForLocalExecution,
     transaction::Transaction,
     TypeTag,
 };
 use tracing::Level;
+use walrus_sdk::{
+    core_utils::backoff::ExponentialBackoffConfig as WalrusBackoffConfig,
+    sui::client::retry_client::RetriableSuiClient as WalrusRetriableSuiClient,
+};
 
 use crate::{
     backoff::{BackoffStrategy, ExponentialBackoff, ExponentialBackoffConfig},
@@ -153,6 +157,15 @@ impl RetriableSuiClient {
     #[allow(dead_code)]
     pub fn backoff_config(&self) -> &ExponentialBackoffConfig {
         &self.backoff_config
+    }
+
+    /// Creates a walrus-sdk `RetriableSuiClient` from this client.
+    pub async fn to_walrus_retriable_client(&self) -> Result<WalrusRetriableSuiClient> {
+        Ok(WalrusRetriableSuiClient::new(
+            vec![self.sui_client.clone().into()],
+            WalrusBackoffConfig::default(),
+        )
+        .await?)
     }
 
     /// Creates a new retriable client from a wallet context.
@@ -416,7 +429,7 @@ impl RetriableSuiClient {
         owner: SuiAddress,
         type_origin_map: &'a TypeOriginMap,
         type_args: &'a [TypeTag],
-    ) -> Result<impl Iterator<Item = U> + 'a>
+    ) -> Result<impl Iterator<Item = (U, ObjectRef)> + 'a>
     where
         U: AssociatedContractStruct,
     {
@@ -431,7 +444,7 @@ impl RetriableSuiClient {
                     None
                 },
                 |object_data| match U::try_from_object_data(&object_data) {
-                    Result::Ok(value) => Some(value),
+                    Result::Ok(value) => Some((value, object_data.object_ref())),
                     Result::Err(error) => {
                         tracing::warn!(?error, "failed to convert to local type");
                         None
@@ -463,7 +476,7 @@ impl RetriableSuiClient {
             )
         })
         .await?
-        .map(|resp| {
+        .map(|resp: SuiObjectResponse| {
             resp.data.ok_or_else(|| {
                 anyhow!(
                     "response does not contain object data [err={:?}]",

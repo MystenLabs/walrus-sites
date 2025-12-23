@@ -32,7 +32,6 @@ use sui_types::{
 use walrus_core::{BlobId as BlobIdOriginal, QuiltPatchId};
 
 use crate::{
-    config::Config,
     display,
     retry_client::RetriableSuiClient,
     site::config::WSResources,
@@ -578,18 +577,16 @@ pub fn get_epochs_ahead(
 
 pub async fn get_owned_blobs(
     sui_client: &RetriableSuiClient,
-    config: &Config,
+    walrus_package: ObjectID,
     owner_address: SuiAddress,
-) -> anyhow::Result<HashMap<BlobId, SuiBlob>> {
-    let walrus_package = config.general.resolve_walrus_package(sui_client).await?;
-
+) -> anyhow::Result<HashMap<BlobId, (SuiBlob, ObjectRef)>> {
     let type_map = sui_client
         .type_origin_map_for_package(walrus_package)
         .await?;
     let blobs = sui_client
         .get_owned_objects_of_type::<SuiBlob>(owner_address, &type_map, &[])
         .await?
-        .map(|blob| (blob.blob_id, blob))
+        .map(|blob| (blob.0.blob_id, blob))
         .collect();
     Ok(blobs)
 }

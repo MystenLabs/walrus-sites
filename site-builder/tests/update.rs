@@ -308,7 +308,7 @@ async fn quilts_update_check_quilt_lifetime() -> anyhow::Result<()> {
     let wallet_address = cluster.wallet_active_address()?;
     let owned_blobs = cluster.get_owned_blobs(wallet_address).await?;
 
-    // Calculate expected end_epoch: current_epoch + UPDATE_EPOCHS
+    // Calculate expected end_epoch: current_epoch + PUBLISH_EPOCHS
     let expected_end_epoch = publish_epoch + PUBLISH_EPOCHS;
 
     for blob in &owned_blobs {
