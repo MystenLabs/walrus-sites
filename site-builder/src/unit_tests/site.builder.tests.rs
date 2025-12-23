@@ -8,7 +8,7 @@ use super::*;
 fn create_test_site_ptb<const MAX_MOVE_CALLS: u16>() -> SitePtb<(), MAX_MOVE_CALLS> {
     let package = ObjectID::ZERO;
     let module = Identifier::new("test_module").unwrap();
-    SitePtb::new(package, module)
+    SitePtb::new(package, module, ObjectID::ZERO)
 }
 
 fn create_test_site_ptb_with_arg<const MAX_MOVE_CALLS: u16>() -> SitePtb<Argument, MAX_MOVE_CALLS> {

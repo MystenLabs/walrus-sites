@@ -177,7 +177,7 @@ impl SiteManager {
         // Check if there are any updates to the site on-chain.
         let result = if site_updates.has_updates() {
             display::action("Applying the Walrus Site object updates on Sui");
-            self.execute_sui_updates(&site_updates)
+            self.execute_sui_updates(&site_updates, walrus_pkg)
                 .await
                 .inspect(|_| display::done())?
         } else {
@@ -223,6 +223,7 @@ impl SiteManager {
     async fn execute_sui_updates(
         &mut self,
         updates: &SiteDataDiff<'_>,
+        walrus_package: ObjectID,
     ) -> Result<SuiTransactionBlockResponse> {
         tracing::debug!(
             address=?self.active_address()?,
@@ -236,6 +237,7 @@ impl SiteManager {
         let mut ptb = SitePtb::<(), INITIAL_MAX>::new(
             self.config.package,
             Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
+            walrus_package,
         );
 
         // Start with blob-extensions. Assuming it won't take a lot of space in the PTB.
@@ -359,6 +361,7 @@ impl SiteManager {
             let ptb: SitePtb<(), { PTB_MAX_MOVE_CALLS }> = SitePtb::new(
                 self.config.package,
                 Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
+                walrus_package,
             );
             let mut site_object_ref = self.wallet.get_object_ref(site_object_id).await?;
             site_object_ref = self.verify_object_ref_choose_latest(site_object_ref)?;
@@ -412,6 +415,11 @@ impl SiteManager {
 
         let mut operations_iter = operations.iter().peekable();
         let retry_client = self.sui_client().await?;
+        let walrus_package = self
+            .config
+            .general
+            .resolve_walrus_package(&retry_client)
+            .await?;
 
         tracing::debug!("modifying the site object on chain");
 
@@ -420,6 +428,7 @@ impl SiteManager {
             let ptb = SitePtb::<(), PTB_MAX_MOVE_CALLS>::new(
                 self.config.package,
                 Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
+                walrus_package,
             );
             let mut site_obj_ref = self.wallet.get_object_ref(site_id).await?;
             site_obj_ref = self.verify_object_ref_choose_latest(site_obj_ref)?;

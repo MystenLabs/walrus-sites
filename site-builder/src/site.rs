@@ -53,7 +53,7 @@ pub struct SiteDataDiff<'a> {
     pub route_ops: RouteOps,
     pub metadata_op: MetadataOp,
     pub site_name_op: SiteNameOp,
-    /// Blob references, epochs to extend, WAL cost
+    /// total wal cost, Vec(Blob references, epochs to extend)
     pub extend_ops: (u64, Vec<(ObjectRef, u32)>),
 }
 
