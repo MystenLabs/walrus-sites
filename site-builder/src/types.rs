@@ -296,6 +296,20 @@ impl SiteNameOp {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum ExtendOps {
+    Extend {
+        total_wal_cost: u64,
+        blobs_epochs: Vec<(ObjectRef, u32)>,
+    },
+    Noop,
+}
+impl ExtendOps {
+    pub(crate) fn is_noop(&self) -> bool {
+        matches!(self, Self::Noop)
+    }
+}
+
 #[derive(Deserialize, Clone, Debug)]
 pub struct SiteFields {
     #[allow(dead_code)]

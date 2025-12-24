@@ -23,7 +23,10 @@ use sui_types::{
     Identifier,
 };
 use tracing::warn;
-use walrus_sdk::sui::client::{ReadClient, SuiReadClient};
+use walrus_sdk::sui::{
+    client::{ReadClient, SuiReadClient},
+    utils::price_for_encoded_length,
+};
 
 use super::{
     builder::SitePtb,
@@ -44,9 +47,9 @@ use crate::{
         resource::ResourceSet,
     },
     summary::SiteDataDiffSummary,
-    types::{Metadata, MetadataOp, ObjectCache, RouteOps, SiteNameOp},
+    types::{ExtendOps, Metadata, MetadataOp, ObjectCache, RouteOps, SiteNameOp},
     util::{get_epochs_ahead, get_owned_blobs, get_site_id_from_response, sign_and_send_ptb},
-    walrus::{types::BlobId, Walrus},
+    walrus::{output::SuiBlob, types::BlobId, Walrus},
 };
 
 #[cfg(test)]
@@ -96,11 +99,6 @@ impl SiteManager {
         local_site_data: &SiteData,
     ) -> Result<(SuiTransactionBlockResponse, SiteDataDiffSummary)> {
         tracing::debug!(?self.site_id, "creating or updating site");
-        let epoch_arg = self
-            .epochs
-            .clone()
-            .expect("epochs must be set when calling update_site"); // EpochArg is an ArgGroup with
-                                                                    // required true
         let retriable_client = self.sui_client().await?;
         let existing_site = match &self.site_id {
             Some(site_id) => {
@@ -113,66 +111,20 @@ impl SiteManager {
         };
 
         // TODO(sew-495): Improve code-quality. From here we handle blob-extension
-        let epoch_info = self.walrus.epoch_info().await?;
-        let current_epoch = epoch_info.current_epoch;
-        let epochs_ahead = match (
-            epoch_arg.epochs,
-            epoch_arg.earliest_expiry_time,
-            epoch_arg.end_epoch,
-        ) {
-            (Some(EpochCountOrMax::Epochs(epochs)), None, None) => epochs.into(),
-            (Some(EpochCountOrMax::Max), None, None) => epoch_info.max_epochs_ahead,
-            (None, Some(earliest), None) => get_epochs_ahead(earliest, epoch_info)?,
-            (None, None, Some(end_epoch)) => {
-                let end_epoch: u32 = end_epoch.into();
-                if end_epoch <= current_epoch {
-                    bail!(
-                        "end epoch ({end_epoch}) must be greater than the current epoch ({current_epoch})"
-                    );
-                }
-                end_epoch - current_epoch
-            }
-            _ => bail!("exactly one of --epochs, --end-epoch, or --expiry-time must be specified"),
-        };
-        let new_end_epoch = current_epoch + epochs_ahead;
-
         let walrus_pkg = self
             .config
             .general
             .resolve_walrus_package(&retriable_client)
             .await?;
-        let to_extend = get_owned_blobs(&retriable_client, walrus_pkg, self.active_address()?)
-            .await?
-            .into_iter()
-            .filter(|(blob_id, (sui_blob, _obj_ref))| {
-                // blob-id exists in resources currently in directory and end_epoch is less than
-                // epochs to update to.
-                local_site_data
-                    .resources
-                    .into_iter()
-                    .any(|r| r.info.blob_id == *blob_id)
-                    && sui_blob.storage.end_epoch < new_end_epoch
-            });
-
-        // Collect blobs to extend first
-        let (_, to_extend): (Vec<_>, Vec<_>) = to_extend.unzip();
-
-        let storage_price = if to_extend.is_empty() {
-            None
-        } else {
-            let walrus_client = retriable_client.to_walrus_retriable_client()?;
-            let walrus_config = self.config.general.walrus_config()?;
-
-            let sui_read_client = SuiReadClient::new(walrus_client, &walrus_config).await?;
-            Some(sui_read_client.storage_price_per_unit_size().await?)
-        };
+        let blob_extensions = self
+            .retrieve_blobs_to_extend(local_site_data, walrus_pkg, &retriable_client)
+            .await?;
         // TODO(sew-495): Up to here. This outputs `to_extend`, `new_end_epoch`, and
         // `storage_price`.
 
         tracing::debug!(?existing_site, "checked existing site");
 
-        let site_updates =
-            local_site_data.diff(&existing_site, to_extend, new_end_epoch, storage_price)?;
+        let site_updates = local_site_data.diff(&existing_site, blob_extensions.into())?;
         tracing::debug!(?site_updates, "computed site updates");
 
         // Check if there are any updates to the site on-chain.
@@ -220,6 +172,72 @@ impl SiteManager {
         Ok(())
     }
 
+    async fn retrieve_blobs_to_extend(
+        &self,
+        local_site_data: &SiteData,
+        walrus_pkg: ObjectID,
+        retriable_client: &RetriableSuiClient,
+    ) -> anyhow::Result<BlobExtensions> {
+        let epoch_arg = self
+            .epochs
+            .clone()
+            .expect("epochs must be set when calling update_site"); // EpochArg is an ArgGroup with
+                                                                    // required true
+        let epoch_info = self.walrus.epoch_info().await?;
+        let current_epoch = epoch_info.current_epoch;
+        let epochs_ahead = match (
+            epoch_arg.epochs,
+            epoch_arg.earliest_expiry_time,
+            epoch_arg.end_epoch,
+        ) {
+            (Some(EpochCountOrMax::Epochs(epochs)), None, None) => epochs.into(),
+            (Some(EpochCountOrMax::Max), None, None) => epoch_info.max_epochs_ahead,
+            (None, Some(earliest), None) => get_epochs_ahead(earliest, epoch_info)?,
+            (None, None, Some(end_epoch)) => {
+                let end_epoch: u32 = end_epoch.into();
+                if end_epoch <= current_epoch {
+                    bail!(
+                        "end epoch ({end_epoch}) must be greater than the current epoch ({current_epoch})"
+                    );
+                }
+                end_epoch - current_epoch
+            }
+            _ => bail!("exactly one of --epochs, --end-epoch, or --expiry-time must be specified"),
+        };
+        let new_end_epoch = current_epoch + epochs_ahead;
+
+        let to_extend = get_owned_blobs(retriable_client, walrus_pkg, self.active_address()?)
+            .await?
+            .into_iter()
+            .filter(|(blob_id, (sui_blob, _obj_ref))| {
+                // blob-id exists in resources currently in directory and end_epoch is less than
+                // epochs to update to.
+                local_site_data
+                    .resources
+                    .into_iter()
+                    .any(|r| r.info.blob_id == *blob_id)
+                    && sui_blob.storage.end_epoch < new_end_epoch
+            });
+
+        // Collect blobs to extend first
+        let (_, to_extend): (Vec<_>, Vec<_>) = to_extend.unzip();
+
+        if to_extend.is_empty() {
+            return Ok(BlobExtensions::Noop);
+        }
+
+        let walrus_client = retriable_client.to_walrus_retriable_client()?;
+        let walrus_config = self.config.general.walrus_config()?;
+        let sui_read_client = SuiReadClient::new(walrus_client, &walrus_config).await?;
+        let storage_price = sui_read_client.storage_price_per_unit_size().await?;
+
+        Ok(BlobExtensions::Extend {
+            blobs: to_extend,
+            new_end_epoch,
+            storage_price,
+        })
+    }
+
     /// Executes the updates on Sui.
     async fn execute_sui_updates(
         &mut self,
@@ -242,8 +260,11 @@ impl SiteManager {
         );
 
         // Start with blob-extensions. Assuming it won't take a lot of space in the PTB.
-        let (total_wal_needed, blob_extensions) = updates.extend_ops.clone();
-        if !blob_extensions.is_empty() {
+        if let ExtendOps::Extend {
+            total_wal_cost,
+            blobs_epochs,
+        } = updates.extend_ops.clone()
+        {
             debug_assert!(
                 self.site_id.is_some(),
                 "Cannot have blobs to extend if we are publishing a new site"
@@ -261,7 +282,7 @@ impl SiteManager {
                 .select_coins(
                     self.active_address()?,
                     Some(wal_coin_type),
-                    total_wal_needed as u128,
+                    total_wal_cost as u128,
                     vec![],
                 )
                 .await?;
@@ -275,7 +296,7 @@ impl SiteManager {
                 .ok_or(anyhow!("Expected data in walrus System object response"))?;
             ptb.fill_walrus_system_and_coin(coins, system_obj)?;
 
-            ptb.add_extend_operations(blob_extensions)?;
+            ptb.add_extend_operations(blobs_epochs)?;
         }
 
         // Add the call arg if we are updating a site, or add the command to create a new site.
@@ -559,6 +580,46 @@ impl SiteManager {
                 Ok(object_ref)
             }
             _ => Ok(object_ref),
+        }
+    }
+}
+
+pub enum BlobExtensions {
+    Noop,
+    Extend {
+        blobs: Vec<(SuiBlob, ObjectRef)>,
+        new_end_epoch: u32,
+        storage_price: u64,
+    },
+}
+
+impl From<BlobExtensions> for ExtendOps {
+    fn from(value: BlobExtensions) -> ExtendOps {
+        let BlobExtensions::Extend {
+            blobs: blobs_to_extend,
+            new_end_epoch,
+            storage_price,
+        } = value
+        else {
+            return ExtendOps::Noop;
+        };
+
+        let (total_wal_cost, blobs_epochs) = blobs_to_extend.into_iter().fold(
+            (0_u64, vec![]),
+            |(mut cost, mut blobs), (sui_blob, obj_ref)| {
+                let epochs_extended = new_end_epoch - sui_blob.storage.end_epoch;
+                cost += price_for_encoded_length(
+                    sui_blob.storage.storage_size,
+                    storage_price,
+                    epochs_extended,
+                );
+                blobs.push((obj_ref, epochs_extended));
+                (cost, blobs)
+            },
+        );
+        ExtendOps::Extend {
+            total_wal_cost,
+            blobs_epochs,
         }
     }
 }
