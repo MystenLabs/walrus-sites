@@ -5,7 +5,7 @@
 
 use std::{num::NonZeroU32, path::PathBuf, str::FromStr, time::SystemTime};
 
-use anyhow::{anyhow, bail, ensure, Context as _, Result};
+use anyhow::{anyhow, bail, ensure, Result};
 use bytesize::ByteSize;
 use clap::{ArgGroup, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
@@ -137,13 +137,11 @@ impl GeneralArgs {
     }
 
     pub fn walrus_config(&self) -> Result<WalrusContractConfig> {
-        let walrus_config_path = self.walrus_config.as_ref().ok_or_else(|| {
-            anyhow!("no walrus package, or walrus config specified; please add either")
-        })?;
-
-        let contents = std::fs::read_to_string(walrus_config_path)
-            .context("Failed to read walrus config file")?;
-        serde_yaml::from_str(&contents).context("Failed to parse walrus config file")
+        let client_config = walrus_sdk::config::load_configuration(
+            self.walrus_config.as_ref(),
+            self.walrus_context.as_deref(),
+        )?;
+        Ok(client_config.contract_config)
     }
 
     /// Resolves the walrus package ID.
