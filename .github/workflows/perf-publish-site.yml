@@ -31,10 +31,8 @@ jobs:
     name: Publish Sites
     runs-on: ubuntu-ghcloud
     steps:
-      - name: Checkout site-builder ref
+      - name: Checkout workflow ref
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          ref: ${{ inputs.ref || github.ref }}
 
       - name: Install suiup, sui, and walrus
         run: |
@@ -70,6 +68,12 @@ jobs:
           sui client active-address
           sui client balance
 
+      - name: Checkout site-builder ref
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          clean: false
+
       - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
 
       - name: Build site-builder
@@ -80,6 +84,12 @@ jobs:
         with:
           ref: ${{ github.ref }}
           clean: false
+
+      - name: Verify sites-config.yaml exists
+        run: |
+          echo "Current directory: $(pwd)"
+          ls -la sites-config.yaml
+          head -20 sites-config.yaml
 
       # =============================================================================
       # walrus-docs: Docusaurus site (page-edit update scenario)
