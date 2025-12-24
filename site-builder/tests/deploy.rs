@@ -504,8 +504,8 @@ async fn quilts_deploy_updates_site_name() -> anyhow::Result<()> {
                 .with_directory(directory)
                 .with_epoch_count_or_max(EpochCountOrMax::Max)
                 .build()?,
-            site_name: None, // Let it read from ws-resources.json. TODO(fix): argument should take
-            // precedence from ws-resources.json, not the other way around.
+            site_name: None, // Let it read from ws-resources.json. TODO(sew-462): argument should
+            // take precedence from ws-resources.json, not the other way around.
             object_id: None,
         })
         .build()?;
@@ -540,8 +540,8 @@ async fn deploy_quilts_with_slot_sized_files() -> anyhow::Result<()> {
     let n_shards = cluster.cluster_state.walrus_cluster.n_shards;
 
     // Calculate capacity per column (slot) in bytes
-    let (n_rows, n_cols) = walrus_core::encoding::source_symbols_for_n_shards(n_shards);
-    let max_symbol_size = walrus_core::DEFAULT_ENCODING.max_symbol_size() as usize;
+    let (n_rows, n_cols) = walrus_sdk::core::encoding::source_symbols_for_n_shards(n_shards);
+    let max_symbol_size = walrus_sdk::core::DEFAULT_ENCODING.max_symbol_size() as usize;
     let column_capacity = max_symbol_size * n_rows.get() as usize;
 
     // Available columns: n_cols - 1 (reserve 1 for quilt index)
@@ -682,5 +682,87 @@ async fn deploy_quilts_with_slot_sized_files() -> anyhow::Result<()> {
 
     println!("Successfully verified deployment replaced 1 quilt with 2 quilts");
 
+    Ok(())
+}
+
+/// Test that deploy works when walrus_config is discovered from XDG_CONFIG_HOME.
+///
+/// This test verifies that when the sites-config doesn't have an explicit `walrus_config` path,
+/// the walrus config is correctly discovered from the XDG_CONFIG_HOME directory.
+///
+/// This test would fail with the old implementation that required an explicit `walrus_config` path.
+#[tokio::test]
+#[ignore]
+async fn test_deploy_discovers_walrus_config_from_xdg() -> anyhow::Result<()> {
+    use localnode::create_sites_config;
+
+    let cluster = TestSetup::start_local_test_cluster().await?;
+
+    // Create XDG_CONFIG_HOME directory with walrus config.
+    // Note: walrus_sdk looks for $XDG_CONFIG_HOME/client_config.yaml directly
+    // (not in a walrus subdirectory when XDG_CONFIG_HOME is explicitly set).
+    let xdg_temp = tempfile::tempdir()?;
+
+    // Copy the walrus config to XDG_CONFIG_HOME/client_config.yaml
+    let walrus_config_content = std::fs::read_to_string(cluster.walrus_config.inner.1.as_path())?;
+    let xdg_walrus_config_path = xdg_temp.path().join("client_config.yaml");
+    std::fs::write(&xdg_walrus_config_path, &walrus_config_content)?;
+
+    // Create a sites config WITHOUT explicit walrus_config path (pass None)
+    let sites_config_without_walrus = create_sites_config(
+        cluster.wallet.inner.get_config_path().to_path_buf(),
+        cluster.walrus_sites_package_id,
+        None, // No explicit walrus_config - rely on XDG_CONFIG_HOME discovery
+    )?;
+
+    // Save original environment and CWD
+    let original_xdg = std::env::var("XDG_CONFIG_HOME").ok();
+    let original_cwd = std::env::current_dir()?;
+
+    // Change to a clean temp directory to avoid picking up any client_config.yaml
+    // from the current directory (walrus_sdk checks CWD first, then XDG_CONFIG_HOME)
+    let clean_cwd = tempfile::tempdir()?;
+    std::env::set_current_dir(clean_cwd.path())?;
+    std::env::set_var("XDG_CONFIG_HOME", xdg_temp.path());
+
+    // Create test site
+    let temp_dir = helpers::create_test_site(1)?;
+    let directory = temp_dir.path().to_path_buf();
+
+    // Build args with the sites config that has NO explicit walrus_config
+    let args = ArgsBuilder::default()
+        .with_config(Some(sites_config_without_walrus.inner.1.clone()))
+        .with_command(Commands::Deploy {
+            publish_options: PublishOptionsBuilder::default()
+                .with_directory(directory.clone())
+                .with_epoch_count_or_max(EpochCountOrMax::Epochs(1_u32.try_into().unwrap()))
+                .build()?,
+            site_name: None,
+            object_id: None,
+        })
+        .build()?;
+
+    // Run deploy - this should discover walrus config from XDG_CONFIG_HOME
+    let result = site_builder::run(args).await;
+
+    // Restore CWD and XDG_CONFIG_HOME
+    std::env::set_current_dir(original_cwd)?;
+    match original_xdg {
+        Some(val) => std::env::set_var("XDG_CONFIG_HOME", val),
+        None => std::env::remove_var("XDG_CONFIG_HOME"),
+    }
+
+    // Verify the command succeeded
+    result.expect("Deploy should succeed when walrus config is discovered from XDG_CONFIG_HOME");
+
+    // Verify site was created
+    let ws_resources: WSResources =
+        serde_json::from_reader(File::open(directory.join("ws-resources.json"))?)?;
+    assert!(
+        ws_resources.object_id.is_some(),
+        "Site should have been created"
+    );
+
+    println!("Successfully deployed site using walrus config discovered from XDG_CONFIG_HOME");
     Ok(())
 }

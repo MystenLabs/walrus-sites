@@ -9,13 +9,13 @@ use site_builder::{
     args::{Commands, EpochCountOrMax},
     site_config::WSResources,
 };
-use walrus_sdk::core::{metadata::QuiltMetadata, BlobId};
+use walrus_sdk::core::BlobId;
 
 #[allow(dead_code)]
 mod helpers;
 #[allow(dead_code)]
 mod localnode;
-use helpers::copy_dir;
+use helpers::{copy_dir, get_quilt_identifiers};
 use localnode::{
     args_builder::{ArgsBuilder, PublishOptionsBuilder},
     TestSetup,
@@ -217,9 +217,26 @@ async fn publish_quilts_with_list_directory() -> anyhow::Result<()> {
 
 #[tokio::test]
 #[ignore]
-// This test verifies that DeployQuilts with --list-directory correctly handles
-// changing ignore patterns, ensuring that newly ignored files are removed from
-// the quilt and previously ignored files are added.
+/// Tests that Deploy with `--list-directory` correctly handles changing ignore patterns,
+/// ensuring that newly ignored files are removed and previously ignored files are added.
+///
+/// # Test Setup
+/// Creates 5 files on disk: `file_0.html` through `file_4.html`
+///
+/// # First Deploy
+/// - **Ignore patterns**: `/file_2.html`, `**/file_3.html`
+/// - **On-chain resources** (4 total):
+///   - `/file_0.html`, `/file_1.html`, `/file_4.html`, `/index.html` (auto-generated)
+/// - **Quilt A**: contains all 4 files as patches
+///
+/// # Second Deploy (changed ignore patterns)
+/// - **Ignore patterns**: `/file_0.html`, `**/file_1.html`
+/// - **On-chain resources** (4 total):
+///   - `/file_2.html`, `/file_3.html`, `/file_4.html`, `/index.html`
+/// - **Quilt A**: still exists, contains original 4 files (`file_0`, `file_1`, `file_4`, `index.html`)
+///   - Site only references `/file_4.html` from this quilt (unchanged file)
+/// - **Quilt B** (new): contains `/file_2.html`, `/file_3.html`, `/index.html`
+///   - `index.html` regenerated since directory listing changed
 async fn deploy_quilts_with_list_directory_updates_ignored_files() -> anyhow::Result<()> {
     // With --list-directory: 3 HTML files + 1 generated index.html = 4 resources
     const EXPECTED_RESOURCES_PER_DEPLOY: usize = 4;
@@ -233,13 +250,13 @@ async fn deploy_quilts_with_list_directory_updates_ignored_files() -> anyhow::Re
     // Testing different glob formats:
     // - "/file_2.html" (leading slash format)
     // - "**/file_3.html" (globstar format)
-    // - "file_4.html" (TODO: .gitignore pattern matching not yet supported, commented out)
+    // - "file_4.html" (TODO(sew-445): .gitignore pattern matching not yet supported, commented out)
     let ws_resources_path = directory.join("ws-resources.json");
     let ws_resources = WSResources {
         ignore: Some(vec![
             "/file_2.html".to_string(),
             "**/file_3.html".to_string(),
-            // "file_4.html".to_string(),  // TODO: implement .gitignore pattern matching
+            // "file_4.html".to_string(),  // TODO(sew-445): implement .gitignore pattern matching
         ]),
         ..Default::default()
     };
@@ -268,7 +285,7 @@ async fn deploy_quilts_with_list_directory_updates_ignored_files() -> anyhow::Re
     let paths_first: Vec<&str> = resources_first.iter().map(|r| r.path.as_str()).collect();
     assert!(paths_first.contains(&"/file_0.html"));
     assert!(paths_first.contains(&"/file_1.html"));
-    assert!(paths_first.contains(&"/file_4.html")); // TODO (.gitignore)
+    assert!(paths_first.contains(&"/file_4.html")); // TODO(sew-445): .gitignore
     assert!(
         paths_first.contains(&"/index.html"),
         "Generated index.html should be present"
@@ -283,13 +300,8 @@ async fn deploy_quilts_with_list_directory_updates_ignored_files() -> anyhow::Re
         .expect("Should have at least one quilt resource");
 
     let quilt_blob_id_first = BlobId(quilt_resource_first.blob_id.0);
-    let QuiltMetadata::V1(metadata_v1) = cluster.read_quilt_metadata(&quilt_blob_id_first).await?;
-    let quilt_identifiers_first: Vec<_> = metadata_v1
-        .index
-        .quilt_patches
-        .iter()
-        .map(|p| p.identifier.as_str())
-        .collect();
+    let metadata_first = cluster.read_quilt_metadata(&quilt_blob_id_first).await?;
+    let quilt_identifiers_first = get_quilt_identifiers(&metadata_first);
 
     // Verify count
     assert_eq!(
@@ -356,58 +368,87 @@ async fn deploy_quilts_with_list_directory_updates_ignored_files() -> anyhow::Re
     assert!(!paths_second.contains(&"/file_0.html"));
     assert!(!paths_second.contains(&"/file_1.html"));
 
-    // Step 7: Verification - Parse quilt metadata to verify the quilt structure
-    // This verifies that the Walrus quilt blob contains the correct files
-    // Find a resource with quilt patch ID to get the quilt blob ID
-    let quilt_resource = resources_second
+    // Step 7: Verify file_4 still references Quilt A (unchanged file stays on old quilt)
+    let file_4_resource = resources_second
         .iter()
-        .find(|r| r.headers.0.contains_key("x-wal-quilt-patch-internal-id"))
-        .expect("Should have at least one quilt resource");
-
-    let quilt_blob_id = BlobId(quilt_resource.blob_id.0);
-    let QuiltMetadata::V1(metadata_v1) = cluster.read_quilt_metadata(&quilt_blob_id).await?;
-
-    // Step 7: Verification Method 2 - Verify quilt metadata contains correct files
-    // Extract identifiers from the quilt metadata
-    let quilt_identifiers: Vec<_> = metadata_v1
-        .index
-        .quilt_patches
-        .iter()
-        .map(|p| p.identifier.as_str())
-        .collect();
-
-    // Verify count
+        .find(|r| r.path == "/file_4.html")
+        .expect("file_4.html should exist");
     assert_eq!(
-        quilt_identifiers.len(),
-        EXPECTED_RESOURCES_PER_DEPLOY,
-        "Quilt should contain exactly {EXPECTED_RESOURCES_PER_DEPLOY} patches after ignoring file_0 and file_1",
+        file_4_resource.blob_id, quilt_resource_first.blob_id,
+        "file_4.html should still reference Quilt A (unchanged file)"
     );
 
-    let expected_present = [
-        "/file_2.html",
-        "/file_3.html",
-        "/file_4.html",
-        "/index.html",
-    ];
+    // Step 8: Verify Quilt B metadata (new quilt with newly un-ignored files)
+    // Get Quilt B's blob_id from file_2 (a newly added file)
+    let file_2_resource = resources_second
+        .iter()
+        .find(|r| r.path == "/file_2.html")
+        .expect("file_2.html should exist");
+    let quilt_blob_id_second = BlobId(file_2_resource.blob_id.0);
 
-    let expected_ignored = ["/file_0.html", "/file_1.html"];
+    // Quilt B should be different from Quilt A
+    assert_ne!(
+        quilt_blob_id_second, quilt_blob_id_first,
+        "Quilt B should be a new blob, different from Quilt A"
+    );
 
-    // Verify that expected files are present and ignored files are absent
+    // Verify file_3 and index.html also reference Quilt B
+    let file_3_resource = resources_second
+        .iter()
+        .find(|r| r.path == "/file_3.html")
+        .expect("file_3.html should exist");
+    assert_eq!(
+        file_3_resource.blob_id, file_2_resource.blob_id,
+        "file_3.html should reference Quilt B"
+    );
+
+    let index_resource = resources_second
+        .iter()
+        .find(|r| r.path == "/index.html")
+        .expect("index.html should exist");
+    assert_eq!(
+        index_resource.blob_id, file_2_resource.blob_id,
+        "index.html should reference Quilt B (regenerated)"
+    );
+
+    let metadata_second = cluster.read_quilt_metadata(&quilt_blob_id_second).await?;
+    let quilt_identifiers_second = get_quilt_identifiers(&metadata_second);
+
+    // Quilt B should have 3 files: file_2, file_3, and regenerated index.html
+    const EXPECTED_QUILT_B_SIZE: usize = 3;
+    assert_eq!(
+        quilt_identifiers_second.len(),
+        EXPECTED_QUILT_B_SIZE,
+        "Quilt B should contain exactly {EXPECTED_QUILT_B_SIZE} patches (file_2, file_3, index.html)",
+    );
+
+    let expected_in_quilt_b = ["/file_2.html", "/file_3.html", "/index.html"];
+    let expected_not_in_quilt_b = ["/file_0.html", "/file_1.html", "/file_4.html"];
+
     assert_quilt_identifiers(
-        &quilt_identifiers,
-        &expected_present,
-        &expected_ignored,
-        "Second deploy",
+        &quilt_identifiers_second,
+        &expected_in_quilt_b,
+        &expected_not_in_quilt_b,
+        "Second deploy (Quilt B)",
     );
 
-    // Step 8: Verify that the old quilt blob from first deploy was deleted
+    // Step 9: Verify both quilts still exist (Quilt A is NOT deleted because file_4 references it)
     let wallet_address = cluster.wallet_active_address()?;
     let owned_blobs = cluster.get_owned_blobs(wallet_address).await?;
     let owned_blob_ids: Vec<BlobId> = owned_blobs.iter().map(|b| b.blob_id).collect();
 
+    assert_eq!(
+        owned_blobs.len(),
+        2,
+        "Should have exactly 2 blobs: Quilt A (with file_4) and Quilt B (with file_2, file_3, index.html)"
+    );
     assert!(
-        !owned_blob_ids.contains(&quilt_blob_id_first),
-        "Old quilt blob from first deploy (ID: {quilt_blob_id_first:?}) should have been deleted after second deploy",
+        owned_blob_ids.contains(&quilt_blob_id_first),
+        "Quilt A should still exist (file_4 references it)"
+    );
+    assert!(
+        owned_blob_ids.contains(&quilt_blob_id_second),
+        "Quilt B should exist (new quilt with file_2, file_3, index.html)"
     );
 
     Ok(())
@@ -548,13 +589,8 @@ async fn deploy_quilts_with_list_directory_handles_ws_resources() -> anyhow::Res
         .expect("Should have at least one quilt resource");
 
     let quilt_blob_id = BlobId(quilt_resource.blob_id.0);
-    let QuiltMetadata::V1(metadata_v1) = cluster.read_quilt_metadata(&quilt_blob_id).await?;
-    let quilt_identifiers: Vec<_> = metadata_v1
-        .index
-        .quilt_patches
-        .iter()
-        .map(|p| p.identifier.as_str())
-        .collect();
+    let metadata = cluster.read_quilt_metadata(&quilt_blob_id).await?;
+    let quilt_identifiers = get_quilt_identifiers(&metadata);
 
     let ws_resources_json_identifier = "/ws-resources.json";
     let ws_resources_override_identifier = "/ws-resources-override.json";

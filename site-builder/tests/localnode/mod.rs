@@ -51,13 +51,17 @@ use walrus_sdk::{
         QuiltPatchId,
     },
     error::ClientResult,
+    sui::{
+        client::{contract_config::ContractConfig, SuiContractClient},
+        test_utils::{
+            new_wallet_on_sui_test_cluster,
+            system_setup::SystemContext,
+            TestClusterHandle,
+        },
+        wallet::Wallet,
+    },
 };
 use walrus_service::test_utils::{test_cluster, StorageNodeHandle, TestCluster};
-use walrus_sui::{
-    client::{contract_config::ContractConfig, SuiContractClient},
-    test_utils::{new_wallet_on_sui_test_cluster, system_setup::SystemContext, TestClusterHandle},
-    wallet::Wallet,
-};
 use walrus_test_utils::WithTempDir;
 
 pub mod args_builder;
@@ -145,7 +149,7 @@ impl TestSetup {
         let sites_config = create_sites_config(
             test_wallet.inner.get_config_path().to_path_buf(),
             walrus_sites_package_id,
-            walrus_config.inner.1.clone(),
+            Some(walrus_config.inner.1.clone()),
         )?;
 
         Ok(TestSetup {
@@ -347,7 +351,7 @@ impl TestSetup {
     /// Get the epoch start timestamp from the Walrus staking object.
     /// Returns the estimated start time of the current Walrus epoch.
     pub async fn epoch_start_timestamp(&self) -> anyhow::Result<chrono::DateTime<chrono::Utc>> {
-        use walrus_sui::types::move_structs::EpochState;
+        use walrus_sdk::sui::types::move_structs::EpochState;
 
         let staking_object = self
             .cluster_state
@@ -412,6 +416,68 @@ impl TestSetup {
         }
 
         Ok(blobs)
+    }
+
+    /// Get blob object IDs that were extended via `system::extend_blob` calls.
+    ///
+    /// This queries all transactions that called `extend_blob` on the Walrus system package,
+    /// then extracts the mutated Blob object IDs from those transactions.
+    pub async fn get_extended_blob_object_ids(&self) -> anyhow::Result<Vec<ObjectID>> {
+        let walrus_pkg_id = self.cluster_state.system_context.walrus_pkg_id;
+
+        // Query transactions that called extend_blob
+        let resp = self
+            .client
+            .read_api()
+            .query_transaction_blocks(
+                SuiTransactionBlockResponseQuery::new_with_filter(
+                    TransactionFilter::MoveFunction {
+                        package: walrus_pkg_id,
+                        module: Some("system".to_string()),
+                        function: Some("extend_blob".to_string()),
+                    },
+                ),
+                None,
+                None,
+                true,
+            )
+            .await?;
+
+        let mut blob_object_ids = Vec::new();
+        let blob_struct_tag = StructTag {
+            address: walrus_pkg_id.into(),
+            module: Identifier::from_str("blob")?,
+            name: Identifier::from_str("Blob")?,
+            type_params: vec![],
+        };
+
+        for tx in resp.data {
+            let full_resp = self
+                .client
+                .read_api()
+                .get_transaction_with_options(
+                    tx.digest,
+                    SuiTransactionBlockResponseOptions::new().with_object_changes(),
+                )
+                .await?;
+
+            if let Some(changes) = full_resp.object_changes {
+                for change in changes {
+                    if let ObjectChange::Mutated {
+                        object_id,
+                        object_type,
+                        ..
+                    } = change
+                    {
+                        if object_type == blob_struct_tag {
+                            blob_object_ids.push(object_id);
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(blob_object_ids)
     }
 
     // ============ Convenient accessors ============
@@ -558,10 +624,14 @@ pub fn create_walrus_config(
     })
 }
 
+/// Creates a sites config.
+///
+/// If `walrus_config_path` is `None`, the walrus config will be discovered from default locations
+/// (XDG_CONFIG_HOME/walrus, ~/.config/walrus, ~/.walrus).
 pub fn create_sites_config(
     wallet_path: PathBuf,
     walrus_sites_package_id: ObjectID,
-    walrus_config_path: PathBuf,
+    walrus_config_path: Option<PathBuf>,
 ) -> anyhow::Result<WithTempDir<(SitesConfig, PathBuf)>> {
     let temp_dir = TempDir::new().expect("able to create a temporary directory");
     let sites_config_path = temp_dir.path().to_path_buf().join("sites-config.yaml");
@@ -571,7 +641,7 @@ pub fn create_sites_config(
         package: walrus_sites_package_id,
         general: GeneralArgs {
             wallet: Some(wallet_path),
-            walrus_config: Some(walrus_config_path),
+            walrus_config: walrus_config_path,
             ..Default::default()
         },
         staking_object: None,

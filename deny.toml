@@ -81,10 +81,9 @@ skip-tree = [
     # Sui's bin-version pulls in conflicting const-str versions.
     { name = "bin-version", depth = 1 },
     { name = "fastcrypto", depth = 4 },
-    { name = "sui-rest-api", depth = 6 },
     { name = "sui-sdk", depth = 6 },
     # Sui's test infrastructure has many version conflicts.
-    { name = "test-cluster", depth = 6 },
+    { name = "test-cluster", depth = 8 },
     # Walrus's typed-store has dependency conflicts.
     { name = "typed-store", depth = 6 },
     # several crates depend on an older version of windows-sys.

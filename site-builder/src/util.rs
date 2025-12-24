@@ -1,11 +1,14 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 use std::{
+    collections::HashMap,
     path::{Path, PathBuf},
     str,
+    time::SystemTime,
 };
 
 use anyhow::{anyhow, bail, Context, Result};
+use chrono::{DateTime, Utc};
 use futures::Future;
 use glob::Pattern;
 use serde::{Deserialize, Deserializer};
@@ -14,8 +17,6 @@ use sui_sdk::{
     rpc_types::{
         Page,
         SuiExecutionStatus,
-        SuiObjectDataOptions,
-        SuiRawData,
         SuiTransactionBlockEffects,
         SuiTransactionBlockEffectsAPI,
         SuiTransactionBlockResponse,
@@ -28,14 +29,17 @@ use sui_types::{
     transaction::{ProgrammableTransaction, TransactionData},
     TypeTag,
 };
-use walrus_core::{BlobId as BlobIdOriginal, QuiltPatchId};
+use walrus_sdk::core::{BlobId as BlobIdOriginal, QuiltPatchId};
 
 use crate::{
     display,
     retry_client::RetriableSuiClient,
-    site::{config::WSResources, contracts::TypeOriginMap},
+    site::config::WSResources,
     types::{HttpHeaders, ObjectCache, Staking, StakingInnerV1, StakingObjectForDeserialization},
-    walrus::types::BlobId,
+    walrus::{
+        output::{EpochCount, EpochTimeOrMessage, InfoEpochOutput, SuiBlob},
+        types::BlobId,
+    },
 };
 
 #[cfg(test)]
@@ -200,29 +204,6 @@ pub(crate) fn path_or_defaults_if_exist(
         path = default.exists().then_some(default.clone());
     }
     path
-}
-
-/// Gets the type origin map for a given package.
-pub(crate) async fn type_origin_map_for_package(
-    sui_client: &RetriableSuiClient,
-    package_id: ObjectID,
-) -> Result<TypeOriginMap> {
-    let Ok(Some(SuiRawData::Package(raw_package))) = sui_client
-        .get_object_with_options(
-            package_id,
-            SuiObjectDataOptions::default().with_type().with_bcs(),
-        )
-        .await?
-        .into_object()
-        .map(|object| object.bcs)
-    else {
-        bail!("no package foundwith ID {package_id}");
-    };
-    Ok(raw_package
-        .type_origin_table
-        .into_iter()
-        .map(|origin| ((origin.module_name, origin.datatype_name), origin.package))
-        .collect())
 }
 
 /// Loads the wallet context from the given optional wallet config (optional path and optional
@@ -555,4 +536,57 @@ mod test_util {
             "5d8t4gd5q8x4xcfyctpygyr5pnk85x54o7ndeq2j4pg9l7rmw"
         );
     }
+}
+
+pub fn get_epochs_ahead(
+    earliest_expiry_time: SystemTime,
+    InfoEpochOutput {
+        start_of_current_epoch,
+        epoch_duration,
+        max_epochs_ahead,
+        ..
+    }: InfoEpochOutput,
+) -> anyhow::Result<EpochCount> {
+    let estimated_start_of_current_epoch = match start_of_current_epoch {
+        EpochTimeOrMessage::Message(_) => Utc::now(),
+        EpochTimeOrMessage::DateTime(start) => start,
+    };
+    let epoch_duration_millis: u64 = epoch_duration
+        .as_millis()
+        .try_into()
+        .context("epoch duration is too long")?;
+    let earliest_expiry_ts: DateTime<Utc> = earliest_expiry_time.into();
+    if earliest_expiry_ts < estimated_start_of_current_epoch || earliest_expiry_ts < Utc::now() {
+        bail!(
+            "earliest_expiry_time must be greater than the current epoch start time and the current time"
+        );
+    }
+    let delta = (earliest_expiry_ts - estimated_start_of_current_epoch).num_milliseconds() as u64;
+    let epochs_ahead = (delta / epoch_duration_millis + 1)
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("expiry time is too far in the future"))?;
+
+    // Check that the number of epochs is lower than the number of epochs the blob can be stored
+    // for.
+    if epochs_ahead > max_epochs_ahead {
+        bail!("blobs can only be stored for up to {max_epochs_ahead} epochs ahead; {epochs_ahead} epochs were requested");
+    }
+
+    Ok(epochs_ahead)
+}
+
+pub async fn get_owned_blobs(
+    sui_client: &RetriableSuiClient,
+    walrus_package: ObjectID,
+    owner_address: SuiAddress,
+) -> anyhow::Result<HashMap<BlobId, (SuiBlob, ObjectRef)>> {
+    let type_map = sui_client
+        .type_origin_map_for_package(walrus_package)
+        .await?;
+    let blobs = sui_client
+        .get_owned_objects_of_type::<SuiBlob>(owner_address, &type_map, &[])
+        .await?
+        .map(|blob| (blob.0.blob_id, blob))
+        .collect();
+    Ok(blobs)
 }

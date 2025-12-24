@@ -11,18 +11,26 @@ use output::{
     try_from_output,
     BlobIdOutput,
     DryRunOutput,
+    InfoEpochOutput,
     ReadOutput,
     StorageInfoOutput,
     StoreOutput,
 };
+use sui_types::base_types::ObjectID;
 use tokio::process::Command as CliCommand;
 
 use self::types::BlobId;
 use crate::{
     args::EpochArg,
     walrus::{
-        command::{CommonStoreOptions, StoreQuiltInput, WalrusCmdBuilder},
-        output::{DestroyOutput, QuiltStoreResult, StoreQuiltDryRunOutput},
+        command::{CommonStoreOptions, ExtendInput, StoreQuiltInput, WalrusCmdBuilder},
+        output::{
+            DestroyOutput,
+            EpochCount,
+            ExtendBlobOutput,
+            QuiltStoreResult,
+            StoreQuiltDryRunOutput,
+        },
     },
 };
 pub mod command;
@@ -138,6 +146,19 @@ impl Walrus {
         )
     }
 
+    /// Issues an `extend` JSON command to the Walrus CLI to extend a blob's storage duration.
+    pub async fn extend(
+        &mut self,
+        blob_obj_id: ObjectID,
+        extend_epochs: EpochCount,
+    ) -> Result<ExtendBlobOutput> {
+        create_command!(
+            self,
+            extend,
+            ExtendInput::non_shared(blob_obj_id, extend_epochs)
+        )
+    }
+
     /// Issues a `delete` JSON command to the Walrus CLI, returning the parsed output.
     pub async fn delete(&mut self, blob_ids: &[BlobId]) -> Result<Vec<DestroyOutput>> {
         create_command!(self, delete, blob_ids)
@@ -211,11 +232,15 @@ impl Walrus {
         Ok(n_shards.n_shards)
     }
 
+    pub async fn epoch_info(&self) -> Result<InfoEpochOutput> {
+        create_command!(self, info, self.rpc_arg(), Some(InfoCommands::Epoch))
+    }
+
     /// Returns the number of columns available to fill with files in a Quilt.
     ///
     /// (All columns minus one for the index.)
     pub fn max_slots_in_quilt(n_shards: NonZeroU16) -> u16 {
-        let (_n_rows, n_cols) = walrus_core::encoding::source_symbols_for_n_shards(n_shards);
+        let (_n_rows, n_cols) = walrus_sdk::core::encoding::source_symbols_for_n_shards(n_shards);
         n_cols.get() - 1
     }
 
@@ -224,8 +249,8 @@ impl Walrus {
     /// This is calculated as `MAX_SYMBOL_SIZE × n_rows`, representing the capacity
     /// of one column in the quilt matrix.
     pub fn max_slot_size(n_shards: NonZeroU16) -> usize {
-        let (n_rows, _n_cols) = walrus_core::encoding::source_symbols_for_n_shards(n_shards);
-        let max_symbol_size = walrus_core::DEFAULT_ENCODING.max_symbol_size() as usize;
+        let (n_rows, _n_cols) = walrus_sdk::core::encoding::source_symbols_for_n_shards(n_shards);
+        let max_symbol_size = walrus_sdk::core::DEFAULT_ENCODING.max_symbol_size() as usize;
         max_symbol_size * n_rows.get() as usize
     }
 

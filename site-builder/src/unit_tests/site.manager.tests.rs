@@ -47,12 +47,13 @@ async fn test_site_manager_cache_updated_after_transaction() {
     let config = create_test_config(wallet_path, fake_package_id);
 
     // Create SiteManager
-    let mut manager = SiteManager::new(config, None, None, None).await.unwrap();
+    let mut manager = SiteManager::new(config, None, None, None, None)
+        .await
+        .unwrap();
     assert!(manager.object_cache.is_empty());
 
     // Get a gas coin and execute a simple transaction
     let address = manager.active_address().unwrap();
-    let retry_client = manager.sui_client().await.unwrap();
 
     let coins = cluster
         .sui_client()
@@ -67,17 +68,7 @@ async fn test_site_manager_cache_updated_after_transaction() {
     let ptb = ProgrammableTransactionBuilder::new().finish();
 
     // Execute via manager's sign_and_send_ptb (which updates cache)
-    let _response = crate::util::sign_and_send_ptb(
-        address,
-        &manager.wallet,
-        &retry_client,
-        ptb,
-        gas_ref,
-        manager.config.gas_budget(),
-        &mut manager.object_cache,
-    )
-    .await
-    .unwrap();
+    let _response = manager.sign_and_send_ptb(ptb, gas_ref).await.unwrap();
 
     // Cache should now contain the gas object with updated version
     assert!(!manager.object_cache.is_empty());
@@ -125,7 +116,9 @@ async fn test_site_manager_cache_protects_against_stale_fullnode() {
     let config = create_test_config(wallet_path.clone(), fake_package_id);
 
     // Create SiteManager with main fullnode
-    let mut manager = SiteManager::new(config, None, None, None).await.unwrap();
+    let mut manager = SiteManager::new(config, None, None, None, None)
+        .await
+        .unwrap();
     let address = manager.active_address().unwrap();
 
     // Get initial gas coin version (V0)
@@ -158,11 +151,10 @@ async fn test_site_manager_cache_protects_against_stale_fullnode() {
         .await;
 
     // Step 2: SiteManager executes a simple tx with the gas-object using main fullnode
-    let main_retry_client = manager.sui_client().await.unwrap();
     let ptb = ProgrammableTransactionBuilder::new().finish();
 
     let _response = manager
-        .sign_and_send_ptb(ptb, initial_gas_ref, &main_retry_client)
+        .sign_and_send_ptb(ptb, initial_gas_ref)
         .await
         .unwrap();
 
@@ -238,7 +230,7 @@ async fn test_site_manager_cache_protects_against_stale_fullnode() {
 
     // Create new SiteManager with stale wallet config, but copy the cache
     let stale_config = create_test_config(stale_wallet_path, fake_package_id);
-    let mut stale_manager = SiteManager::new(stale_config, None, None, None)
+    let mut stale_manager = SiteManager::new(stale_config, None, None, None, None)
         .await
         .unwrap();
 
@@ -276,10 +268,17 @@ async fn test_site_manager_cache_protects_against_stale_fullnode() {
 
     // Execute another tx using the cache-corrected gas ref (V1) through main fullnode
     let ptb2 = ProgrammableTransactionBuilder::new().finish();
-    let _response2 = stale_manager
-        .sign_and_send_ptb(ptb2, gas_ref_for_tx, &main_retry_client)
-        .await
-        .unwrap();
+    let _response2 = crate::util::sign_and_send_ptb(
+        stale_manager.active_address().unwrap(),
+        &stale_manager.wallet,
+        &main_retry_client,
+        ptb2,
+        gas_ref_for_tx,
+        stale_manager.config.gas_budget(),
+        &mut stale_manager.object_cache,
+    )
+    .await
+    .unwrap();
 
     // Verify the transaction succeeded and cache was updated to V2
     let final_cached_ref = *stale_manager.object_cache.get(&initial_gas_ref.0).unwrap();
