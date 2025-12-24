@@ -79,7 +79,7 @@ pub struct ExtendInput {
     /// If the blob_obj_id refers to a shared blob object, this flag must be present.
     shared: bool,
     /// The number of epochs to extend the blob for.
-    // TODO (WAL-614): Offer multiple options similar to the `store` command:
+    // TODO(wal-614): Offer multiple options similar to the `store` command:
     // `--extended-epochs`, `--epochs-ahead`, `--max`, `--end-epoch`,
     // `--earliest-expiration-time`.
     epochs_extended: u32,

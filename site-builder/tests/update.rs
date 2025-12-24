@@ -88,7 +88,6 @@ async fn update_snake() -> anyhow::Result<()> {
         .build()?;
     site_builder::run(update_args).await?;
 
-    // TODO: Update only stores new blobs
     // Verify that the user now has 2 blob objects:
     // - One from the old site (unchanged resources)
     // - One with only the updated index.html

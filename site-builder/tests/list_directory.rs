@@ -250,13 +250,13 @@ async fn deploy_quilts_with_list_directory_updates_ignored_files() -> anyhow::Re
     // Testing different glob formats:
     // - "/file_2.html" (leading slash format)
     // - "**/file_3.html" (globstar format)
-    // - "file_4.html" (TODO: .gitignore pattern matching not yet supported, commented out)
+    // - "file_4.html" (TODO(sew-445): .gitignore pattern matching not yet supported, commented out)
     let ws_resources_path = directory.join("ws-resources.json");
     let ws_resources = WSResources {
         ignore: Some(vec![
             "/file_2.html".to_string(),
             "**/file_3.html".to_string(),
-            // "file_4.html".to_string(),  // TODO: implement .gitignore pattern matching
+            // "file_4.html".to_string(),  // TODO(sew-445): implement .gitignore pattern matching
         ]),
         ..Default::default()
     };
@@ -285,7 +285,7 @@ async fn deploy_quilts_with_list_directory_updates_ignored_files() -> anyhow::Re
     let paths_first: Vec<&str> = resources_first.iter().map(|r| r.path.as_str()).collect();
     assert!(paths_first.contains(&"/file_0.html"));
     assert!(paths_first.contains(&"/file_1.html"));
-    assert!(paths_first.contains(&"/file_4.html")); // TODO (.gitignore)
+    assert!(paths_first.contains(&"/file_4.html")); // TODO(sew-445): .gitignore
     assert!(
         paths_first.contains(&"/index.html"),
         "Generated index.html should be present"

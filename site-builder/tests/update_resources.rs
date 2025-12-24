@@ -433,7 +433,7 @@ async fn test_update_resources_respects_ws_resources() -> anyhow::Result<()> {
 
     // 2. Create a ws-resources.json file with a custom header for *.html files
     let ws_resources_path = directory.join("ws-resources.json");
-    // TODO: ignore patterns should support .gitignore format
+    // TODO(sew-445): ignore patterns should support .gitignore format
     let ws_resources_content = r#"{
         "headers": {
             "**/*.html": {"X-Custom-Header": "CustomValue"}
@@ -505,7 +505,7 @@ async fn test_update_resources_respects_ws_resources() -> anyhow::Result<()> {
                     file_path: external_file_path.clone(),
                     url_path: "/external_file.html".to_string(),
                 },
-                // TODO: #SEW-480 BUG Fix, ignore should look on the full-path, not the resource-path
+                // TODO(sew-480): BUG Fix, ignore should look on the full-path, not the resource-path
                 ResourcePaths {
                     file_path: ignored_file_path.clone(),
                     url_path: "/private/secret.html".to_string(),

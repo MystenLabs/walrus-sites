@@ -87,7 +87,6 @@ impl SiteManager {
         })
     }
 
-    // TODO: #SEW-605 quilts are stored in ResourceManager and extended in SiteManager.
     /// Updates the site with the given [`Resource`].
     ///
     /// If the site does not exist, it is created and updated. The resources that need to be updated
@@ -335,8 +334,8 @@ impl SiteManager {
         let retry_client = self.sui_client().await?;
         let built_ptb = ptb.finish();
         assert!(built_ptb.commands.len() <= PTB_MAX_MOVE_CALLS as usize);
-        // TODO: #SEW-498 Verify gas_ref. Currently, we do not have the last tx the user submitted through
-        // walrus.
+        // TODO(sew-498): Verify gas_ref. Currently, we do not have the last tx the user submitted
+        // through walrus.
         let gas_ref = self.gas_coin_ref().await?;
         let result = self
             .sign_and_send_ptb(built_ptb, gas_ref, &retry_client)
@@ -543,7 +542,7 @@ impl SiteManager {
     ) -> anyhow::Result<ObjectRef> {
         let cached: Option<&ObjectRef> = self.object_cache.get(&object_ref.0);
         match cached {
-            // TODO: #SEW-503 Will we have a problem if during the execute we use an FN with an
+            // TODO(sew-503): Will we have a problem if during the execute we use an FN with an
             // older version? Does RetriableSuiClient mitigate this?
             // If the cached version is bigger than the fetched, just used the cached.
             Some(&cached) if cached.1 > object_ref.1 => {
