@@ -201,7 +201,11 @@ jobs:
       - name: Generate cost summary
         if: ${{ always() }}
         run: |
+          SITE_BUILDER_REF="${{ inputs.ref || github.ref }}"
+
           echo "## Performance Regression Test - Cost Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Site-builder ref:** \`${SITE_BUILDER_REF}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           echo "### Deploy Costs" >> $GITHUB_STEP_SUMMARY
