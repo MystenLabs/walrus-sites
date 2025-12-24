@@ -6,6 +6,7 @@ pub mod config;
 pub mod content;
 pub mod contracts;
 pub mod manager;
+pub mod quilts;
 pub mod resource;
 
 use std::{collections::HashMap, time::Duration};

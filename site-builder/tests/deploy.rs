@@ -505,7 +505,7 @@ async fn quilts_deploy_updates_site_name() -> anyhow::Result<()> {
                 .with_epoch_count_or_max(EpochCountOrMax::Max)
                 .build()?,
             site_name: None, // Let it read from ws-resources.json. TODO(sew-462): argument should
-                             // take precedence from ws-resources.json, not the other way around.
+            // take precedence from ws-resources.json, not the other way around.
             object_id: None,
         })
         .build()?;
