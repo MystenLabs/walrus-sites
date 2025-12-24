@@ -20,14 +20,14 @@ mod preprocessor;
 mod publish;
 mod retry_client;
 mod site;
-// TODO: This can be a standalone crate, helping integration testing and other projects using our
-// contract.
+// TODO(sew-251): This can be a standalone crate, helping integration testing and other projects
+// using our contract.
 pub use site::{config as site_config, contracts, resource::MAX_IDENTIFIER_SIZE};
 mod sitemap;
 mod suins;
 mod summary;
-// TODO: This can be a standalone crate, helping integration testing and other projects using our
-// contract.
+// TODO(sew-251): This can be a standalone crate, helping integration testing and other projects
+// using our contract.
 pub mod types;
 pub mod util;
 mod walrus;

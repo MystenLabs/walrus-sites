@@ -150,8 +150,6 @@ impl GeneralArgs {
     ///
     /// Returns `walrus_package` if provided, otherwise loads the walrus config file
     /// and extracts the original package ID from the staking object.
-    // TODO: Maybe we want to parse from the walrus-config everywhere, not just for site-map
-    // and when get-owned-blobs is called.
     pub async fn resolve_walrus_package(
         &self,
         sui_client: &RetriableSuiClient,
