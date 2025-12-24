@@ -6,9 +6,10 @@ use std::{collections::BTreeMap, num::NonZeroU16, path::PathBuf};
 use bytesize::ByteSize;
 use move_core_types::u256::U256;
 
-use super::{full_path_to_resource_path, ResourceData, ResourceManager, MAX_IDENTIFIER_SIZE};
+use super::{full_path_to_resource_path, ResourceData, MAX_IDENTIFIER_SIZE};
 use crate::{
     config::Walrus,
+    site::quilts::QuiltsManager,
     site_config::WSResources,
     types::{HttpHeaders, VecMap},
 };
@@ -87,16 +88,9 @@ fn test_large_file_below_theoretical_limit_placed_in_own_chunk() {
     // Create mock resource
     let resource = create_mock_resource("large_file.bin".to_string(), file_size, 0);
 
-    // Create a mock ResourceManager
-    let resource_manager = ResourceManager {
-        walrus: Walrus::new("walrus".to_string(), 1000000, None, None, None, None),
-        ws_resources: None,
-        ws_resources_path: None,
-        n_shards,
-    };
-
     // Call quilts_chunkify
-    let result = resource_manager.quilts_chunkify(vec![resource], max_quilt_size);
+    let result =
+        QuiltsManager::quilts_chunkify_with_n_shards(vec![resource], max_quilt_size, n_shards);
 
     // The function should not error, and should place the file in its own chunk
     let chunks = result.expect("Should not fail for file below theoretical limit");
@@ -155,16 +149,8 @@ fn test_large_file_among_small_files_creates_correct_chunks() {
         ));
     }
 
-    // Create a mock ResourceManager
-    let resource_manager = ResourceManager {
-        walrus: Walrus::new("walrus".to_string(), 1000000, None, None, None, None),
-        ws_resources: None,
-        ws_resources_path: None,
-        n_shards,
-    };
-
     // Call quilts_chunkify
-    let result = resource_manager.quilts_chunkify(files, max_quilt_size);
+    let result = QuiltsManager::quilts_chunkify_with_n_shards(files, max_quilt_size, n_shards);
 
     // Expected behavior:
     // - The large file should be alone in the first chunk

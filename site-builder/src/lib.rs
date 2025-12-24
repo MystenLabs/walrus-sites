@@ -8,7 +8,12 @@ use args::{Args, Commands};
 use config::Config;
 use preprocessor::Preprocessor;
 use publish::{load_ws_resources, SiteEditor};
-use site::{config::WSResources, manager::SiteManager, resource::ResourceManager};
+use site::{
+    config::WSResources,
+    manager::SiteManager,
+    quilts::QuiltsManager,
+    resource::{ResourceManager, ResourceSet},
+};
 use sitemap::display_sitemap;
 use util::{id_to_base36, path_or_defaults_if_exist};
 
@@ -134,6 +139,7 @@ async fn run_internal(
             let site_editor = SiteEditor::new(context, config);
             site_editor.destroy(object).await?;
         }
+        // TODO(sew-495): Check whether quilts-extensions happen here.
         Commands::UpdateResources {
             resources,
             site_object,
@@ -145,9 +151,8 @@ async fn run_internal(
                 .as_ref()
                 .map(WSResources::read)
                 .transpose()?;
-            let mut resource_manager =
-                ResourceManager::new(config.walrus_client(), ws_res, common.ws_resources.clone())
-                    .await?;
+            let resource_manager = ResourceManager::new(ws_res, common.ws_resources.clone())?;
+            let mut quilts_manager = QuiltsManager::new(config.walrus_client()).await?;
             let mut site_manager = SiteManager::new(
                 config,
                 Some(site_object),
@@ -157,17 +162,33 @@ async fn run_internal(
             )
             .await?;
 
-            let resources = resource_manager
-                .parse_resources_and_store_quilts(
-                    resources,
+            // Parse the resource paths into resource data
+            let resource_data = resource_manager.parse_resources(resources)?;
+
+            // Store the resources into quilts
+            let dry_run_info = if common.dry_run {
+                Some(site::quilts::DryRunInfo {
+                    extension_estimate: None, // No extension estimate for update-resources
+                })
+            } else {
+                None
+            };
+            let stored_resources = quilts_manager
+                .store_quilts(
+                    resource_data,
                     common.epoch_arg,
-                    common.dry_run,
                     common.max_quilt_size,
+                    dry_run_info,
                 )
                 .await?;
+
+            // Convert to ResourceSet for the site manager
+            let mut resource_set = ResourceSet::empty();
+            resource_set.extend(stored_resources);
+
             // TODO(sew-604): Extend the lifetime of the rest of the resources that belong to the
             // site?
-            site_manager.update_resources(resources).await?;
+            site_manager.update_resources(resource_set).await?;
         }
     };
 
