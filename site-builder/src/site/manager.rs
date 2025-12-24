@@ -110,7 +110,6 @@ impl SiteManager {
             None => SiteData::empty(),
         };
 
-        // TODO(sew-495): Improve code-quality. From here we handle blob-extension
         let walrus_pkg = self
             .config
             .general
@@ -119,8 +118,6 @@ impl SiteManager {
         let blob_extensions = self
             .retrieve_blobs_to_extend(local_site_data, walrus_pkg, &retriable_client)
             .await?;
-        // TODO(sew-495): Up to here. This outputs `to_extend`, `new_end_epoch`, and
-        // `storage_price`.
 
         tracing::debug!(?existing_site, "checked existing site");
 
