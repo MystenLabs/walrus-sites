@@ -149,7 +149,7 @@ impl TestSetup {
         let sites_config = create_sites_config(
             test_wallet.inner.get_config_path().to_path_buf(),
             walrus_sites_package_id,
-            walrus_config.inner.1.clone(),
+            Some(walrus_config.inner.1.clone()),
         )?;
 
         Ok(TestSetup {
@@ -624,10 +624,14 @@ pub fn create_walrus_config(
     })
 }
 
+/// Creates a sites config.
+///
+/// If `walrus_config_path` is `None`, the walrus config will be discovered from default locations
+/// (XDG_CONFIG_HOME/walrus, ~/.config/walrus, ~/.walrus).
 pub fn create_sites_config(
     wallet_path: PathBuf,
     walrus_sites_package_id: ObjectID,
-    walrus_config_path: PathBuf,
+    walrus_config_path: Option<PathBuf>,
 ) -> anyhow::Result<WithTempDir<(SitesConfig, PathBuf)>> {
     let temp_dir = TempDir::new().expect("able to create a temporary directory");
     let sites_config_path = temp_dir.path().to_path_buf().join("sites-config.yaml");
@@ -637,7 +641,7 @@ pub fn create_sites_config(
         package: walrus_sites_package_id,
         general: GeneralArgs {
             wallet: Some(wallet_path),
-            walrus_config: Some(walrus_config_path),
+            walrus_config: walrus_config_path,
             ..Default::default()
         },
         staking_object: None,
