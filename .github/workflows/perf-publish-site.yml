@@ -85,11 +85,25 @@ jobs:
           ref: ${{ github.ref }}
           clean: false
 
-      - name: Verify sites-config.yaml exists
+      - name: Verify setup after checkout
         run: |
-          echo "Current directory: $(pwd)"
+          echo "=== Current directory ==="
+          pwd
+          echo ""
+          echo "=== sites-config.yaml ==="
           ls -la sites-config.yaml
           head -20 sites-config.yaml
+          echo ""
+          echo "=== PATH ==="
+          echo "$PATH"
+          echo ""
+          echo "=== Walrus binary ==="
+          which walrus || echo "walrus not found in PATH"
+          ls -la ~/.local/bin/walrus 2>/dev/null || echo "walrus not in ~/.local/bin"
+          echo ""
+          echo "=== Walrus config ==="
+          ls -la ~/.config/walrus/ 2>/dev/null || echo "~/.config/walrus/ not found"
+          head -30 ~/.config/walrus/client_config.yaml 2>/dev/null || echo "client_config.yaml not found"
 
       # =============================================================================
       # walrus-docs: Docusaurus site (page-edit update scenario)
