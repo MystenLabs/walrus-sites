@@ -635,3 +635,159 @@ async fn update_with_file_rename() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+/// Test that blobs for deleted resources are NOT extended during site update.
+///
+/// This test verifies that when a file is deleted from a site, its blob is NOT extended
+/// even though other unchanged blobs ARE extended. This is important because:
+/// 1. We don't want to pay for extending blobs that are about to be deleted
+/// 2. The extend operation filters out blobs that have no remaining resources
+///
+/// Setup (similar to quilts_update_check_quilt_lifetime):
+/// - Create n_slots_in_quilts + 1 files
+/// - First n_slots_in_quilts files → main quilt (1 blob)
+/// - Last file → single-file quilt (1 blob)
+///
+/// Test:
+/// 1. Publish with short epochs (5)
+/// 2. Delete the single-file from directory
+/// 3. Update with longer epochs (50)
+/// 4. Query extend_blob transactions and verify:
+///    - Main quilt blob WAS extended (appears in transactions)
+///    - Single-file blob was NOT extended (does not appear in transactions)
+#[tokio::test]
+#[ignore]
+async fn test_update_does_not_extend_deleted_blobs() -> anyhow::Result<()> {
+    const PUBLISH_EPOCHS: u32 = 5;
+    const UPDATE_EPOCHS: u32 = 50;
+
+    let mut cluster = TestSetup::start_local_test_cluster().await?;
+
+    // Calculate n_slots_in_quilts based on the cluster's n_shards
+    let n_shards = cluster.cluster_state.walrus_cluster.n_shards;
+    let n_slots_in_quilts =
+        u16::from(walrus_sdk::core::encoding::source_symbols_for_n_shards(n_shards).1) as usize - 1;
+
+    let n_files = n_slots_in_quilts + 1;
+    println!("Creating test site with {n_files} files (n_slots_in_quilts + 1)...");
+    let temp_dir = create_test_site(n_files)?;
+    let test_site_dir = temp_dir.path().to_owned();
+
+    // Publish the initial site
+    println!("Publishing initial site for {PUBLISH_EPOCHS} epochs...");
+    let publish_args = ArgsBuilder::default()
+        .with_config(Some(cluster.sites_config_path().to_owned()))
+        .with_command(Commands::Publish {
+            publish_options: PublishOptionsBuilder::default()
+                .with_directory(test_site_dir.clone())
+                .with_epoch_count_or_max(EpochCountOrMax::Epochs(PUBLISH_EPOCHS.try_into()?))
+                .build()?,
+            site_name: Some("Test Delete Blob Extension".to_string()),
+        })
+        .with_gas_budget(10_000_000_000)
+        .build()?;
+
+    site_builder::run(publish_args).await?;
+
+    let site = cluster.last_site_created().await?;
+    let site_object_id = *site.id.object_id();
+    let wallet_address = cluster.wallet_active_address()?;
+
+    println!("Published site with object ID: {site_object_id}");
+
+    // Get initial resources and group by blob_id
+    let initial_resources = cluster.site_resources(site_object_id).await?;
+    assert_eq!(initial_resources.len(), n_files);
+
+    let mut blob_id_to_paths = std::collections::HashMap::new();
+    for resource in &initial_resources {
+        blob_id_to_paths
+            .entry(resource.blob_id)
+            .or_insert_with(Vec::new)
+            .push(resource.path.clone());
+    }
+
+    let items: Vec<_> = blob_id_to_paths.iter().collect();
+    let [(blob_id_first, paths_first), (blob_id_second, paths_second)] = items[..] else {
+        panic!("Expected exactly 2 blobs");
+    };
+
+    // Find which blob_id has n_slots_in_quilts files and which has 1 file
+    let (main_quilt_blob_id, _single_file_blob_id, single_file_path) = {
+        if paths_first.len() == n_slots_in_quilts {
+            (*blob_id_first, *blob_id_second, paths_second[0].as_str())
+        } else {
+            (*blob_id_second, *blob_id_first, paths_first[0].as_str())
+        }
+    };
+
+    println!("\n✓ Main quilt (blob {main_quilt_blob_id}): {n_slots_in_quilts} files");
+    println!("✓ Single file to delete: {single_file_path}");
+
+    // Get the blob object IDs before deletion
+    let initial_blobs = cluster.get_owned_blobs(wallet_address).await?;
+    assert_eq!(
+        initial_blobs.len(),
+        2,
+        "Should have exactly 2 blobs initially"
+    );
+
+    let main_blob_obj = initial_blobs
+        .iter()
+        .find(|b| b.blob_id.0 == main_quilt_blob_id.0)
+        .expect("main quilt blob should exist");
+    let main_blob_object_id = main_blob_obj.id;
+
+    let single_file_blob_obj = initial_blobs
+        .iter()
+        .find(|b| b.blob_id.0 != main_quilt_blob_id.0)
+        .expect("single file blob should exist");
+    let single_file_blob_object_id = single_file_blob_obj.id;
+
+    println!(
+        "\nMain blob object ID: {main_blob_object_id}, Single file blob object ID: {single_file_blob_object_id}"
+    );
+
+    // Delete the single file from directory
+    println!("\nDeleting file: {single_file_path}");
+    fs::remove_file(test_site_dir.join(single_file_path.trim_start_matches('/')))?;
+
+    // Update site with longer epochs (triggers extensions)
+    println!("\n=== Update: {UPDATE_EPOCHS} epochs ===");
+    let update_args = ArgsBuilder::default()
+        .with_config(Some(cluster.sites_config_path().to_owned()))
+        .with_command(Commands::Update {
+            publish_options: PublishOptionsBuilder::default()
+                .with_directory(test_site_dir)
+                .with_epoch_count_or_max(EpochCountOrMax::Epochs(UPDATE_EPOCHS.try_into()?))
+                .build()?,
+            object_id: site_object_id,
+        })
+        .with_gas_budget(10_000_000_000)
+        .build()?;
+
+    site_builder::run(update_args).await?;
+    println!("Successfully ran update");
+
+    // Query for extend_blob transactions
+    let extended_blob_ids = cluster.get_extended_blob_object_ids().await?;
+    println!("\nExtended blob object IDs: {extended_blob_ids:?}");
+
+    // Verify: main quilt blob WAS extended
+    assert!(
+        extended_blob_ids.contains(&main_blob_object_id),
+        "Main quilt blob should be extended, but extended blobs are: {:?}",
+        extended_blob_ids
+    );
+
+    // Verify: single-file blob was NOT extended
+    assert!(
+        !extended_blob_ids.contains(&single_file_blob_object_id),
+        "Single file blob (about to be deleted) should NOT be extended, but it was. Extended blobs: {:?}",
+        extended_blob_ids
+    );
+
+    println!("\n✓ Test passed: Deleted blob was NOT extended, main quilt blob WAS extended");
+
+    Ok(())
+}
