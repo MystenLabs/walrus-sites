@@ -84,7 +84,9 @@ impl SiteDataDiff<'_> {
     }
 }
 
-// TODO(sew-495): Blobs make sense to exist as a field instead of just fetched.
+// TODO(sew-166): Blobs make sense to exist as a field instead of just fetched. This struct was made
+// to compare sites. Now we also do some basic blob-lifetime-management.
+// It might make more sense to track the blob-id here as well?
 /// The site on chain.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SiteData {
@@ -94,9 +96,6 @@ pub struct SiteData {
     site_name: Option<String>,
 }
 
-// TODO(sew-495): This struct was made to compare sites.
-// Now we also do some basic blob-lifetime-management.
-// It might make more sense to track the blob-id here as well?
 impl SiteData {
     /// SiteData constructor.
     pub fn new(
@@ -173,9 +172,9 @@ impl SiteData {
         &self.resources
     }
 
-    // TODO(sew-495): We pass Option as storage_price, in order to not do the extra call to Fullnode
-    // for getting the storage_price when there is no blob to extend.
-    // This smells a bit.
+    // TODO(sew-495): Code quality: We pass Option as storage_price, in order to not do the extra
+    // call to Fullnode for getting the storage_price when there is no blob to extend. This smells a
+    // bit.
     fn blobs_to_extend(
         &self,
         blobs_to_extend: impl IntoIterator<Item = (SuiBlob, ObjectRef), IntoIter: ExactSizeIterator>,
