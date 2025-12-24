@@ -23,6 +23,7 @@ use sui_types::{
     Identifier,
 };
 use tracing::warn;
+use walrus_sdk::sui::client::{ReadClient, SuiReadClient};
 
 use super::{
     builder::SitePtb,
@@ -96,10 +97,11 @@ impl SiteManager {
         local_site_data: &SiteData,
     ) -> Result<(SuiTransactionBlockResponse, SiteDataDiffSummary)> {
         tracing::debug!(?self.site_id, "creating or updating site");
-        let Some(epoch_arg) = self.epochs.clone() else {
-            // TODO(sew-495): We should have already checked for this.
-            bail!("Cannot publish or update a site without passing epochs");
-        };
+        let epoch_arg = self
+            .epochs
+            .clone()
+            .expect("epochs must be set when calling update_site"); // EpochArg is an ArgGroup with
+                                                                    // required true
         let retriable_client = self.sui_client().await?;
         let existing_site = match &self.site_id {
             Some(site_id) => {
@@ -111,6 +113,7 @@ impl SiteManager {
             None => SiteData::empty(),
         };
 
+        // TODO(sew-495): Improve code-quality. From here we handle blob-extension
         let epoch_info = self.walrus.epoch_info().await?;
         let current_epoch = epoch_info.current_epoch;
         let epochs_ahead = match (
@@ -134,7 +137,6 @@ impl SiteManager {
         };
         let new_end_epoch = current_epoch + epochs_ahead;
 
-        // TODO(sew-495): Move to SitePtb
         let walrus_pkg = self
             .config
             .general
@@ -159,14 +161,14 @@ impl SiteManager {
         let storage_price = if to_extend.is_empty() {
             None
         } else {
-            let walrus_client = retriable_client.to_walrus_retriable_client().await?;
+            let walrus_client = retriable_client.to_walrus_retriable_client()?;
             let walrus_config = self.config.general.walrus_config()?;
-            Some(
-                walrus_config
-                    .storage_price_per_unit_size(walrus_client)
-                    .await?,
-            )
+
+            let sui_read_client = SuiReadClient::new(walrus_client, &walrus_config).await?;
+            Some(sui_read_client.storage_price_per_unit_size().await?)
         };
+        // TODO(sew-495): Up to here. This outputs `to_extend`, `new_end_epoch`, and
+        // `storage_price`.
 
         tracing::debug!(?existing_site, "checked existing site");
 
@@ -249,8 +251,13 @@ impl SiteManager {
             );
             let retriable_client = self.sui_client().await?;
             let walrus_config = self.config.general.walrus_config()?;
-            let walrus_client = retriable_client.to_walrus_retriable_client().await?;
-            let wal_coin_type = walrus_config.wal_coin_type(walrus_client.clone()).await?;
+            let walrus_client = retriable_client.to_walrus_retriable_client()?;
+
+            let wal_coin_type = {
+                let sui_read_client =
+                    SuiReadClient::new(walrus_client.clone(), &walrus_config).await?;
+                sui_read_client.wal_coin_type().to_owned()
+            };
             let coins = retriable_client
                 .select_coins(
                     self.active_address()?,

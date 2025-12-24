@@ -160,12 +160,11 @@ impl RetriableSuiClient {
     }
 
     /// Creates a walrus-sdk `RetriableSuiClient` from this client.
-    pub async fn to_walrus_retriable_client(&self) -> Result<WalrusRetriableSuiClient> {
+    pub fn to_walrus_retriable_client(&self) -> Result<WalrusRetriableSuiClient> {
         WalrusRetriableSuiClient::new(
             vec![self.sui_client.clone().into()],
             WalrusBackoffConfig::default(),
         )
-        .await
     }
 
     /// Creates a new retriable client from a wallet context.

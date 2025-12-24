@@ -5,18 +5,19 @@
 
 use std::{num::NonZeroU32, path::PathBuf, str::FromStr, time::SystemTime};
 
-use anyhow::{anyhow, bail, ensure, Result};
+use anyhow::{anyhow, bail, ensure, Context as _, Result};
 use bytesize::ByteSize;
 use clap::{ArgGroup, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use sui_sdk::wallet_context::WalletContext;
 use sui_types::base_types::{ObjectID, SuiAddress};
+pub use walrus_sdk::sui::client::contract_config::ContractConfig as WalrusContractConfig;
 
 use crate::{
     retry_client::RetriableSuiClient,
     suins::SuiNsClient,
     util::load_wallet_context,
-    walrus::{config::WalrusContractConfig, output::EpochCount},
+    walrus::output::EpochCount,
 };
 
 #[cfg(test)]
@@ -139,7 +140,10 @@ impl GeneralArgs {
         let walrus_config_path = self.walrus_config.as_ref().ok_or_else(|| {
             anyhow!("no walrus package, or walrus config specified; please add either")
         })?;
-        WalrusContractConfig::from_file(walrus_config_path)
+
+        let contents = std::fs::read_to_string(walrus_config_path)
+            .context("Failed to read walrus config file")?;
+        serde_yaml::from_str(&contents).context("Failed to parse walrus config file")
     }
 
     /// Resolves the walrus package ID.
