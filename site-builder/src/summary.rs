@@ -7,7 +7,7 @@ use walrus_sdk::core::QuiltPatchId;
 
 use crate::{
     site::{resource::SiteOps, SiteDataDiff},
-    types::RouteOps,
+    types::{ExtendOps, RouteOps},
     util::parse_quilt_patch_id,
     walrus::types::BlobId,
 };
@@ -71,6 +71,23 @@ impl Summarizable for RouteOps {
     }
 }
 
+impl Summarizable for ExtendOps {
+    fn to_summary(&self) -> String {
+        match self {
+            ExtendOps::Noop => "No blob extensions performed.".to_owned(),
+            ExtendOps::Extend { blobs_epochs, .. } => {
+                let lines: Vec<String> = blobs_epochs
+                    .iter()
+                    .map(|(obj_ref, epochs)| {
+                        format!("  - Extended blob {} by {} epochs", obj_ref.0, epochs)
+                    })
+                    .collect();
+                format!("Blob extensions:\n{}", lines.join("\n"))
+            }
+        }
+    }
+}
+
 impl Summarizable for Vec<ResourceOpSummary> {
     fn to_summary(&self) -> String {
         self.iter()
@@ -86,7 +103,7 @@ pub struct SiteDataDiffSummary {
     pub route_ops: RouteOps,
     pub metadata_updated: bool,
     pub site_name_updated: bool,
-    // TODO(sew-495): extend summary
+    pub extend_ops: ExtendOps,
 }
 
 impl From<&SiteDataDiff<'_>> for SiteDataDiffSummary {
@@ -96,6 +113,7 @@ impl From<&SiteDataDiff<'_>> for SiteDataDiffSummary {
             route_ops: value.route_ops.clone(),
             metadata_updated: !value.metadata_op.is_noop(),
             site_name_updated: !value.site_name_op.is_noop(),
+            extend_ops: value.extend_ops.clone(),
         }
     }
 }
@@ -112,6 +130,7 @@ impl Summarizable for SiteDataDiffSummary {
             && self.route_ops.is_unchanged()
             && !self.metadata_updated
             && !self.site_name_updated
+            && self.extend_ops.is_noop()
         {
             return "No operation needs to be performed.".to_owned();
         }
@@ -136,7 +155,8 @@ impl Summarizable for SiteDataDiffSummary {
         } else {
             "Site name has not been updated."
         };
+        let extend_str = self.extend_ops.to_summary();
 
-        format!("{resource_str}\n{route_str}\n{metadata_str}\n{site_name_str}")
+        format!("{resource_str}\n{route_str}\n{metadata_str}\n{site_name_str}\n{extend_str}")
     }
 }
