@@ -153,7 +153,7 @@ impl SiteManager {
 
     /// Builds the initial PTB for site creation/update with initial resources
     async fn build_initial_ptb<'a>(
-        &self,
+        &mut self,
         updates: &'a SiteDataDiff<'_>,
     ) -> Result<(
         ProgrammableTransaction,
@@ -172,7 +172,9 @@ impl SiteManager {
         // Keep 3 operations for optional route deletion + creation + site-transfer
         let mut ptb = match &self.site_id {
             Some(site_id) => {
-                let ptb = ptb.with_call_arg(&self.wallet.get_object_ref(*site_id).await?.into())?;
+                let mut site_object_ref = self.wallet.get_object_ref(*site_id).await?;
+                site_object_ref = self.verify_object_ref_choose_latest(site_object_ref)?;
+                let ptb = ptb.with_call_arg(&site_object_ref.into())?;
                 // Also update metadata if there is a diff
                 match updates.metadata_op {
                     MetadataOp::Update => {
@@ -226,7 +228,7 @@ impl SiteManager {
 
     /// Builds PTBs for remaining resources and routes
     async fn build_remaining_resources_ptbs<'a>(
-        &self,
+        &mut self,
         site_object_id: ObjectID,
         mut resources_iter: Peekable<std::slice::Iter<'a, SiteOps<'a>>>,
         mut routes_iter: Peekable<btree_map::Iter<'a, String, String>>,
@@ -238,7 +240,8 @@ impl SiteManager {
                 self.config.package,
                 Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
             );
-            let site_object_ref = self.wallet.get_object_ref(site_object_id).await?;
+            let mut site_object_ref = self.wallet.get_object_ref(site_object_id).await?;
+            site_object_ref = self.verify_object_ref_choose_latest(site_object_ref)?;
             let call_arg: CallArg = site_object_ref.into();
             let mut ptb = ptb.with_call_arg(&call_arg)?;
 
