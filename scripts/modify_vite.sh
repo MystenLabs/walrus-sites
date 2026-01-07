@@ -6,14 +6,16 @@
 #
 # What happens in a real Vite code edit:
 # 1. Multiple JS chunk files change (new content hashes = new filenames)
-# 2. index.html is updated with new JS/CSS references
-# 3. Old JS files are removed
+# 2. CSS file changes (new content hash = new filename)
+# 3. index.html is updated with new JS/CSS references
+# 4. Old JS/CSS files are removed
 #
 # This script simulates this by:
-# 1. Finding JS files and renaming them with new hashes
-# 2. Updating index.html to reference the new filenames
-# 3. Modifying the content of the renamed JS files
-# 4. Optionally adding an image file (for code-edit-image scenario)
+# 1. Modifying the content of JS/CSS files (inserting a unique marker)
+# 2. Computing a new hash from the modified content
+# 3. Renaming files based on their new content hash
+# 4. Updating index.html to reference the new filenames
+# 5. Optionally adding an image file (for code-edit-image scenario)
 #
 # Usage: ./modify_vite.sh --site-dir <build-dir> [--add-image]
 
@@ -55,14 +57,17 @@ if [ ! -d "$ASSETS_DIR" ]; then
     exit 1
 fi
 
-# Generate a new hash suffix (8 characters)
-# Use md5sum on Linux, md5 on macOS
-if command -v md5sum &> /dev/null; then
-    NEW_HASH=$(head -c 100 /dev/urandom | md5sum | head -c 8)
-else
-    NEW_HASH=$(head -c 100 /dev/urandom | md5 | head -c 8)
-fi
 TIMESTAMP=$(date +%s)
+
+# Helper function to compute hash from file content (first 8 chars)
+compute_content_hash() {
+    local file="$1"
+    if command -v md5sum &> /dev/null; then
+        md5sum "$file" | head -c 8
+    else
+        md5 -q "$file" | head -c 8
+    fi
+}
 
 # Helper function for portable sed -i
 sed_inplace() {
@@ -74,86 +79,134 @@ sed_inplace() {
 }
 
 echo "=== Simulating Vite code edit ==="
-echo "New hash suffix: $NEW_HASH"
 
-# Track files for HTML update
-declare -a OLD_NAMES
-declare -a NEW_NAMES
+# Track files for HTML update (using pipe-separated strings for portability)
+OLD_NAMES=""
+NEW_NAMES=""
 
-# 1. Find main entry JS file (usually index-HASH.js, referenced in HTML)
+# Helper to add to tracking lists
+add_rename() {
+    local old="$1"
+    local new="$2"
+    if [ -z "$OLD_NAMES" ]; then
+        OLD_NAMES="$old"
+        NEW_NAMES="$new"
+    else
+        OLD_NAMES="$OLD_NAMES|$old"
+        NEW_NAMES="$NEW_NAMES|$new"
+    fi
+}
+
+# Helper to modify a file and rename based on content hash
+modify_and_rename() {
+    local file="$1"
+    local prefix="$2"
+    local ext="$3"
+    local comment_start="$4"
+    local comment_end="$5"
+
+    local old_name
+    old_name=$(basename "$file")
+
+    # Modify the content by inserting a unique marker at the beginning
+    # This simulates real code changes that affect the entire bundle
+    local temp_file="${file}.tmp"
+    echo "${comment_start} Build marker: $TIMESTAMP ${comment_end}" > "$temp_file"
+    cat "$file" >> "$temp_file"
+    mv "$temp_file" "$file"
+
+    # Compute new hash from modified content
+    local new_hash
+    new_hash=$(compute_content_hash "$file")
+
+    # Create new filename
+    local new_name="${prefix}-${new_hash}.${ext}"
+    local new_path="$ASSETS_DIR/$new_name"
+
+    echo "Modifying and renaming: $old_name -> $new_name"
+    mv "$file" "$new_path"
+
+    add_rename "$old_name" "$new_name"
+}
+
 INDEX_HTML="$SITE_DIR/index.html"
 if [ ! -f "$INDEX_HTML" ]; then
     echo "Error: index.html not found in $SITE_DIR" >&2
     exit 1
 fi
 
-# Extract the main JS file from index.html
+# Collect ALL files to process BEFORE any modifications
+# This prevents renamed files from being processed again
+
+# 1. Get main entry JS file (usually index-HASH.js, referenced in HTML)
 MAIN_JS=$(grep -o 'src="/assets/index-[^"]*\.js"' "$INDEX_HTML" | sed 's/src="\/assets\///;s/"$//' | head -1)
-
-if [ -n "$MAIN_JS" ]; then
+MAIN_JS_PATH=""
+if [ -n "$MAIN_JS" ] && [ -f "$ASSETS_DIR/$MAIN_JS" ]; then
     MAIN_JS_PATH="$ASSETS_DIR/$MAIN_JS"
-    if [ -f "$MAIN_JS_PATH" ]; then
-        # Extract base name (index) and create new name
-        NEW_MAIN_JS="index-${NEW_HASH}.js"
-        NEW_MAIN_JS_PATH="$ASSETS_DIR/$NEW_MAIN_JS"
-
-        echo "Renaming: $MAIN_JS -> $NEW_MAIN_JS"
-        mv "$MAIN_JS_PATH" "$NEW_MAIN_JS_PATH"
-        echo "// Modified at $TIMESTAMP for perf test" >> "$NEW_MAIN_JS_PATH"
-
-        OLD_NAMES+=("$MAIN_JS")
-        NEW_NAMES+=("$NEW_MAIN_JS")
-    fi
 fi
 
-# 2. Find and rename other JS chunks (lazy-loaded modules)
-# Track used prefixes to avoid naming conflicts (using a simple string)
-# Start with 'index' as used since we handled the main entry above
-USED_PREFIXES="|index|"
-CHUNK_COUNT=0
+# 2. Get CSS file (usually index-HASH.css, referenced in HTML)
+MAIN_CSS=$(grep -o 'href="/assets/index-[^"]*\.css"' "$INDEX_HTML" | sed 's/href="\/assets\///;s/"$//' | head -1)
+MAIN_CSS_PATH=""
+if [ -n "$MAIN_CSS" ] && [ -f "$ASSETS_DIR/$MAIN_CSS" ]; then
+    MAIN_CSS_PATH="$ASSETS_DIR/$MAIN_CSS"
+fi
+
+# 3. Collect ALL other JS chunks (lazy-loaded modules)
+JS_FILES=""
 for js_file in "$ASSETS_DIR"/*.js; do
     [ -f "$js_file" ] || continue
     js_basename=$(basename "$js_file")
 
-    # Skip if already processed
-    if [[ " ${OLD_NAMES[*]} " =~ " ${js_basename} " ]]; then
+    # Skip the main JS file (will be processed separately)
+    if [ -n "$MAIN_JS" ] && [ "$js_basename" = "$MAIN_JS" ]; then
         continue
     fi
 
     # Only process files that look like chunks (contain a hash pattern like name-HASH.js)
-    if [[ "$js_basename" =~ ^([a-zA-Z]+)-[A-Za-z0-9]+\.js$ ]]; then
-        # Extract the chunk name prefix
-        CHUNK_PREFIX="${BASH_REMATCH[1]}"
-
-        # Skip if we already processed a file with this prefix (avoid conflicts)
-        if [[ "$USED_PREFIXES" == *"|$CHUNK_PREFIX|"* ]]; then
-            continue
-        fi
-        USED_PREFIXES="$USED_PREFIXES|$CHUNK_PREFIX|"
-
-        NEW_CHUNK="${CHUNK_PREFIX}-${NEW_HASH}.js"
-        NEW_CHUNK_PATH="$ASSETS_DIR/$NEW_CHUNK"
-
-        echo "Renaming: $js_basename -> $NEW_CHUNK"
-        mv "$js_file" "$NEW_CHUNK_PATH"
-        echo "// Modified at $TIMESTAMP for perf test" >> "$NEW_CHUNK_PATH"
-
-        OLD_NAMES+=("$js_basename")
-        NEW_NAMES+=("$NEW_CHUNK")
-        CHUNK_COUNT=$((CHUNK_COUNT + 1))
-
-        # Limit to a few chunks to keep it manageable
-        [ $CHUNK_COUNT -ge 3 ] && break
+    if [[ "$js_basename" =~ ^([a-zA-Z0-9_-]+)-[A-Za-z0-9_-]+\.js$ ]]; then
+        JS_FILES="$JS_FILES|$js_file"
     fi
 done
 
-# 3. Update index.html with new filenames
+# Now process all collected files
+
+# Process main JS
+if [ -n "$MAIN_JS_PATH" ]; then
+    modify_and_rename "$MAIN_JS_PATH" "index" "js" "//" ""
+fi
+
+# Process main CSS
+if [ -n "$MAIN_CSS_PATH" ]; then
+    modify_and_rename "$MAIN_CSS_PATH" "index" "css" "/*" "*/"
+fi
+
+# Process other JS files
+IFS='|'
+for js_file in $JS_FILES; do
+    [ -z "$js_file" ] && continue
+    js_basename=$(basename "$js_file")
+
+    # Extract the chunk name prefix
+    [[ "$js_basename" =~ ^([a-zA-Z0-9_-]+)-[A-Za-z0-9_-]+\.js$ ]]
+    CHUNK_PREFIX="${BASH_REMATCH[1]}"
+
+    modify_and_rename "$js_file" "$CHUNK_PREFIX" "js" "//" ""
+done
+unset IFS
+
+# 4. Update index.html with new filenames
 echo "Updating index.html with new references..."
-for i in "${!OLD_NAMES[@]}"; do
-    sed_inplace "s|${OLD_NAMES[$i]}|${NEW_NAMES[$i]}|g" "$INDEX_HTML"
+IFS='|'
+old_arr=($OLD_NAMES)
+new_arr=($NEW_NAMES)
+unset IFS
+
+for i in "${!old_arr[@]}"; do
+    sed_inplace "s|${old_arr[$i]}|${new_arr[$i]}|g" "$INDEX_HTML"
 done
 
-# 4. If this is the code-edit-image scenario, add an image
+# 5. If this is the code-edit-image scenario, add an image
 if [ "$ADD_IMAGE" = true ]; then
     IMG_DIR="$ASSETS_DIR"
     IMG_FILE="$IMG_DIR/perf-test-image-$TIMESTAMP.png"
@@ -163,9 +216,12 @@ if [ "$ADD_IMAGE" = true ]; then
     printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82' > "$IMG_FILE"
 fi
 
+# Count files modified
+FILE_COUNT=$(echo "$OLD_NAMES" | tr '|' '\n' | grep -c . || echo 0)
+
 echo "=== Vite modification complete ==="
 echo "Files affected:"
-echo "  - ${#NEW_NAMES[@]} JS files renamed and modified"
+echo "  - $FILE_COUNT JS/CSS files modified and renamed"
 echo "  - index.html updated"
 if [ "$ADD_IMAGE" = true ]; then
     echo "  - 1 image file added"
