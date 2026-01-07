@@ -74,7 +74,7 @@ jobs:
   publish:
     needs: [build-walrus-docs, build-seal-docs, build-stake-wal, build-landing-page]
     if: ${{ !cancelled() && (needs.build-walrus-docs.result == 'success' || needs.build-seal-docs.result == 'success' || needs.build-stake-wal.result == 'success' || needs.build-landing-page.result == 'success') }}
-    uses: ./.github/workflows/perf-publish-site.yml
+    uses: ./.github/workflows/perf-deploy-site.yml
     with:
       ref: ${{ inputs.ref }}
       test_sites: ${{ inputs.test_sites }}

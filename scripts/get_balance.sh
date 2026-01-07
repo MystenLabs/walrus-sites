@@ -1,7 +1,6 @@
+#!/bin/bash
 # Copyright (c) Mysten Labs, Inc.
 # SPDX-License-Identifier: Apache-2.0
-
-#!/bin/bash
 
 # Script to get SUI and WAL balances for an address
 #

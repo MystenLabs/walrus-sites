@@ -31,9 +31,6 @@ jobs:
     name: Publish Sites
     runs-on: ubuntu-ghcloud
     steps:
-      - name: Checkout workflow ref
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-
       - name: Install suiup, sui, and walrus
         run: |
           curl -sSfL https://raw.githubusercontent.com/MystenLabs/suiup/main/install.sh | sh
