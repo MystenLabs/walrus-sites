@@ -7,17 +7,14 @@ name: "Perf: Regression Tests"
 # Test sites:
 #   - walrus-docs (Docusaurus)
 #   - seal-docs (MkDocs)
-#   - stake-wal (dist-generator) - TODO
-#   - walrus-sites-landing-page (dist-generator) - TODO
+#   - stake-wal (synthetic via dist-generator)
+#   - landing-page (synthetic via dist-generator)
 #
 # Measurements (TODO):
 #   - Costs: WAL, SUI, time, memory for publish and update
 #   - Update scenarios: page edit, page edit + addition, code edit, code edit + image
 
 on:
-  push:
-    branches:
-      - sew-728-implement-docs-builder-script-walrus-docs-and-seal-docs
   workflow_dispatch:
     inputs:
       ref:
@@ -32,8 +29,8 @@ on:
           - all
           - walrus-docs
           - seal-docs
-          # - stake-wal        # TODO: implement with dist-generator
-          # - landing-page     # TODO: implement with dist-generator
+          - stake-wal
+          - landing-page
         default: all
 
 permissions:
@@ -58,16 +55,26 @@ jobs:
       seal_ref: main
       artifact_name: seal-docs-build
 
-  # TODO: Add dist-generator builds for stake-wal and landing-page
+  build-stake-wal:
+    if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'stake-wal' }}
+    uses: ./.github/workflows/perf-build-stake-wal.yml
+    with:
+      artifact_name: stake-wal-build
+
+  build-landing-page:
+    if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'landing-page' }}
+    uses: ./.github/workflows/perf-build-landing-page.yml
+    with:
+      artifact_name: landing-page-build
 
   # =============================================================================
   # Publish Phase - Sequential steps in a single job
   # =============================================================================
 
   publish:
-    needs: [build-walrus-docs, build-seal-docs]
-    if: ${{ !cancelled() && (needs.build-walrus-docs.result == 'success' || needs.build-seal-docs.result == 'success') }}
-    uses: ./.github/workflows/perf-publish-site.yml
+    needs: [build-walrus-docs, build-seal-docs, build-stake-wal, build-landing-page]
+    if: ${{ !cancelled() && (needs.build-walrus-docs.result == 'success' || needs.build-seal-docs.result == 'success' || needs.build-stake-wal.result == 'success' || needs.build-landing-page.result == 'success') }}
+    uses: ./.github/workflows/perf-deploy-site.yml
     with:
       ref: ${{ inputs.ref }}
       test_sites: ${{ inputs.test_sites }}
@@ -79,7 +86,7 @@ jobs:
   # =============================================================================
 
   summary:
-    needs: [build-walrus-docs, build-seal-docs, publish]
+    needs: [build-walrus-docs, build-seal-docs, build-stake-wal, build-landing-page, publish]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
@@ -91,5 +98,6 @@ jobs:
           echo "|------|-------|---------|" >> $GITHUB_STEP_SUMMARY
           echo "| walrus-docs | ${{ needs.build-walrus-docs.result }} | ${{ needs.publish.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| seal-docs | ${{ needs.build-seal-docs.result }} | ${{ needs.publish.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| stake-wal | ${{ needs.build-stake-wal.result }} | ${{ needs.publish.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| landing-page | ${{ needs.build-landing-page.result }} | ${{ needs.publish.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "TODO: Add cost measurements (WAL, SUI, time, memory)" >> $GITHUB_STEP_SUMMARY

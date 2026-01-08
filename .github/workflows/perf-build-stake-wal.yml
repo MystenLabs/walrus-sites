@@ -1,0 +1,100 @@
+name: "Perf: Build Stake-WAL"
+
+# Reusable workflow to generate a synthetic site mimicking stake-wal for performance testing.
+# Uses generate_synthetic_site.sh to create files matching the real site's profile.
+#
+# Real stake-wal site profile (28 files, ~2.6 MB total):
+#   Root: index.html (446 B), favicon.svg (13 KB), ws-resources.json (236 B)
+#   Assets: JS (1.2 MB, 85 KB, 26 KB, 6.6 KB), CSS (71 KB), SVG (44 KB)
+#   Fonts: 22 woff/woff2 files (39-78 KB each)
+
+on:
+  workflow_call:
+    inputs:
+      artifact_name:
+        description: "Name for the uploaded build artifact"
+        required: false
+        type: string
+        default: "stake-wal-build"
+    outputs:
+      artifact_name:
+        description: "Name of the uploaded artifact containing the build"
+        value: ${{ jobs.build.outputs.artifact_name }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Stake-WAL (synthetic)
+    runs-on: ubuntu-latest
+    outputs:
+      artifact_name: ${{ inputs.artifact_name }}
+    steps:
+      - name: Checkout walrus-sites repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Generate synthetic site mimicking stake-wal
+        run: |
+          ./scripts/generate_synthetic_site.sh \
+            --output-dir ./stake-wal-site \
+            --file index.html:446 \
+            --file favicon.svg:13312 \
+            --file assets/index-AaBbCc1x.js:1228800 \
+            --file assets/index-BbCcDd2y.js:87040 \
+            --file assets/index-CcDdEe3z.css:72704 \
+            --file assets/nodeOps-DdEeFf4a.js:26624 \
+            --file assets/useStorage-EeFfGg5b.js:6758 \
+            --file assets/staked-bg-FfGgHh6c.svg:45056 \
+            --file assets/mondwest-bold-GgHhIi7d.woff2:62464 \
+            --file assets/mondwest-regular-HhIiJj8e.woff2:60416 \
+            --file assets/neue-mtl-bold-IiJjKk9f.woff2:43008 \
+            --file assets/neue-mtl-book-JjKkLl0g.woff2:45056 \
+            --file assets/neue-mtl-italic-KkLlMm1h.woff2:43008 \
+            --file assets/neue-mtl-medium-LlMmNn2i.woff2:46080 \
+            --file assets/neue-mtl-semi-MmNnOo3j.woff2:48128 \
+            --file assets/neue-mtl-thin-NnOoPp4k.woff2:41984 \
+            --file assets/neuebit-bold-OoPpQq5l.woff2:47104 \
+            --file assets/neuebit-regular-PpQqRr6m.woff2:39936 \
+            --file assets/mondwest-bold-QqRrSs7n.woff:79872 \
+            --file assets/mondwest-regular-RrSsTt8o.woff:76800 \
+            --file assets/neue-mtl-bold-SsTtUu9p.woff:61440 \
+            --file assets/neue-mtl-book-TtUuVv0q.woff:62464 \
+            --file assets/neue-mtl-italic-UuVvWw1r.woff:61440 \
+            --file assets/neue-mtl-medium-VvWwXx2s.woff:64512 \
+            --file assets/neue-mtl-semi-WwXxYy3t.woff:66560 \
+            --file assets/neue-mtl-thin-XxYyZz4u.woff:59392 \
+            --file assets/neuebit-bold-YyZzAa5v.woff:59392 \
+            --file assets/neuebit-regular-ZzAaBb6w.woff:50176
+
+      - name: Create ws-resources.json
+        run: |
+          cat > ./stake-wal-site/ws-resources.json << 'EOF'
+          {
+            "headers": {
+              "/index.html": {
+                "Cache-Control": "max-age=10"
+              }
+            },
+            "routes": {
+              "/*": "/index.html"
+            },
+            "site_name": "Stake WAL (synthetic)"
+          }
+          EOF
+
+      - name: List generated files
+        run: |
+          echo "Root files:"
+          ls -la ./stake-wal-site
+          echo ""
+          echo "Asset files:"
+          ls -la ./stake-wal-site/assets
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: stake-wal-site
+          retention-days: 1
+          if-no-files-found: error
