@@ -15,10 +15,6 @@ name: "Perf: Regression Tests"
 #   - Update scenarios: page edit, page edit + addition, code edit, code edit + image
 
 on:
-  push:
-    branches:
-      - sew-728-implement-docs-builder-script-walrus-docs-and-seal-docs
-      - sew-729-implement-script-that-uses-dist-generator-with-stake-wal-and
   workflow_dispatch:
     inputs:
       ref:
@@ -78,7 +74,7 @@ jobs:
   publish:
     needs: [build-walrus-docs, build-seal-docs, build-stake-wal, build-landing-page]
     if: ${{ !cancelled() && (needs.build-walrus-docs.result == 'success' || needs.build-seal-docs.result == 'success' || needs.build-stake-wal.result == 'success' || needs.build-landing-page.result == 'success') }}
-    uses: ./.github/workflows/perf-publish-site.yml
+    uses: ./.github/workflows/perf-deploy-site.yml
     with:
       ref: ${{ inputs.ref }}
       test_sites: ${{ inputs.test_sites }}
@@ -105,4 +101,3 @@ jobs:
           echo "| stake-wal | ${{ needs.build-stake-wal.result }} | ${{ needs.publish.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| landing-page | ${{ needs.build-landing-page.result }} | ${{ needs.publish.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "TODO: Add cost measurements (WAL, SUI, time, memory)" >> $GITHUB_STEP_SUMMARY
