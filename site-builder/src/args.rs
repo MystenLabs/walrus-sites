@@ -415,7 +415,15 @@ pub struct WalrusStoreOptions {
     /// (non-deletable)
     #[arg(long, action = clap::ArgAction::SetTrue)]
     pub permanent: bool,
-    /// Perform a dry run (you'll be asked for confirmation before committing changes).
+    /// Perform a dry run to test and estimate costs before executing transactions.
+    ///
+    /// This is a four-step process:
+    /// Step 1: Dry-run quilts computation and storage (outputs FROST storage costs)
+    /// Step 2: If confirmed, commit quilts to Walrus (deducts FROST fees)
+    /// Step 3: Build and inspect SUI transactions (outputs SUI execution gas costs)
+    /// Step 4: If confirmed, execute transactions on SUI (deducts SUI fees)
+    ///
+    /// Existing quilts are reused automatically without additional FROST spending.
     #[arg(long)]
     pub dry_run: bool,
     /// Limits the max total size of all the files stored per Quilt.
