@@ -43,8 +43,8 @@ jobs:
             --file assets/index-AaBbCc1x.js:1228800 \
             --file assets/index-BbCcDd2y.js:87040 \
             --file assets/index-CcDdEe3z.css:72704 \
-            --file assets/node-ops-DdEeFf4a.js:26624 \
-            --file assets/use-storage-EeFfGg5b.js:6758 \
+            --file assets/nodeOps-DdEeFf4a.js:26624 \
+            --file assets/useStorage-EeFfGg5b.js:6758 \
             --file assets/staked-bg-FfGgHh6c.svg:45056 \
             --file assets/mondwest-bold-GgHhIi7d.woff2:62464 \
             --file assets/mondwest-regular-HhIiJj8e.woff2:60416 \
