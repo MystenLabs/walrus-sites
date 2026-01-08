@@ -22,6 +22,7 @@
 #   <prefix>_sui_cost_human - SUI cost in human readable format
 #   <prefix>_wal_cost_human - WAL cost in human readable format
 #   <prefix>_peak_memory_mb - Peak memory usage in MB
+#   <prefix>_user_cpu_time  - User CPU time in seconds (excludes I/O wait)
 #   <prefix>_site_id        - Site object ID (if ws-resources.json exists)
 #
 # Examples:
@@ -103,12 +104,14 @@ START_TIME=$(date +%s.%N)
 END_TIME=$(date +%s.%N)
 OP_TIME=$(echo "$END_TIME - $START_TIME" | bc)
 
-# Extract peak memory (in KB) from time output
+# Extract metrics from GNU time output
 PEAK_MEMORY_KB=$(grep "Maximum resident set size" "$TIME_OUTPUT_FILE" | awk '{print $NF}')
 PEAK_MEMORY_MB=$((PEAK_MEMORY_KB / 1024))
+USER_CPU_TIME=$(grep "User time (seconds)" "$TIME_OUTPUT_FILE" | awk '{print $NF}')
 
 echo "Duration: ${OP_TIME}s"
 echo "Peak memory: ${PEAK_MEMORY_MB} MB"
+echo "User CPU time: ${USER_CPU_TIME}s"
 
 # Get balance after
 echo "Getting balance after operation..."
@@ -132,6 +135,7 @@ fi
 echo ""
 echo "=== Results ==="
 echo "Time: ${OP_TIME}s"
+echo "User CPU time: ${USER_CPU_TIME}s"
 echo "Peak memory: ${PEAK_MEMORY_MB} MB"
 echo "SUI: $SUI_COST_HUMAN ($SUI_COST MIST)"
 echo "WAL: $WAL_COST_HUMAN ($WAL_COST units)"
@@ -140,6 +144,7 @@ echo "WAL: $WAL_COST_HUMAN ($WAL_COST units)"
 # Write to GitHub Actions output if GITHUB_OUTPUT is set
 if [ -n "$GITHUB_OUTPUT" ]; then
     echo "${OUTPUT_PREFIX}_time=$OP_TIME" >> "$GITHUB_OUTPUT"
+    echo "${OUTPUT_PREFIX}_user_cpu_time=$USER_CPU_TIME" >> "$GITHUB_OUTPUT"
     echo "${OUTPUT_PREFIX}_peak_memory_mb=$PEAK_MEMORY_MB" >> "$GITHUB_OUTPUT"
     echo "${OUTPUT_PREFIX}_sui_cost=$SUI_COST" >> "$GITHUB_OUTPUT"
     echo "${OUTPUT_PREFIX}_wal_cost=$WAL_COST" >> "$GITHUB_OUTPUT"
