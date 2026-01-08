@@ -94,22 +94,19 @@ BEFORE_JSON=$("$SCRIPT_DIR/get_balance.sh" --json)
 BEFORE_SUI=$(echo "$BEFORE_JSON" | jq -r '.sui.balance')
 BEFORE_WAL=$(echo "$BEFORE_JSON" | jq -r '.wal.balance')
 
-# Run site-builder with timing and memory tracking
-# /usr/bin/time -v outputs stats to stderr, so we capture stderr to a temp file
+# Run site-builder with GNU time for metrics (time, memory, CPU)
 TIME_OUTPUT_FILE=$(mktemp)
 trap "rm -f $TIME_OUTPUT_FILE" EXIT
 
-START_TIME=$(date +%s.%N)
 /usr/bin/time -v ./target/release/site-builder --context "$CONTEXT" --gas-budget "$GAS_BUDGET" "${SITE_BUILDER_ARGS[@]}" 2> >(tee "$TIME_OUTPUT_FILE" >&2)
-END_TIME=$(date +%s.%N)
-OP_TIME=$(echo "$END_TIME - $START_TIME" | bc)
 
-# Extract metrics from GNU time output
+# Extract all metrics from GNU time output
+OP_TIME=$(grep "Elapsed (wall clock) time" "$TIME_OUTPUT_FILE" | awk '{print $NF}')
 PEAK_MEMORY_KB=$(grep "Maximum resident set size" "$TIME_OUTPUT_FILE" | awk '{print $NF}')
 PEAK_MEMORY_MB=$((PEAK_MEMORY_KB / 1024))
 USER_CPU_TIME=$(grep "User time (seconds)" "$TIME_OUTPUT_FILE" | awk '{print $NF}')
 
-echo "Duration: ${OP_TIME}s"
+echo "Duration: ${OP_TIME}"
 echo "Peak memory: ${PEAK_MEMORY_MB} MB"
 echo "User CPU time: ${USER_CPU_TIME}s"
 
@@ -134,7 +131,7 @@ fi
 # Output results
 echo ""
 echo "=== Results ==="
-echo "Time: ${OP_TIME}s"
+echo "Time: ${OP_TIME}"
 echo "User CPU time: ${USER_CPU_TIME}s"
 echo "Peak memory: ${PEAK_MEMORY_MB} MB"
 echo "SUI: $SUI_COST_HUMAN ($SUI_COST MIST)"

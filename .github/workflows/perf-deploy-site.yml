@@ -236,8 +236,8 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
 
           echo "### Deploy Costs" >> $GITHUB_STEP_SUMMARY
-          echo "| Site | Time (s) | User CPU (s) | Peak Memory (MB) | SUI Cost | WAL Cost |" >> $GITHUB_STEP_SUMMARY
-          echo "|------|----------|--------------|------------------|----------|----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Site | Time | User CPU (s) | Peak Memory (MB) | SUI Cost | WAL Cost |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|------|--------------|------------------|----------|----------|" >> $GITHUB_STEP_SUMMARY
 
           [ -n "${{ steps.deploy_walrus_docs.outputs.walrus_docs_deploy_sui_cost_human }}" ] && \
             echo "| walrus-docs | ${{ steps.deploy_walrus_docs.outputs.walrus_docs_deploy_time }} | ${{ steps.deploy_walrus_docs.outputs.walrus_docs_deploy_user_cpu_time }} | ${{ steps.deploy_walrus_docs.outputs.walrus_docs_deploy_peak_memory_mb }} | ${{ steps.deploy_walrus_docs.outputs.walrus_docs_deploy_sui_cost_human }} SUI | ${{ steps.deploy_walrus_docs.outputs.walrus_docs_deploy_wal_cost_human }} WAL |" >> $GITHUB_STEP_SUMMARY || true
@@ -253,8 +253,8 @@ jobs:
 
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Update Costs" >> $GITHUB_STEP_SUMMARY
-          echo "| Site | Scenario | Time (s) | User CPU (s) | Peak Memory (MB) | SUI Cost | WAL Cost |" >> $GITHUB_STEP_SUMMARY
-          echo "|------|----------|----------|--------------|------------------|----------|----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Site | Scenario | Time | User CPU (s) | Peak Memory (MB) | SUI Cost | WAL Cost |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|----------|------|--------------|------------------|----------|----------|" >> $GITHUB_STEP_SUMMARY
 
           [ -n "${{ steps.update_walrus_docs.outputs.walrus_docs_update_sui_cost_human }}" ] && \
             echo "| walrus-docs | page-edit | ${{ steps.update_walrus_docs.outputs.walrus_docs_update_time }} | ${{ steps.update_walrus_docs.outputs.walrus_docs_update_user_cpu_time }} | ${{ steps.update_walrus_docs.outputs.walrus_docs_update_peak_memory_mb }} | ${{ steps.update_walrus_docs.outputs.walrus_docs_update_sui_cost_human }} SUI | ${{ steps.update_walrus_docs.outputs.walrus_docs_update_wal_cost_human }} WAL |" >> $GITHUB_STEP_SUMMARY || true
