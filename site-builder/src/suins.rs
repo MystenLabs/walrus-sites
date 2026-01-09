@@ -10,7 +10,6 @@ use crate::{
     retry_client::RetriableSuiClient,
     site::contracts::{self, TypeOriginMap},
     types::{Domain, NameRecord},
-    util::type_origin_map_for_package,
 };
 
 /// A static config containing the SuiNS addresses for testnet and mainnet.
@@ -75,7 +74,7 @@ impl SuiNsClient {
         suins_object_id: ObjectID,
         package_id: ObjectID,
     ) -> Result<Self> {
-        let type_map = type_origin_map_for_package(&client, package_id).await?;
+        let type_map = client.type_origin_map_for_package(package_id).await?;
         Ok(Self {
             client,
             suins_object_id,

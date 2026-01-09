@@ -137,7 +137,8 @@ async fn publish_quilts_lots_of_identical_files() -> anyhow::Result<()> {
 
     let n_shards = cluster.cluster_state.walrus_cluster.n_shards;
     let n_files_per_dir =
-        (u16::from(walrus_core::encoding::source_symbols_for_n_shards(n_shards).1) as usize - 1)
+        (u16::from(walrus_sdk::core::encoding::source_symbols_for_n_shards(n_shards).1) as usize
+            - 1)
             * 10; // 10 is arbitrary
 
     let temp_dir = tempfile::tempdir()?;
@@ -359,7 +360,7 @@ async fn publish_quilts_with_two_large_files() -> anyhow::Result<()> {
 
     let mut cluster = TestSetup::start_local_test_cluster().await?;
     let n_shards = cluster.cluster_state.walrus_cluster.n_shards;
-    let (n_rows, n_cols) = walrus_core::encoding::source_symbols_for_n_shards(n_shards);
+    let (n_rows, n_cols) = walrus_sdk::core::encoding::source_symbols_for_n_shards(n_shards);
     // n_rows x (n_cols - index_cols) * MAX_SYMBOL_SIZE - QUILT_PATCH_OVERHEAD
     // where QUILT_PATCH_OVERHEAD is the MAX_IDENTIFIER_SIZE + the constant overhead (6 for
     // BLOB_HEADER and 2 for encoding the identifier length)
