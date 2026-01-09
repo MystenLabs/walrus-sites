@@ -20,7 +20,7 @@ use flate2::{write::GzEncoder, Compression};
 use itertools::Itertools;
 use move_core_types::u256::U256;
 
-use super::SiteData;
+use super::{grouping::group_by_size, SiteData};
 use crate::{
     args::{EpochArg, ResourcePaths},
     display,
@@ -600,7 +600,26 @@ impl ResourceManager {
         dry_run: bool,
         max_quilt_size: ByteSize,
     ) -> anyhow::Result<ResourceSet> {
-        let chunks = self.quilts_chunkify(resource_file_inputs, max_quilt_size)?;
+        // Group resources by size for optimal quilt packing.
+        // This prevents small files from being penalized by large files'
+        // column allocation overhead in Walrus quilt encoding.
+        let size_groups = group_by_size(resource_file_inputs, |(data, _)| {
+            ByteSize::b(data.unencoded_size as u64)
+        });
+
+        tracing::debug!(
+            num_size_groups = size_groups.len(),
+            "Grouped resources by size for quilt packing"
+        );
+
+        // Process each size group through quilts_chunkify separately.
+        // Files from different size buckets will end up in different quilts.
+        let mut chunks = Vec::new();
+        for (group_idx, group) in size_groups.into_iter().enumerate() {
+            tracing::debug!(group_idx, num_files = group.len(), "Processing size group");
+            let group_chunks = self.quilts_chunkify(group, max_quilt_size)?;
+            chunks.extend(group_chunks);
+        }
 
         if dry_run {
             let mut total_storage_cost = 0;
