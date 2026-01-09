@@ -80,3 +80,10 @@ repos:
     language: rust
     files: ^(site-builder/|Cargo\.(toml|lock)$)
     pass_filenames: false
+  - id: prettier
+    name: prettier
+    entry: sh -c 'cd ts-sdk && bunx prettier --write "${@#ts-sdk/}"' --
+    language: system
+    types_or: [javascript, jsx, ts, tsx, css, scss, less, json, yaml, markdown, html]
+    files: ^ts-sdk/
+    pass_filenames: true
