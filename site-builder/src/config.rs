@@ -5,7 +5,7 @@
 
 use std::{collections::HashMap, path::Path};
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use sui_sdk::wallet_context::WalletContext;
 use sui_types::base_types::ObjectID;
@@ -73,18 +73,15 @@ impl Config {
         path: impl AsRef<Path>,
         context: Option<&str>,
     ) -> Result<(Self, Option<String>)> {
-        let config_content = std::fs::read_to_string(path.as_ref()).map_err(|e| {
-            anyhow!(
-                "could not read site builder config file '{}': {e}",
+        let config_content = std::fs::read_to_string(path.as_ref()).context(format!(
+            "could not read site builder config file '{}'",
+            path.as_ref().display()
+        ))?;
+        let multi_config =
+            serde_yaml::from_str::<MultiConfig>(&config_content).context(format!(
+                "could not parse site builder config file '{}'",
                 path.as_ref().display()
-            )
-        })?;
-        let multi_config = serde_yaml::from_str::<MultiConfig>(&config_content).map_err(|e| {
-            anyhow!(
-                "could not parse site builder config file '{}': {e}",
-                path.as_ref().display()
-            )
-        })?;
+            ))?;
 
         match multi_config {
             MultiConfig::SingletonConfig(config) => {
