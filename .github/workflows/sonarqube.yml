@@ -1,0 +1,34 @@
+name: sonarqube
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+jobs:
+  sonarqube:
+    name: SonarQube
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+      - uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+      - name: Run coverage
+        working-directory: portal/common
+        run: |
+          bun install
+          bun run coverage
+      - name: Debug lcov
+        run: |
+          ls -lh portal/common/coverage/
+          head -20 portal/common/coverage/lcov.info
+      - name: Fix lcov.info relative paths to match the project root
+        run: |
+          sed -i 's|SF:../lib/src/|SF:portal/common/lib/src/|g' portal/common/coverage/lcov.info
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@2500896589ef8f7247069a56136f8dc177c27ccf # v5.2.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

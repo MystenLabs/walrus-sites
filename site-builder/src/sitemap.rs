@@ -22,7 +22,7 @@ use crate::{
     retry_client::RetriableSuiClient,
     site::{RemoteSiteFactory, SiteData},
     types::Staking,
-    util::{get_staking_object, type_origin_map_for_package},
+    util::{get_owned_blobs, get_staking_object, parse_quilt_patch_id},
     walrus::{output::SuiBlob, types::BlobId},
 };
 
@@ -78,20 +78,12 @@ async fn get_site_resources_and_blobs(
     site_object_id: ObjectID,
 ) -> Result<(SiteData, HashMap<BlobId, SuiBlob>)> {
     // Get all the blobs owned by the owner.
-    let type_map = type_origin_map_for_package(
-        sui_client,
-        config.general.walrus_package.ok_or(anyhow!(
-            "no walrus package specified; please add it to the config or \
-            pass it with `--walrus-package`"
-        ))?,
-    )
-    .await?;
-
-    let owned_blobs = sui_client
-        .get_owned_objects_of_type::<SuiBlob>(owner_address, &type_map, &[])
+    let walrus_package = config.general.resolve_walrus_package(sui_client).await?;
+    let owned_blobs = get_owned_blobs(sui_client, walrus_package, owner_address)
         .await?
-        .map(|blob| (blob.blob_id, blob))
-        .collect::<HashMap<_, _>>();
+        .into_iter()
+        .map(|(blob_id, (sui_blob, _obj_ref))| (blob_id, sui_blob))
+        .collect();
 
     let site = RemoteSiteFactory::new(sui_client, config.package)
         .await?
@@ -101,7 +93,7 @@ async fn get_site_resources_and_blobs(
     Ok((site, owned_blobs))
 }
 
-struct SiteMapTable(Vec<(String, BlobId, Option<ObjectID>, Option<NaiveDate>)>);
+struct SiteMapTable(Vec<(String, String, Option<ObjectID>, Option<NaiveDate>)>);
 
 impl SiteMapTable {
     fn new(
@@ -135,7 +127,21 @@ impl SiteMapTable {
                 )
             });
 
-            data.push((info.path.clone(), info.blob_id, blob_object_id, expiration));
+            if let Some(quilt_patch_id) = parse_quilt_patch_id(&info.blob_id, &info.headers) {
+                data.push((
+                    info.path.clone(),
+                    quilt_patch_id.to_string(),
+                    blob_object_id,
+                    expiration,
+                ));
+            } else {
+                data.push((
+                    info.path.clone(),
+                    info.blob_id.to_string(),
+                    blob_object_id,
+                    expiration,
+                ));
+            }
         });
 
         Self(data)
@@ -159,7 +165,7 @@ impl SiteMapTable {
 
         let mut titles = row![
             b->"Resource path",
-            b->"Blob ID",
+            b->"Blob / Quilt Patch ID",
         ];
         let has_blob_id = self
             .0

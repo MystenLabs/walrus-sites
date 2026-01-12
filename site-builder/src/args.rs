@@ -3,18 +3,15 @@
 
 //! Arguments for the site builder CLI.
 
-use std::{
-    num::{NonZeroU32, NonZeroUsize},
-    path::PathBuf,
-    str::FromStr,
-    time::SystemTime,
-};
+use std::{num::NonZeroU32, path::PathBuf, str::FromStr, time::SystemTime};
 
-use anyhow::{anyhow, ensure, Result};
+use anyhow::{anyhow, bail, ensure, Result};
+use bytesize::ByteSize;
 use clap::{ArgGroup, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use sui_sdk::wallet_context::WalletContext;
 use sui_types::base_types::{ObjectID, SuiAddress};
+pub use walrus_sdk::sui::client::contract_config::ContractConfig as WalrusContractConfig;
 
 use crate::{
     retry_client::RetriableSuiClient,
@@ -22,6 +19,10 @@ use crate::{
     util::load_wallet_context,
     walrus::output::EpochCount,
 };
+
+#[cfg(test)]
+#[path = "unit_tests/args.tests.rs"]
+mod args_tests;
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
@@ -134,6 +135,33 @@ impl GeneralArgs {
             self.wallet_address.as_ref(),
         )
     }
+
+    pub fn walrus_config(&self) -> Result<WalrusContractConfig> {
+        let client_config = walrus_sdk::config::load_configuration(
+            self.walrus_config.as_ref(),
+            self.walrus_context.as_deref(),
+        )?;
+        Ok(client_config.contract_config)
+    }
+
+    /// Resolves the walrus package ID.
+    ///
+    /// Returns `walrus_package` if provided, otherwise loads the walrus config file
+    /// and extracts the original package ID from the staking object.
+    pub async fn resolve_walrus_package(
+        &self,
+        sui_client: &RetriableSuiClient,
+    ) -> Result<ObjectID> {
+        match self.walrus_package {
+            Some(pkg) => Ok(pkg),
+            None => {
+                let walrus_config = self.walrus_config()?;
+                sui_client
+                    .get_object_original_package(walrus_config.staking_object)
+                    .await
+            }
+        }
+    }
 }
 
 macro_rules! merge {
@@ -217,8 +245,7 @@ impl ObjectIdOrName {
                     Ok(object_id)
                 } else {
                     Err(anyhow!(
-                        "the SuiNS name ({}) provided does not point to any object",
-                        domain
+                        "the SuiNS name ({domain}) provided does not point to any object"
                     ))
                 }
             }
@@ -256,29 +283,6 @@ pub enum Commands {
         /// If this is provided, it will override the object ID in the ws-resources.json file.
         #[arg(short, long)]
         object_id: Option<ObjectID>,
-        /// Watch the site directory for changes and automatically redeploy when files are modified.
-        ///
-        /// When enabled, the command will continuously monitor the site directory and trigger a
-        /// redepoloyment whenever changes are detected, allowing for rapid development iteration.
-        #[arg(short, long)]
-        watch: bool,
-        /// Checks and extends all blobs in an existing site during an update.
-        ///
-        /// With this flag, the site-builder will force a check of the status of all the Walrus
-        /// blobs composing the site, and will extend the ones that expire before `--epochs` epochs.
-        /// This is useful to ensure all the resources in the site are available for the same
-        /// amount of epochs.
-        ///
-        /// Further, when this flag is set, _missing_ blobs will also be reuploaded (e.g., in case
-        /// they were deleted, or are all expired and were not owned, or, in case of testnet, the
-        /// network was wiped).
-        ///
-        /// Without this flag, when updating a site, the `deploy` command will only create new blobs
-        /// for the resources that have been added or modified (compared to the object on Sui).
-        /// This implies that successive updates (without --check-extend) may result in the site
-        /// having resources with different expiration times (and possibly some that are expired).
-        #[arg(long)]
-        check_extend: bool,
     },
     /// Publish a new site on Sui.
     Publish {
@@ -288,52 +292,14 @@ pub enum Commands {
         #[arg(short, long)]
         site_name: Option<String>,
     },
-    /// Publish a new site on Sui using Quilts
-    #[cfg(feature = "quilts-experimental")]
-    PublishQuilts {
-        #[clap(flatten)]
-        publish_options: PublishOptions,
-        /// The name of the site.
-        #[arg(short, long)]
-        site_name: Option<String>,
-    },
     /// Update an existing site.
+    /// If the update epoch is larger than the site-expiration epoch, all Quilts are extended to the
+    /// new update epoch.
     Update {
         #[clap(flatten)]
         publish_options: PublishOptions,
         /// The object ID of a partially published site to be completed.
         object_id: ObjectID,
-        /// Watch the site directory for changes and automatically redeploy when files are modified.
-        ///
-        /// When enabled, the command will continuously monitor the site directory and trigger a
-        /// redepoloyment whenever changes are detected, allowing for rapid development iteration.
-        #[arg(short, long)]
-        watch: bool,
-        /// This flag is deprecated and will be removed in the future. Use --check-extend.
-        ///
-        /// Publish all resources to Sui and Walrus, even if they may be already present.
-        /// This can be useful in case the Walrus devnet is reset, but the resources are still
-        /// available on Sui.
-        #[arg(long)]
-        #[deprecated(note = "This flag is being removed; please use --check-extend")]
-        force: bool,
-        /// Checks and extends all blobs in the site during the update.
-        ///
-        /// With this flag, the site-builder will force a check of the status of all the Walrus
-        /// blobs composing the site, and will extend the ones that expire before `--epochs` epochs.
-        /// This is useful to ensure all the resources in the site are available for the same
-        /// amount of epochs.
-        ///
-        /// Further, when this flag is set, _missing_ blobs will also be reuploaded (e.g., in case
-        /// they were deleted, or are all expired and were not owned, or, in case of testnet, the
-        /// network was wiped).
-        ///
-        /// Without this flag, the `update` command will only create new blobs for the resources
-        /// that have been added or modified (compared to the object on Sui). This implies that
-        /// successive updates (without --check-extend) may result in the site having resources
-        /// with different expiration times (and possibly some that are expired).
-        #[arg(long)]
-        check_extend: bool,
     },
     /// Convert an object ID in hex format to the equivalent Base36 format.
     ///
@@ -357,25 +323,40 @@ pub enum Commands {
     /// Preprocess the directory, creating and linking index files.
     /// This command allows to publish directories as sites. Warning: Rewrites all `index.html`
     /// files.
-    ListDirectory { path: PathBuf },
+    ListDirectory {
+        path: PathBuf,
+        /// Path to the `ws-resources.json` file.
+        /// Tip: Use the `ignore` field in `ws-resources.json` to exclude files and
+        /// directories from list-directory output.
+        ws_resources: Option<PathBuf>,
+    },
     /// Completely destroys the site at the given object id.
     ///
     /// Removes all resources and routes, and destroys the site, returning the Sui storage rebate to
     /// the owner. Warning: this action is irreversible! Re-publishing the site will generate a
     /// different Site object ID.
     Destroy { object: ObjectID },
-    /// Adds or updates a single resource in a site, eventually replacing any pre-existing ones.
+    /// Adds or updates one or more resources in a site, eventually replacing any pre-existing ones.
+    ///
+    /// Multiple resources can be updated in a single command, and will be grouped into Quilts
+    /// for efficient storage on the Walrus network.
     ///
     /// The ws_resource file will still be used to determine the resource's headers.
-    UpdateResource {
-        /// The path to the resource to be added.
-        #[arg(long)]
-        resource: PathBuf,
-        /// The path the resource should have in the site.
+    UpdateResources {
+        /// Resources to add or update, specified as 'local_path:site_path' pairs.
         ///
-        /// Should be in the form `/path/to/resource.html`, with a leading `/`.
-        #[arg(long)]
-        path: String,
+        /// Each resource is specified in the format 'local_path:site_path', where:
+        /// - local_path: The path to the resource file on your local filesystem
+        /// - site_path: The path the resource should have in the site (with a leading '/')
+        ///
+        /// Multiple resources can be provided separated by spaces. If a path contains a literal
+        /// colon, escape it with a backslash: 'file\:name.html:/site/path.html'.
+        ///
+        /// Examples:
+        ///   --resources ./index.html:/index.html ./style.css:/assets/style.css
+        ///   --resources "my file.html:/my-file.html" image.jpg:/image.jpg
+        #[arg(long, num_args = 1.., required = true)]
+        resources: Vec<ResourcePaths>,
         /// The object ID of the Site object on Sui, to which the resource will be added.
         #[arg(long)]
         site_object: ObjectID,
@@ -383,6 +364,46 @@ pub enum Commands {
         #[clap(flatten)]
         common: WalrusStoreOptions,
     },
+}
+
+/// (file-path, url-path)
+#[derive(Clone, Debug)]
+pub struct ResourcePaths {
+    pub file_path: PathBuf,
+    pub url_path: String,
+}
+
+impl FromStr for ResourcePaths {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> anyhow::Result<Self> {
+        let parts: Vec<&str> = s.split(':').collect();
+
+        // Handle escaped colons specifically
+        let merged = parts
+            .iter()
+            .fold(Vec::new(), |mut acc: Vec<String>, &part| {
+                if let Some(last) = acc.last_mut() {
+                    if last.ends_with('\\') {
+                        last.pop();
+                        last.push(':');
+                        last.push_str(part);
+                        return acc;
+                    }
+                }
+                acc.push(part.to_string());
+                acc
+            });
+
+        if merged.len() != 2 {
+            bail!("Expected 'local:site', got '{s}'");
+        }
+
+        Ok(ResourcePaths {
+            file_path: PathBuf::from(&merged[0]),
+            url_path: merged[1].clone(),
+        })
+    }
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -393,14 +414,6 @@ pub struct PublishOptions {
     /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
     #[arg(long)]
     pub list_directory: bool,
-    /// The maximum number of concurrent calls to the Walrus CLI for the computation of blob IDs.
-    #[arg(long)]
-    pub max_concurrent: Option<NonZeroUsize>,
-    /// The maximum number of blobs that can be stored concurrently.
-    ///
-    /// More blobs can be stored concurrently, but this will increase memory usage.
-    #[arg(long, default_value_t = default::max_parallel_stores())]
-    pub max_parallel_stores: NonZeroUsize,
     /// Common configurations.
     #[clap(flatten)]
     pub walrus_options: WalrusStoreOptions,
@@ -433,6 +446,16 @@ pub struct WalrusStoreOptions {
     /// Perform a dry run (you'll be asked for confirmation before committing changes).
     #[arg(long)]
     pub dry_run: bool,
+    /// Limits the max total size of all the files stored per Quilt.
+    ///
+    /// Supports both decimal (KB, MB, GB) and binary (KiB, MiB, GiB) units, or plain byte numbers.
+    /// Examples: "512MiB", "1GB", "1048576".
+    ///
+    /// Files exceeding this limit are placed alone in their own Quilt.
+    ///
+    /// Note: Larger sizes require more memory during storing and may increase storage overhead.
+    #[arg(long, default_value_t = default::max_quilt_size())]
+    pub max_quilt_size: ByteSize,
 }
 
 /// The number of epochs to store the blob for.
@@ -520,7 +543,7 @@ impl EpochCountOrMax {
 }
 
 pub mod default {
-    use std::num::NonZeroUsize;
+    use bytesize::ByteSize;
 
     pub const DEFAULT_SITE_NAME: &str = "My Walrus Site";
     pub const DEFAULT_WS_RESOURCES_FILE: &str = "ws-resources.json";
@@ -531,7 +554,7 @@ pub mod default {
     pub fn gas_budget() -> Option<u64> {
         Some(500_000_000)
     }
-    pub fn max_parallel_stores() -> NonZeroUsize {
-        NonZeroUsize::new(50).unwrap()
+    pub fn max_quilt_size() -> ByteSize {
+        ByteSize::mib(512) // 512 MiB
     }
 }

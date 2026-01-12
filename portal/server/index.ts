@@ -6,9 +6,9 @@ import blocklist_healthcheck from "src/blocklist_healthcheck";
 import CookieMonster from "src/cookie_monster";
 import { genericError } from "@lib/http/http_error_responses";
 import main from "src/main";
-import { instrumentationFacade } from "@lib/instrumentation";
 import { setupTapelog } from "custom_logger";
 import logger from "@lib/logger";
+import { QUILT_PATCH_ID_INTERNAL_HEADER } from "@lib/url_fetcher";
 
 const PORT = 3000;
 console.log("Running Bun server at port", PORT, "...")
@@ -32,7 +32,30 @@ serve({
 			CookieMonster.eatCookies(request, response)
 			return response
 		} catch (e) {
-			instrumentationFacade.bumpGenericErrors();
+			logger.error(
+				"Unexpected uncaught exception during processing request",
+				{
+					error: e,
+					// Get a subset of the request data to not include sensitive info.
+					request: {
+					  method: request.method,
+					  url: new URL(request.url).pathname, // Excludes query params
+					  headers: {
+						// Only log non-sensitive headers useful for debugging.
+						'user-agent': request.headers.get('user-agent'),
+						'content-type': request.headers.get('content-type'),
+						'range': request.headers.get('range'),
+						'accept': request.headers.get('accept'),
+						'accept-encoding': request.headers.get('accept-encoding'),
+						'if-none-match': request.headers.get('if-none-match'),
+						'if-modified-since': request.headers.get('if-modified-since'),
+						'cache-control': request.headers.get('cache-control'),
+						'origin': request.headers.get('origin'),
+						[QUILT_PATCH_ID_INTERNAL_HEADER]: request.headers.get(QUILT_PATCH_ID_INTERNAL_HEADER),
+					  },
+					},
+				}
+			);
 			return genericError()
 		}
 	}

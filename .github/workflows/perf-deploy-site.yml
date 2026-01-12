@@ -1,0 +1,288 @@
+name: "Perf: Publish Site"
+
+# Reusable workflow to publish built sites to Walrus Sites using site-builder CLI.
+# Downloads build artifacts, sets up sui/walrus toolchain, and deploys sequentially.
+# After deployment, simulates updates and measures costs.
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref (branch, tag, or commit SHA) of walrus-sites to test"
+        required: false
+        type: string
+        default: ""
+      test_sites:
+        description: "Which sites to publish (all, walrus-docs, seal-docs, stake-wal, landing-page)"
+        required: true
+        type: string
+    secrets:
+      SUI_KEYSTORE_TESTNET:
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  publish:
+    name: Publish Sites
+    runs-on: ubuntu-ghcloud
+    steps:
+      - name: Install suiup, sui, and walrus
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/MystenLabs/suiup/main/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          export PATH="$HOME/.local/bin:$PATH"
+          suiup install sui -y
+          suiup install walrus -y
+
+      - name: Setup Sui wallet from keystore
+        run: |
+          mkdir -p ~/.sui/sui_config
+          echo '${{ secrets.SUI_KEYSTORE_TESTNET }}' > ~/.sui/sui_config/sui.keystore
+          cat > ~/.sui/sui_config/client.yaml << EOF
+          keystore:
+            File: $HOME/.sui/sui_config/sui.keystore
+          envs:
+            - alias: testnet
+              rpc: "https://fullnode.testnet.sui.io:443"
+              ws: ~
+          active_env: testnet
+          active_address: "${{ vars.SUI_ADDRESS_TESTNET }}"
+          EOF
+
+      - name: Setup Walrus config
+        run: |
+          mkdir -p ~/.config/walrus
+          curl -sSL https://raw.githubusercontent.com/MystenLabs/walrus/main/setup/client_config.yaml \
+            -o ~/.config/walrus/client_config.yaml
+
+      - name: Verify wallet setup
+        run: |
+          sui client active-address
+          sui client balance
+
+      - name: Checkout site-builder ref
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          clean: false
+
+      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+
+      - name: Build site-builder
+        run: cargo build --release -p site-builder
+
+      - name: Checkout workflow ref (restore scripts)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.ref }}
+          clean: false
+
+      - name: Verify setup after checkout
+        run: |
+          echo "=== Current directory ==="
+          pwd
+          echo ""
+          echo "=== sites-config.yaml ==="
+          ls -la sites-config.yaml
+          head -20 sites-config.yaml
+          echo ""
+          echo "=== PATH ==="
+          echo "$PATH"
+          echo ""
+          echo "=== Walrus binary ==="
+          which walrus || echo "walrus not found in PATH"
+          ls -la ~/.local/bin/walrus 2>/dev/null || echo "walrus not in ~/.local/bin"
+          echo ""
+          echo "=== Walrus config ==="
+          ls -la ~/.config/walrus/ 2>/dev/null || echo "~/.config/walrus/ not found"
+          head -30 ~/.config/walrus/client_config.yaml 2>/dev/null || echo "client_config.yaml not found"
+
+      # =============================================================================
+      # walrus-docs: Docusaurus site (page-edit update scenario)
+      # =============================================================================
+      - name: Download walrus-docs artifact
+        if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'walrus-docs' }}
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: walrus-docs-build
+          path: walrus-docs-site
+
+      - name: Deploy walrus-docs
+        if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'walrus-docs' }}
+        id: deploy_walrus_docs
+        run: |
+          ./scripts/site_builder_with_cost.sh \
+            --output-prefix walrus_docs_deploy \
+            -- deploy ./walrus-docs-site --epochs 1
+
+      - name: Modify walrus-docs (page-edit)
+        if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'walrus-docs' }}
+        run: ./scripts/modify_docusaurus.sh --site-dir ./walrus-docs-site
+
+      - name: Update walrus-docs
+        if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'walrus-docs' }}
+        id: update_walrus_docs
+        run: |
+          ./scripts/site_builder_with_cost.sh \
+            --output-prefix walrus_docs_update \
+            -- update ./walrus-docs-site ${{ steps.deploy_walrus_docs.outputs.walrus_docs_deploy_site_id }} --epochs 1
+
+      # =============================================================================
+      # seal-docs: MkDocs site (page-edit-add update scenario)
+      # =============================================================================
+      - name: Download seal-docs artifact
+        if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'seal-docs' }}
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: seal-docs-build
+          path: seal-docs-site
+
+      - name: Deploy seal-docs
+        if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'seal-docs' }}
+        id: deploy_seal_docs
+        run: |
+          ./scripts/site_builder_with_cost.sh \
+            --output-prefix seal_docs_deploy \
+            -- deploy ./seal-docs-site --epochs 1
+
+      - name: Modify seal-docs (page-edit-add)
+        if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'seal-docs' }}
+        run: ./scripts/modify_mkdocs.sh --site-dir ./seal-docs-site
+
+      - name: Update seal-docs
+        if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'seal-docs' }}
+        id: update_seal_docs
+        run: |
+          ./scripts/site_builder_with_cost.sh \
+            --output-prefix seal_docs_update \
+            -- update ./seal-docs-site ${{ steps.deploy_seal_docs.outputs.seal_docs_deploy_site_id }} --epochs 1
+
+      # =============================================================================
+      # stake-wal: Vite/React app (code-edit update scenario)
+      # =============================================================================
+      - name: Download stake-wal artifact
+        if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'stake-wal' }}
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: stake-wal-build
+          path: stake-wal-site
+
+      - name: Deploy stake-wal
+        if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'stake-wal' }}
+        id: deploy_stake_wal
+        run: |
+          ./scripts/site_builder_with_cost.sh \
+            --output-prefix stake_wal_deploy \
+            -- deploy ./stake-wal-site --epochs 1
+
+      - name: Modify stake-wal (code-edit)
+        if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'stake-wal' }}
+        run: ./scripts/modify_vite.sh --site-dir ./stake-wal-site
+
+      - name: Update stake-wal
+        if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'stake-wal' }}
+        id: update_stake_wal
+        run: |
+          ./scripts/site_builder_with_cost.sh \
+            --output-prefix stake_wal_update \
+            -- update ./stake-wal-site ${{ steps.deploy_stake_wal.outputs.stake_wal_deploy_site_id }} --epochs 1
+
+      # =============================================================================
+      # landing-page: Vite/React app (code-edit-image update scenario)
+      # =============================================================================
+      - name: Download landing-page artifact
+        if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'landing-page' }}
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: landing-page-build
+          path: landing-page-site
+
+      - name: Deploy landing-page
+        if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'landing-page' }}
+        id: deploy_landing_page
+        run: |
+          ./scripts/site_builder_with_cost.sh \
+            --output-prefix landing_page_deploy \
+            -- deploy ./landing-page-site --epochs 1
+
+      - name: Modify landing-page (code-edit-image)
+        if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'landing-page' }}
+        run: ./scripts/modify_vite.sh --site-dir ./landing-page-site --add-image
+
+      - name: Update landing-page
+        if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'landing-page' }}
+        id: update_landing_page
+        run: |
+          ./scripts/site_builder_with_cost.sh \
+            --output-prefix landing_page_update \
+            -- update ./landing-page-site ${{ steps.deploy_landing_page.outputs.landing_page_deploy_site_id }} --epochs 1
+
+      # =============================================================================
+      # Cost Summary
+      # =============================================================================
+      - name: Generate cost summary
+        if: ${{ always() }}
+        run: |
+          SITE_BUILDER_REF="${{ inputs.ref || github.ref }}"
+
+          echo "## Performance Regression Test - Cost Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Site-builder ref:** \`${SITE_BUILDER_REF}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### Deploy Costs" >> $GITHUB_STEP_SUMMARY
+          echo "| Site | Time | User CPU (s) | Peak Memory (MB) | SUI Cost | WAL Cost |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|------|--------------|------------------|----------|----------|" >> $GITHUB_STEP_SUMMARY
+
+          [ -n "${{ steps.deploy_walrus_docs.outputs.walrus_docs_deploy_sui_cost_human }}" ] && \
+            echo "| walrus-docs | ${{ steps.deploy_walrus_docs.outputs.walrus_docs_deploy_time }} | ${{ steps.deploy_walrus_docs.outputs.walrus_docs_deploy_user_cpu_time }} | ${{ steps.deploy_walrus_docs.outputs.walrus_docs_deploy_peak_memory_mb }} | ${{ steps.deploy_walrus_docs.outputs.walrus_docs_deploy_sui_cost_human }} SUI | ${{ steps.deploy_walrus_docs.outputs.walrus_docs_deploy_wal_cost_human }} WAL |" >> $GITHUB_STEP_SUMMARY || true
+
+          [ -n "${{ steps.deploy_seal_docs.outputs.seal_docs_deploy_sui_cost_human }}" ] && \
+            echo "| seal-docs | ${{ steps.deploy_seal_docs.outputs.seal_docs_deploy_time }} | ${{ steps.deploy_seal_docs.outputs.seal_docs_deploy_user_cpu_time }} | ${{ steps.deploy_seal_docs.outputs.seal_docs_deploy_peak_memory_mb }} | ${{ steps.deploy_seal_docs.outputs.seal_docs_deploy_sui_cost_human }} SUI | ${{ steps.deploy_seal_docs.outputs.seal_docs_deploy_wal_cost_human }} WAL |" >> $GITHUB_STEP_SUMMARY || true
+
+          [ -n "${{ steps.deploy_stake_wal.outputs.stake_wal_deploy_sui_cost_human }}" ] && \
+            echo "| stake-wal | ${{ steps.deploy_stake_wal.outputs.stake_wal_deploy_time }} | ${{ steps.deploy_stake_wal.outputs.stake_wal_deploy_user_cpu_time }} | ${{ steps.deploy_stake_wal.outputs.stake_wal_deploy_peak_memory_mb }} | ${{ steps.deploy_stake_wal.outputs.stake_wal_deploy_sui_cost_human }} SUI | ${{ steps.deploy_stake_wal.outputs.stake_wal_deploy_wal_cost_human }} WAL |" >> $GITHUB_STEP_SUMMARY || true
+
+          [ -n "${{ steps.deploy_landing_page.outputs.landing_page_deploy_sui_cost_human }}" ] && \
+            echo "| landing-page | ${{ steps.deploy_landing_page.outputs.landing_page_deploy_time }} | ${{ steps.deploy_landing_page.outputs.landing_page_deploy_user_cpu_time }} | ${{ steps.deploy_landing_page.outputs.landing_page_deploy_peak_memory_mb }} | ${{ steps.deploy_landing_page.outputs.landing_page_deploy_sui_cost_human }} SUI | ${{ steps.deploy_landing_page.outputs.landing_page_deploy_wal_cost_human }} WAL |" >> $GITHUB_STEP_SUMMARY || true
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Update Costs" >> $GITHUB_STEP_SUMMARY
+          echo "| Site | Scenario | Time | User CPU (s) | Peak Memory (MB) | SUI Cost | WAL Cost |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|----------|------|--------------|------------------|----------|----------|" >> $GITHUB_STEP_SUMMARY
+
+          [ -n "${{ steps.update_walrus_docs.outputs.walrus_docs_update_sui_cost_human }}" ] && \
+            echo "| walrus-docs | page-edit | ${{ steps.update_walrus_docs.outputs.walrus_docs_update_time }} | ${{ steps.update_walrus_docs.outputs.walrus_docs_update_user_cpu_time }} | ${{ steps.update_walrus_docs.outputs.walrus_docs_update_peak_memory_mb }} | ${{ steps.update_walrus_docs.outputs.walrus_docs_update_sui_cost_human }} SUI | ${{ steps.update_walrus_docs.outputs.walrus_docs_update_wal_cost_human }} WAL |" >> $GITHUB_STEP_SUMMARY || true
+
+          [ -n "${{ steps.update_seal_docs.outputs.seal_docs_update_sui_cost_human }}" ] && \
+            echo "| seal-docs | page-edit-add | ${{ steps.update_seal_docs.outputs.seal_docs_update_time }} | ${{ steps.update_seal_docs.outputs.seal_docs_update_user_cpu_time }} | ${{ steps.update_seal_docs.outputs.seal_docs_update_peak_memory_mb }} | ${{ steps.update_seal_docs.outputs.seal_docs_update_sui_cost_human }} SUI | ${{ steps.update_seal_docs.outputs.seal_docs_update_wal_cost_human }} WAL |" >> $GITHUB_STEP_SUMMARY || true
+
+          [ -n "${{ steps.update_stake_wal.outputs.stake_wal_update_sui_cost_human }}" ] && \
+            echo "| stake-wal | code-edit | ${{ steps.update_stake_wal.outputs.stake_wal_update_time }} | ${{ steps.update_stake_wal.outputs.stake_wal_update_user_cpu_time }} | ${{ steps.update_stake_wal.outputs.stake_wal_update_peak_memory_mb }} | ${{ steps.update_stake_wal.outputs.stake_wal_update_sui_cost_human }} SUI | ${{ steps.update_stake_wal.outputs.stake_wal_update_wal_cost_human }} WAL |" >> $GITHUB_STEP_SUMMARY || true
+
+          [ -n "${{ steps.update_landing_page.outputs.landing_page_update_sui_cost_human }}" ] && \
+            echo "| landing-page | code-edit-image | ${{ steps.update_landing_page.outputs.landing_page_update_time }} | ${{ steps.update_landing_page.outputs.landing_page_update_user_cpu_time }} | ${{ steps.update_landing_page.outputs.landing_page_update_peak_memory_mb }} | ${{ steps.update_landing_page.outputs.landing_page_update_sui_cost_human }} SUI | ${{ steps.update_landing_page.outputs.landing_page_update_wal_cost_human }} WAL |" >> $GITHUB_STEP_SUMMARY || true
+
+      # =============================================================================
+      # Cleanup: Destroy deployed sites
+      # =============================================================================
+      - name: Destroy walrus-docs site
+        if: ${{ always() && steps.deploy_walrus_docs.outputs.walrus_docs_deploy_site_id }}
+        run: ./target/release/site-builder --context testnet destroy ${{ steps.deploy_walrus_docs.outputs.walrus_docs_deploy_site_id }}
+
+      - name: Destroy seal-docs site
+        if: ${{ always() && steps.deploy_seal_docs.outputs.seal_docs_deploy_site_id }}
+        run: ./target/release/site-builder --context testnet destroy ${{ steps.deploy_seal_docs.outputs.seal_docs_deploy_site_id }}
+
+      - name: Destroy stake-wal site
+        if: ${{ always() && steps.deploy_stake_wal.outputs.stake_wal_deploy_site_id }}
+        run: ./target/release/site-builder --context testnet destroy ${{ steps.deploy_stake_wal.outputs.stake_wal_deploy_site_id }}
+
+      - name: Destroy landing-page site
+        if: ${{ always() && steps.deploy_landing_page.outputs.landing_page_deploy_site_id }}
+        run: ./target/release/site-builder --context testnet destroy ${{ steps.deploy_landing_page.outputs.landing_page_deploy_site_id }}

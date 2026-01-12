@@ -3,8 +3,8 @@
   "description": "Central point of the walrus-sites portal workspace.",
   "workspaces": [
     "common",
-	"worker",
-	"server"
+    "worker",
+    "server"
   ],
   "keywords": ["walrus", "sui", "sui-ns", "sites"],
   "author": "Mysten Labs",
@@ -12,6 +12,7 @@
   "scripts": {
     "build:worker": "bun -F worker build:prod",
     "worker": "bun -F worker serve:prod",
-    "server": "bun -F server start"
+    "server": "bun -F server start",
+    "coverage": "bun -F common coverage"
   }
 }

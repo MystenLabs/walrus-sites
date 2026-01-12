@@ -10,10 +10,12 @@ use std::{
 
 use anyhow::{anyhow, bail};
 use move_core_types::language_storage::StructTag;
+use serde::Deserialize;
 use site_builder::{
     args::GeneralArgs,
     config::Config as SitesConfig,
     contracts,
+    contracts::AssociatedContractStruct,
     types::{ResourceDynamicField, SiteFields, SuiResource},
 };
 use sui_move_build::BuildConfig;
@@ -32,7 +34,7 @@ use sui_sdk::{
     SuiClientBuilder,
 };
 use sui_types::{
-    base_types::ObjectID,
+    base_types::{ObjectID, SuiAddress},
     programmable_transaction_builder::ProgrammableTransactionBuilder,
     quorum_driver_types::ExecuteTransactionRequestType,
     transaction::TransactionData,
@@ -44,20 +46,67 @@ use walrus_sdk::{
     client::WalrusNodeClient,
     core::{
         encoding::{quilt_encoding::QuiltStoreBlob, Primary},
+        metadata::QuiltMetadata,
         BlobId,
         QuiltPatchId,
     },
     error::ClientResult,
+    sui::{
+        client::{contract_config::ContractConfig, SuiContractClient},
+        test_utils::{
+            new_wallet_on_sui_test_cluster,
+            system_setup::SystemContext,
+            TestClusterHandle,
+        },
+        wallet::Wallet,
+    },
 };
 use walrus_service::test_utils::{test_cluster, StorageNodeHandle, TestCluster};
-use walrus_sui::{
-    client::{contract_config::ContractConfig, SuiContractClient},
-    test_utils::{new_wallet_on_sui_test_cluster, system_setup::SystemContext, TestClusterHandle},
-    wallet::Wallet,
-};
 use walrus_test_utils::WithTempDir;
 
 pub mod args_builder;
+
+// ===== Type definitions for blob epoch testing =====
+
+/// Sui object for storage resources (copied from walrus::output module).
+#[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TestStorageResource {
+    /// Object ID of the Sui object.
+    pub id: ObjectID,
+    /// The start epoch of the resource (inclusive).
+    pub start_epoch: u32,
+    /// The end epoch of the resource (exclusive).
+    pub end_epoch: u32,
+    /// The total amount of reserved storage.
+    pub storage_size: u64,
+}
+
+/// Sui object for a blob (copied from walrus::output::SuiBlob).
+#[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TestBlob {
+    /// Object ID of the Sui object.
+    pub id: ObjectID,
+    /// The epoch in which the blob has been registered.
+    pub registered_epoch: u32,
+    /// The blob ID.
+    pub blob_id: walrus_sdk::core::BlobId,
+    /// The (unencoded) size of the blob.
+    pub size: u64,
+    /// The encoding coding type used for the blob.
+    pub encoding_type: u8,
+    /// The epoch in which the blob was first certified, `None` if the blob is uncertified.
+    pub certified_epoch: Option<u32>,
+    /// The [`TestStorageResource`] used to store the blob.
+    pub storage: TestStorageResource,
+    /// Marks the blob as deletable.
+    pub deletable: bool,
+}
+
+impl AssociatedContractStruct for TestBlob {
+    const CONTRACT_STRUCT: contracts::StructTag<'static> = contracts::walrus::Blob;
+}
 
 pub struct WalrusSitesClusterState {
     pub walrus_admin_client: WithTempDir<WalrusNodeClient<SuiContractClient>>,
@@ -100,7 +149,7 @@ impl TestSetup {
         let sites_config = create_sites_config(
             test_wallet.inner.get_config_path().to_path_buf(),
             walrus_sites_package_id,
-            walrus_config.inner.1.clone(),
+            Some(walrus_config.inner.1.clone()),
         )?;
 
         Ok(TestSetup {
@@ -117,10 +166,6 @@ impl TestSetup {
             walrus_config,
             walrus_sites_package_id,
         })
-    }
-
-    pub fn sites_config_path(&self) -> &Path {
-        self.sites_config.inner.1.as_path()
     }
 
     pub async fn read_blob(&self, blob_id: &BlobId) -> ClientResult<Vec<u8>> {
@@ -153,6 +198,15 @@ impl TestSetup {
             .inner
             .quilt_client()
             .get_blobs_by_identifiers(blob_id, file_identifiers)
+            .await
+    }
+
+    pub async fn read_quilt_metadata(&self, quilt_id: &BlobId) -> ClientResult<QuiltMetadata> {
+        self.cluster_state
+            .walrus_admin_client
+            .inner
+            .quilt_client()
+            .get_quilt_metadata(quilt_id)
             .await
     }
 
@@ -233,15 +287,11 @@ impl TestSetup {
                 .map(|df| df.object_id)
                 .collect::<Vec<ObjectID>>();
 
-            // TODO: Check if we need to limit more here.
             let resource_fields = self
                 .client
                 .read_api()
-                .multi_get_object_with_options(
-                    ids,
-                    SuiObjectDataOptions::new().with_bcs().with_type(),
-                )
-                .await?; // with_type?
+                .multi_get_object_with_options(ids, SuiObjectDataOptions::new().with_bcs())
+                .await?;
 
             let mut resources_chunk = resource_fields
                 .into_iter()
@@ -270,6 +320,192 @@ impl TestSetup {
             resources.append(&mut resources_chunk);
         }
         Ok(resources)
+    }
+
+    /// Get the current Walrus epoch from the Walrus staking object.
+    pub async fn current_walrus_epoch(&self) -> anyhow::Result<u32> {
+        let staking_object = self
+            .cluster_state
+            .walrus_admin_client
+            .inner
+            .sui_client()
+            .read_client
+            .get_staking_object()
+            .await?;
+        Ok(staking_object.epoch())
+    }
+
+    /// Get the epoch duration in milliseconds from the Walrus staking object.
+    pub async fn epoch_duration_ms(&self) -> anyhow::Result<u64> {
+        let staking_object = self
+            .cluster_state
+            .walrus_admin_client
+            .inner
+            .sui_client()
+            .read_client
+            .get_staking_object()
+            .await?;
+        Ok(staking_object.epoch_duration_millis())
+    }
+
+    /// Get the epoch start timestamp from the Walrus staking object.
+    /// Returns the estimated start time of the current Walrus epoch.
+    pub async fn epoch_start_timestamp(&self) -> anyhow::Result<chrono::DateTime<chrono::Utc>> {
+        use walrus_sdk::sui::types::move_structs::EpochState;
+
+        let staking_object = self
+            .cluster_state
+            .walrus_admin_client
+            .inner
+            .sui_client()
+            .read_client
+            .get_staking_object()
+            .await?;
+
+        let epoch_state = staking_object.epoch_state();
+        let estimated_start_of_current_epoch = match epoch_state {
+            EpochState::EpochChangeDone(epoch_start)
+            | EpochState::NextParamsSelected(epoch_start) => *epoch_start,
+            EpochState::EpochChangeSync(_) => chrono::Utc::now(),
+        };
+
+        Ok(estimated_start_of_current_epoch)
+    }
+
+    /// Get blob information from a blob object ID.
+    /// Returns a `TestBlob` struct with the blob's storage information including end_epoch.
+    pub async fn get_blob_info(&self, blob_object_id: ObjectID) -> anyhow::Result<TestBlob> {
+        contracts::get_sui_object(&self.client, blob_object_id).await
+    }
+
+    /// Get all blob objects owned by the specified address.
+    /// Returns a vector of TestBlob structs with their storage information including end_epoch.
+    pub async fn get_owned_blobs(
+        &self,
+        wallet_address: SuiAddress,
+    ) -> anyhow::Result<Vec<TestBlob>> {
+        let owned_blobs = self
+            .client
+            .read_api()
+            .get_owned_objects(
+                wallet_address,
+                Some(sui_sdk::rpc_types::SuiObjectResponseQuery::new_with_filter(
+                    sui_sdk::rpc_types::SuiObjectDataFilter::StructType(StructTag {
+                        address: self.cluster_state.system_context.walrus_pkg_id.into(),
+                        module: Identifier::from_str("blob")?,
+                        name: Identifier::from_str("Blob")?,
+                        type_params: vec![],
+                    }),
+                )),
+                None,
+                None,
+            )
+            .await?;
+
+        let blob_object_ids: Vec<ObjectID> = owned_blobs
+            .data
+            .into_iter()
+            .filter_map(|obj| obj.data.map(|d| d.object_id))
+            .collect();
+
+        // Fetch full blob info for each object ID
+        let mut blobs = Vec::new();
+        for object_id in blob_object_ids {
+            let blob = self.get_blob_info(object_id).await?;
+            blobs.push(blob);
+        }
+
+        Ok(blobs)
+    }
+
+    /// Get blob object IDs that were extended via `system::extend_blob` calls.
+    ///
+    /// This queries all transactions that called `extend_blob` on the Walrus system package,
+    /// then extracts the mutated Blob object IDs from those transactions.
+    pub async fn get_extended_blob_object_ids(&self) -> anyhow::Result<Vec<ObjectID>> {
+        let walrus_pkg_id = self.cluster_state.system_context.walrus_pkg_id;
+
+        // Query transactions that called extend_blob
+        let resp = self
+            .client
+            .read_api()
+            .query_transaction_blocks(
+                SuiTransactionBlockResponseQuery::new_with_filter(
+                    TransactionFilter::MoveFunction {
+                        package: walrus_pkg_id,
+                        module: Some("system".to_string()),
+                        function: Some("extend_blob".to_string()),
+                    },
+                ),
+                None,
+                None,
+                true,
+            )
+            .await?;
+
+        let mut blob_object_ids = Vec::new();
+        let blob_struct_tag = StructTag {
+            address: walrus_pkg_id.into(),
+            module: Identifier::from_str("blob")?,
+            name: Identifier::from_str("Blob")?,
+            type_params: vec![],
+        };
+
+        for tx in resp.data {
+            let full_resp = self
+                .client
+                .read_api()
+                .get_transaction_with_options(
+                    tx.digest,
+                    SuiTransactionBlockResponseOptions::new().with_object_changes(),
+                )
+                .await?;
+
+            if let Some(changes) = full_resp.object_changes {
+                for change in changes {
+                    if let ObjectChange::Mutated {
+                        object_id,
+                        object_type,
+                        ..
+                    } = change
+                    {
+                        if object_type == blob_struct_tag {
+                            blob_object_ids.push(object_id);
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(blob_object_ids)
+    }
+
+    // ============ Convenient accessors ============
+
+    pub fn sites_config_path(&self) -> &Path {
+        self.sites_config.inner.1.as_path()
+    }
+
+    pub fn rpc_url(&self) -> anyhow::Result<String> {
+        self.wallet.inner.get_rpc_url()
+    }
+
+    pub fn wallet_active_address(&mut self) -> anyhow::Result<SuiAddress> {
+        self.wallet.inner.active_address()
+    }
+
+    /// Pauses the test and waits for user input, allowing the user to inspect the current
+    /// state (e.g., by pasting the fn-url into a Sui explorer in their browser) before continuing.
+    pub async fn wait_for_user_input(&mut self) -> anyhow::Result<()> {
+        use tokio::io::{self, AsyncBufReadExt, BufReader};
+        // Simple readline wait
+        let mut stdin = BufReader::new(io::stdin());
+        let mut line = String::new();
+        println!("FN url: {}", self.rpc_url()?);
+        println!("Wallet address: {}", self.wallet_active_address()?);
+        println!("Press Enter to continue...");
+        stdin.read_line(&mut line).await?;
+        Ok(())
     }
 }
 
@@ -322,7 +558,7 @@ async fn publish_walrus_sites(
         gas_price,
     );
 
-    let signed_tx = publisher.sign_transaction(&tx_data);
+    let signed_tx = publisher.sign_transaction(&tx_data).await;
     let resp = sui_client
         .quorum_driver_api()
         .execute_transaction_block(
@@ -388,10 +624,14 @@ pub fn create_walrus_config(
     })
 }
 
+/// Creates a sites config.
+///
+/// If `walrus_config_path` is `None`, the walrus config will be discovered from default locations
+/// (XDG_CONFIG_HOME/walrus, ~/.config/walrus, ~/.walrus).
 pub fn create_sites_config(
     wallet_path: PathBuf,
     walrus_sites_package_id: ObjectID,
-    walrus_config_path: PathBuf,
+    walrus_config_path: Option<PathBuf>,
 ) -> anyhow::Result<WithTempDir<(SitesConfig, PathBuf)>> {
     let temp_dir = TempDir::new().expect("able to create a temporary directory");
     let sites_config_path = temp_dir.path().to_path_buf().join("sites-config.yaml");
@@ -401,7 +641,7 @@ pub fn create_sites_config(
         package: walrus_sites_package_id,
         general: GeneralArgs {
             wallet: Some(wallet_path),
-            walrus_config: Some(walrus_config_path),
+            walrus_config: walrus_config_path,
             ..Default::default()
         },
         staking_object: None,

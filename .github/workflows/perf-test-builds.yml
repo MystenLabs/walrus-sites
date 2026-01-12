@@ -1,0 +1,103 @@
+name: "Perf: Regression Tests"
+
+# Orchestrator workflow for performance regression testing.
+# - Build phase: All builds run in parallel
+# - Publish phase: Sequential execution
+#
+# Test sites:
+#   - walrus-docs (Docusaurus)
+#   - seal-docs (MkDocs)
+#   - stake-wal (synthetic via dist-generator)
+#   - landing-page (synthetic via dist-generator)
+#
+# Measurements (TODO):
+#   - Costs: WAL, SUI, time, memory for publish and update
+#   - Update scenarios: page edit, page edit + addition, code edit, code edit + image
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref (branch, tag, or commit SHA) of walrus-sites to test"
+        required: false
+        default: ""
+      test_sites:
+        description: "Which sites to test"
+        required: true
+        type: choice
+        options:
+          - all
+          - walrus-docs
+          - seal-docs
+          - stake-wal
+          - landing-page
+        default: all
+
+permissions:
+  contents: read
+
+jobs:
+  # =============================================================================
+  # Build Phase - All builds run in parallel
+  # =============================================================================
+
+  build-walrus-docs:
+    if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'walrus-docs' }}
+    uses: ./.github/workflows/perf-build-walrus-docs.yml
+    with:
+      walrus_ref: main
+      artifact_name: walrus-docs-build
+
+  build-seal-docs:
+    if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'seal-docs' }}
+    uses: ./.github/workflows/perf-build-seal-docs.yml
+    with:
+      seal_ref: main
+      artifact_name: seal-docs-build
+
+  build-stake-wal:
+    if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'stake-wal' }}
+    uses: ./.github/workflows/perf-build-stake-wal.yml
+    with:
+      artifact_name: stake-wal-build
+
+  build-landing-page:
+    if: ${{ inputs.test_sites == 'all' || inputs.test_sites == 'landing-page' }}
+    uses: ./.github/workflows/perf-build-landing-page.yml
+    with:
+      artifact_name: landing-page-build
+
+  # =============================================================================
+  # Publish Phase - Sequential steps in a single job
+  # =============================================================================
+
+  publish:
+    needs: [build-walrus-docs, build-seal-docs, build-stake-wal, build-landing-page]
+    if: ${{ !cancelled() && (needs.build-walrus-docs.result == 'success' || needs.build-seal-docs.result == 'success' || needs.build-stake-wal.result == 'success' || needs.build-landing-page.result == 'success') }}
+    uses: ./.github/workflows/perf-deploy-site.yml
+    with:
+      ref: ${{ inputs.ref }}
+      test_sites: ${{ inputs.test_sites }}
+    secrets:
+      SUI_KEYSTORE_TESTNET: ${{ secrets.SUI_KEYSTORE_TESTNET }}
+
+  # =============================================================================
+  # Summary Phase
+  # =============================================================================
+
+  summary:
+    needs: [build-walrus-docs, build-seal-docs, build-stake-wal, build-landing-page, publish]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## Performance Regression Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Site | Build | Publish |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| walrus-docs | ${{ needs.build-walrus-docs.result }} | ${{ needs.publish.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| seal-docs | ${{ needs.build-seal-docs.result }} | ${{ needs.publish.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| stake-wal | ${{ needs.build-stake-wal.result }} | ${{ needs.publish.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| landing-page | ${{ needs.build-landing-page.result }} | ${{ needs.publish.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY

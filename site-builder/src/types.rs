@@ -4,15 +4,16 @@
 //! Collection of types to mirror the Sui move structs.
 use std::{
     borrow::Borrow,
-    collections::{btree_map, BTreeMap},
+    collections::{btree_map, BTreeMap, HashMap},
     num::NonZeroU16,
+    ops::Deref,
     str::FromStr,
 };
 
 use move_core_types::u256::U256;
 use serde::{de::DeserializeOwned, Deserialize, Serialize, Serializer};
 use sui_types::{
-    base_types::{ObjectID, SuiAddress},
+    base_types::{ObjectID, ObjectRef, SuiAddress},
     id::UID,
 };
 
@@ -21,6 +22,8 @@ use crate::{
     util::deserialize_bag_or_table,
     walrus::types::BlobId,
 };
+
+pub type ObjectCache = HashMap<ObjectID, ObjectRef>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SuiDynamicField<N, V> {
@@ -93,7 +96,7 @@ where
         self.0.is_empty()
     }
 
-    pub fn entry(&mut self, key: K) -> btree_map::Entry<K, V> {
+    pub fn entry(&mut self, key: K) -> btree_map::Entry<'_, K, V> {
         self.0.entry(key)
     }
 
@@ -121,7 +124,7 @@ where
         self.0.len()
     }
 
-    pub fn iter(&self) -> btree_map::Iter<K, V> {
+    pub fn iter(&self) -> btree_map::Iter<'_, K, V> {
         self.0.iter()
     }
 
@@ -174,6 +177,13 @@ where
 /// The representation of the HTTP headers.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct HttpHeaders(pub VecMap<String, String>);
+impl Deref for HttpHeaders {
+    type Target = VecMap<String, String>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 /// The routes of a site.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -282,6 +292,20 @@ pub enum SiteNameOp {
 
 impl SiteNameOp {
     pub fn is_noop(&self) -> bool {
+        matches!(self, Self::Noop)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum ExtendOps {
+    Extend {
+        total_wal_cost: u64,
+        blobs_epochs: Vec<(ObjectRef, u32)>,
+    },
+    Noop,
+}
+impl ExtendOps {
+    pub(crate) fn is_noop(&self) -> bool {
         matches!(self, Self::Noop)
     }
 }

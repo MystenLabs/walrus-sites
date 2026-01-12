@@ -1,39 +1,30 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-
 use std::{
-    collections::BTreeSet,
-    num::NonZeroUsize,
+    collections::HashSet,
     path::{Path, PathBuf},
-    sync::mpsc::channel,
 };
 
-use anyhow::{anyhow, bail, Result};
-use notify::{RecursiveMode, Watcher};
+use anyhow::{anyhow, Result};
 use sui_sdk::rpc_types::{
     SuiExecutionStatus,
     SuiTransactionBlockEffects,
     SuiTransactionBlockResponse,
 };
-use sui_types::{
-    base_types::{ObjectID, SuiAddress},
-    Identifier,
-};
+use sui_types::base_types::{ObjectID, SuiAddress};
 
 use crate::{
-    args::{PublishOptions, WalrusStoreOptions},
-    backoff::ExponentialBackoffConfig,
+    args::PublishOptions,
     config::Config,
     display,
     preprocessor::Preprocessor,
-    retry_client::RetriableSuiClient,
     site::{
-        builder::SitePtb,
         config::WSResources,
-        manager::SiteManager,
-        resource::ResourceManager,
+        manager::{BlobExtensions, SiteManager},
+        quilts::{DryRunInfo, QuiltsManager},
+        resource::{ResourceManager, ResourceSet, SiteOps},
         RemoteSiteFactory,
-        SITE_MODULE,
+        SiteData,
     },
     summary::{SiteDataDiffSummary, Summarizable},
     util::{
@@ -41,59 +32,14 @@ use crate::{
         id_to_base36,
         path_or_defaults_if_exist,
         persist_site_id_and_name,
-        sign_and_send_ptb,
     },
 };
-
 const DEFAULT_WS_RESOURCES_FILE: &str = "ws-resources.json";
-
-/// The continuous editing options.
-#[derive(Debug, Clone)]
-pub(crate) enum ContinuousEditing {
-    /// Edit the site once and exit.
-    Once,
-    /// Watch the directory for changes and publish the site on change.
-    Watch,
-}
-
-impl ContinuousEditing {
-    /// Convert the flag to the enum.
-    pub fn from_watch_flag(flag: bool) -> Self {
-        if flag {
-            ContinuousEditing::Watch
-        } else {
-            ContinuousEditing::Once
-        }
-    }
-}
-
-/// Options for the management of Walrus blobs.
-#[derive(Debug, Clone)]
-pub(crate) struct BlobManagementOptions {
-    /// Forces a check of the expiration of all blobs, and extension if necessary.
-    pub(crate) check_extend: bool,
-}
-
-impl BlobManagementOptions {
-    /// Returns true if the expiration of all blobs should be checked.
-    pub fn is_check_extend(&self) -> bool {
-        self.check_extend
-    }
-
-    /// Returns an instance of `Self` with the expiration check disabled.
-    pub fn no_status_check() -> Self {
-        BlobManagementOptions {
-            check_extend: false,
-        }
-    }
-}
 
 pub(crate) struct EditOptions {
     pub publish_options: PublishOptions,
     pub site_id: Option<ObjectID>,
     pub site_name: Option<String>,
-    pub continuous_editing: ContinuousEditing,
-    pub blob_options: BlobManagementOptions,
 }
 
 pub(crate) struct SiteEditor<E = ()> {
@@ -116,8 +62,6 @@ impl SiteEditor {
         publish_options: PublishOptions,
         site_id: Option<ObjectID>,
         site_name: Option<String>,
-        continuous_editing: ContinuousEditing,
-        blob_options: BlobManagementOptions,
     ) -> SiteEditor<EditOptions> {
         SiteEditor {
             context: self.context,
@@ -126,84 +70,48 @@ impl SiteEditor {
                 publish_options,
                 site_id,
                 site_name,
-                continuous_editing,
-                blob_options,
             },
         }
     }
 
     pub async fn destroy(&self, site_id: ObjectID) -> Result<()> {
-        // Delete blobs on Walrus.
-        let wallet_walrus = self.config.load_wallet()?;
-        let retriable_client = RetriableSuiClient::new_from_wallet(
-            &wallet_walrus,
-            ExponentialBackoffConfig::default(),
-        )
-        .await?;
+        let mut site_manager =
+            SiteManager::new(self.config.clone(), Some(site_id), None, None, None).await?;
 
-        let site = RemoteSiteFactory::new(
-            // TODO(giac): make the backoff configurable.
-            &retriable_client,
-            self.config.package,
-        )
-        .await?
-        .get_from_chain(site_id)
-        .await?;
+        let site = RemoteSiteFactory::new(site_manager.sui_client(), self.config.package)
+            .await?
+            .get_from_chain(site_id)
+            .await?;
 
         let all_blobs = site
             .resources()
             .into_iter()
             .map(|resource| resource.info.blob_id)
-            .collect::<Vec<_>>();
+            .collect::<HashSet<_>>();
 
         tracing::debug!(?all_blobs, "retrieved the site for deletion");
 
-        // Add warning if no deletable blobs found.
+        // Delete blobs from Walrus.
         if all_blobs.is_empty() {
-            println!("Warning: No deletable resources found. This may be because the site was created with permanent=true");
+            println!(
+                "Warning: No deletable resources found. This may be because the site was created with permanent=true"
+            );
         } else {
-            // TODO: Change the site manager not to require the unnecessary info.
-            let mut site_manager = SiteManager::new(
-                self.config.clone(),
-                Some(site_id),
-                BlobManagementOptions::no_status_check(),
-                WalrusStoreOptions::default(),
-                None,
-                None,
-                NonZeroUsize::new(1).expect("non-zero"),
-            )
-            .await?;
-
             site_manager.delete_from_walrus(&all_blobs).await?;
         }
 
-        // Delete objects on SUI blockchain
-        let mut wallet = self.config.load_wallet()?;
-        let ptb = SitePtb::new(self.config.package, Identifier::new(SITE_MODULE)?)?;
-        let mut ptb = ptb.with_call_arg(&wallet.get_object_ref(site_id).await?.into())?;
-        let site = RemoteSiteFactory::new(&retriable_client, self.config.package)
-            .await?
-            .get_from_chain(site_id)
-            .await?;
-
-        ptb.destroy(site.resources())?;
-        let active_address = wallet.active_address()?;
-        let gas_coin = wallet
-            .gas_for_owner_budget(active_address, self.config.gas_budget(), BTreeSet::new())
-            .await?
-            .1
-            .object_ref();
-
-        sign_and_send_ptb(
-            active_address,
-            &wallet,
-            &retriable_client,
-            ptb.finish(),
-            gas_coin,
-            self.config.gas_budget(),
-        )
-        .await?;
-
+        // Delete site object from Sui (reuse the fetched site data).
+        let mut operations: Vec<_> = site
+            .resources()
+            .inner
+            .iter()
+            .map(SiteOps::Deleted)
+            .collect();
+        operations.push(SiteOps::RemovedRoutes);
+        operations.push(SiteOps::BurnedSite);
+        display::action("Deleting Sui object data");
+        site_manager.execute_operations(operations).await?;
+        display::done();
         Ok(())
     }
 }
@@ -212,15 +120,6 @@ impl SiteEditor<EditOptions> {
     /// The directory containing the site sources.
     pub fn directory(&self) -> &Path {
         &self.edit_options.publish_options.directory
-    }
-
-    /// Run the editing operations requested.
-    pub async fn run(&self) -> Result<()> {
-        match self.edit_options.continuous_editing {
-            ContinuousEditing::Once => self.run_single_and_print_summary().await?,
-            ContinuousEditing::Watch => self.run_continuous().await?,
-        }
-        Ok(())
     }
 
     pub async fn run_quilts(&self) -> Result<()> {
@@ -235,63 +134,104 @@ impl SiteEditor<EditOptions> {
         Ok(())
     }
 
-    async fn run_single_edit(
-        &self,
-    ) -> Result<(SuiAddress, SuiTransactionBlockResponse, SiteDataDiffSummary)> {
-        if self.edit_options.publish_options.list_directory {
-            display::action(format!("Preprocessing: {}", self.directory().display()));
-            Preprocessor::preprocess(self.directory())?;
-            display::done();
-        }
-
-        let (mut resource_manager, mut site_manager) = self.create_managers().await?;
-
-        display::action(format!(
-            "Parsing the directory {} and locally computing blob IDs",
-            self.directory().to_string_lossy()
-        ));
-        let local_site_data = resource_manager.read_dir(self.directory()).await?;
-        display::done();
-        tracing::debug!(?local_site_data, "resources loaded from directory");
-
-        let (response, summary) = site_manager.update_site(&local_site_data, true).await?;
-
-        self.persist_site_identifier(resource_manager, &site_manager, &response)?;
-
-        Ok((site_manager.active_address()?, response, summary))
-    }
-
     async fn run_single_edit_quilts(
         &self,
     ) -> Result<(SuiAddress, SuiTransactionBlockResponse, SiteDataDiffSummary)> {
-        if self.edit_options.publish_options.list_directory {
-            bail!("Option list-directory is not supported for Quilts yet.");
+        let (resource_manager, mut quilts_manager, mut site_manager) =
+            self.create_managers().await?;
+        if self.is_list_directory() {
+            self.preprocess_directory(&resource_manager)?;
         }
 
-        let (mut resource_manager, mut site_manager) = self.create_managers().await?;
-
         display::action(format!(
-            "Parsing the directory {} and locally computing Quilt IDs",
+            "Parsing the directory {}",
             self.directory().to_string_lossy()
         ));
         let dry_run = self.edit_options.publish_options.walrus_options.dry_run;
-        let local_site_data = resource_manager
-            .read_dir_and_store_quilts(self.directory(), dry_run)
+        // Existing site:
+        let retriable_client = site_manager.sui_client();
+        let existing_site = match site_manager.site_id {
+            Some(site_id) => {
+                RemoteSiteFactory::new(retriable_client, self.config.package)
+                    .await?
+                    .get_from_chain(site_id)
+                    .await?
+            }
+            None => SiteData::empty(),
+        };
+
+        // Parse directory to get unchanged and changed resources
+        let parsed = resource_manager.read_dir(self.directory(), &existing_site)?;
+        display::done();
+
+        let walrus_pkg = self
+            .config
+            .general
+            .resolve_walrus_package(retriable_client)
             .await?;
+
+        // Retrieve blobs to extend for updates (reused for both estimation and actual extension)
+        let blob_extensions = if site_manager.site_id.is_some() {
+            site_manager
+                .retrieve_blobs_to_extend(&parsed.unchanged, walrus_pkg, retriable_client)
+                .await?
+        } else {
+            BlobExtensions::Noop
+        };
+
+        // Build dry run info if in dry run mode
+        let dry_run_info = if dry_run {
+            Some(DryRunInfo {
+                extension_estimate: blob_extensions.estimate(),
+            })
+        } else {
+            None
+        };
+
+        display::action("Computing Quilt IDs and storing Quilts");
+        let stored_resources = quilts_manager
+            .store_quilts(
+                parsed.changed,
+                self.edit_options
+                    .publish_options
+                    .walrus_options
+                    .epoch_arg
+                    .clone(),
+                self.edit_options
+                    .publish_options
+                    .walrus_options
+                    .max_quilt_size,
+                dry_run_info,
+            )
+            .await?;
+
+        // Combine stored resources with unchanged resources
+        let mut resource_set = ResourceSet::empty();
+        resource_set.extend(stored_resources);
+        resource_set.extend(parsed.unchanged);
+
+        let local_site_data = resource_manager.to_site_data(resource_set);
         display::done();
         tracing::debug!(
             ?local_site_data,
             "resources loaded and stored from directory"
         );
 
-        let (response, summary) = site_manager.update_site(&local_site_data, false).await?;
+        let (response, summary) = site_manager
+            .update_site(
+                &local_site_data,
+                &existing_site,
+                blob_extensions,
+                walrus_pkg,
+            )
+            .await?;
 
         self.persist_site_identifier(resource_manager, &site_manager, &response)?;
 
         Ok((site_manager.active_address()?, response, summary))
     }
 
-    async fn create_managers(&self) -> Result<(ResourceManager, SiteManager)> {
+    async fn create_managers(&self) -> Result<(ResourceManager, QuiltsManager, SiteManager)> {
         // Note: `load_ws_resources` again. We already loaded them when parsing the name.
         let (ws_resources, ws_resources_path) = load_ws_resources(
             self.edit_options
@@ -308,13 +248,9 @@ impl SiteEditor<EditOptions> {
             );
         }
 
-        let resource_manager = ResourceManager::new(
-            self.config.walrus_client(),
-            ws_resources,
-            ws_resources_path,
-            self.edit_options.publish_options.max_concurrent,
-        )
-        .await?;
+        let resource_manager = ResourceManager::new(ws_resources, ws_resources_path)?;
+
+        let quilts_manager = QuiltsManager::new(self.config.walrus_client()).await?;
 
         let site_metadata = match resource_manager.ws_resources.clone() {
             Some(value) => value.metadata,
@@ -329,48 +265,19 @@ impl SiteEditor<EditOptions> {
         let site_manager = SiteManager::new(
             self.config.clone(),
             self.edit_options.site_id,
-            self.edit_options.blob_options.clone(),
-            self.edit_options.publish_options.walrus_options.clone(),
             site_metadata,
             self.edit_options.site_name.clone().or(site_name),
-            self.edit_options.publish_options.max_parallel_stores,
+            Some(
+                self.edit_options
+                    .publish_options
+                    .walrus_options
+                    .epoch_arg
+                    .clone(),
+            ),
         )
         .await?;
 
-        Ok((resource_manager, site_manager))
-    }
-
-    async fn run_single_and_print_summary(&self) -> Result<()> {
-        let (active_address, response, summary) = self.run_single_edit().await?;
-        print_summary(
-            &self.config,
-            &active_address,
-            &self.edit_options.site_id,
-            &response,
-            &summary,
-        )?;
-        Ok(())
-    }
-
-    async fn run_continuous(&self) -> Result<()> {
-        let (tx, rx) = channel();
-        let mut watcher = notify::recommended_watcher(move |res| {
-            tx.send(res).expect("Error in sending the watch event")
-        })?;
-
-        // Add a path to be watched. All files and directories at that path and
-        // below will be monitored for changes.
-        watcher.watch(self.directory(), RecursiveMode::Recursive)?;
-
-        loop {
-            match rx.recv() {
-                Ok(event) => {
-                    tracing::info!("change detected: {:?}", event);
-                    self.run_single_and_print_summary().await?;
-                }
-                Err(e) => println!("Watch error!: {e}"),
-            }
-        }
+        Ok((resource_manager, quilts_manager, site_manager))
     }
 
     fn persist_site_identifier(
@@ -379,18 +286,40 @@ impl SiteEditor<EditOptions> {
         site_manager: &SiteManager,
         response: &SuiTransactionBlockResponse,
     ) -> Result<()> {
-        // TODO: Deduplicate
         let path_for_saving = resource_manager
             .ws_resources_path
             .unwrap_or_else(|| self.directory().join(DEFAULT_WS_RESOURCES_FILE));
 
         persist_site_identifier(
-            &self.edit_options.site_id,
+            &site_manager.site_id,
             site_manager,
             response,
             resource_manager.ws_resources,
             &path_for_saving,
         )
+    }
+
+    /// Returns whether the list_directory option is enabled.
+    fn is_list_directory(&self) -> bool {
+        self.edit_options.publish_options.list_directory
+    }
+
+    /// Runs the preprocessing step on the directory.
+    fn preprocess_directory(&self, resource_manager: &ResourceManager) -> Result<()> {
+        display::action(format!("Preprocessing: {}", self.directory().display()));
+        let _ = Preprocessor::preprocess(
+            self.directory(),
+            &resource_manager
+                .ws_resources
+                .as_ref()
+                .and_then(|ws| ws.ignore.clone()),
+        );
+        display::action(format!(
+            "Successfully preprocessed the {} directory!",
+            self.directory().display()
+        ));
+        display::done();
+        Ok(())
     }
 }
 
@@ -404,8 +333,7 @@ fn print_summary(
     if let Some(SuiTransactionBlockEffects::V1(eff)) = response.effects.as_ref() {
         if let SuiExecutionStatus::Failure { error } = &eff.status {
             return Err(anyhow!(
-                "error while processing the Sui transaction: {}",
-                error
+                "error while processing the Sui transaction: {error}"
             ));
         }
     }
@@ -444,10 +372,15 @@ fn print_summary(
         );
     } else {
         println!(
-            r#"To browse the site, run a testnet portal locally and visit:
-    http://{base36_id}.localhost:3000
+            r#"⚠️ wal.app only supports sites deployed on mainnet.
+     To browse your testnet site, you need to self-host a portal:
+     1. For local development: http://{base36_id}.localhost:3000
+     2. For public sharing: http://{base36_id}.yourdomain.com:3000
 
-    (more info: https://docs.wal.app/walrus-sites/portal.html#running-the-portal-locally)"#,
+     📖 Setup instructions: https://docs.wal.app/walrus-sites/portal.html#running-the-portal-locally
+
+     💡 Tip: You may also bring your own domain (https://docs.wal.app/walrus-sites/bring-your-own-domain.html)
+            or find third-party hosted testnet portals."#,
             base36_id = id_to_base36(&object_id)?
         );
     }

@@ -78,6 +78,9 @@ pub struct StoredQuiltPatch {
     pub identifier: String,
     /// The quilt patch id.
     pub quilt_patch_id: String,
+    /// The range of the quilt patch.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub range: Option<(u64, u64)>,
 }
 
 /// A enum wrapper around the quilt index.
@@ -104,7 +107,6 @@ pub struct QuiltIndexV1 {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QuiltPatchV1 {
-    // TODO: add start_index the moment walrus supports it.
     /// The end sliver index of the blob.
     pub end_index: u16,
     /// The identifier of the blob, it can be used to locate the blob in the quilt.

@@ -6,6 +6,7 @@ pub mod config;
 pub mod content;
 pub mod contracts;
 pub mod manager;
+pub mod quilts;
 pub mod resource;
 
 use std::{collections::HashMap, time::Duration};
@@ -13,15 +14,15 @@ use std::{collections::HashMap, time::Duration};
 use anyhow::Result;
 use contracts::TypeOriginMap;
 use futures::future::try_join_all;
-use resource::{ResourceOp, ResourceSet};
+use resource::{ResourceSet, SiteOps};
 use sui_sdk::rpc_types::DynamicFieldInfo;
 use sui_types::{base_types::ObjectID, TypeTag};
 
 use crate::{
-    publish::BlobManagementOptions,
     retry_client::RetriableSuiClient,
     summary::SiteDataDiffSummary,
     types::{
+        ExtendOps,
         Metadata,
         MetadataOp,
         ResourceDynamicField,
@@ -31,7 +32,7 @@ use crate::{
         SiteNameOp,
         SuiDynamicField,
     },
-    util::{handle_pagination, type_origin_map_for_package},
+    util::handle_pagination,
 };
 
 pub const SITE_MODULE: &str = "site";
@@ -45,10 +46,11 @@ const DF_REQ_DELAY_MS: u64 = 100;
 #[derive(Debug, Clone)]
 pub struct SiteDataDiff<'a> {
     /// The operations to perform on the resources.
-    pub resource_ops: Vec<ResourceOp<'a>>,
+    pub resource_ops: Vec<SiteOps<'a>>,
     pub route_ops: RouteOps,
     pub metadata_op: MetadataOp,
     pub site_name_op: SiteNameOp,
+    pub extend_ops: ExtendOps,
 }
 
 impl SiteDataDiff<'_> {
@@ -58,21 +60,11 @@ impl SiteDataDiff<'_> {
             || !self.route_ops.is_unchanged()
             || !self.metadata_op.is_noop()
             || !self.site_name_op.is_noop()
-    }
-
-    /// Returns the resources that need to be updated on Walrus.
-    pub fn get_walrus_updates(&self, blob_options: &BlobManagementOptions) -> Vec<&ResourceOp> {
-        self.resource_ops
-            .iter()
-            .filter(|u| u.is_walrus_update(blob_options))
-            .collect::<Vec<_>>()
+            || !self.extend_ops.is_noop()
     }
 
     /// Returns the summary of the operations in the diff.
-    pub fn summary(&self, blob_options: &BlobManagementOptions) -> SiteDataDiffSummary {
-        if blob_options.is_check_extend() {
-            return SiteDataDiffSummary::from(self);
-        }
+    pub fn summary(&self) -> SiteDataDiffSummary {
         SiteDataDiffSummary {
             resource_ops: self
                 .resource_ops
@@ -83,10 +75,14 @@ impl SiteDataDiff<'_> {
             route_ops: self.route_ops.clone(),
             metadata_updated: !self.metadata_op.is_noop(),
             site_name_updated: !self.site_name_op.is_noop(),
+            extend_ops: self.extend_ops.clone(),
         }
     }
 }
 
+// TODO(sew-166): Blobs make sense to exist as a field instead of just fetched. This struct was made
+// to compare sites. Now we also do some basic blob-lifetime-management.
+// It might make more sense to track the blob-id here as well?
 /// The site on chain.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SiteData {
@@ -124,23 +120,18 @@ impl SiteData {
 
     // TODO(giac): rename start and reorder the direction of the diff.
     /// Returns the operations to perform to transform the start set into self.
-    pub fn diff<'a>(&'a self, start: &'a SiteData) -> SiteDataDiff<'a> {
-        SiteDataDiff {
+    pub fn diff<'a>(
+        &'a self,
+        start: &'a SiteData,
+        extend_ops: ExtendOps,
+    ) -> anyhow::Result<SiteDataDiff<'a>> {
+        Ok(SiteDataDiff {
             resource_ops: self.resources.diff(&start.resources),
             route_ops: self.routes_diff(start),
             metadata_op: self.metadata_diff(start),
             site_name_op: self.site_name_diff(start),
-        }
-    }
-
-    /// Returns the operations to perform to replace all resources in self with the ones in other.
-    pub fn replace_all<'a>(&'a self, other: &'a SiteData) -> SiteDataDiff<'a> {
-        SiteDataDiff {
-            resource_ops: self.resources.replace_all(&other.resources),
-            route_ops: self.routes_diff(other),
-            metadata_op: self.metadata_diff(other),
-            site_name_op: self.site_name_diff(other),
-        }
+            extend_ops,
+        })
     }
 
     fn routes_diff(&self, start: &Self) -> RouteOps {
@@ -187,8 +178,8 @@ impl RemoteSiteFactory<'_> {
     pub async fn new(
         sui_client: &RetriableSuiClient,
         package_id: ObjectID,
-    ) -> Result<RemoteSiteFactory> {
-        let type_origin_map = type_origin_map_for_package(sui_client, package_id).await?;
+    ) -> Result<RemoteSiteFactory<'_>> {
+        let type_origin_map = sui_client.type_origin_map_for_package(package_id).await?;
         Ok(RemoteSiteFactory {
             sui_client,
             type_origin_map,
@@ -203,7 +194,7 @@ impl RemoteSiteFactory<'_> {
         let resource_path_tag = self.resource_path_tag()?;
 
         // Chunking ensures that we do not make too many requests at once.
-        // TODO: multi_get_objects?
+        // TODO(sew-737): multi_get_objects?
         let futures = dynamic_fields.chunks(DF_REQ_BATCH_SIZE).map(|chunk| {
             try_join_all(
                 chunk
@@ -326,7 +317,7 @@ mod tests {
     use super::SiteData;
     use crate::{
         site::resource::ResourceSet,
-        types::{Metadata, Routes},
+        types::{ExtendOps, Metadata, Routes},
     };
 
     fn routes_from_pair(key: &str, value: &str) -> Option<Routes> {
@@ -354,7 +345,7 @@ mod tests {
         for (this_routes, other_routes, has_updates) in cases {
             let this = SiteData::new(ResourceSet::empty(), this_routes, None, None);
             let other = SiteData::new(ResourceSet::empty(), other_routes, None, None);
-            let diff = this.diff(&other);
+            let diff = this.diff(&other, ExtendOps::Noop).unwrap();
             assert_eq!(diff.has_updates(), has_updates);
         }
     }
@@ -393,7 +384,10 @@ mod tests {
         for (this_metadata, other_metadata, has_updates) in cases {
             let this = SiteData::new(ResourceSet::empty(), None, this_metadata, None);
             let other = SiteData::new(ResourceSet::empty(), None, other_metadata, None);
-            assert_eq!(this.diff(&other).has_updates(), has_updates);
+            assert_eq!(
+                this.diff(&other, ExtendOps::Noop).unwrap().has_updates(),
+                has_updates
+            );
         }
     }
 
@@ -421,7 +415,10 @@ mod tests {
         for (this_site_name, other_site_name, has_updates) in cases {
             let this = SiteData::new(ResourceSet::empty(), None, None, this_site_name);
             let other = SiteData::new(ResourceSet::empty(), None, None, other_site_name);
-            assert_eq!(this.diff(&other).has_updates(), has_updates);
+            assert_eq!(
+                this.diff(&other, ExtendOps::Noop).unwrap().has_updates(),
+                has_updates
+            );
         }
     }
 }

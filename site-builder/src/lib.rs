@@ -1,14 +1,19 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{num::NonZeroUsize, path::PathBuf};
+use std::path::PathBuf;
 
 use anyhow::anyhow;
 use args::{Args, Commands};
 use config::Config;
 use preprocessor::Preprocessor;
-use publish::{load_ws_resources, BlobManagementOptions, ContinuousEditing, SiteEditor};
-use site::{config::WSResources, manager::SiteManager, resource::ResourceManager};
+use publish::{load_ws_resources, SiteEditor};
+use site::{
+    config::WSResources,
+    manager::SiteManager,
+    quilts::QuiltsManager,
+    resource::{ResourceManager, ResourceSet},
+};
 use sitemap::display_sitemap;
 use util::{id_to_base36, path_or_defaults_if_exist};
 
@@ -20,16 +25,16 @@ mod preprocessor;
 mod publish;
 mod retry_client;
 mod site;
-// TODO: This can be a standalone crate, helping integration testing and other projects using our
-// contract.
-pub use site::contracts;
+// TODO(sew-251): This can be a standalone crate, helping integration testing and other projects
+// using our contract.
+pub use site::{config as site_config, contracts, resource::MAX_IDENTIFIER_SIZE};
 mod sitemap;
 mod suins;
 mod summary;
-// TODO: This can be a standalone crate, helping integration testing and other projects using our
-// contract.
+// TODO(sew-251): This can be a standalone crate, helping integration testing and other projects
+// using our contract.
 pub mod types;
-mod util;
+pub mod util;
 mod walrus;
 
 /// The default path to the configuration file for the site builder.
@@ -72,8 +77,6 @@ async fn run_internal(
             publish_options,
             site_name,
             object_id,
-            watch,
-            check_extend,
         } => {
             // Load the ws-resources file, to check for the site-object-id. If it exists, it means
             // the site is already deployed, in which case we should do update the site.
@@ -87,28 +90,9 @@ async fn run_internal(
             let site_object_id =
                 object_id.or_else(|| ws_resources.as_ref().and_then(|res| res.object_id));
 
-            let (identifier, continuous_editing, blob_management) = match site_object_id {
-                Some(object_id) => (
-                    Some(object_id),
-                    ContinuousEditing::from_watch_flag(watch),
-                    BlobManagementOptions { check_extend },
-                ),
-                None => (
-                    None,
-                    ContinuousEditing::Once,
-                    BlobManagementOptions::no_status_check(),
-                ),
-            };
-
             SiteEditor::new(context, config)
-                .with_edit_options(
-                    publish_options,
-                    identifier,
-                    site_name,
-                    continuous_editing,
-                    blob_management,
-                )
-                .run()
+                .with_edit_options(publish_options, site_object_id, site_name)
+                .run_quilts()
                 .await?
         }
         Commands::Publish {
@@ -116,60 +100,17 @@ async fn run_internal(
             site_name,
         } => {
             SiteEditor::new(context, config)
-                .with_edit_options(
-                    publish_options,
-                    None,
-                    site_name,
-                    ContinuousEditing::Once,
-                    BlobManagementOptions::no_status_check(),
-                )
-                .run()
-                .await?
-        }
-        #[cfg(feature = "quilts-experimental")]
-        Commands::PublishQuilts {
-            publish_options,
-            site_name,
-        } => {
-            SiteEditor::new(context, config)
-                .with_edit_options(
-                    publish_options,
-                    None,
-                    site_name,
-                    ContinuousEditing::Once,
-                    BlobManagementOptions::no_status_check(),
-                )
+                .with_edit_options(publish_options, None, site_name)
                 .run_quilts()
                 .await?
         }
-        #[allow(deprecated)]
         Commands::Update {
             publish_options,
             object_id,
-            watch,
-            force,
-            check_extend,
         } => {
-            if force {
-                display::warning(
-                    "Warning: The --force flag is deprecated and will be removed in a future \
-                    version. Please use --check-extend instead.",
-                )
-            }
             SiteEditor::new(context, config)
-                .with_edit_options(
-                    publish_options,
-                    Some(object_id),
-                    None,
-                    ContinuousEditing::from_watch_flag(watch),
-                    // Check the extension if either `check_extend` is true or `force` is true.
-                    // This is for backwards compatibility.
-                    // TODO: Remove once the `force` flag is deprecated.
-                    BlobManagementOptions {
-                        check_extend: check_extend || force,
-                    },
-                )
-                .run()
+                .with_edit_options(publish_options, Some(object_id), None)
+                .run_quilts()
                 .await?
         }
         // Add a path to be watched. All files and directories at that path and
@@ -178,16 +119,29 @@ async fn run_internal(
             display_sitemap(site_to_map, selected_context, config).await?;
         }
         Commands::Convert { object_id } => println!("{}", id_to_base36(&object_id)?),
-        Commands::ListDirectory { path } => {
-            Preprocessor::preprocess(path.as_path())?;
+        Commands::ListDirectory { path, ws_resources } => {
+            let (ws_resources_opt, _) = load_ws_resources(ws_resources.as_deref(), &path)?;
+            let ws_res = ws_resources_opt;
+            match ws_res {
+                Some(ws_res) => {
+                    Preprocessor::preprocess(path.as_path(), &ws_res.ignore)?;
+                }
+                None => {
+                    Preprocessor::preprocess(path.as_path(), &None)?;
+                }
+            }
+            display::header(format!(
+                "Successfully preprocessed the {} directory!",
+                path.display()
+            ));
         }
         Commands::Destroy { object } => {
             let site_editor = SiteEditor::new(context, config);
             site_editor.destroy(object).await?;
         }
-        Commands::UpdateResource {
-            resource,
-            path,
+        // TODO(sew-495): Check whether quilts-extensions happen here.
+        Commands::UpdateResources {
+            resources,
             site_object,
             common,
         } => {
@@ -197,33 +151,44 @@ async fn run_internal(
                 .as_ref()
                 .map(WSResources::read)
                 .transpose()?;
-            let resource_manager = ResourceManager::new(
-                config.walrus_client(),
-                ws_res,
-                common.ws_resources.clone(),
-                None,
-            )
-            .await?;
-            let resource = resource_manager
-                .read_single_blob_resource(&resource, path)
-                .await?
-                .ok_or(anyhow!(
-                    "could not read the resource at path: {}",
-                    resource.display()
-                ))?;
-            // TODO: make when upload configurable.
+            let resource_manager = ResourceManager::new(ws_res, common.ws_resources.clone())?;
+            let mut quilts_manager = QuiltsManager::new(config.walrus_client()).await?;
             let mut site_manager = SiteManager::new(
                 config,
                 Some(site_object),
-                BlobManagementOptions::no_status_check(),
-                common,
-                None, // TODO: update the site metadata.
                 None,
-                NonZeroUsize::new(1).expect("non-zero"),
+                None,
+                Some(common.epoch_arg.clone()),
             )
             .await?;
-            site_manager.update_single_resource(resource).await?;
-            display::header("Resource updated successfully");
+
+            // Parse the resource paths into resource data
+            let resource_data = resource_manager.parse_resources(resources)?;
+
+            // Store the resources into quilts
+            let dry_run_info = if common.dry_run {
+                Some(site::quilts::DryRunInfo {
+                    extension_estimate: None, // No extension estimate for update-resources
+                })
+            } else {
+                None
+            };
+            let stored_resources = quilts_manager
+                .store_quilts(
+                    resource_data,
+                    common.epoch_arg,
+                    common.max_quilt_size,
+                    dry_run_info,
+                )
+                .await?;
+
+            // Convert to ResourceSet for the site manager
+            let mut resource_set = ResourceSet::empty();
+            resource_set.extend(stored_resources);
+
+            // TODO(sew-604): Extend the lifetime of the rest of the resources that belong to the
+            // site?
+            site_manager.update_resources(resource_set).await?;
         }
     };
 
