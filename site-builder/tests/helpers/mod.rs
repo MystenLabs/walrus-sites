@@ -14,7 +14,7 @@ use hex::FromHex;
 use move_core_types::u256::U256;
 use site_builder::types::SuiResource;
 use sui_types::base_types::SuiAddress;
-use walrus_sdk::core::{BlobId, QuiltPatchId};
+use walrus_sdk::core::{metadata::QuiltMetadata, BlobId, QuiltPatchId};
 
 use crate::localnode::{TestBlob, TestSetup};
 
@@ -223,4 +223,15 @@ pub async fn verify_resource_and_get_content(
     );
 
     Ok(data)
+}
+
+/// Extracts file identifiers from quilt metadata.
+pub fn get_quilt_identifiers(metadata: &QuiltMetadata) -> Vec<&str> {
+    let QuiltMetadata::V1(metadata_v1) = metadata;
+    metadata_v1
+        .index
+        .quilt_patches
+        .iter()
+        .map(|p| p.identifier.as_str())
+        .collect()
 }

@@ -11,6 +11,7 @@ use clap::{ArgGroup, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use sui_sdk::wallet_context::WalletContext;
 use sui_types::base_types::{ObjectID, SuiAddress};
+pub use walrus_sdk::sui::client::contract_config::ContractConfig as WalrusContractConfig;
 
 use crate::{
     retry_client::RetriableSuiClient,
@@ -133,6 +134,33 @@ impl GeneralArgs {
             self.wallet_env.as_deref(),
             self.wallet_address.as_ref(),
         )
+    }
+
+    pub fn walrus_config(&self) -> Result<WalrusContractConfig> {
+        let client_config = walrus_sdk::config::load_configuration(
+            self.walrus_config.as_ref(),
+            self.walrus_context.as_deref(),
+        )?;
+        Ok(client_config.contract_config)
+    }
+
+    /// Resolves the walrus package ID.
+    ///
+    /// Returns `walrus_package` if provided, otherwise loads the walrus config file
+    /// and extracts the original package ID from the staking object.
+    pub async fn resolve_walrus_package(
+        &self,
+        sui_client: &RetriableSuiClient,
+    ) -> Result<ObjectID> {
+        match self.walrus_package {
+            Some(pkg) => Ok(pkg),
+            None => {
+                let walrus_config = self.walrus_config()?;
+                sui_client
+                    .get_object_original_package(walrus_config.staking_object)
+                    .await
+            }
+        }
     }
 }
 

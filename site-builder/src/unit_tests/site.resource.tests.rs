@@ -6,12 +6,12 @@ use std::{collections::BTreeMap, num::NonZeroU16, path::PathBuf};
 use bytesize::ByteSize;
 use move_core_types::u256::U256;
 
-use super::{full_path_to_resource_path, ResourceData, ResourceManager, MAX_IDENTIFIER_SIZE};
+use super::{full_path_to_resource_path, ResourceData, MAX_IDENTIFIER_SIZE};
 use crate::{
     config::Walrus,
+    site::quilts::QuiltsManager,
     site_config::WSResources,
     types::{HttpHeaders, VecMap},
-    walrus::command::QuiltBlobInput,
 };
 
 #[test]
@@ -27,7 +27,7 @@ fn test_derive_http_headers() {
     ];
     let ws_resources = mock_ws_resources();
     for (path, expected) in test_paths {
-        let result = ResourceManager::derive_http_headers(&ws_resources, path);
+        let result = ResourceData::derive_http_headers(ws_resources.as_ref(), path);
         assert_eq!(result.len(), 1);
         assert!(result.contains_key(expected));
     }
@@ -56,26 +56,14 @@ fn mock_ws_resources() -> Option<WSResources> {
 }
 
 /// Helper function to create a mock resource for testing.
-fn create_mock_resource(
-    file_name: String,
-    file_size: usize,
-    index: u64,
-) -> (ResourceData, QuiltBlobInput) {
-    let resource_data = ResourceData {
+fn create_mock_resource(file_name: String, file_size: usize, index: u64) -> ResourceData {
+    ResourceData {
         unencoded_size: file_size,
         full_path: PathBuf::from(format!("/test/{}", file_name)),
         resource_path: format!("/{}", file_name),
         headers: HttpHeaders(VecMap::new()),
         blob_hash: U256::from(index),
-    };
-
-    let quilt_input = QuiltBlobInput {
-        path: PathBuf::from(format!("/test/{}", file_name)),
-        identifier: Some(format!("/{}", file_name)),
-        tags: BTreeMap::new(),
-    };
-
-    (resource_data, quilt_input)
+    }
 }
 
 #[test]
@@ -100,16 +88,9 @@ fn test_large_file_below_theoretical_limit_placed_in_own_chunk() {
     // Create mock resource
     let resource = create_mock_resource("large_file.bin".to_string(), file_size, 0);
 
-    // Create a mock ResourceManager
-    let resource_manager = ResourceManager {
-        walrus: Walrus::new("walrus".to_string(), 1000000, None, None, None, None),
-        ws_resources: None,
-        ws_resources_path: None,
-        n_shards,
-    };
-
     // Call quilts_chunkify
-    let result = resource_manager.quilts_chunkify(vec![resource], max_quilt_size);
+    let result =
+        QuiltsManager::quilts_chunkify_with_n_shards(vec![resource], max_quilt_size, n_shards);
 
     // The function should not error, and should place the file in its own chunk
     let chunks = result.expect("Should not fail for file below theoretical limit");
@@ -168,16 +149,8 @@ fn test_large_file_among_small_files_creates_correct_chunks() {
         ));
     }
 
-    // Create a mock ResourceManager
-    let resource_manager = ResourceManager {
-        walrus: Walrus::new("walrus".to_string(), 1000000, None, None, None, None),
-        ws_resources: None,
-        ws_resources_path: None,
-        n_shards,
-    };
-
     // Call quilts_chunkify
-    let result = resource_manager.quilts_chunkify(files, max_quilt_size);
+    let result = QuiltsManager::quilts_chunkify_with_n_shards(files, max_quilt_size, n_shards);
 
     // Expected behavior:
     // - The large file should be alone in the first chunk

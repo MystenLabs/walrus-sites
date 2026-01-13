@@ -5,7 +5,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use sui_sdk::rpc_types::{
     SuiExecutionStatus,
     SuiTransactionBlockEffects,
@@ -19,13 +19,12 @@ use crate::{
     display,
 };
 use crate::{
-    backoff::ExponentialBackoffConfig,
     preprocessor::Preprocessor,
-    retry_client::RetriableSuiClient,
     site::{
         config::WSResources,
-        manager::SiteManager,
-        resource::{ResourceManager, SiteOps},
+        manager::{BlobExtensions, SiteManager},
+        quilts::{DryRunInfo, QuiltsManager},
+        resource::{ResourceManager, ResourceSet, SiteOps},
         RemoteSiteFactory,
         SiteData,
     },
@@ -78,36 +77,23 @@ impl SiteEditor {
     }
 
     pub async fn destroy(&self, site_id: ObjectID) -> Result<()> {
-        // Delete blobs on Walrus.
-        let wallet_walrus = self.config.load_wallet()?;
-        let retriable_client = RetriableSuiClient::new_from_wallet(
-            &wallet_walrus,
-            ExponentialBackoffConfig::default(),
-        )
-        .await?;
+        let mut site_manager =
+            SiteManager::new(self.config.clone(), Some(site_id), None, None, None).await?;
 
-        let site = RemoteSiteFactory::new(
-            // TODO(giac): make the backoff configurable.
-            &retriable_client,
-            self.config.package,
-        )
-        .await?
-        .get_from_chain(site_id)
-        .await?;
+        let site = RemoteSiteFactory::new(site_manager.sui_client(), self.config.package)
+            .await?
+            .get_from_chain(site_id)
+            .await?;
 
         let all_blobs = site
             .resources()
             .into_iter()
             .map(|resource| resource.info.blob_id)
-            // Collect first to a hash-set to keep unique blob-ids.
             .collect::<HashSet<_>>();
 
         tracing::debug!(?all_blobs, "retrieved the site for deletion");
 
-        let mut site_manager =
-            SiteManager::new(self.config.clone(), Some(site_id), None, None).await?;
-
-        // Add warning if no deletable blobs found.
+        // Delete blobs from Walrus.
         if all_blobs.is_empty() {
             println!(
                 "Warning: No deletable resources found. This may be because the site was created with permanent=true"
@@ -116,11 +102,7 @@ impl SiteEditor {
             site_manager.delete_from_walrus(&all_blobs).await?;
         }
 
-        let site = RemoteSiteFactory::new(&retriable_client, self.config.package)
-            .await?
-            .get_from_chain(site_id)
-            .await?;
-
+        // Delete site object from Sui (reuse the fetched site data).
         let mut operations: Vec<_> = site
             .resources()
             .inner
@@ -155,170 +137,124 @@ impl SiteEditor<EditOptions> {
     }
 
     /// Load resources from directory and store quilts (with enhanced dry-run logic)
-    async fn load_and_store_resources(
+    async fn run_single_edit_quilts(
         &self,
-        resource_manager: &mut ResourceManager,
-    ) -> Result<SiteData> {
-        let dry_run = self.edit_options.publish_options.walrus_options.dry_run;
-        
-        if dry_run {
-            return self.dry_run(resource_manager).await;
+    ) -> Result<(SuiAddress, SuiTransactionBlockResponse, SiteDataDiffSummary)> {
+        let (resource_manager, mut quilts_manager, mut site_manager) = self.create_managers().await?;
+        if self.is_list_directory() {
+            self.preprocess_directory(&resource_manager)?;
         }
-
-        // Normal (non-dry-run) flow
         display::action(format!(
-            "Parsing the directory {}, computing Quilt IDs, and {} quilts",
-            self.directory().to_string_lossy(),
-            if dry_run { "dry-running storage of" } else { "storing" }
+            "Parsing the directory {}",
+            self.directory().to_string_lossy()
         ));
-        let (local_site_data, _cost) = self.execute_quilt_operations(resource_manager, dry_run).await?;
-        display::done();
-        tracing::debug!(
-            ?local_site_data,
-            "finished loading and storing resources"
-        );
-        Ok(local_site_data)
-    }
+        let dry_run = self.edit_options.publish_options.walrus_options.dry_run;
+        // Existing site:
+        let retriable_client = site_manager.sui_client();
+        let existing_site = match site_manager.site_id {
+            Some(site_id) => {
+                RemoteSiteFactory::new(retriable_client, self.config.package)
+                    .await?
+                    .get_from_chain(site_id)
+                    .await?
+            }
+            None => SiteData::empty(),
+        };
 
-    /// Execute quilt operations (dry-run or actual storage) and return site data
-    async fn execute_quilt_operations(
-        &self,
-        resource_manager: &mut ResourceManager,
-        dry_run: bool,
-    ) -> Result<(SiteData, Option<u64>)> {
-        resource_manager
-            .read_dir_and_store_quilts(
-                self.directory(),
+        // Parse directory to get unchanged and changed resources
+        let parsed = resource_manager.read_dir(self.directory(), &existing_site)?;
+        display::done();
+
+        let walrus_pkg = self
+            .config
+            .general
+            .resolve_walrus_package(retriable_client)
+            .await?;
+
+        // Retrieve blobs to extend for updates (reused for both estimation and actual extension)
+        let blob_extensions = if site_manager.site_id.is_some() {
+            site_manager
+                .retrieve_blobs_to_extend(&parsed.unchanged, walrus_pkg, retriable_client)
+                .await?
+        } else {
+            BlobExtensions::Noop
+        };
+
+        // Build dry run info if in dry run mode
+        let dry_run_info = if dry_run {
+            Some(DryRunInfo {
+                extension_estimate: blob_extensions.estimate(),
+            })
+        } else {
+            None
+        };
+
+        let stored_resources = quilts_manager
+            .store_quilts(
+                parsed.changed,
                 self.edit_options
                     .publish_options
                     .walrus_options
                     .epoch_arg
                     .clone(),
-                dry_run,
                 self.edit_options
                     .publish_options
                     .walrus_options
                     .max_quilt_size,
+                dry_run_info,
             )
-            .await
-    }
+            .await?;
+        // Combine stored resources with unchanged resources
+        let mut resource_set = ResourceSet::empty();
+        resource_set.extend(stored_resources);
+        resource_set.extend(parsed.unchanged);
 
-    /// Execute dry run with 4-step process: 
-    /// estimate FROST → store quilts → estimate SUI → execute transactions
-    async fn dry_run(
-        &self,
-        resource_manager: &mut ResourceManager,
-    ) -> Result<SiteData> {
-        println!(); // Empty line to separate from initial INFO logs
-        
-        // Step 1: Start the dry-run action
-        display::action(format!(
-            "Parsing the directory {}, computing Quilt IDs, and dry-running storage of quilts",
-            self.directory().to_string_lossy()
-        ));
-        // compute quilt IDs and estimate FROST storage costs
-        let (_local_site_data, cost) = self.execute_quilt_operations(resource_manager, true).await?;
-        display::done(); // Complete the dry-run action
-        
-        println!(); // Empty line for spacing
-        
-        // Display cost information
-        if let Some(storage_cost) = cost {
-            println!("Dry-run Walrus storage cost: {} FROST (Walrus gas for quilt storage)", storage_cost);
-        }
-        
-        // Ask if user wants to proceed with storing quilts
-        #[cfg(not(feature = "_testing-dry-run"))]
-        {
-            if !dialoguer::Confirm::new()
-                .with_prompt("Store quilts to Walrus and estimate Sui gas? (Reuses existing quilts, otherwise deducts FROST fees)")
-                .default(true)
-                .interact()?
-            {
-                display::error("Dry run cancelled");
-                return Err(anyhow!("Dry run cancelled by user"));
-            }
-        }
-        #[cfg(feature = "_testing-dry-run")]
-        {
-            println!("Test mode: automatically proceeding with gas estimation");
-        }
-
-        // Step 2: Store quilts (actual storage)
-        // Suppress INFO logs during manager creation to maintain clean flow
-        let _guard = tracing::subscriber::set_default(tracing::subscriber::NoSubscriber::default());
-        let (mut resource_manager, mut site_manager) = self.create_managers().await?;
-        drop(_guard); // Restore normal logging
-        
-        if self.is_list_directory() {
-            self.preprocess_directory(&resource_manager)?;
-        }
-
-        println!(); // Empty line before storing action
-        
-        // Store quilts for real (dry_run=false)
-        display::action("Storing quilts to Walrus");
-        let (local_site_data, _cost) = self.execute_quilt_operations(&mut resource_manager, false).await?;
+        let local_site_data = resource_manager.to_site_data(resource_set);
         display::done();
-        
-        println!(); // Empty line after completion
-        
-        // Step 3. Estimate SUI gas
-        println!("Sui Gas Estimates:");
-        let _total_gas = site_manager.estimate_sui_gas(&local_site_data).await?;
-        println!(); // Empty line before final question
 
-        // Ask if user wants to proceed with Sui transactions
-        #[cfg(not(feature = "_testing-dry-run"))]
-        {
-            if !dialoguer::Confirm::new()
-                .with_prompt("Execute Sui transactions? (This will deduct fees from your wallet - actual cost may vary from estimate)")
-                .default(true)
-                .interact()?
+        // If dry_run, also show Sui gas estimates using the detailed estimator
+        // and ask for confirmation before executing Sui transactions.
+        if dry_run {
+            println!();
+            println!("Sui Gas Estimates:");
+            let _total_gas = site_manager
+                .estimate_sui_gas(&local_site_data, &existing_site, blob_extensions.clone(), walrus_pkg)
+                .await?;
+            println!();
+
+            #[cfg(not(feature = "_testing-dry-run"))]
             {
-                display::error("Transactions cancelled");
-                return Err(anyhow!("Transactions cancelled by user"));
+                if !dialoguer::Confirm::new()
+                    .with_prompt(
+                        "Execute Sui transactions? (This will deduct fees from your wallet - actual cost may vary from the estimate)",
+                    )
+                    .default(true)
+                    .interact()? 
+                {
+                    display::error("Sui execution cancelled by user");
+                    bail!("Sui execution cancelled by user");
+                }
+            }
+            #[cfg(feature = "_testing-dry-run")]
+            {
+                println!("Test mode: automatically proceeding with Sui execution");
             }
         }
-        #[cfg(feature = "_testing-dry-run")]
-        {
-            println!("Test mode: automatically proceeding with transactions");
-        }
 
-        // Step 4. Proceed with actual Sui transactions
-        let (_response, _summary) = self.update_site_with_resources(&mut site_manager, resource_manager, &local_site_data).await?;
-        
-        display::action("Sui transactions completed successfully!");
-        Ok(local_site_data)
-    }
-
-    /// Update site with loaded resources
-    async fn update_site_with_resources(
-        &self,
-        site_manager: &mut SiteManager,
-        resource_manager: ResourceManager,
-        local_site_data: &SiteData,
-    ) -> Result<(SuiTransactionBlockResponse, SiteDataDiffSummary)> {
-        let (response, summary) = site_manager.update_site(local_site_data).await?;
-        self.persist_site_identifier(resource_manager, site_manager, &response)?;
-        Ok((response, summary))
-    }
-
-    async fn run_single_edit_quilts(
-        &self,
-    ) -> Result<(SuiAddress, SuiTransactionBlockResponse, SiteDataDiffSummary)> {
-        let (mut resource_manager, mut site_manager) = self.create_managers().await?;
-        if self.is_list_directory() {
-            self.preprocess_directory(&resource_manager)?;
-        }
-
-        let local_site_data = self.load_and_store_resources(&mut resource_manager).await?;
-        let (response, summary) = self.update_site_with_resources(&mut site_manager, resource_manager, &local_site_data).await?;
+        let (response, summary) = site_manager
+            .update_site(
+                &local_site_data,
+                &existing_site,
+                blob_extensions,
+                walrus_pkg,
+            )
+            .await?;
+        self.persist_site_identifier(resource_manager, &site_manager, &response)?;
 
         Ok((site_manager.active_address()?, response, summary))
     }
 
-    async fn create_managers(&self) -> Result<(ResourceManager, SiteManager)> {
+    async fn create_managers(&self) -> Result<(ResourceManager, QuiltsManager, SiteManager)> {
         // Note: `load_ws_resources` again. We already loaded them when parsing the name.
         let (ws_resources, ws_resources_path) = load_ws_resources(
             self.edit_options
@@ -335,9 +271,9 @@ impl SiteEditor<EditOptions> {
             );
         }
 
-        let resource_manager =
-            ResourceManager::new(self.config.walrus_client(), ws_resources, ws_resources_path)
-                .await?;
+        let resource_manager = ResourceManager::new(ws_resources, ws_resources_path)?;
+
+        let quilts_manager = QuiltsManager::new(self.config.walrus_client()).await?;
 
         let site_metadata = match resource_manager.ws_resources.clone() {
             Some(value) => value.metadata,
@@ -354,10 +290,17 @@ impl SiteEditor<EditOptions> {
             self.edit_options.site_id,
             site_metadata,
             self.edit_options.site_name.clone().or(site_name),
+            Some(
+                self.edit_options
+                    .publish_options
+                    .walrus_options
+                    .epoch_arg
+                    .clone(),
+            ),
         )
         .await?;
 
-        Ok((resource_manager, site_manager))
+        Ok((resource_manager, quilts_manager, site_manager))
     }
 
     fn persist_site_identifier(
@@ -371,7 +314,7 @@ impl SiteEditor<EditOptions> {
             .unwrap_or_else(|| self.directory().join(DEFAULT_WS_RESOURCES_FILE));
 
         persist_site_identifier(
-            &self.edit_options.site_id,
+            &site_manager.site_id,
             site_manager,
             response,
             resource_manager.ws_resources,

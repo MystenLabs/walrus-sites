@@ -35,13 +35,17 @@ use sui_sdk::{
     SuiClient,
 };
 use sui_types::{
-    base_types::{ObjectID, SuiAddress},
+    base_types::{ObjectID, ObjectRef, ObjectType, SuiAddress},
     dynamic_field::derive_dynamic_field_id,
     quorum_driver_types::ExecuteTransactionRequestType::WaitForLocalExecution,
     transaction::Transaction,
     TypeTag,
 };
 use tracing::Level;
+use walrus_sdk::{
+    core_utils::backoff::ExponentialBackoffConfig as WalrusBackoffConfig,
+    sui::client::retry_client::RetriableSuiClient as WalrusRetriableSuiClient,
+};
 
 use crate::{
     backoff::{BackoffStrategy, ExponentialBackoff, ExponentialBackoffConfig},
@@ -154,10 +158,17 @@ impl RetriableSuiClient {
     pub fn backoff_config(&self) -> &ExponentialBackoffConfig {
         &self.backoff_config
     }
-
     /// Returns a reference to the inner SuiClient.
     pub fn client(&self) -> &SuiClient {
         &self.sui_client
+    }
+
+    /// Creates a walrus-sdk `RetriableSuiClient` from this client.
+    pub fn to_walrus_retriable_client(&self) -> Result<WalrusRetriableSuiClient> {
+        WalrusRetriableSuiClient::new(
+            vec![self.sui_client.clone().into()],
+            WalrusBackoffConfig::default(),
+        )
     }
 
     /// Creates a new retriable client from a wallet context.
@@ -293,6 +304,24 @@ impl RetriableSuiClient {
         .await
     }
 
+    /// Returns the original package ID for the given object's type.
+    ///
+    /// The original package ID is the runtime ID used by Move - the first version of the package,
+    /// shared across all upgrades.
+    #[tracing::instrument(level = Level::DEBUG, skip_all)]
+    pub async fn get_object_original_package(&self, object_id: ObjectID) -> Result<ObjectID> {
+        let response = self
+            .get_object_with_options(object_id, SuiObjectDataOptions::new().with_type())
+            .await?;
+        let object_data = response
+            .data
+            .ok_or_else(|| anyhow!("object {object_id} not found"))?;
+        let ObjectType::Struct(move_object_type) = object_data.object_type()? else {
+            bail!("object ID ({object_id}) points to a package, not an object");
+        };
+        Ok(ObjectID::from_address(move_object_type.address()))
+    }
+
     /// Return a list of [SuiObjectResponse] from the given vector of [ObjectID]s.
     ///
     /// Calls [`sui_sdk::apis::ReadApi::multi_get_object_with_options`] internally.
@@ -342,7 +371,6 @@ impl RetriableSuiClient {
     }
 
     /// Gets the type origin map for a given package.
-    #[allow(dead_code)]
     pub(crate) async fn type_origin_map_for_package(
         &self,
         package_id: ObjectID,
@@ -404,7 +432,7 @@ impl RetriableSuiClient {
         owner: SuiAddress,
         type_origin_map: &'a TypeOriginMap,
         type_args: &'a [TypeTag],
-    ) -> Result<impl Iterator<Item = U> + 'a>
+    ) -> Result<impl Iterator<Item = (U, ObjectRef)> + 'a>
     where
         U: AssociatedContractStruct,
     {
@@ -419,7 +447,7 @@ impl RetriableSuiClient {
                     None
                 },
                 |object_data| match U::try_from_object_data(&object_data) {
-                    Result::Ok(value) => Some(value),
+                    Result::Ok(value) => Some((value, object_data.object_ref())),
                     Result::Err(error) => {
                         tracing::warn!(?error, "failed to convert to local type");
                         None
@@ -451,7 +479,7 @@ impl RetriableSuiClient {
             )
         })
         .await?
-        .map(|resp| {
+        .map(|resp: SuiObjectResponse| {
             resp.data.ok_or_else(|| {
                 anyhow!(
                     "response does not contain object data [err={:?}]",

@@ -433,7 +433,7 @@ async fn test_update_resources_respects_ws_resources() -> anyhow::Result<()> {
 
     // 2. Create a ws-resources.json file with a custom header for *.html files
     let ws_resources_path = directory.join("ws-resources.json");
-    // TODO: ignore patterns should support .gitignore format
+    // TODO(sew-445): ignore patterns should support .gitignore format
     let ws_resources_content = r#"{
         "headers": {
             "**/*.html": {"X-Custom-Header": "CustomValue"}
@@ -505,7 +505,7 @@ async fn test_update_resources_respects_ws_resources() -> anyhow::Result<()> {
                     file_path: external_file_path.clone(),
                     url_path: "/external_file.html".to_string(),
                 },
-                // TODO: #SEW-480 BUG Fix, ignore should look on the full-path, not the resource-path
+                // TODO(sew-480): BUG Fix, ignore should look on the full-path, not the resource-path
                 ResourcePaths {
                     file_path: ignored_file_path.clone(),
                     url_path: "/private/secret.html".to_string(),
@@ -666,6 +666,110 @@ async fn test_update_resources_filters_ws_resources_file() -> anyhow::Result<()>
         updated_resources.iter().any(|r| r.path == "/file_2.html"),
         "file_2.html should still be present"
     );
+
+    Ok(())
+}
+
+/// Test that update-resources does NOT extend any existing blobs.
+///
+/// Unlike site-update (Update command), the update-resources command only adds/replaces
+/// specific resources without extending existing blobs. This test verifies that:
+/// 1. After update-resources, no extend_blob transactions are made
+/// 2. Original blobs keep their original end_epochs
+#[tokio::test]
+#[ignore]
+async fn test_update_resources_does_not_extend_blobs() -> anyhow::Result<()> {
+    const PUBLISH_EPOCHS: u32 = 5;
+    const UPDATE_RESOURCES_EPOCHS: u32 = 50;
+
+    let mut cluster = TestSetup::start_local_test_cluster().await?;
+
+    // Create a site with 3 files
+    let temp_dir = create_test_site(3)?;
+    let directory = temp_dir.path().to_path_buf();
+
+    // Publish the initial site with short epochs
+    let publish_args = ArgsBuilder::default()
+        .with_config(Some(cluster.sites_config_path().to_owned()))
+        .with_command(Commands::Publish {
+            publish_options: PublishOptionsBuilder::default()
+                .with_directory(directory.clone())
+                .with_epoch_count_or_max(EpochCountOrMax::Epochs(PUBLISH_EPOCHS.try_into()?))
+                .build()?,
+            site_name: None,
+        })
+        .build()?;
+    site_builder::run(publish_args).await?;
+
+    let site_id = *cluster.last_site_created().await?.id.object_id();
+    let wallet_address = cluster.wallet_active_address()?;
+
+    println!("Published site with ID: {site_id}");
+
+    // Record initial blobs and their end_epochs
+    let initial_blobs = cluster.get_owned_blobs(wallet_address).await?;
+    let initial_blob_epochs: std::collections::HashMap<_, _> = initial_blobs
+        .iter()
+        .map(|b| (b.id, b.storage.end_epoch))
+        .collect();
+
+    println!(
+        "Initial blobs: {} with end_epochs: {:?}",
+        initial_blobs.len(),
+        initial_blob_epochs
+    );
+
+    // Create a new file to add via update-resources
+    let new_file_path = directory.join("new_file.html");
+    {
+        let mut new_file = File::create(&new_file_path)?;
+        writeln!(new_file, "<html><body><h1>New File</h1></body></html>")?;
+    }
+
+    // Add the new file via update-resources with LONGER epochs
+    println!("\n=== update-resources with {UPDATE_RESOURCES_EPOCHS} epochs ===");
+    let update_resources_args = ArgsBuilder::default()
+        .with_config(Some(cluster.sites_config_path().to_owned()))
+        .with_command(Commands::UpdateResources {
+            resources: vec![ResourcePaths {
+                file_path: new_file_path,
+                url_path: "/new_file.html".to_string(),
+            }],
+            site_object: site_id,
+            common: WalrusStoreOptionsBuilder::default()
+                .with_epoch_count_or_max(EpochCountOrMax::Epochs(
+                    UPDATE_RESOURCES_EPOCHS.try_into()?,
+                ))
+                .build()?,
+        })
+        .build()?;
+    site_builder::run(update_resources_args).await?;
+
+    println!("Successfully ran update-resources");
+
+    // Query for extend_blob transactions - should be empty for update-resources
+    let extended_blob_ids = cluster.get_extended_blob_object_ids().await?;
+    assert!(
+        extended_blob_ids.is_empty(),
+        "update-resources should NOT extend any blobs, but extended: {:?}",
+        extended_blob_ids
+    );
+
+    // Verify original blobs still have their original end_epochs
+    let final_blobs = cluster.get_owned_blobs(wallet_address).await?;
+    for (obj_id, original_end_epoch) in &initial_blob_epochs {
+        let blob = final_blobs
+            .iter()
+            .find(|b| b.id == *obj_id)
+            .expect("original blob should still exist");
+        assert_eq!(
+            blob.storage.end_epoch, *original_end_epoch,
+            "Original blob {} end_epoch should not change (was {}, now {})",
+            obj_id, original_end_epoch, blob.storage.end_epoch
+        );
+    }
+
+    println!("\n✓ Test passed: update-resources did NOT extend any existing blobs");
 
     Ok(())
 }

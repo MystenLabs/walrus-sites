@@ -12,6 +12,7 @@ use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{
     rpc_types::{
         SuiExecutionStatus,
+        SuiObjectDataOptions,
         SuiTransactionBlockEffectsAPI as _,
         SuiTransactionBlockResponse,
     },
@@ -23,28 +24,29 @@ use sui_types::{
     Identifier,
 };
 use tracing::warn;
+use walrus_sdk::sui::{
+    client::{ReadClient, SuiReadClient},
+    utils::price_for_encoded_length,
+};
 
 use super::{
     builder::SitePtb,
-    resource::SiteOps,
-    RemoteSiteFactory,
+    resource::{Resource, ResourceSet, SiteOps},
     SiteData,
     SiteDataDiff,
     SITE_MODULE,
 };
 use crate::{
+    args::{EpochArg, EpochCountOrMax},
     backoff::ExponentialBackoffConfig,
     config::Config,
     display,
     retry_client::RetriableSuiClient,
-    site::{
-        builder::{SitePtbBuilderResultExt, PTB_MAX_MOVE_CALLS},
-        resource::ResourceSet,
-    },
+    site::builder::{SitePtbBuilderResultExt, PTB_MAX_MOVE_CALLS},
     summary::SiteDataDiffSummary,
-    types::{Metadata, MetadataOp, ObjectCache, RouteOps, SiteNameOp},
-    util::{get_site_id_from_response, get_site_object_via_graphql, sign_and_send_ptb},
-    walrus::{types::BlobId, Walrus},
+    types::{ExtendOps, Metadata, MetadataOp, ObjectCache, RouteOps, SiteNameOp},
+    util::{get_epochs_ahead, get_owned_blobs, get_site_id_from_response, get_site_object_via_graphql, sign_and_send_ptb},
+    walrus::{output::SuiBlob, types::BlobId, Walrus},
 };
 
 #[cfg(test)]
@@ -59,6 +61,8 @@ pub struct SiteManager {
     pub backoff_config: ExponentialBackoffConfig,
     pub metadata: Option<Metadata>,
     pub site_name: Option<String>,
+    pub epochs: Option<EpochArg>,
+    pub sui_client: RetriableSuiClient,
     pub object_cache: ObjectCache,
 }
 
@@ -69,16 +73,24 @@ impl SiteManager {
         site_id: Option<ObjectID>,
         metadata: Option<Metadata>,
         site_name: Option<String>,
+        epochs: Option<EpochArg>,
     ) -> Result<Self> {
+        let walrus = config.walrus_client();
+        let wallet = config.load_wallet()?;
+        let backoff_config = ExponentialBackoffConfig::default();
+        let sui_client =
+            RetriableSuiClient::new_from_wallet(&wallet, backoff_config.clone()).await?;
         Ok(SiteManager {
-            walrus: config.walrus_client(),
-            wallet: config.load_wallet()?,
+            walrus,
+            wallet,
             config,
             site_id,
-            backoff_config: ExponentialBackoffConfig::default(),
+            backoff_config,
             metadata,
             site_name,
             object_cache: ObjectCache::new(),
+            epochs,
+            sui_client,
         })
     }
 
@@ -89,27 +101,22 @@ impl SiteManager {
     pub async fn update_site(
         &mut self,
         local_site_data: &SiteData,
+        existing_site: &SiteData,
+        blob_extensions: BlobExtensions,
+        walrus_pkg: ObjectID,
     ) -> Result<(SuiTransactionBlockResponse, SiteDataDiffSummary)> {
         tracing::debug!(?self.site_id, "creating or updating site");
-        let retriable_client = self.sui_client().await?;
-        let existing_site = match &self.site_id {
-            Some(site_id) => {
-                RemoteSiteFactory::new(&retriable_client, self.config.package)
-                    .await?
-                    .get_from_chain(*site_id)
-                    .await?
-            }
-            None => SiteData::empty(),
-        };
+
         tracing::debug!(?existing_site, "checked existing site");
 
-        let site_updates = local_site_data.diff(&existing_site);
+        let site_updates = local_site_data.diff(existing_site, blob_extensions.into())?;
+        tracing::debug!(?site_updates, "computed site updates");
 
         // Check if there are any updates to the site on-chain.
         let result = if site_updates.has_updates() {
             println!(); // Empty line before applying action for consistency
             display::action("Applying the Walrus Site object updates on Sui");
-            self.execute_sui_updates(&site_updates)
+            self.execute_sui_updates(&site_updates, walrus_pkg)
                 .await
                 .inspect(|_| display::done())?
         } else {
@@ -151,10 +158,80 @@ impl SiteManager {
         Ok(())
     }
 
-    /// Builds the initial PTB for site creation/update with initial resources
+    pub async fn retrieve_blobs_to_extend(
+        &self,
+        resources: &[Resource],
+        walrus_pkg: ObjectID,
+        retriable_client: &RetriableSuiClient,
+    ) -> anyhow::Result<BlobExtensions> {
+        // Fast path: no resources means no blobs to extend
+        if resources.is_empty() {
+            return Ok(BlobExtensions::Noop);
+        }
+
+        let epoch_arg = self
+            .epochs
+            .clone()
+            .expect("epochs must be set when calling update_site"); // EpochArg is an ArgGroup with
+                                                                    // required true
+        let epoch_info = self.walrus.epoch_info().await?;
+        let current_epoch = epoch_info.current_epoch;
+        let epochs_ahead = match (
+            epoch_arg.epochs,
+            epoch_arg.earliest_expiry_time,
+            epoch_arg.end_epoch,
+        ) {
+            (Some(EpochCountOrMax::Epochs(epochs)), None, None) => epochs.into(),
+            (Some(EpochCountOrMax::Max), None, None) => epoch_info.max_epochs_ahead,
+            (None, Some(earliest), None) => get_epochs_ahead(earliest, epoch_info)?,
+            (None, None, Some(end_epoch)) => {
+                let end_epoch: u32 = end_epoch.into();
+                if end_epoch <= current_epoch {
+                    bail!(
+                        "end epoch ({end_epoch}) must be greater than the current epoch ({current_epoch})"
+                    );
+                }
+                end_epoch - current_epoch
+            }
+            _ => bail!("exactly one of --epochs, --end-epoch, or --expiry-time must be specified"),
+        };
+        let new_end_epoch = current_epoch + epochs_ahead;
+
+        let to_extend = get_owned_blobs(retriable_client, walrus_pkg, self.active_address()?)
+            .await?
+            .into_iter()
+            .filter(|(blob_id, (sui_blob, _obj_ref))| {
+                // blob-id exists in resources currently in directory and end_epoch is less than
+                // epochs to update to.
+                resources.iter().any(|r| r.info.blob_id == *blob_id)
+                    && sui_blob.storage.end_epoch < new_end_epoch
+            });
+
+        // Collect blobs to extend first
+        let (_, to_extend): (Vec<_>, Vec<_>) = to_extend.unzip();
+
+        if to_extend.is_empty() {
+            return Ok(BlobExtensions::Noop);
+        }
+
+        let walrus_client = retriable_client.to_walrus_retriable_client()?;
+        let walrus_config = self.config.general.walrus_config()?;
+        let sui_read_client = SuiReadClient::new(walrus_client, &walrus_config).await?;
+        let storage_price = sui_read_client.storage_price_per_unit_size().await?;
+
+        Ok(BlobExtensions::Extend {
+            blobs: to_extend,
+            new_end_epoch,
+            storage_price,
+        })
+    }
+
+    /// Builds the initial PTB for site creation/update with initial resources and
+    /// blob extension operations.
     async fn build_initial_ptb<'a>(
         &mut self,
         updates: &'a SiteDataDiff<'_>,
+        walrus_pkg: ObjectID,
     ) -> Result<(
         ProgrammableTransaction,
         Peekable<std::slice::Iter<'a, SiteOps<'a>>>,
@@ -163,10 +240,51 @@ impl SiteManager {
         // 1st iteration
         // Keep 4 operations for optional update_name + route deletion + creation + site-transfer
         const INITIAL_MAX: u16 = PTB_MAX_MOVE_CALLS - 4;
-        let ptb = SitePtb::<(), INITIAL_MAX>::new(
+        let mut ptb = SitePtb::<(), INITIAL_MAX>::new(
             self.config.package,
             Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
+            walrus_pkg,
         );
+
+        // Start with blob-extensions. Assuming it won't take a lot of space in the PTB.
+        if let ExtendOps::Extend {
+            total_wal_cost,
+            blobs_epochs,
+        } = updates.extend_ops.clone()
+        {
+            debug_assert!(
+                self.site_id.is_some(),
+                "Cannot have blobs to extend if we are publishing a new site"
+            );
+            let retriable_client = self.sui_client();
+            let walrus_config = self.config.general.walrus_config()?;
+            let walrus_client = retriable_client.to_walrus_retriable_client()?;
+
+            let wal_coin_type = {
+                let sui_read_client =
+                    SuiReadClient::new(walrus_client.clone(), &walrus_config).await?;
+                sui_read_client.wal_coin_type().to_owned()
+            };
+            let coins = retriable_client
+                .select_coins(
+                    self.active_address()?,
+                    Some(wal_coin_type),
+                    total_wal_cost as u128,
+                    vec![],
+                )
+                .await?;
+
+            let system_obj_id = walrus_config.system_object;
+            let system_obj = retriable_client
+                .get_object_with_options(system_obj_id, SuiObjectDataOptions::new().with_owner())
+                .await
+                .map_err(|e| anyhow!("Error getting blob-object from fullnode: {e}"))?
+                .data
+                .ok_or(anyhow!("Expected data in walrus System object response"))?;
+            ptb.fill_walrus_system_and_coin(coins, system_obj)?;
+
+            ptb.add_extend_operations(blobs_epochs)?;
+        }
 
         // Add the call arg if we are updating a site, or add the command to create a new site.
         // Keep 3 operations for optional route deletion + creation + site-transfer
@@ -226,19 +344,21 @@ impl SiteManager {
         Ok((ptb.finish(), resources_iter, routes_iter))
     }
 
-    /// Builds PTBs for remaining resources and routes
+    /// Builds PTBs for remaining resources and routes.
     async fn build_remaining_resources_ptbs<'a>(
         &mut self,
         site_object_id: ObjectID,
+        walrus_pkg: ObjectID,
         mut resources_iter: Peekable<std::slice::Iter<'a, SiteOps<'a>>>,
         mut routes_iter: Peekable<btree_map::Iter<'a, String, String>>,
     ) -> Result<Vec<ProgrammableTransaction>> {
         let mut transactions = Vec::new();
-        
+
         while resources_iter.peek().is_some() || routes_iter.peek().is_some() {
             let ptb: SitePtb<(), { PTB_MAX_MOVE_CALLS }> = SitePtb::new(
                 self.config.package,
                 Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
+                walrus_pkg,
             );
             let mut site_object_ref = self.wallet.get_object_ref(site_object_id).await?;
             site_object_ref = self.verify_object_ref_choose_latest(site_object_ref)?;
@@ -256,40 +376,36 @@ impl SiteManager {
 
             transactions.push(ptb.finish());
         }
-        
+
         Ok(transactions)
     }
 
-    /// Estimates Sui gas costs for site updates by dry-running ptbs
-    pub async fn estimate_sui_gas(&mut self, local_site_data: &SiteData) -> Result<u64> {
+    /// Estimates Sui gas costs for site updates by dry-running PTBs built
+    /// with the same logic as `execute_sui_updates`.
+    pub async fn estimate_sui_gas(
+        &mut self,
+        local_site_data: &SiteData,
+        existing_site: &SiteData,
+        blob_extensions: BlobExtensions,
+        walrus_pkg: ObjectID,
+    ) -> Result<u64> {
         tracing::debug!(
             address=?self.active_address()?,
             "estimating Sui gas for site updates",
         );
 
-        let retry_client = self.sui_client().await?;
-        
-        // Get existing site data (if any)
-        let existing_site = match &self.site_id {
-            Some(site_id) => {
-                RemoteSiteFactory::new(&retry_client, self.config.package)
-                    .await?
-                    .get_from_chain(*site_id)
-                    .await?
-            }
-            None => SiteData::empty(),
-        };
-
-        // Calculate the diff between current and new site data
-        let updates = local_site_data.diff(&existing_site);
+        // Calculate the diff between current and new site data, including blob extensions
+        let updates = local_site_data.diff(existing_site, blob_extensions.into())?;
 
         // Build the initial PTB
-        let (initial_ptb, mut resources_iter, mut routes_iter) = self.build_initial_ptb(&updates).await?;
+        let (initial_ptb, mut resources_iter, mut routes_iter) =
+            self.build_initial_ptb(&updates, walrus_pkg).await?;
 
         let gas_ref = self.gas_coin_ref().await?;
-        
+
         // Dry run initial PTB
-        let initial_response = self.dry_run_ptb(initial_ptb.clone(), gas_ref, &retry_client, false).await?;
+        let initial_response =
+            self.dry_run_ptb(initial_ptb.clone(), gas_ref, false).await?;
         let initial_gas = initial_response.effects.gas_cost_summary().net_gas_usage() as u64;
         
         println!(
@@ -335,11 +451,9 @@ impl SiteManager {
         };
 
         // Build remaining PTBs
-        let remaining_ptbs = self.build_remaining_resources_ptbs(
-            site_object_id,
-            resources_iter,
-            routes_iter,
-        ).await?;
+        let remaining_ptbs = self
+            .build_remaining_resources_ptbs(site_object_id, walrus_pkg, resources_iter, routes_iter)
+            .await?;
 
         // Dry run remaining PTBs
         let mut total_gas = initial_gas;
@@ -354,7 +468,7 @@ impl SiteManager {
         
         for (i, ptb) in remaining_ptbs.iter().enumerate() {
             let gas_ref = self.gas_coin_ref().await?;
-            let response = self.dry_run_ptb(ptb.clone(), gas_ref, &retry_client, true).await?;
+            let response = self.dry_run_ptb(ptb.clone(), gas_ref, true).await?;
             
             // If dev_inspect failed, estimate gas based on command count
             let gas_cost = if response.error.is_some() {
@@ -402,16 +516,16 @@ impl SiteManager {
 
     /// Dry runs a PTB using DevInspectTransactionBlock and returns the response
     ///
-    /// It makes sense to use dev_inspect_transaction_block instead of dry_run_transaction_block 
+    /// It makes sense to use dev_inspect_transaction_block instead of dry_run_transaction_block
     /// because the latter requires extended validations like signed transactions.
     /// For our use case we actually need only high level verification and gas cost estimation.
     async fn dry_run_ptb(
         &mut self,
         ptb: ProgrammableTransaction,
         gas_coin: ObjectRef,
-        retry_client: &RetriableSuiClient,
         _use_modified_for_estimation: bool,
     ) -> Result<sui_sdk::rpc_types::DevInspectResults> {
+        let retry_client = self.sui_client();
         // Get the current reference gas price
         let gas_price = retry_client
             .client()
@@ -420,7 +534,7 @@ impl SiteManager {
             .await?;
 
         let tx_data = TransactionData::new_programmable(
-            self.wallet.active_address()?,
+            self.active_address()?,
             vec![gas_coin],
             ptb,
             self.config.gas_budget(),
@@ -431,7 +545,7 @@ impl SiteManager {
             .client()
             .read_api()
             .dev_inspect_transaction_block(
-                self.wallet.active_address()?,
+                self.active_address()?,
                 tx_data.into_kind(),
                 Some(gas_price.into()),
                 None, // epoch
@@ -452,6 +566,7 @@ impl SiteManager {
     async fn execute_sui_updates(
         &mut self,
         updates: &SiteDataDiff<'_>,
+        walrus_pkg: ObjectID,
     ) -> Result<SuiTransactionBlockResponse> {
         tracing::debug!(
             address=?self.active_address()?,
@@ -460,17 +575,15 @@ impl SiteManager {
         );
 
         // Build the initial PTB
-        let (initial_ptb, resources_iter, routes_iter) = self.build_initial_ptb(updates).await?;
+        let (initial_ptb, resources_iter, routes_iter) =
+            self.build_initial_ptb(updates, walrus_pkg).await?;
 
-        let retry_client = self.sui_client().await?;
         assert!(initial_ptb.commands.len() <= PTB_MAX_MOVE_CALLS as usize);
-        
-        // TODO: #SEW-498 Verify gas_ref. Currently, we do not have the last tx the user submitted through
-        // walrus.
+
+        // TODO(sew-498): Verify gas_ref. Currently, we do not have the last tx the user submitted
+        // through walrus.
         let gas_ref = self.gas_coin_ref().await?;
-        let result = self
-            .sign_and_send_ptb(initial_ptb, gas_ref, &retry_client)
-            .await?;
+        let result = self.sign_and_send_ptb(initial_ptb, gas_ref).await?;
 
         // Check explicitly for execution failures.
         if let Some(SuiExecutionStatus::Failure { error }) =
@@ -492,20 +605,15 @@ impl SiteManager {
                 get_site_id_from_response(self.active_address()?, resp)?
             }
         };
-
         // Build remaining PTBs
-        let remaining_ptbs = self.build_remaining_resources_ptbs(
-            site_object_id,
-            resources_iter,
-            routes_iter,
-        ).await?;
+        let remaining_ptbs = self
+            .build_remaining_resources_ptbs(site_object_id, walrus_pkg, resources_iter, routes_iter)
+            .await?;
 
         // Execute remaining PTBs
         for ptb in remaining_ptbs {
             let gas_ref = self.gas_coin_ref().await?;
-            let resource_result = self
-                .sign_and_send_ptb(ptb, gas_ref, &retry_client)
-                .await?;
+            let resource_result = self.sign_and_send_ptb(ptb, gas_ref).await?;
             if let Some(SuiExecutionStatus::Failure { error }) =
                 resource_result.effects.as_ref().map(|e| e.status())
             {
@@ -539,7 +647,12 @@ impl SiteManager {
         };
 
         let mut operations_iter = operations.iter().peekable();
-        let retry_client = self.sui_client().await?;
+        let retry_client = self.sui_client();
+        let walrus_package = self
+            .config
+            .general
+            .resolve_walrus_package(retry_client)
+            .await?;
 
         tracing::debug!("modifying the site object on chain");
 
@@ -548,6 +661,7 @@ impl SiteManager {
             let ptb = SitePtb::<(), PTB_MAX_MOVE_CALLS>::new(
                 self.config.package,
                 Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
+                walrus_package,
             );
             let mut site_obj_ref = self.wallet.get_object_ref(site_id).await?;
             site_obj_ref = self.verify_object_ref_choose_latest(site_obj_ref)?;
@@ -558,8 +672,7 @@ impl SiteManager {
                 .ok_if_limit_reached()?;
 
             let gas_ref = self.gas_coin_ref().await?;
-            self.sign_and_send_ptb(ptb.finish(), gas_ref, &retry_client)
-                .await?;
+            self.sign_and_send_ptb(ptb.finish(), gas_ref).await?;
         }
         Ok(())
     }
@@ -568,12 +681,11 @@ impl SiteManager {
         &mut self,
         programmable_transaction: ProgrammableTransaction,
         gas_coin: ObjectRef,
-        retry_client: &RetriableSuiClient,
     ) -> Result<SuiTransactionBlockResponse> {
         sign_and_send_ptb(
             self.active_address()?,
             &self.wallet,
-            retry_client,
+            &self.sui_client,
             programmable_transaction,
             gas_coin,
             self.config.gas_budget(),
@@ -582,8 +694,8 @@ impl SiteManager {
         .await
     }
 
-    async fn sui_client(&self) -> Result<RetriableSuiClient> {
-        RetriableSuiClient::new_from_wallet(&self.wallet, self.backoff_config.clone()).await
+    pub fn sui_client(&self) -> &RetriableSuiClient {
+        &self.sui_client
     }
 
     // TODO(giac): This is a copy of `[WalletContext::active_address`] that works without borrowing
@@ -655,7 +767,7 @@ impl SiteManager {
     ) -> anyhow::Result<ObjectRef> {
         let cached: Option<&ObjectRef> = self.object_cache.get(&object_ref.0);
         match cached {
-            // TODO: #SEW-503 Will we have a problem if during the execute we use an FN with an
+            // TODO(sew-503): Will we have a problem if during the execute we use an FN with an
             // older version? Does RetriableSuiClient mitigate this?
             // If the cached version is bigger than the fetched, just used the cached.
             Some(&cached) if cached.1 > object_ref.1 => {
@@ -676,7 +788,77 @@ impl SiteManager {
     }
 }
 
-/// Collects the `BlobId`s from the site_updates Deleted SiteOps.
+#[derive(Clone)]
+pub enum BlobExtensions {
+    Noop,
+    Extend {
+        blobs: Vec<(SuiBlob, ObjectRef)>,
+        new_end_epoch: u32,
+        storage_price: u64,
+    },
+}
+
+impl BlobExtensions {
+    /// Returns the estimation for blob extensions: (blob_count, total_wal_cost).
+    /// Returns None if no extensions are needed.
+    pub fn estimate(&self) -> Option<(usize, u64)> {
+        match self {
+            BlobExtensions::Noop => None,
+            BlobExtensions::Extend {
+                blobs,
+                new_end_epoch,
+                storage_price,
+            } => {
+                let count = blobs.len();
+                let total_cost: u64 = blobs
+                    .iter()
+                    .map(|(sui_blob, _)| {
+                        let epochs_extended = *new_end_epoch - sui_blob.storage.end_epoch;
+                        price_for_encoded_length(
+                            sui_blob.storage.storage_size,
+                            *storage_price,
+                            epochs_extended,
+                        )
+                    })
+                    .sum();
+                Some((count, total_cost))
+            }
+        }
+    }
+}
+
+impl From<BlobExtensions> for ExtendOps {
+    fn from(value: BlobExtensions) -> ExtendOps {
+        let BlobExtensions::Extend {
+            blobs: blobs_to_extend,
+            new_end_epoch,
+            storage_price,
+        } = value
+        else {
+            return ExtendOps::Noop;
+        };
+
+        let (total_wal_cost, blobs_epochs) = blobs_to_extend.into_iter().fold(
+            (0_u64, vec![]),
+            |(mut cost, mut blobs), (sui_blob, obj_ref)| {
+                let epochs_extended = new_end_epoch - sui_blob.storage.end_epoch;
+                cost += price_for_encoded_length(
+                    sui_blob.storage.storage_size,
+                    storage_price,
+                    epochs_extended,
+                );
+                blobs.push((obj_ref, epochs_extended));
+                (cost, blobs)
+            },
+        );
+        ExtendOps::Extend {
+            total_wal_cost,
+            blobs_epochs,
+        }
+    }
+}
+
+/// Collects the `BlobId`s from the site_updates Deleted ResourceOps.
 /// These are candidates for deletion from Walrus.
 /// Resources that have been deleted but also created are excluded.
 fn collect_deletable_blob_candidates(site_updates: &SiteDataDiff) -> HashSet<BlobId> {
@@ -689,16 +871,19 @@ fn collect_deletable_blob_candidates(site_updates: &SiteDataDiff) -> HashSet<Blo
         })
         // Collect first to a hash-set to keep unique blob-ids.
         .collect::<HashSet<_>>();
-    let resource_deleted_but_blob_extended = site_updates
+    let resource_deleted_but_blob_still_used = site_updates
         .resource_ops
         .iter()
         .filter_map(|op| match op {
             SiteOps::Created(resource) if deleted.contains(&resource.info.blob_id) => {
                 Some(resource.info.blob_id)
             }
+            SiteOps::Unchanged(resource) if deleted.contains(&resource.info.blob_id) => {
+                Some(resource.info.blob_id)
+            }
             _ => None,
         })
         .collect::<HashSet<_>>();
-    deleted.retain(|blob_id| !resource_deleted_but_blob_extended.contains(blob_id));
+    deleted.retain(|blob_id| !resource_deleted_but_blob_still_used.contains(blob_id));
     deleted
 }
