@@ -27,7 +27,6 @@ use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
     object::Owner,
     transaction::{ProgrammableTransaction, TransactionData},
-    TypeTag,
 };
 use walrus_sdk::core::{BlobId as BlobIdOriginal, QuiltPatchId};
 
@@ -35,7 +34,7 @@ use crate::{
     display,
     retry_client::RetriableSuiClient,
     site::config::WSResources,
-    types::{HttpHeaders, ObjectCache, Staking, StakingInnerV1, StakingObjectForDeserialization},
+    types::{HttpHeaders, ObjectCache},
     walrus::{
         output::{EpochCount, EpochTimeOrMessage, InfoEpochOutput, SuiBlob},
         types::BlobId,
@@ -381,36 +380,6 @@ pub(crate) fn is_ignored<'a>(
     resource_path: &str,
 ) -> bool {
     ignore_patterns.any(|pattern| is_pattern_match(pattern, resource_path))
-}
-
-/// Fetches the staking object by its ID and the current walrus package ID.
-/// Returns a `StakingObject` that includes version, package IDs, and staking parameters.
-pub(crate) async fn get_staking_object(
-    sui_client: &RetriableSuiClient,
-    staking_object_id: ObjectID,
-) -> Result<Staking> {
-    let StakingObjectForDeserialization {
-        id,
-        version,
-        package_id,
-        new_package_id,
-    } = sui_client
-        .get_sui_object(staking_object_id)
-        .await
-        .context("Failed to fetch staking object data")?;
-
-    let inner = sui_client
-        .get_dynamic_field::<u64, StakingInnerV1>(staking_object_id, TypeTag::U64, version)
-        .await
-        .context("Failed to fetch inner staking data")?;
-
-    Ok(Staking {
-        id,
-        version,
-        package_id,
-        new_package_id,
-        inner,
-    })
 }
 
 /// Decodes a hexadecimal string (with "0x" prefix) into a vector of bytes.
