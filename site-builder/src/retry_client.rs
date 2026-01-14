@@ -7,7 +7,7 @@
 
 use std::{fmt::Debug, future::Future};
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use rand::{
     rngs::{StdRng, ThreadRng},
     Rng as _,
@@ -55,7 +55,7 @@ use crate::{
         AssociatedContractStruct,
         TypeOriginMap,
     },
-    types::SuiDynamicField,
+    types::{Staking, StakingInnerV1, StakingObjectForDeserialization, SuiDynamicField},
     util::handle_pagination,
 };
 
@@ -316,6 +316,35 @@ impl RetriableSuiClient {
             bail!("object ID ({object_id}) points to a package, not an object");
         };
         Ok(ObjectID::from_address(move_object_type.address()))
+    }
+
+    /// Fetches the staking object by its ID.
+    ///
+    /// Returns a [`Staking`] that includes version, package IDs, and staking parameters.
+    #[tracing::instrument(level = Level::DEBUG, skip_all)]
+    pub async fn get_staking_object(&self, staking_object_id: ObjectID) -> Result<Staking> {
+        let StakingObjectForDeserialization {
+            id,
+            version,
+            package_id,
+            new_package_id,
+        } = self
+            .get_sui_object(staking_object_id)
+            .await
+            .context("Failed to fetch staking object data")?;
+
+        let inner = self
+            .get_dynamic_field::<u64, StakingInnerV1>(staking_object_id, TypeTag::U64, version)
+            .await
+            .context("Failed to fetch inner staking data")?;
+
+        Ok(Staking {
+            id,
+            version,
+            package_id,
+            new_package_id,
+            inner,
+        })
     }
 
     /// Return a list of [SuiObjectResponse] from the given vector of [ObjectID]s.

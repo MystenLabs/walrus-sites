@@ -22,7 +22,7 @@ use crate::{
     retry_client::RetriableSuiClient,
     site::{RemoteSiteFactory, SiteData},
     types::Staking,
-    util::{get_owned_blobs, get_staking_object, parse_quilt_patch_id},
+    util::{get_owned_blobs, parse_quilt_patch_id},
     walrus::{output::SuiBlob, types::BlobId},
 };
 
@@ -64,7 +64,7 @@ pub(crate) async fn display_sitemap(
         .ok_or_else(|| anyhow!("staking_object not defined in the config"))?;
     dbg!("Using staking object:", staking_object_id);
 
-    let staking_object = get_staking_object(&sui_client, staking_object_id).await?;
+    let staking_object = sui_client.get_staking_object(staking_object_id).await?;
     let table = SiteMapTable::new(&site_data, &owned_blobs, &staking_object);
     table.printstd();
 
