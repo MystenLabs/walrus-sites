@@ -11,7 +11,7 @@ pub mod resource;
 
 use std::{collections::HashMap, time::Duration};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use contracts::TypeOriginMap;
 use futures::future::try_join_all;
 use resource::{ResourceSet, SiteOps};
@@ -188,7 +188,10 @@ impl RemoteSiteFactory<'_> {
 
     /// Gets the remote site representation stored on chain
     pub async fn get_from_chain(&self, site_id: ObjectID) -> Result<SiteData> {
-        let site_fields = self.get_site_fields(site_id).await?;
+        let site_fields = self
+            .get_site_fields(site_id)
+            .await
+            .context(format!("Could not fetch fields for site: {site_id}"))?;
         let metadata = Some(site_fields.clone().into());
         let dynamic_fields = self.get_all_dynamic_fields(site_id).await?;
         let resource_path_tag = self.resource_path_tag()?;
