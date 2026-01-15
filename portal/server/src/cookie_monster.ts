@@ -69,7 +69,7 @@ export class CookieMonster {
 		let currentParentDomain = this.getParentDomain(host);
 		while (currentParentDomain) {
 			const parsedPsl = psl.parse(currentParentDomain);
-			if (parsedPsl.error) {
+			if ('error' in parsedPsl) {
 				logger.warn(`Unexpected PSL parse error for domain "${currentParentDomain}"`, parsedPsl);
 				break;
 			}
