@@ -33,7 +33,7 @@ export class CookieMonster {
 			Object.keys(cookies).forEach(name => {
 				const parentDomains = CookieMonster.getCookieParentDomains(fullDomain);
 				// Eat cookie for the full domain
-				const opts: cookie.CookieSerializeOptions = {
+				const opts: cookie.SerializeOptions = {
 					expires: new Date(1),
 					path: '/',
 					httpOnly: true,
