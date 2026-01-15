@@ -3,6 +3,7 @@
 
 import * as cookie from 'cookie'
 import psl from 'psl'
+import logger from '@lib/logger'
 
 export class CookieMonster {
 	/**
@@ -68,11 +69,14 @@ export class CookieMonster {
 		let currentParentDomain = this.getParentDomain(host);
 		while (currentParentDomain) {
 			const parsedPsl = psl.parse(currentParentDomain);
+			if (parsedPsl.error) {
+				logger.warn(`Unexpected PSL parse error for domain "${currentParentDomain}"`, parsedPsl);
+				break;
+			}
 			if (!parsedPsl.sld) {
 				break;
-			} else {
-				console.log(`sld for ${currentParentDomain} is ${parsedPsl.sld}`);
 			}
+			logger.debug(`sld for ${currentParentDomain} is ${parsedPsl.sld}`);
 			parentDomains.push(currentParentDomain);
 			currentParentDomain = this.getParentDomain(currentParentDomain);
 		}
