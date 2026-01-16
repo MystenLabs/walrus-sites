@@ -8,6 +8,8 @@ use std::{
 };
 
 use anyhow::{anyhow, bail, Result};
+use bcs;
+use serde::Serialize;
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{
     rpc_types::{
@@ -20,6 +22,7 @@ use sui_sdk::{
 };
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
+    id::UID,
     transaction::{CallArg, ProgrammableTransaction, TransactionData, TransactionDataAPI},
     Identifier,
 };
@@ -45,9 +48,46 @@ use crate::{
     site::builder::{SitePtbBuilderResultExt, PTB_MAX_MOVE_CALLS},
     summary::SiteDataDiffSummary,
     types::{ExtendOps, Metadata, MetadataOp, ObjectCache, RouteOps, SiteNameOp},
-    util::{get_epochs_ahead, get_owned_blobs, get_site_id_from_response, get_site_object_via_graphql, sign_and_send_ptb},
+    util::{get_epochs_ahead, get_owned_blobs, get_site_id_from_response, sign_and_send_ptb},
     walrus::{output::SuiBlob, types::BlobId, Walrus},
 };
+
+/// A minimal Site struct for gas estimation purposes.
+#[derive(Serialize)]
+struct SiteForEstimation {
+    id: UID,
+    name: String,
+    link: Option<String>,
+    image_url: Option<String>,
+    description: Option<String>,
+    project_url: Option<String>,
+    creator: Option<String>,
+}
+
+impl SiteForEstimation {
+    /// Creates a minimal Site struct for gas estimation purposes.
+    fn new_for_estimation() -> Self {
+        Self {
+            id: UID::new(ObjectID::ZERO),
+            name: String::new(),
+            link: None,
+            image_url: None,
+            description: None,
+            project_url: None,
+            creator: None,
+        }
+    }
+
+    /// Serialize to BCS bytes for use as a Pure CallArg.
+    fn to_bcs_bytes(&self) -> Vec<u8> {
+        bcs::to_bytes(self).expect("SiteForEstimation serialization should not fail")
+    }
+}
+
+/// Returns a `CallArg` using a fake BCS-serialized Site for gas estimation.
+fn fake_site_call_arg() -> CallArg {
+    CallArg::Pure(SiteForEstimation::new_for_estimation().to_bcs_bytes())
+}
 
 #[cfg(test)]
 #[path = "../unit_tests/site.manager.tests.rs"]
@@ -240,11 +280,7 @@ impl SiteManager {
         // 1st iteration
         // Keep 4 operations for optional update_name + route deletion + creation + site-transfer
         const INITIAL_MAX: u16 = PTB_MAX_MOVE_CALLS - 4;
-        let mut ptb = SitePtb::<(), INITIAL_MAX>::new(
-            self.config.package,
-            Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
-            walrus_pkg,
-        );
+        let mut ptb = self.create_site_ptb::<INITIAL_MAX>(walrus_pkg);
 
         // Start with blob-extensions. Assuming it won't take a lot of space in the PTB.
         if let ExtendOps::Extend {
@@ -290,9 +326,8 @@ impl SiteManager {
         // Keep 3 operations for optional route deletion + creation + site-transfer
         let mut ptb = match &self.site_id {
             Some(site_id) => {
-                let mut site_object_ref = self.wallet.get_object_ref(*site_id).await?;
-                site_object_ref = self.verify_object_ref_choose_latest(site_object_ref)?;
-                let ptb = ptb.with_call_arg(&site_object_ref.into())?;
+                let call_arg = self.fetch_site_call_arg(*site_id).await?;
+                let ptb = ptb.with_call_arg(&call_arg)?;
                 // Also update metadata if there is a diff
                 match updates.metadata_op {
                     MetadataOp::Update => {
@@ -344,44 +379,23 @@ impl SiteManager {
         Ok((ptb.finish(), resources_iter, routes_iter))
     }
 
-    /// Builds PTBs for remaining resources and routes.
-    async fn build_remaining_resources_ptbs<'a>(
-        &mut self,
-        site_object_id: ObjectID,
-        walrus_pkg: ObjectID,
-        mut resources_iter: Peekable<std::slice::Iter<'a, SiteOps<'a>>>,
-        mut routes_iter: Peekable<btree_map::Iter<'a, String, String>>,
-    ) -> Result<Vec<ProgrammableTransaction>> {
-        let mut transactions = Vec::new();
-
-        while resources_iter.peek().is_some() || routes_iter.peek().is_some() {
-            let ptb: SitePtb<(), { PTB_MAX_MOVE_CALLS }> = SitePtb::new(
-                self.config.package,
-                Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
-                walrus_pkg,
-            );
-            let mut site_object_ref = self.wallet.get_object_ref(site_object_id).await?;
-            site_object_ref = self.verify_object_ref_choose_latest(site_object_ref)?;
-            let call_arg: CallArg = site_object_ref.into();
-            let mut ptb = ptb.with_call_arg(&call_arg)?;
-
-            ptb.add_resource_operations(&mut resources_iter)
-                .ok_if_limit_reached()?;
-
-            // Add routes only if all resources have been added.
-            if resources_iter.peek().is_none() {
-                ptb.add_route_operations(&mut routes_iter)
-                    .ok_if_limit_reached()?;
-            }
-
-            transactions.push(ptb.finish());
-        }
-
-        Ok(transactions)
+    /// Fetches a fresh `CallArg` for the given site object from the chain.
+    async fn fetch_site_call_arg(&mut self, site_object_id: ObjectID) -> Result<CallArg> {
+        let mut site_object_ref = self.wallet.get_object_ref(site_object_id).await?;
+        site_object_ref = self.verify_object_ref_choose_latest(site_object_ref)?;
+        Ok(site_object_ref.into())
     }
 
-    /// Estimates Sui gas costs for site updates by dry-running PTBs built
-    /// with the same logic as `execute_sui_updates`.
+    /// Creates a new SitePtb with common configuration.
+    fn create_site_ptb<const MAX_MOVE_CALLS: u16>(&self, walrus_pkg: ObjectID) -> SitePtb<(), MAX_MOVE_CALLS> {
+        SitePtb::<(), MAX_MOVE_CALLS>::new(
+            self.config.package,
+            Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
+            walrus_pkg,
+        )
+    }
+
+    /// Estimates Sui gas costs for site updates by dry-running PTBs
     pub async fn estimate_sui_gas(
         &mut self,
         local_site_data: &SiteData,
@@ -418,7 +432,7 @@ impl SiteManager {
         // Check if we'll need additional PTBs by peeking at the iterators
         let has_remaining_resources = resources_iter.peek().is_some() || routes_iter.peek().is_some();
         
-        let site_object_id = if !has_remaining_resources {
+        if !has_remaining_resources {
             // No additional PTBs needed - just return the initial PTB gas cost
             println!(
                 "Total estimated gas cost: {} MIST ({:.2} SUI)",
@@ -426,34 +440,27 @@ impl SiteManager {
                 initial_gas as f64 / 1_000_000_000.0
             );
             return Ok(initial_gas);
-        } else {
-            // Additional PTBs needed - get site object ID
-            // Since their validation will depend on it
-            match &self.site_id {
-                Some(id) => *id, // Use existing site ID
-                None => {
-                    // For new sites, query for existing site object
-                    // We can use any one but it should be real one, present on the chain
-                    // We have to use GraphQL here since the standard rpc api 
-                    // doesn't have such interface for querying site objects
-                    let existing_site_id = {
-                        let package = self.config.package;
-                        tracing::debug!(?package, "Using package from config for GraphQL query");
-                        get_site_object_via_graphql(&self.wallet, package).await
-                    };
-                    if let Some(existing_id) = existing_site_id {
-                        existing_id
-                    } else {
-                        return Err(anyhow::anyhow!("No existing site object found for gas estimation"));
-                    }
-                }
-            }
-        };
+        }
 
         // Build remaining PTBs
-        let remaining_ptbs = self
-            .build_remaining_resources_ptbs(site_object_id, walrus_pkg, resources_iter, routes_iter)
-            .await?;
+        let fake_call_arg = fake_site_call_arg();
+        let mut remaining_ptbs = Vec::new();
+
+        while resources_iter.peek().is_some() || routes_iter.peek().is_some() {
+            let ptb = self.create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_pkg);
+            let mut ptb = ptb.with_call_arg(&fake_call_arg)?;
+
+            ptb.add_resource_operations(&mut resources_iter)
+                .ok_if_limit_reached()?;
+
+            // Add routes only if all resources have been added.
+            if resources_iter.peek().is_none() {
+                ptb.add_route_operations(&mut routes_iter)
+                    .ok_if_limit_reached()?;
+            }
+
+            remaining_ptbs.push(ptb.finish());
+        }
 
         // Dry run remaining PTBs
         let mut total_gas = initial_gas;
@@ -575,7 +582,7 @@ impl SiteManager {
         );
 
         // Build the initial PTB
-        let (initial_ptb, resources_iter, routes_iter) =
+        let (initial_ptb, mut resources_iter, mut routes_iter) =
             self.build_initial_ptb(updates, walrus_pkg).await?;
 
         assert!(initial_ptb.commands.len() <= PTB_MAX_MOVE_CALLS as usize);
@@ -605,15 +612,24 @@ impl SiteManager {
                 get_site_id_from_response(self.active_address()?, resp)?
             }
         };
-        // Build remaining PTBs
-        let remaining_ptbs = self
-            .build_remaining_resources_ptbs(site_object_id, walrus_pkg, resources_iter, routes_iter)
-            .await?;
-
         // Execute remaining PTBs
-        for ptb in remaining_ptbs {
+        while resources_iter.peek().is_some() || routes_iter.peek().is_some() {
+            let call_arg = self.fetch_site_call_arg(site_object_id).await?;
+            
+            let ptb = self.create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_pkg);
+            let mut ptb = ptb.with_call_arg(&call_arg)?;
+
+            ptb.add_resource_operations(&mut resources_iter)
+                .ok_if_limit_reached()?;
+
+            // Add routes only if all resources have been added.
+            if resources_iter.peek().is_none() {
+                ptb.add_route_operations(&mut routes_iter)
+                    .ok_if_limit_reached()?;
+            }
+
             let gas_ref = self.gas_coin_ref().await?;
-            let resource_result = self.sign_and_send_ptb(ptb, gas_ref).await?;
+            let resource_result = self.sign_and_send_ptb(ptb.finish(), gas_ref).await?;
             if let Some(SuiExecutionStatus::Failure { error }) =
                 resource_result.effects.as_ref().map(|e| e.status())
             {
@@ -658,14 +674,9 @@ impl SiteManager {
 
         // Create PTBs until all operations are processed
         while operations_iter.peek().is_some() {
-            let ptb = SitePtb::<(), PTB_MAX_MOVE_CALLS>::new(
-                self.config.package,
-                Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
-                walrus_package,
-            );
-            let mut site_obj_ref = self.wallet.get_object_ref(site_id).await?;
-            site_obj_ref = self.verify_object_ref_choose_latest(site_obj_ref)?;
-            let call_arg: CallArg = site_obj_ref.into();
+            let call_arg = self.fetch_site_call_arg(site_id).await?;
+            
+            let ptb = self.create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_package);
             let mut ptb = ptb.with_call_arg(&call_arg)?;
 
             ptb.add_resource_operations(&mut operations_iter)
