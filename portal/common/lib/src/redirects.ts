@@ -39,7 +39,7 @@ export function redirectToAggregatorUrlResponse(
  */
 export function checkRedirect(object: SuiObjectResponse): string | null {
     logger.info("Checking if the request should be redirected (existing Display object)", {
-        objectId: object.data.objectId,
+        objectId: object.data?.objectId,
     });
     if (object.data && object.data.display) {
         let display = object.data.display;
