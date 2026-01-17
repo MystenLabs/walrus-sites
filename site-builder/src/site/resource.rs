@@ -312,13 +312,37 @@ impl Display for ResourceSet {
 ///
 /// Contains the file's metadata (path, size, headers, hash) but not the blob ID,
 /// which is only assigned after upload.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ResourceData {
     unencoded_size: usize,
     full_path: PathBuf,
     pub resource_path: String,
     headers: HttpHeaders,
     pub blob_hash: U256,
+}
+
+impl ResourceData {
+    /// Creates a deterministic mock blob ID for estimation purposes.
+    pub fn create_mock_blob_id(&self) -> BlobId {
+        use fastcrypto::hash::HashFunction;
+        
+        // Create a deterministic hash based on resource path and content hash
+        let mut hasher = fastcrypto::hash::Sha256::default();
+        hasher.update(self.resource_path.as_bytes());
+        hasher.update(self.blob_hash.to_le_bytes());
+        let hash = hasher.finalize();
+        
+        // Convert to first 32 bytes to a BlobId
+        let blob_id_bytes: [u8; 32] = hash.as_ref()[..32].try_into().unwrap();
+        BlobId::try_from(&blob_id_bytes[..]).expect("Invalid blob ID length")
+    }
+
+    /// Converts this ResourceData into a mock Resource for estimation purposes.
+    pub fn into_mock_resource(self) -> Resource {
+        let mock_blob_id = self.create_mock_blob_id();
+        let mock_patch_id = Some(format!("0x{}", hex::encode([0u8; 32]))); // Mock patch ID
+        self.into_resource(mock_blob_id, mock_patch_id)
+    }
 }
 
 /// The result of parsing a directory for resources.
@@ -654,6 +678,20 @@ impl ResourceManager {
                 .as_ref()
                 .and_then(|config| config.site_name.clone()),
         )
+    }
+
+    /// Creates mock resources from chunked resource data for estimation purposes.
+    pub fn create_mock_resources_from_chunks(
+        &self,
+        chunks: &[Vec<(ResourceData, crate::walrus::command::QuiltBlobInput)>],
+    ) -> Vec<Resource> {
+        let mut mock_resources = Vec::new();
+        for chunk in chunks {
+            for (res_data, _) in chunk {
+                mock_resources.push(res_data.clone().into_mock_resource());
+            }
+        }
+        mock_resources
     }
 }
 

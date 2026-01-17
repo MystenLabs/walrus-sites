@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 use std::{
     collections::HashSet,
+    io::{self, Write},
     path::{Path, PathBuf},
 };
 
@@ -17,13 +18,12 @@ use crate::{
     args::PublishOptions,
     config::Config,
     display,
-};
-use crate::{
     preprocessor::Preprocessor,
     site::{
         config::WSResources,
+        estimates::Estimator,
         manager::{BlobExtensions, SiteManager},
-        quilts::{DryRunInfo, QuiltsManager},
+        quilts::QuiltsManager,
         resource::{ResourceManager, ResourceSet, SiteOps},
         RemoteSiteFactory,
         SiteData,
@@ -144,6 +144,7 @@ impl SiteEditor<EditOptions> {
         if self.is_list_directory() {
             self.preprocess_directory(&resource_manager)?;
         }
+        println!();
         display::action(format!(
             "Parsing the directory {}",
             self.directory().to_string_lossy()
@@ -180,15 +181,78 @@ impl SiteEditor<EditOptions> {
             BlobExtensions::Noop
         };
 
-        // Build dry run info if in dry run mode
-        let dry_run_info = if dry_run {
-            Some(DryRunInfo {
-                extension_estimate: blob_extensions.estimate(),
-            })
-        } else {
-            None
-        };
+        // If dry_run, show both Walrus and Sui estimates upfront before any execution
+        if dry_run {
+            let estimator = Estimator::new();
+            
+            // Create separate managers for dry-run to avoid polluting cache
+            let (_, mut dry_quilts_manager, mut dry_site_manager) = self.create_managers().await?;
+            
+            // First, show Walrus storage estimates
+            estimator.show_walrus_estimates(
+                &mut dry_quilts_manager,
+                parsed.changed.clone(),
+                self.edit_options
+                    .publish_options
+                    .walrus_options
+                    .epoch_arg
+                    .clone(),
+                self.edit_options
+                    .publish_options
+                    .walrus_options
+                    .max_quilt_size,
+                &blob_extensions,
+            ).await?;
+            
+            // Create mock resources for accurate Sui estimation
+            let chunks = quilts_manager.quilts_chunkify(
+                parsed.changed.clone(),
+                self.edit_options
+                    .publish_options
+                    .walrus_options
+                    .max_quilt_size,
+            )?;
+            let mock_resources = resource_manager.create_mock_resources_from_chunks(&chunks);
+            
+            // Combine mock resources with unchanged resources for accurate Sui estimation
+            let mut mock_resource_set = ResourceSet::empty();
+            mock_resource_set.extend(mock_resources);
+            mock_resource_set.extend(parsed.unchanged.clone());
+            let mock_local_site_data = resource_manager.to_site_data(mock_resource_set);
 
+            // Calculate updates to pass to estimator
+            let updates = mock_local_site_data.diff(&existing_site, blob_extensions.clone().into())?;
+
+            // Show Sui gas estimates using estimator
+            estimator.show_sui_gas_estimates(
+                &mut dry_site_manager,
+                &updates,
+                blob_extensions.clone(),
+                walrus_pkg,
+            ).await?;
+
+            #[cfg(not(feature = "_testing-dry-run"))]
+            {
+                println!();
+                print!("Store quilts to Walrus and execute SUI transactions? (This will deduct fees from your wallet - actual cost may vary from estimates) [Y/n] ");
+                io::stdout().flush()?;
+                let mut input = String::new();
+                io::stdin().read_line(&mut input)?;
+                
+                let input = input.trim().to_lowercase();
+                if !input.is_empty() && !input.starts_with('y') {
+                    bail!("Execution cancelled by user");
+                }
+            }
+            #[cfg(feature = "_testing-dry-run")]
+            {
+                println!("Test mode: automatically proceeding with execution");
+            }
+        }
+
+        // Now execute the actual operations
+        println!();
+        display::action("Storing quilts to Walrus");
         let stored_resources = quilts_manager
             .store_quilts(
                 parsed.changed,
@@ -201,45 +265,16 @@ impl SiteEditor<EditOptions> {
                     .publish_options
                     .walrus_options
                     .max_quilt_size,
-                dry_run_info,
             )
             .await?;
+        display::done();
+
         // Combine stored resources with unchanged resources
         let mut resource_set = ResourceSet::empty();
         resource_set.extend(stored_resources);
         resource_set.extend(parsed.unchanged);
 
         let local_site_data = resource_manager.to_site_data(resource_set);
-        display::done();
-
-        // If dry_run, also show Sui gas estimates using the detailed estimator
-        // and ask for confirmation before executing Sui transactions.
-        if dry_run {
-            println!();
-            println!("Sui Gas Estimates:");
-            let _total_gas = site_manager
-                .estimate_sui_gas(&local_site_data, &existing_site, blob_extensions.clone(), walrus_pkg)
-                .await?;
-            println!();
-
-            #[cfg(not(feature = "_testing-dry-run"))]
-            {
-                if !dialoguer::Confirm::new()
-                    .with_prompt(
-                        "Execute Sui transactions? (This will deduct fees from your wallet - actual cost may vary from the estimate)",
-                    )
-                    .default(true)
-                    .interact()? 
-                {
-                    display::error("Sui execution cancelled by user");
-                    bail!("Sui execution cancelled by user");
-                }
-            }
-            #[cfg(feature = "_testing-dry-run")]
-            {
-                println!("Test mode: automatically proceeding with Sui execution");
-            }
-        }
 
         let (response, summary) = site_manager
             .update_site(
@@ -341,8 +376,7 @@ impl SiteEditor<EditOptions> {
             "Successfully preprocessed the {} directory!",
             self.directory().display()
         ));
-        display::done();
-        Ok(())
+    Ok(())
     }
 }
 

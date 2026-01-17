@@ -8,8 +8,6 @@ use std::{
 };
 
 use anyhow::{anyhow, bail, Result};
-use bcs;
-use serde::Serialize;
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{
     rpc_types::{
@@ -22,7 +20,6 @@ use sui_sdk::{
 };
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
-    id::UID,
     transaction::{CallArg, ProgrammableTransaction, TransactionData, TransactionDataAPI},
     Identifier,
 };
@@ -33,11 +30,8 @@ use walrus_sdk::sui::{
 };
 
 use super::{
-    builder::SitePtb,
     resource::{Resource, ResourceSet, SiteOps},
-    SiteData,
-    SiteDataDiff,
-    SITE_MODULE,
+    builder::{SitePtbBuilderResultExt, SitePtb, PTB_MAX_MOVE_CALLS},
 };
 use crate::{
     args::{EpochArg, EpochCountOrMax},
@@ -45,49 +39,12 @@ use crate::{
     config::Config,
     display,
     retry_client::RetriableSuiClient,
-    site::builder::{SitePtbBuilderResultExt, PTB_MAX_MOVE_CALLS},
+    site::{SiteData, SiteDataDiff, SITE_MODULE},
     summary::SiteDataDiffSummary,
     types::{ExtendOps, Metadata, MetadataOp, ObjectCache, RouteOps, SiteNameOp},
     util::{get_epochs_ahead, get_owned_blobs, get_site_id_from_response, sign_and_send_ptb},
     walrus::{output::SuiBlob, types::BlobId, Walrus},
 };
-
-/// A minimal Site struct for gas estimation purposes.
-#[derive(Serialize)]
-struct SiteForEstimation {
-    id: UID,
-    name: String,
-    link: Option<String>,
-    image_url: Option<String>,
-    description: Option<String>,
-    project_url: Option<String>,
-    creator: Option<String>,
-}
-
-impl SiteForEstimation {
-    /// Creates a minimal Site struct for gas estimation purposes.
-    fn new_for_estimation() -> Self {
-        Self {
-            id: UID::new(ObjectID::ZERO),
-            name: String::new(),
-            link: None,
-            image_url: None,
-            description: None,
-            project_url: None,
-            creator: None,
-        }
-    }
-
-    /// Serialize to BCS bytes for use as a Pure CallArg.
-    fn to_bcs_bytes(&self) -> Vec<u8> {
-        bcs::to_bytes(self).expect("SiteForEstimation serialization should not fail")
-    }
-}
-
-/// Returns a `CallArg` using a fake BCS-serialized Site for gas estimation.
-fn fake_site_call_arg() -> CallArg {
-    CallArg::Pure(SiteForEstimation::new_for_estimation().to_bcs_bytes())
-}
 
 #[cfg(test)]
 #[path = "../unit_tests/site.manager.tests.rs"]
@@ -268,7 +225,7 @@ impl SiteManager {
 
     /// Builds the initial PTB for site creation/update with initial resources and
     /// blob extension operations.
-    async fn build_initial_ptb<'a>(
+    pub async fn build_initial_ptb<'a>(
         &mut self,
         updates: &'a SiteDataDiff<'_>,
         walrus_pkg: ObjectID,
@@ -387,7 +344,8 @@ impl SiteManager {
     }
 
     /// Creates a new SitePtb with common configuration.
-    fn create_site_ptb<const MAX_MOVE_CALLS: u16>(&self, walrus_pkg: ObjectID) -> SitePtb<(), MAX_MOVE_CALLS> {
+    /// Creates a new SitePtb with common configuration.
+    pub fn create_site_ptb<const MAX_MOVE_CALLS: u16>(&self, walrus_pkg: ObjectID) -> SitePtb<(), MAX_MOVE_CALLS> {
         SitePtb::<(), MAX_MOVE_CALLS>::new(
             self.config.package,
             Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
@@ -395,138 +353,12 @@ impl SiteManager {
         )
     }
 
-    /// Estimates Sui gas costs for site updates by dry-running PTBs
-    pub async fn estimate_sui_gas(
-        &mut self,
-        local_site_data: &SiteData,
-        existing_site: &SiteData,
-        blob_extensions: BlobExtensions,
-        walrus_pkg: ObjectID,
-    ) -> Result<u64> {
-        tracing::debug!(
-            address=?self.active_address()?,
-            "estimating Sui gas for site updates",
-        );
-
-        // Calculate the diff between current and new site data, including blob extensions
-        let updates = local_site_data.diff(existing_site, blob_extensions.into())?;
-
-        // Build the initial PTB
-        let (initial_ptb, mut resources_iter, mut routes_iter) =
-            self.build_initial_ptb(&updates, walrus_pkg).await?;
-
-        let gas_ref = self.gas_coin_ref().await?;
-
-        // Dry run initial PTB
-        let initial_response =
-            self.dry_run_ptb(initial_ptb.clone(), gas_ref, false).await?;
-        let initial_gas = initial_response.effects.gas_cost_summary().net_gas_usage() as u64;
-        
-        println!(
-            "Initial PTB gas cost: {} MIST ({:.3} SUI) ({} commands)",
-            initial_gas,
-            initial_gas as f64 / 1_000_000_000.0,
-            initial_ptb.commands.len()
-        );
-
-        // Check if we'll need additional PTBs by peeking at the iterators
-        let has_remaining_resources = resources_iter.peek().is_some() || routes_iter.peek().is_some();
-        
-        if !has_remaining_resources {
-            // No additional PTBs needed - just return the initial PTB gas cost
-            println!(
-                "Total estimated gas cost: {} MIST ({:.2} SUI)",
-                initial_gas,
-                initial_gas as f64 / 1_000_000_000.0
-            );
-            return Ok(initial_gas);
-        }
-
-        // Build remaining PTBs
-        let fake_call_arg = fake_site_call_arg();
-        let mut remaining_ptbs = Vec::new();
-
-        while resources_iter.peek().is_some() || routes_iter.peek().is_some() {
-            let ptb = self.create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_pkg);
-            let mut ptb = ptb.with_call_arg(&fake_call_arg)?;
-
-            ptb.add_resource_operations(&mut resources_iter)
-                .ok_if_limit_reached()?;
-
-            // Add routes only if all resources have been added.
-            if resources_iter.peek().is_none() {
-                ptb.add_route_operations(&mut routes_iter)
-                    .ok_if_limit_reached()?;
-            }
-
-            remaining_ptbs.push(ptb.finish());
-        }
-
-        // Dry run remaining PTBs
-        let mut total_gas = initial_gas;
-        if remaining_ptbs.is_empty() {
-            println!("Single transaction required for all updates");
-        } else {
-            println!(
-                "Multiple transactions required: {} additional resource PTBs",
-                remaining_ptbs.len()
-            );
-        }
-        
-        for (i, ptb) in remaining_ptbs.iter().enumerate() {
-            let gas_ref = self.gas_coin_ref().await?;
-            let response = self.dry_run_ptb(ptb.clone(), gas_ref, true).await?;
-            
-            // If dev_inspect failed, estimate gas based on command count
-            let gas_cost = if response.error.is_some() {
-                // Use heuristic: scale based on command count compared to initial PTB
-                let command_ratio = ptb.commands.len() as f64 / initial_ptb.commands.len() as f64;
-                (initial_gas as f64 * command_ratio * 0.8) as u64 // Resource PTBs are typically simpler
-            } else {
-                response.effects.gas_cost_summary().net_gas_usage() as u64
-            };
-            
-            total_gas += gas_cost;
-            
-            // Debug: show if there were any errors in dev_inspect
-            if let Some(ref error) = response.error {
-                println!(
-                    "Resource PTB {}/{} had dev_inspect error: {}",
-                    i + 1,
-                    remaining_ptbs.len(),
-                    error
-                );
-                println!(
-                    "Estimated cost based on {} commands", 
-                    ptb.commands.len()
-                );
-            }
-            
-            println!(
-                "Resource PTB {}/{}: {} MIST ({:.3} SUI) ({} commands)",
-                i + 1,
-                remaining_ptbs.len(),
-                gas_cost,
-                gas_cost as f64 / 1_000_000_000.0,
-                ptb.commands.len()
-            );
-        }
-
-        println!(
-            "Total estimated gas cost: {} MIST ({:.3} SUI)",
-            total_gas,
-            total_gas as f64 / 1_000_000_000.0
-        );
-
-        Ok(total_gas)
-    }
-
     /// Dry runs a PTB using DevInspectTransactionBlock and returns the response
     ///
     /// It makes sense to use dev_inspect_transaction_block instead of dry_run_transaction_block
     /// because the latter requires extended validations like signed transactions.
     /// For our use case we actually need only high level verification and gas cost estimation.
-    async fn dry_run_ptb(
+    pub async fn dry_run_ptb(
         &mut self,
         ptb: ProgrammableTransaction,
         gas_coin: ObjectRef,
@@ -730,7 +562,7 @@ impl SiteManager {
     // TODO: Why require a **single** gas-coin and not do select_coins?
     /// Returns the [`ObjectRef`] of an arbitrary gas coin owned by the active wallet
     /// with a sufficient balance for the gas budget specified in the config.
-    async fn gas_coin_ref(&mut self) -> Result<ObjectRef> {
+    pub async fn gas_coin_ref(&mut self) -> Result<ObjectRef> {
         // Keep re-fetching the coin, until it matches the latest state stored by our cache, as
         // older versions might show more balance than its actual balance.
         let mut backoff = self.backoff_config.get_strategy(rand::random());
@@ -807,35 +639,6 @@ pub enum BlobExtensions {
         new_end_epoch: u32,
         storage_price: u64,
     },
-}
-
-impl BlobExtensions {
-    /// Returns the estimation for blob extensions: (blob_count, total_wal_cost).
-    /// Returns None if no extensions are needed.
-    pub fn estimate(&self) -> Option<(usize, u64)> {
-        match self {
-            BlobExtensions::Noop => None,
-            BlobExtensions::Extend {
-                blobs,
-                new_end_epoch,
-                storage_price,
-            } => {
-                let count = blobs.len();
-                let total_cost: u64 = blobs
-                    .iter()
-                    .map(|(sui_blob, _)| {
-                        let epochs_extended = *new_end_epoch - sui_blob.storage.end_epoch;
-                        price_for_encoded_length(
-                            sui_blob.storage.storage_size,
-                            *storage_price,
-                            epochs_extended,
-                        )
-                    })
-                    .sum();
-                Some((count, total_cost))
-            }
-        }
-    }
 }
 
 impl From<BlobExtensions> for ExtendOps {
