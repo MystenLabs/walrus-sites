@@ -158,6 +158,10 @@ impl RetriableSuiClient {
     pub fn backoff_config(&self) -> &ExponentialBackoffConfig {
         &self.backoff_config
     }
+    /// Returns a reference to the inner SuiClient.
+    pub fn client(&self) -> &SuiClient {
+        &self.sui_client
+    }
 
     /// Creates a walrus-sdk `RetriableSuiClient` from this client.
     pub fn to_walrus_retriable_client(&self) -> Result<WalrusRetriableSuiClient> {
