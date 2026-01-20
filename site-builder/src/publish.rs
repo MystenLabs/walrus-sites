@@ -2,11 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 use std::{
     collections::HashSet,
-    io::{self, Write},
     path::{Path, PathBuf},
 };
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, Result};
 use sui_sdk::rpc_types::{
     SuiExecutionStatus,
     SuiTransactionBlockEffects,
@@ -140,7 +139,8 @@ impl SiteEditor<EditOptions> {
     async fn run_single_edit_quilts(
         &self,
     ) -> Result<(SuiAddress, SuiTransactionBlockResponse, SiteDataDiffSummary)> {
-        let (resource_manager, mut quilts_manager, mut site_manager) = self.create_managers().await?;
+        let (resource_manager, mut quilts_manager, mut site_manager) =
+            self.create_managers().await?;
         if self.is_list_directory() {
             self.preprocess_directory(&resource_manager)?;
         }
@@ -184,26 +184,28 @@ impl SiteEditor<EditOptions> {
         // If dry_run, show both Walrus and Sui estimates upfront before any execution
         if dry_run {
             let estimator = Estimator::new();
-            
+
             // Create separate managers for dry-run to avoid polluting cache
             let (_, mut dry_quilts_manager, mut dry_site_manager) = self.create_managers().await?;
-            
+
             // First, show Walrus storage estimates
-            estimator.show_walrus_estimates(
-                &mut dry_quilts_manager,
-                parsed.changed.clone(),
-                self.edit_options
-                    .publish_options
-                    .walrus_options
-                    .epoch_arg
-                    .clone(),
-                self.edit_options
-                    .publish_options
-                    .walrus_options
-                    .max_quilt_size,
-                &blob_extensions,
-            ).await?;
-            
+            estimator
+                .show_walrus_estimates(
+                    &mut dry_quilts_manager,
+                    parsed.changed.clone(),
+                    self.edit_options
+                        .publish_options
+                        .walrus_options
+                        .epoch_arg
+                        .clone(),
+                    self.edit_options
+                        .publish_options
+                        .walrus_options
+                        .max_quilt_size,
+                    &blob_extensions,
+                )
+                .await?;
+
             // Create mock resources for accurate Sui estimation
             let chunks = quilts_manager.quilts_chunkify(
                 parsed.changed.clone(),
@@ -213,7 +215,7 @@ impl SiteEditor<EditOptions> {
                     .max_quilt_size,
             )?;
             let mock_resources = resource_manager.create_mock_resources_from_chunks(&chunks);
-            
+
             // Combine mock resources with unchanged resources for accurate Sui estimation
             let mut mock_resource_set = ResourceSet::empty();
             mock_resource_set.extend(mock_resources);
@@ -221,32 +223,37 @@ impl SiteEditor<EditOptions> {
             let mock_local_site_data = resource_manager.to_site_data(mock_resource_set);
 
             // Calculate updates to pass to estimator
-            let updates = mock_local_site_data.diff(&existing_site, blob_extensions.clone().into())?;
+            let updates =
+                mock_local_site_data.diff(&existing_site, blob_extensions.clone().into())?;
 
             // Show Sui gas estimates using estimator
-            estimator.show_sui_gas_estimates(
-                &mut dry_site_manager,
-                &updates,
-                blob_extensions.clone(),
-                walrus_pkg,
-            ).await?;
+            estimator
+                .show_sui_gas_estimates(
+                    &mut dry_site_manager,
+                    &updates,
+                    blob_extensions.clone(),
+                    walrus_pkg,
+                )
+                .await?;
 
             #[cfg(not(feature = "_testing-dry-run"))]
             {
-                println!();
-                print!("Store quilts to Walrus and execute SUI transactions? (This will deduct fees from your wallet - actual cost may vary from estimates) [Y/n] ");
-                io::stdout().flush()?;
-                let mut input = String::new();
-                io::stdin().read_line(&mut input)?;
-                
-                let input = input.trim().to_lowercase();
-                if !input.is_empty() && !input.starts_with('y') {
-                    bail!("Execution cancelled by user");
+                display::warning(
+                    "This will deduct fees from your wallet - actual cost may vary from estimates",
+                );
+                let prompt = "Store quilts to Walrus and execute SUI transactions?";
+
+                if !dialoguer::Confirm::new()
+                    .with_prompt(prompt)
+                    .default(true)
+                    .interact()?
+                {
+                    return Err(anyhow!("Execution cancelled by user"))
                 }
             }
             #[cfg(feature = "_testing-dry-run")]
             {
-                println!("Test mode: automatically proceeding with execution");
+                display::info("Test mode: automatically proceeding with execution");
             }
         }
 
@@ -376,7 +383,7 @@ impl SiteEditor<EditOptions> {
             "Successfully preprocessed the {} directory!",
             self.directory().display()
         ));
-    Ok(())
+        Ok(())
     }
 }
 

@@ -443,14 +443,13 @@ pub struct WalrusStoreOptions {
     /// (non-deletable)
     #[arg(long, action = clap::ArgAction::SetTrue)]
     pub permanent: bool,
-    /// Perform a dry run to test and estimate costs before executing transactions.
+    /// Show cost estimates before executing transactions.
     ///
-    /// This is a four-step process:
-    /// Step 1: Dry-run quilts computation and storage (outputs FROST storage costs)
-    /// Step 2: If confirmed, commit quilts to Walrus (deducts FROST fees)
-    /// Step 3: Build and inspect SUI transactions (outputs SUI execution gas costs)
-    /// Step 4: If confirmed, execute transactions on SUI (deducts SUI fees)
+    /// This is a two-step process:
+    /// Step 1: Calculate Walrus storage costs (in FROST) and SUI gas costs (in MIST)
+    /// Step 2: If you confirm, execute both Walrus storage and SUI transactions
     ///
+    /// No actual fees are deducted during the estimation phase.
     /// Existing quilts are reused automatically without additional FROST spending.
     #[arg(long)]
     pub dry_run: bool,

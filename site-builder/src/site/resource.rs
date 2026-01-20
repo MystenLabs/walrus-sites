@@ -325,13 +325,13 @@ impl ResourceData {
     /// Creates a deterministic mock blob ID for estimation purposes.
     pub fn create_mock_blob_id(&self) -> BlobId {
         use fastcrypto::hash::HashFunction;
-        
+
         // Create a deterministic hash based on resource path and content hash
         let mut hasher = fastcrypto::hash::Sha256::default();
         hasher.update(self.resource_path.as_bytes());
         hasher.update(self.blob_hash.to_le_bytes());
         let hash = hasher.finalize();
-        
+
         // Convert to first 32 bytes to a BlobId
         let blob_id_bytes: [u8; 32] = hash.as_ref()[..32].try_into().unwrap();
         BlobId::try_from(&blob_id_bytes[..]).expect("Invalid blob ID length")

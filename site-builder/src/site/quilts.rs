@@ -1,8 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-//! Quilt storage manager for Walrus Sites.
-
 use std::num::NonZeroU16;
 
 use anyhow::{bail, Context, Result};
@@ -20,11 +18,6 @@ use crate::{
         Walrus,
     },
 };
-
-/// Information for dry-run mode.
-///
-/// When passed to `store_quilts`, enables dry-run mode which shows cost estimates
-/// and asks for user confirmation before proceeding.
 
 /// Manages quilt storage operations for Walrus Sites.
 pub struct QuiltsManager {

@@ -48,6 +48,12 @@ pub fn action<S: Display>(message: S) {
     }
 }
 
+pub fn info<S: Display>(message: S) {
+    if cfg!(not(test)) {
+        crossterm::execute!(stdout(), Print(format!("{message}\n"))).unwrap();
+    }
+}
+
 pub fn done() {
     if cfg!(not(test)) {
         crossterm::execute!(

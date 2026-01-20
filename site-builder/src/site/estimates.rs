@@ -7,25 +7,26 @@
 //! operations, used in dry-run mode
 
 use anyhow::Result;
-use itertools::Itertools;
-use sui_types::base_types::ObjectID;
-use sui_types::id::UID;
-use sui_types::transaction::CallArg;
-use sui_sdk::rpc_types::SuiTransactionBlockEffectsAPI;
-use serde::Serialize;
 use bcs;
+use itertools::Itertools;
+use serde::Serialize;
+use sui_sdk::rpc_types::SuiTransactionBlockEffectsAPI;
+use sui_types::{base_types::ObjectID, id::UID, transaction::CallArg};
 use walrus_sdk::sui::utils::price_for_encoded_length;
 
 use crate::{
     args::EpochArg,
     display,
     site::{
+        builder::{SitePtbBuilderResultExt, PTB_MAX_MOVE_CALLS},
+        manager::{BlobExtensions, SiteManager},
         quilts::QuiltsManager,
         resource::ResourceData,
-        manager::{SiteManager, BlobExtensions},
-        builder::{SitePtbBuilderResultExt, PTB_MAX_MOVE_CALLS},
     },
 };
+
+/// Conversion factor from MIST to SUI
+const MIST_PER_SUI: f64 = 1_000_000_000.0;
 
 /// A minimal Site struct for gas estimation purposes.
 #[derive(Serialize)]
@@ -74,7 +75,10 @@ impl Estimator {
     }
 
     /// Estimates blob extension costs.
-    pub fn estimate_blob_extensions(&self, blob_extensions: &BlobExtensions) -> Option<(usize, u64)> {
+    pub fn estimate_blob_extensions(
+        &self,
+        blob_extensions: &BlobExtensions,
+    ) -> Option<(usize, u64)> {
         match blob_extensions {
             BlobExtensions::Noop => None,
             BlobExtensions::Extend {
@@ -121,10 +125,8 @@ impl Estimator {
             total_storage_cost += wal_storage_cost;
         }
 
-        println!();
-        println!(
-            "Estimated Walrus Storage Cost for this publish/update: {total_storage_cost} FROST"
-        );
+        display::header("Estimated Walrus Storage Cost for this publish/update:");
+        display::info(format!("{total_storage_cost} FROST"));
 
         // Calculate and display blob extension estimates
         let extension_estimate = self.estimate_blob_extensions(blob_extensions);
@@ -138,7 +140,7 @@ impl Estimator {
         // Test mode handling
         #[cfg(feature = "_testing-dry-run")]
         {
-            println!("Test mode: automatically proceeding with estimates");
+            display::info("Test mode: automatically proceeding with estimates");
         }
 
         Ok(())
@@ -164,28 +166,30 @@ impl Estimator {
         let gas_ref = site_manager.gas_coin_ref().await?;
 
         // Dry run initial PTB
-        let initial_response =
-            site_manager.dry_run_ptb(initial_ptb.clone(), gas_ref, false).await?;
+        let initial_response = site_manager
+            .dry_run_ptb(initial_ptb.clone(), gas_ref)
+            .await?;
         let initial_gas = initial_response.effects.gas_cost_summary().net_gas_usage() as u64;
-        println!();
-        println!("Sui gas estimates:");
-        println!(
+        display::header("Sui gas estimates");
+        display::info(format!(
             "Initial PTB gas cost: {} MIST ({:.3} SUI) ({} commands)",
             initial_gas,
-            initial_gas as f64 / 1_000_000_000.0,
+            initial_gas as f64 / MIST_PER_SUI,
             initial_ptb.commands.len()
-        );
+        ));
 
         // Check if we'll need additional PTBs by peeking at the iterators
-        let has_remaining_resources = resources_iter.peek().is_some() || routes_iter.peek().is_some();
-        
+        let has_remaining_resources =
+            resources_iter.peek().is_some() || routes_iter.peek().is_some();
+
         if !has_remaining_resources {
             // No additional PTBs needed - just return the initial PTB gas cost
-            println!(
-                "Total estimated Sui gas cost: {} MIST ({:.2} SUI)",
+            display::header("Total estimated Sui gas cost");
+            display::info(format!(
+                "{} MIST ({:.2} SUI)",
                 initial_gas,
-                initial_gas as f64 / 1_000_000_000.0
-            );
+                initial_gas as f64 / MIST_PER_SUI
+            ));
             return Ok(initial_gas);
         }
 
@@ -208,22 +212,22 @@ impl Estimator {
 
             remaining_ptbs.push(ptb.finish());
         }
-        
+
         // Dry run remaining PTBs
         let mut total_gas = initial_gas;
         if remaining_ptbs.is_empty() {
-            println!("Single transaction required for all updates");
+            display::info("Single transaction required for all updates");
         } else {
-            println!(
+            display::info(format!(
                 "Multiple transactions required: {} additional resource PTBs",
                 remaining_ptbs.len()
-            );
+            ));
         }
-        
+
         for (i, ptb) in remaining_ptbs.iter().enumerate() {
             let gas_ref = site_manager.gas_coin_ref().await?;
-            let response = site_manager.dry_run_ptb(ptb.clone(), gas_ref, true).await?;
-            
+            let response = site_manager.dry_run_ptb(ptb.clone(), gas_ref).await?;
+
             // If dev_inspect failed, estimate gas based on command count
             let gas_cost = if response.error.is_some() {
                 // Use heuristic: scale based on command count compared to initial PTB
@@ -232,38 +236,36 @@ impl Estimator {
             } else {
                 response.effects.gas_cost_summary().net_gas_usage() as u64
             };
-            
+
             total_gas += gas_cost;
-            
+
             // Debug: show if there were any errors in dev_inspect
             if let Some(ref error) = response.error {
-                println!(
-                    "\x1b[31mResource PTB {}/{} had dev_inspect error: {}\x1b[0m",
+                display::error(format!(
+                    "Resource PTB {}/{} had dev_inspect error: {}",
                     i + 1,
                     remaining_ptbs.len(),
                     error
-                );
-                println!(
-                    "Estimated cost based on {} commands", 
-                    ptb.commands.len()
-                );
+                ));
+                tracing::debug!("Estimated cost based on {} commands", ptb.commands.len());
             }
-            
-            println!(
+
+            display::info(format!(
                 "Resource PTB {}/{}: {} MIST ({:.3} SUI) ({} commands)",
                 i + 1,
                 remaining_ptbs.len(),
                 gas_cost,
-                gas_cost as f64 / 1_000_000_000.0,
+                gas_cost as f64 / MIST_PER_SUI,
                 ptb.commands.len()
-            );
+            ));
         }
-        
-        println!(
-            "Total estimated Sui gas cost: {} MIST ({:.3} SUI)",
+
+        display::header("Total estimated Sui gas cost");
+        display::info(format!(
+            "{} MIST ({:.3} SUI)",
             total_gas,
-            total_gas as f64 / 1_000_000_000.0
-        );
+            total_gas as f64 / MIST_PER_SUI
+        ));
 
         Ok(total_gas)
     }

@@ -11,11 +11,11 @@ use publish::{load_ws_resources, SiteEditor};
 use site::{
     config::WSResources,
     estimates::Estimator,
-    manager::{SiteManager, BlobExtensions},
+    manager::{BlobExtensions, SiteManager},
     quilts::QuiltsManager,
     resource::{ResourceManager, ResourceSet},
-    SiteData,
     RemoteSiteFactory,
+    SiteData,
 };
 use sitemap::display_sitemap;
 use util::{id_to_base36, path_or_defaults_if_exist};
@@ -171,18 +171,16 @@ async fn run_internal(
             // If dry_run, show estimates using Estimator
             if common.dry_run {
                 let estimator = Estimator::new();
-                
+
                 // Create mock resources for accurate Sui estimation (same as publish.rs)
-                let chunks = quilts_manager.quilts_chunkify(
-                    resource_data.clone(),
-                    common.max_quilt_size,
-                )?;
+                let chunks =
+                    quilts_manager.quilts_chunkify(resource_data.clone(), common.max_quilt_size)?;
                 let mock_resources = resource_manager.create_mock_resources_from_chunks(&chunks);
-                
+
                 // Combine mock resources with unchanged resources for accurate Sui estimation
                 let mut mock_resource_set = ResourceSet::empty();
                 mock_resource_set.extend(mock_resources);
-                
+
                 // Get existing site data for accurate estimation
                 let existing_site = if site_manager.site_id.is_some() {
                     let retriable_client = site_manager.sui_client();
@@ -194,42 +192,43 @@ async fn run_internal(
                 } else {
                     SiteData::empty()
                 };
-                
+
                 let mock_local_site_data = resource_manager.to_site_data(mock_resource_set);
-                
+
                 // Calculate updates for Sui estimation
-                let updates = mock_local_site_data.diff(&existing_site, BlobExtensions::Noop.into())?;
-                
+                let updates =
+                    mock_local_site_data.diff(&existing_site, BlobExtensions::Noop.into())?;
+
                 // Show Walrus storage estimates
-                estimator.show_walrus_estimates(
-                    &mut quilts_manager,
-                    resource_data.clone(),
-                    common.epoch_arg.clone(),
-                    common.max_quilt_size,
-                    &BlobExtensions::Noop, // No extensions for update-resources
-                ).await?;
-                
+                estimator
+                    .show_walrus_estimates(
+                        &mut quilts_manager,
+                        resource_data.clone(),
+                        common.epoch_arg.clone(),
+                        common.max_quilt_size,
+                        &BlobExtensions::Noop, // No extensions for update-resources
+                    )
+                    .await?;
+
                 let walrus_package = site_manager.config.general.walrus_package.unwrap();
-                
+
                 // Show Sui gas estimates
-                estimator.show_sui_gas_estimates(
-                    &mut site_manager,
-                    &updates,
-                    BlobExtensions::Noop,
-                    walrus_package,
-                ).await?;
-                
-                println!("Dry run completed. No resources were actually stored or updated.");
+                estimator
+                    .show_sui_gas_estimates(
+                        &mut site_manager,
+                        &updates,
+                        BlobExtensions::Noop,
+                        walrus_package,
+                    )
+                    .await?;
+
+                display::header("Dry run completed. No resources were actually stored or updated.");
                 return Ok(());
             }
 
             // Store resources
             let stored_resources = quilts_manager
-                .store_quilts(
-                    resource_data,
-                    common.epoch_arg,
-                    common.max_quilt_size,
-                )
+                .store_quilts(resource_data, common.epoch_arg, common.max_quilt_size)
                 .await?;
 
             // Convert to ResourceSet for the site manager

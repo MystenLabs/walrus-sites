@@ -30,8 +30,8 @@ use walrus_sdk::sui::{
 };
 
 use super::{
+    builder::{SitePtb, SitePtbBuilderResultExt, PTB_MAX_MOVE_CALLS},
     resource::{Resource, ResourceSet, SiteOps},
-    builder::{SitePtbBuilderResultExt, SitePtb, PTB_MAX_MOVE_CALLS},
 };
 use crate::{
     args::{EpochArg, EpochCountOrMax},
@@ -344,8 +344,10 @@ impl SiteManager {
     }
 
     /// Creates a new SitePtb with common configuration.
-    /// Creates a new SitePtb with common configuration.
-    pub fn create_site_ptb<const MAX_MOVE_CALLS: u16>(&self, walrus_pkg: ObjectID) -> SitePtb<(), MAX_MOVE_CALLS> {
+    pub fn create_site_ptb<const MAX_MOVE_CALLS: u16>(
+        &self,
+        walrus_pkg: ObjectID,
+    ) -> SitePtb<(), MAX_MOVE_CALLS> {
         SitePtb::<(), MAX_MOVE_CALLS>::new(
             self.config.package,
             Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
@@ -362,7 +364,6 @@ impl SiteManager {
         &mut self,
         ptb: ProgrammableTransaction,
         gas_coin: ObjectRef,
-        _use_modified_for_estimation: bool,
     ) -> Result<sui_sdk::rpc_types::DevInspectResults> {
         let retry_client = self.sui_client();
         // Get the current reference gas price
@@ -447,7 +448,7 @@ impl SiteManager {
         // Execute remaining PTBs
         while resources_iter.peek().is_some() || routes_iter.peek().is_some() {
             let call_arg = self.fetch_site_call_arg(site_object_id).await?;
-            
+
             let ptb = self.create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_pkg);
             let mut ptb = ptb.with_call_arg(&call_arg)?;
 
@@ -507,7 +508,7 @@ impl SiteManager {
         // Create PTBs until all operations are processed
         while operations_iter.peek().is_some() {
             let call_arg = self.fetch_site_call_arg(site_id).await?;
-            
+
             let ptb = self.create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_package);
             let mut ptb = ptb.with_call_arg(&call_arg)?;
 
