@@ -77,6 +77,9 @@ export class RPCSelector implements RPCSelectorInterface {
 
     // Attempt to call the method on the selected client with a timeout.
     private async callSelectedClient<T>(methodName: string, args: any[]): Promise<T> {
+        if (!this.selectedClient) {
+            throw new Error("Expected an RPC client to be selected");
+        }
 		logger.info("RPCSelector: Calling existing client", {
 			clientName: this.selectedClient.getURL().toString(),
 			methodName,

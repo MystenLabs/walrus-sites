@@ -35,7 +35,7 @@ serve({
 			logger.error(
 				"Unexpected uncaught exception during processing request",
 				{
-					error: e,
+					error: e instanceof Error ? { name: e.name, message: e.message, stack: e.stack } : e,
 					// Get a subset of the request data to not include sensitive info.
 					request: {
 					  method: request.method,

@@ -147,7 +147,7 @@ impl GeneralArgs {
     /// Resolves the walrus package ID.
     ///
     /// Returns `walrus_package` if provided, otherwise loads the walrus config file
-    /// and extracts the original package ID from the staking object.
+    /// and extracts the package ID from the staking object.
     pub async fn resolve_walrus_package(
         &self,
         sui_client: &RetriableSuiClient,
@@ -156,9 +156,10 @@ impl GeneralArgs {
             Some(pkg) => Ok(pkg),
             None => {
                 let walrus_config = self.walrus_config()?;
-                sui_client
-                    .get_object_original_package(walrus_config.staking_object)
-                    .await
+                let staking = sui_client
+                    .get_staking_object(walrus_config.staking_object)
+                    .await?;
+                Ok(staking.package_id)
             }
         }
     }
