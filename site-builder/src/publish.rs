@@ -248,7 +248,7 @@ impl SiteEditor<EditOptions> {
                     .default(true)
                     .interact()?
                 {
-                    return Err(anyhow!("Execution cancelled by user"))
+                    return Err(anyhow!("Execution cancelled by user"));
                 }
             }
             #[cfg(feature = "_testing-dry-run")]
