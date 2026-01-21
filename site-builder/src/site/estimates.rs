@@ -228,27 +228,24 @@ impl Estimator {
             let gas_ref = site_manager.gas_coin_ref().await?;
             let response = site_manager.dry_run_ptb(ptb.clone(), gas_ref).await?;
 
-            // If dev_inspect failed, estimate gas based on command count
-            let gas_cost = if response.error.is_some() {
-                // Use heuristic: scale based on command count compared to initial PTB
-                let command_ratio = ptb.commands.len() as f64 / initial_ptb.commands.len() as f64;
-                (initial_gas as f64 * command_ratio * 0.8) as u64 // Resource PTBs are typically simpler
-            } else {
-                response.effects.gas_cost_summary().net_gas_usage() as u64
-            };
-
-            total_gas += gas_cost;
-
-            // Debug: show if there were any errors in dev_inspect
+            // If dev_inspect failed, bail early with an error
             if let Some(ref error) = response.error {
                 display::error(format!(
-                    "Resource PTB {}/{} had dev_inspect error: {}",
+                    "DevInspect failed for resource PTB {}/{}: {}",
                     i + 1,
                     remaining_ptbs.len(),
                     error
                 ));
-                tracing::debug!("Estimated cost based on {} commands", ptb.commands.len());
+                return Err(anyhow::anyhow!(
+                    "Gas estimation failed due to devInspect error on PTB {}/{}: {}",
+                    i + 1,
+                    remaining_ptbs.len(),
+                    error
+                ));
             }
+
+            let gas_cost = response.effects.gas_cost_summary().net_gas_usage() as u64;
+            total_gas += gas_cost;
 
             display::info(format!(
                 "Resource PTB {}/{}: {} MIST ({:.3} SUI) ({} commands)",
