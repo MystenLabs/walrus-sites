@@ -36,7 +36,7 @@ use helpers::{create_test_site, get_quilt_identifiers, verify_resource_and_get_c
 #[tokio::test]
 #[ignore]
 async fn redeploy_replace_single_file() -> anyhow::Result<()> {
-    let mut cluster = TestSetup::start_local_test_cluster().await?;
+    let mut cluster = TestSetup::start_local_test_cluster(None).await?;
     let wallet_address = cluster.wallet_active_address()?;
 
     // Create initial site with 1 file (file_0.html)
@@ -178,7 +178,7 @@ async fn redeploy_replace_single_file() -> anyhow::Result<()> {
 #[tokio::test]
 #[ignore]
 async fn redeploy_update_file_contents() -> anyhow::Result<()> {
-    let mut cluster = TestSetup::start_local_test_cluster().await?;
+    let mut cluster = TestSetup::start_local_test_cluster(None).await?;
     let wallet_address = cluster.wallet_active_address()?;
 
     // Create initial site with 1 file (file_0.html)
@@ -323,7 +323,7 @@ async fn redeploy_update_file_contents() -> anyhow::Result<()> {
 #[tokio::test]
 #[ignore]
 async fn redeploy_multi_step_changes() -> anyhow::Result<()> {
-    let mut cluster = TestSetup::start_local_test_cluster().await?;
+    let mut cluster = TestSetup::start_local_test_cluster(None).await?;
     let wallet_address = cluster.wallet_active_address()?;
 
     // Create initial site with 2 files (file_0.html and file_1.html)
@@ -634,7 +634,7 @@ async fn redeploy_multi_step_changes() -> anyhow::Result<()> {
 #[tokio::test]
 #[ignore]
 async fn redeploy_delete_some_edit_rest_add_new() -> anyhow::Result<()> {
-    let mut cluster = TestSetup::start_local_test_cluster().await?;
+    let mut cluster = TestSetup::start_local_test_cluster(None).await?;
     let wallet_address = cluster.wallet_active_address()?;
 
     // Create initial site with 4 files

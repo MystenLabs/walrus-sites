@@ -52,7 +52,7 @@ fn assert_quilt_identifiers(
 #[tokio::test]
 #[ignore]
 async fn preprocess_the_snake_example_with_list_directory_no_publish() -> anyhow::Result<()> {
-    let cluster = TestSetup::start_local_test_cluster().await?;
+    let cluster = TestSetup::start_local_test_cluster(None).await?;
     let snake_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
@@ -99,7 +99,7 @@ async fn preprocess_the_snake_example_with_list_directory_no_publish() -> anyhow
 // index.html is published as a Quilt resource.
 async fn publish_quilts_with_list_directory() -> anyhow::Result<()> {
     const SNAKE_FILES_UPLOAD_FILES: usize = 4;
-    let cluster = TestSetup::start_local_test_cluster().await?;
+    let cluster = TestSetup::start_local_test_cluster(None).await?;
     let snake_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
@@ -240,7 +240,7 @@ async fn publish_quilts_with_list_directory() -> anyhow::Result<()> {
 async fn deploy_quilts_with_list_directory_updates_ignored_files() -> anyhow::Result<()> {
     // With --list-directory: 3 HTML files + 1 generated index.html = 4 resources
     const EXPECTED_RESOURCES_PER_DEPLOY: usize = 4;
-    let mut cluster = TestSetup::start_local_test_cluster().await?;
+    let mut cluster = TestSetup::start_local_test_cluster(None).await?;
 
     // Step 1: Create test site with 5 files (file_0.html through file_4.html)
     let temp_dir = helpers::create_test_site(5)?;
@@ -460,7 +460,7 @@ async fn deploy_quilts_with_list_directory_updates_ignored_files() -> anyhow::Re
 // 1. Uses the siteName from the argument ws-resources.json (not from the directory)
 // 2. Includes the ws-resources.json file itself in the deployed resources and index.html
 async fn deploy_quilts_with_list_directory_handles_ws_resources() -> anyhow::Result<()> {
-    let cluster = TestSetup::start_local_test_cluster().await?;
+    let cluster = TestSetup::start_local_test_cluster(None).await?;
 
     // Step 1: Create test site with 2 files
     let temp_dir = helpers::create_test_site(2)?;

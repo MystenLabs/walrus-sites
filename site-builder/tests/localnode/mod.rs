@@ -126,9 +126,17 @@ pub struct TestSetup {
 }
 
 impl TestSetup {
-    pub async fn start_local_test_cluster() -> anyhow::Result<Self> {
+    /// Start test cluster with optional custom epoch duration.
+    /// If None, uses the default epoch duration from E2eTestSetupBuilder.
+    pub async fn start_local_test_cluster(
+        epoch_duration: Option<std::time::Duration>,
+    ) -> anyhow::Result<Self> {
+        let mut builder = test_cluster::E2eTestSetupBuilder::new();
+        if let Some(duration) = epoch_duration {
+            builder = builder.with_epoch_duration(duration);
+        }
         let (sui_cluster_handle, walrus_cluster, walrus_admin_client, system_context) =
-            test_cluster::E2eTestSetupBuilder::new().build().await?;
+            builder.build().await?;
         let rpc_url = sui_cluster_handle.as_ref().lock().await.rpc_url();
         let sui_client = SuiClientBuilder::default().build(rpc_url).await?;
 
@@ -416,6 +424,14 @@ impl TestSetup {
         }
 
         Ok(blobs)
+    }
+
+    /// Wait for all Walrus nodes to reach the specified epoch.
+    pub async fn wait_for_epoch(&self, epoch: u32) {
+        self.cluster_state
+            .walrus_cluster
+            .wait_for_nodes_to_reach_epoch(epoch)
+            .await;
     }
 
     /// Get blob object IDs that were extended via `system::extend_blob` calls.

@@ -63,7 +63,7 @@ async fn dry_run_both_sites_sync() -> anyhow::Result<()> {
 
 /// Helper function to test dry-run execution.
 async fn test_dry_run(site_type: &str, expected_file_count: usize) -> anyhow::Result<()> {
-    let mut cluster = TestSetup::start_local_test_cluster().await?;
+    let mut cluster = TestSetup::start_local_test_cluster(None).await?;
 
     // Get the wallet address for balance checking
     let wallet_address = cluster.wallet.inner.active_address()?;

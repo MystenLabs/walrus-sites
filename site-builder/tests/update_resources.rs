@@ -19,7 +19,7 @@ use helpers::{create_test_site, verify_resource_and_get_content};
 #[tokio::test]
 #[ignore]
 async fn test_update_resources_add_files() -> anyhow::Result<()> {
-    let cluster = TestSetup::start_local_test_cluster().await?;
+    let cluster = TestSetup::start_local_test_cluster(None).await?;
 
     // 1. Generate a dummy site with initial files
     let temp_dir = create_test_site(3)?;
@@ -118,7 +118,7 @@ async fn test_update_resources_add_files() -> anyhow::Result<()> {
 #[tokio::test]
 #[ignore]
 async fn test_update_resources_add_single_file() -> anyhow::Result<()> {
-    let cluster = TestSetup::start_local_test_cluster().await?;
+    let cluster = TestSetup::start_local_test_cluster(None).await?;
 
     // 1. Generate a dummy site with initial files
     let temp_dir = create_test_site(3)?;
@@ -197,7 +197,7 @@ async fn test_update_resources_add_single_file() -> anyhow::Result<()> {
 #[tokio::test]
 #[ignore]
 async fn test_update_resources_replace_file() -> anyhow::Result<()> {
-    let cluster = TestSetup::start_local_test_cluster().await?;
+    let cluster = TestSetup::start_local_test_cluster(None).await?;
 
     // 1. Generate a dummy site with initial files
     let temp_dir = create_test_site(3)?;
@@ -293,7 +293,7 @@ async fn test_update_resources_replace_file() -> anyhow::Result<()> {
 #[tokio::test]
 #[ignore]
 async fn test_update_resources_add_and_replace() -> anyhow::Result<()> {
-    let cluster = TestSetup::start_local_test_cluster().await?;
+    let cluster = TestSetup::start_local_test_cluster(None).await?;
 
     // 1. Generate a dummy site with initial files
     let temp_dir = create_test_site(3)?;
@@ -425,7 +425,7 @@ async fn test_update_resources_add_and_replace() -> anyhow::Result<()> {
 #[tokio::test]
 #[ignore]
 async fn test_update_resources_respects_ws_resources() -> anyhow::Result<()> {
-    let cluster = TestSetup::start_local_test_cluster().await?;
+    let cluster = TestSetup::start_local_test_cluster(None).await?;
 
     // 1. Generate a dummy site with initial files
     let temp_dir = create_test_site(3)?;
@@ -577,7 +577,7 @@ async fn test_update_resources_respects_ws_resources() -> anyhow::Result<()> {
 #[tokio::test]
 #[ignore]
 async fn test_update_resources_filters_ws_resources_file() -> anyhow::Result<()> {
-    let cluster = TestSetup::start_local_test_cluster().await?;
+    let cluster = TestSetup::start_local_test_cluster(None).await?;
 
     // 1. Generate a dummy site with initial files
     let temp_dir = create_test_site(3)?;
@@ -682,7 +682,7 @@ async fn test_update_resources_does_not_extend_blobs() -> anyhow::Result<()> {
     const PUBLISH_EPOCHS: u32 = 5;
     const UPDATE_RESOURCES_EPOCHS: u32 = 50;
 
-    let mut cluster = TestSetup::start_local_test_cluster().await?;
+    let mut cluster = TestSetup::start_local_test_cluster(None).await?;
 
     // Create a site with 3 files
     let temp_dir = create_test_site(3)?;
