@@ -21,9 +21,9 @@ use crate::{
     site::{
         config::WSResources,
         estimates::Estimator,
-        manager::{BlobExtensions, SiteManager},
+        manager::{BlobExtensionResult, BlobExtensions, SiteManager},
         quilts::QuiltsManager,
-        resource::{ResourceManager, ResourceSet, SiteOps},
+        resource::{ParsedResources, ResourceManager, ResourceSet, SiteOps},
         RemoteSiteFactory,
         SiteData,
     },
@@ -173,13 +173,45 @@ impl SiteEditor<EditOptions> {
             .await?;
 
         // Retrieve blobs to extend for updates (reused for both estimation and actual extension)
-        let blob_extensions = if site_manager.site_id.is_some() {
+        let BlobExtensionResult {
+            extensions: blob_extensions,
+            expired_blob_ids,
+        } = if site_manager.site_id.is_some() {
             site_manager
                 .retrieve_blobs_to_extend(&parsed.unchanged, walrus_pkg, retriable_client)
                 .await?
         } else {
-            BlobExtensions::Noop
+            BlobExtensionResult {
+                extensions: BlobExtensions::Noop,
+                expired_blob_ids: HashSet::new(),
+            }
         };
+
+        // Show warning if expired blobs were found
+        if !expired_blob_ids.is_empty() {
+            display::warning(format!(
+                "Found {} expired blob(s) that will be re-stored. \
+                Consider running `walrus burn-blobs --all-expired` to clean up expired blob objects.",
+                expired_blob_ids.len()
+            ));
+        }
+
+        // Move expired resources from unchanged to changed for re-storage
+        let (unchanged, expired_resources): (Vec<_>, Vec<_>) = parsed
+            .unchanged
+            .into_iter()
+            .partition(|r| !expired_blob_ids.contains(&r.info.blob_id));
+
+        // Convert expired Resources back to ResourceData
+        let expired_resource_data: Vec<_> = expired_resources
+            .into_iter()
+            .map(|r| r.into_resource_data())
+            .collect();
+
+        // Combine original changed with newly expired resources
+        let changed = [parsed.changed, expired_resource_data].concat();
+
+        let parsed = ParsedResources { unchanged, changed };
 
         // If dry_run, show both Walrus and Sui estimates upfront before any execution
         if dry_run {

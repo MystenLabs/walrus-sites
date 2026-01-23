@@ -101,6 +101,23 @@ impl Resource {
         self.info.headers.get(Self::QUILT_PATCH_ID_INTERNAL_HEADER)
     }
 
+    /// Converts this Resource back to ResourceData for re-storage.
+    ///
+    /// Used when a resource's blob has expired and needs to be stored again.
+    pub fn into_resource_data(self) -> ResourceData {
+        let mut headers = self.info.headers;
+        // Remove the quilt patch ID since we'll get a new one
+        headers.0.0.remove(Self::QUILT_PATCH_ID_INTERNAL_HEADER);
+
+        ResourceData {
+            unencoded_size: self.unencoded_size,
+            full_path: self.full_path,
+            resource_path: self.info.path,
+            headers,
+            blob_hash: self.info.blob_hash,
+        }
+    }
+
     /// Creates a [`Resource`] from local file data and blob storage information.
     ///
     /// Used when an unchanged file is reused from an existing site, preserving its

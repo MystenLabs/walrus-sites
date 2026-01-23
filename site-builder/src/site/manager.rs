@@ -160,10 +160,13 @@ impl SiteManager {
         resources: &[Resource],
         walrus_pkg: ObjectID,
         retriable_client: &RetriableSuiClient,
-    ) -> anyhow::Result<BlobExtensions> {
+    ) -> anyhow::Result<BlobExtensionResult> {
         // Fast path: no resources means no blobs to extend
         if resources.is_empty() {
-            return Ok(BlobExtensions::Noop);
+            return Ok(BlobExtensionResult {
+                extensions: BlobExtensions::Noop,
+                expired_blob_ids: HashSet::new(),
+            });
         }
 
         let epoch_arg = self
@@ -194,32 +197,53 @@ impl SiteManager {
         };
         let new_end_epoch = current_epoch + epochs_ahead;
 
-        let to_extend = get_owned_blobs(retriable_client, walrus_pkg, self.active_address()?)
-            .await?
-            .into_iter()
-            .filter(|(blob_id, (sui_blob, _obj_ref))| {
-                // blob-id exists in resources currently in directory and end_epoch is less than
-                // epochs to update to.
-                resources.iter().any(|r| r.info.blob_id == *blob_id)
-                    && sui_blob.storage.end_epoch < new_end_epoch
-            });
+        let owned_blobs = get_owned_blobs(retriable_client, walrus_pkg, self.active_address()?)
+            .await?;
 
-        // Collect blobs to extend first
-        let (_, to_extend): (Vec<_>, Vec<_>) = to_extend.unzip();
+        let mut expired_blob_ids = HashSet::new();
+        let mut to_extend = vec![];
 
-        if to_extend.is_empty() {
-            return Ok(BlobExtensions::Noop);
+        // Check each resource to see if its blob needs extension or is expired
+        for resource in resources {
+            let blob_id = resource.info.blob_id;
+
+            match owned_blobs.get(&blob_id) {
+                Some((sui_blob, obj_ref)) => {
+                    // Check if blob is expired (current_epoch >= end_epoch means expired)
+                    if current_epoch >= sui_blob.storage.end_epoch {
+                        expired_blob_ids.insert(blob_id);
+                    }
+                    // Check if blob needs extension (and not expired - we already handled that)
+                    else if sui_blob.storage.end_epoch < new_end_epoch {
+                        to_extend.push((sui_blob.clone(), *obj_ref));
+                    }
+                }
+                None => {
+                    // Blob is not owned - treat as expired/needs re-storage
+                    // This handles cases like permanent blobs or blobs from different owners
+                    expired_blob_ids.insert(blob_id);
+                }
+            }
         }
 
-        let walrus_client = retriable_client.to_walrus_retriable_client()?;
-        let walrus_config = self.config.general.walrus_config()?;
-        let sui_read_client = SuiReadClient::new(walrus_client, &walrus_config).await?;
-        let storage_price = sui_read_client.storage_price_per_unit_size().await?;
+        let extensions = if to_extend.is_empty() {
+            BlobExtensions::Noop
+        } else {
+            let walrus_client = retriable_client.to_walrus_retriable_client()?;
+            let walrus_config = self.config.general.walrus_config()?;
+            let sui_read_client = SuiReadClient::new(walrus_client, &walrus_config).await?;
+            let storage_price = sui_read_client.storage_price_per_unit_size().await?;
 
-        Ok(BlobExtensions::Extend {
-            blobs: to_extend,
-            new_end_epoch,
-            storage_price,
+            BlobExtensions::Extend {
+                blobs: to_extend,
+                new_end_epoch,
+                storage_price,
+            }
+        };
+
+        Ok(BlobExtensionResult {
+            extensions,
+            expired_blob_ids,
         })
     }
 
@@ -630,6 +654,14 @@ impl SiteManager {
             _ => Ok(object_ref),
         }
     }
+}
+
+/// Result of checking which blobs to extend during a site update.
+pub struct BlobExtensionResult {
+    /// Blobs to extend (non-expired, need longer lifetime).
+    pub extensions: BlobExtensions,
+    /// BlobIds of blobs that are expired and need re-storage.
+    pub expired_blob_ids: HashSet<BlobId>,
 }
 
 #[derive(Clone)]
