@@ -7,7 +7,7 @@ use std::{
     str::FromStr,
 };
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{
     rpc_types::{
@@ -197,8 +197,13 @@ impl SiteManager {
         };
         let new_end_epoch = current_epoch + epochs_ahead;
 
+        let owner_address = self.active_address()?;
         let owned_blobs =
-            get_owned_blobs(retriable_client, walrus_pkg, self.active_address()?).await?;
+            get_owned_blobs(retriable_client, walrus_pkg, owner_address)
+                .await
+                .context(format!(
+                    "Could not fetch owned blobs for address: {owner_address}"
+                ))?;
 
         // Get unique blob_ids from resources, then classify each as expired or needing extension
         let unique_blob_ids: HashSet<BlobId> = resources.iter().map(|r| r.info.blob_id).collect();

@@ -5,7 +5,7 @@
 
 use std::{num::NonZeroU32, path::PathBuf, str::FromStr, time::SystemTime};
 
-use anyhow::{anyhow, bail, ensure, Result};
+use anyhow::{anyhow, bail, ensure, Context, Result};
 use bytesize::ByteSize;
 use clap::{ArgGroup, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
@@ -158,7 +158,11 @@ impl GeneralArgs {
                 let walrus_config = self.walrus_config()?;
                 let staking = sui_client
                     .get_staking_object(walrus_config.staking_object)
-                    .await?;
+                    .await
+                    .context(format!(
+                        "Could not fetch staking object: {}",
+                        walrus_config.staking_object
+                    ))?;
                 Ok(staking.package_id)
             }
         }
@@ -236,7 +240,10 @@ impl ObjectIdOrName {
             ObjectIdOrName::ObjectId(object) => Ok(*object),
             ObjectIdOrName::Name(domain) => {
                 let suins = SuiNsClient::from_context(client, context).await?;
-                let record = suins.resolve_name_record(domain).await?;
+                let record = suins
+                    .resolve_name_record(domain)
+                    .await
+                    .context(format!("Could not resolve SuiNS name: {domain}"))?;
                 let object_id = record.walrus_site_id();
 
                 if let Some(object_id) = object_id {
