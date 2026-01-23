@@ -150,11 +150,16 @@ impl QuiltsManager {
     }
 
     /// Get the chunks for storing resources into quilts.
+    ///
+    /// Resources are sorted by size ascending before chunking, so that similarly-sized
+    /// files end up in the same quilt. This minimizes padding waste from disparate file
+    /// sizes sharing columns.
     pub fn quilts_chunkify(
         &self,
-        resources: Vec<ResourceData>,
+        mut resources: Vec<ResourceData>,
         max_quilt_size: ByteSize,
     ) -> Result<Vec<Vec<(ResourceData, QuiltBlobInput)>>> {
+        resources.sort_by_key(|r| r.unencoded_size());
         let max_quilt_size = max_quilt_size.as_u64() as usize;
         let max_available_columns = Walrus::max_slots_in_quilt(self.n_shards) as usize;
         let max_theoretical_quilt_size =
@@ -236,10 +241,11 @@ impl QuiltsManager {
     /// Test-friendly version of quilts_chunkify that accepts n_shards as a parameter.
     #[cfg(test)]
     pub fn quilts_chunkify_with_n_shards(
-        resources: Vec<ResourceData>,
+        mut resources: Vec<ResourceData>,
         max_quilt_size: ByteSize,
         n_shards: NonZeroU16,
     ) -> Result<Vec<Vec<(ResourceData, QuiltBlobInput)>>> {
+        resources.sort_by_key(|r| r.unencoded_size());
         let max_quilt_size = max_quilt_size.as_u64() as usize;
         let max_available_columns = Walrus::max_slots_in_quilt(n_shards) as usize;
         let max_theoretical_quilt_size = Walrus::max_slot_size(n_shards) * max_available_columns;

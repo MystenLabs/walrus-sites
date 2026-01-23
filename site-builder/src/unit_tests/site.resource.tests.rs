@@ -152,31 +152,63 @@ fn test_large_file_among_small_files_creates_correct_chunks() {
     // Call quilts_chunkify
     let result = QuiltsManager::quilts_chunkify_with_n_shards(files, max_quilt_size, n_shards);
 
-    // Expected behavior:
-    // - The large file should be alone in the first chunk
-    // - The remaining small files should be packed in subsequent chunks
+    // Expected behavior (resources are sorted ascending by size):
+    // - Small files are sorted first and packed into chunk(s)
+    // - The large file (sorted last) exceeds effective_quilt_size, so it's placed alone
     let chunks = result.expect("Should not fail");
 
-    // Verify the large file is alone in chunk[0]
+    // Find which chunk contains the large file
+    let large_chunk_idx = chunks
+        .iter()
+        .position(|chunk| {
+            chunk
+                .iter()
+                .any(|(r, _)| r.resource_path.contains("large_file_4"))
+        })
+        .expect("Large file should be in some chunk");
+
+    // The large file should be alone in its chunk
     assert_eq!(
-        chunks[0].len(),
+        chunks[large_chunk_idx].len(),
         1,
-        "First chunk should contain only the large file"
-    );
-    assert!(
-        chunks[0][0].0.resource_path.contains("large_file_4"),
-        "First chunk should contain the large file"
+        "Large file should be alone in its chunk"
     );
 
-    // Verify the next chunk has multiple small files
-    assert!(
-        chunks.len() > 1,
-        "Should have at least one more chunk with small files"
+    // All other chunks should only contain small files
+    let total_small_files: usize = chunks
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| *i != large_chunk_idx)
+        .map(|(_, c)| c.len())
+        .sum();
+    assert_eq!(
+        total_small_files, 20,
+        "All 20 small files should be in other chunks"
     );
-    assert!(
-        chunks[1].len() > 4,
-        "Second chunk should contain multiple small files (more than 4)"
-    );
+}
+
+#[test]
+fn test_quilts_chunkify_sorts_resources_ascending() {
+    let n_shards = NonZeroU16::new(100).unwrap();
+    let max_quilt_size = ByteSize::mib(512);
+
+    // Create files with varying sizes in non-sorted order
+    let files = vec![
+        create_mock_resource("medium.bin".to_string(), 50_000, 0),
+        create_mock_resource("tiny.bin".to_string(), 100, 1),
+        create_mock_resource("large.bin".to_string(), 500_000, 2),
+        create_mock_resource("small.bin".to_string(), 5_000, 3),
+    ];
+
+    let chunks =
+        QuiltsManager::quilts_chunkify_with_n_shards(files, max_quilt_size, n_shards).unwrap();
+
+    // All files should fit in one chunk with this quilt size
+    assert_eq!(chunks.len(), 1);
+
+    // Within the chunk, files should be ordered by size ascending
+    let sizes: Vec<usize> = chunks[0].iter().map(|(r, _)| r.unencoded_size()).collect();
+    assert_eq!(sizes, vec![100, 5_000, 50_000, 500_000]);
 }
 
 #[test]
