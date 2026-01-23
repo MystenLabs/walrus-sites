@@ -1,6 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::collections::HashSet;
+use std::time::Duration;
 use std::{
     fs::{self, File, OpenOptions},
     io::Write,
@@ -26,7 +28,7 @@ use helpers::{create_test_site, verify_resource_and_get_content};
 #[tokio::test]
 #[ignore]
 async fn update_snake() -> anyhow::Result<()> {
-    let mut cluster = TestSetup::start_local_test_cluster().await?;
+    let mut cluster = TestSetup::start_local_test_cluster(None).await?;
     let directory = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
@@ -130,7 +132,7 @@ async fn update_snake() -> anyhow::Result<()> {
 async fn quilts_update_half_files() -> anyhow::Result<()> {
     const N_FILES_IN_SITE: usize = 100;
 
-    let cluster = TestSetup::start_local_test_cluster().await?;
+    let cluster = TestSetup::start_local_test_cluster(None).await?;
 
     // Create a temporary directory for our test site
     println!("Creating {N_FILES_IN_SITE} files for the test site...");
@@ -268,7 +270,7 @@ async fn quilts_update_check_quilt_lifetime() -> anyhow::Result<()> {
     const UPDATE_EPOCHS: u32 = 50;
     const UPDATE_EPOCHS_SHORTER: u32 = 20;
 
-    let mut cluster = TestSetup::start_local_test_cluster().await?;
+    let mut cluster = TestSetup::start_local_test_cluster(None).await?;
 
     // Calculate n_slots_in_quilts based on the cluster's n_shards
     let n_shards = cluster.cluster_state.walrus_cluster.n_shards;
@@ -515,7 +517,7 @@ async fn quilts_update_check_quilt_lifetime() -> anyhow::Result<()> {
 async fn update_with_file_rename() -> anyhow::Result<()> {
     const N_FILES: usize = 10;
 
-    let cluster = TestSetup::start_local_test_cluster().await?;
+    let cluster = TestSetup::start_local_test_cluster(None).await?;
 
     // Create a temporary directory for our test site
     let temp_dir = tempfile::tempdir()?;
@@ -661,7 +663,7 @@ async fn test_update_does_not_extend_deleted_blobs() -> anyhow::Result<()> {
     const PUBLISH_EPOCHS: u32 = 5;
     const UPDATE_EPOCHS: u32 = 50;
 
-    let mut cluster = TestSetup::start_local_test_cluster().await?;
+    let mut cluster = TestSetup::start_local_test_cluster(None).await?;
 
     // Calculate n_slots_in_quilts based on the cluster's n_shards
     let n_shards = cluster.cluster_state.walrus_cluster.n_shards;
@@ -788,6 +790,159 @@ async fn test_update_does_not_extend_deleted_blobs() -> anyhow::Result<()> {
     );
 
     println!("\n✓ Test passed: Deleted blob was NOT extended, main quilt blob WAS extended");
+
+    Ok(())
+}
+
+/// Test that expired resources are re-stored during site update.
+///
+/// This test verifies the fix for the bug where resources with expired blobs
+/// were incorrectly treated as "unchanged" if their content hash matched.
+///
+/// Scenario:
+/// 1. Publish a site with enough files to create multiple blobs, for 1 epoch
+/// 2. Wait for blobs to expire (epoch advances)
+/// 3. Update site, changing only 1 file
+/// 4. Verify ALL resources (including expired ones) are re-stored and readable
+#[tokio::test]
+#[ignore]
+async fn test_expired_resources_are_restored_on_update() -> anyhow::Result<()> {
+    const EPOCH_DURATION_SECS: u64 = 5;
+
+    // Start cluster with short epoch duration
+    let mut cluster =
+        TestSetup::start_local_test_cluster(Some(Duration::from_secs(EPOCH_DURATION_SECS))).await?;
+
+    // Calculate number of files needed to create multiple blobs (quilts)
+    // Each quilt has a limited number of slots based on n_shards
+    let n_shards = cluster.cluster_state.walrus_cluster.n_shards;
+    let n_slots_in_quilts =
+        u16::from(walrus_sdk::core::encoding::source_symbols_for_n_shards(n_shards).1) as usize - 1;
+    // Use 3x the slots to ensure we get at least 3 blobs
+    let n_files = n_slots_in_quilts * 3;
+
+    // Create test site
+    let temp_dir = create_test_site(n_files)?;
+    let test_site_dir = temp_dir.path().to_owned();
+
+    // Step 1: Publish for 1 epoch
+    let publish_epoch = cluster.current_walrus_epoch().await?;
+    println!("Publishing at epoch {publish_epoch} for 1 epoch...");
+
+    let publish_args = ArgsBuilder::default()
+        .with_config(Some(cluster.sites_config_path().to_owned()))
+        .with_command(Commands::Publish {
+            publish_options: PublishOptionsBuilder::default()
+                .with_directory(test_site_dir.clone())
+                .with_epoch_count_or_max(EpochCountOrMax::Epochs(1_u32.try_into()?))
+                .build()?,
+            site_name: Some("Expiration Test Site".to_string()),
+        })
+        .build()?;
+
+    site_builder::run(publish_args).await?;
+
+    let site = cluster.last_site_created().await?;
+    let site_object_id = *site.id.object_id();
+    let wallet_address = cluster.wallet_active_address()?;
+
+    // Verify initial blobs - should have multiple blobs due to quilt slot limits
+    let initial_blobs = cluster.get_owned_blobs(wallet_address).await?;
+    let expected_end_epoch = publish_epoch + 1;
+
+    println!("Initial blobs ({} total):", initial_blobs.len());
+    for blob in &initial_blobs {
+        println!(
+            "  Blob {} - end_epoch: {}",
+            blob.blob_id, blob.storage.end_epoch
+        );
+        assert_eq!(blob.storage.end_epoch, expected_end_epoch);
+    }
+
+    // Verify we have multiple blobs (test prerequisite)
+    assert!(
+        initial_blobs.len() >= 3,
+        "Test requires at least 3 blobs, got {}. Increase n_files.",
+        initial_blobs.len()
+    );
+
+    // Record initial blob IDs
+    let initial_blob_ids: HashSet<_> = initial_blobs.iter().map(|b| b.blob_id).collect();
+
+    // Step 2: Wait for blobs to expire
+    let target_epoch = expected_end_epoch; // When end_epoch == current_epoch, blobs are expired
+    println!("\nWaiting for epoch {target_epoch} (blobs expire)...");
+
+    tokio::time::timeout(
+        Duration::from_secs(EPOCH_DURATION_SECS * 3),
+        cluster.wait_for_epoch(target_epoch),
+    )
+    .await
+    .expect("timed out waiting for epoch");
+
+    let current_epoch = cluster.current_walrus_epoch().await?;
+    println!("Current epoch: {current_epoch}, blobs expired at: {expected_end_epoch}");
+    assert!(
+        current_epoch >= expected_end_epoch,
+        "Blobs should be expired"
+    );
+
+    // Step 3: Modify only 1 file and update
+    println!("\nModifying file_0.html and updating site...");
+    let file_path = test_site_dir.join("file_0.html");
+    {
+        let mut file = OpenOptions::new().append(true).open(&file_path)?;
+        writeln!(file, "<!-- Modified after expiration -->")?;
+    }
+
+    let update_args = ArgsBuilder::default()
+        .with_config(Some(cluster.sites_config_path().to_owned()))
+        .with_command(Commands::Update {
+            publish_options: PublishOptionsBuilder::default()
+                .with_directory(test_site_dir)
+                .with_epoch_count_or_max(EpochCountOrMax::Epochs(10_u32.try_into()?))
+                .build()?,
+            object_id: site_object_id,
+        })
+        .build()?;
+
+    site_builder::run(update_args).await?;
+    println!("Update completed");
+
+    // Step 4: Verify all resources are readable and have new blobs
+    let updated_resources = cluster.site_resources(site_object_id).await?;
+    assert_eq!(
+        updated_resources.len(),
+        n_files,
+        "All resources should still exist"
+    );
+
+    println!("\nVerifying updated resources:");
+    for resource in &updated_resources {
+        // Verify resource is readable
+        let _data = verify_resource_and_get_content(&cluster, resource).await?;
+
+        // Verify blob ID is new (not in initial set - since all were expired)
+        // Note: All blobs should be new since all expired resources should be re-stored
+        println!("  {} - blob_id: {}", resource.path, resource.blob_id);
+    }
+
+    // Verify new blobs were created
+    let final_blobs = cluster.get_owned_blobs(wallet_address).await?;
+    let final_blob_ids: HashSet<_> = final_blobs.iter().map(|b| b.blob_id).collect();
+
+    // All blob IDs should be different since all resources were re-stored
+    let overlap: Vec<_> = initial_blob_ids.intersection(&final_blob_ids).collect();
+    assert!(
+        overlap.is_empty(),
+        "All blobs should be new after re-storing expired resources. \
+         Overlapping blob IDs: {:?}",
+        overlap
+    );
+
+    println!("\n Test passed: All expired resources were re-stored with new blobs");
+    println!("  Initial blob count: {}", initial_blobs.len());
+    println!("  Final blob count: {}", final_blobs.len());
 
     Ok(())
 }

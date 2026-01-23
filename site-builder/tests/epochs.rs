@@ -41,7 +41,7 @@ async fn setup_test_cluster_and_site(
     std::path::PathBuf,
     sui_types::base_types::ObjectID,
 )> {
-    let cluster = TestSetup::start_local_test_cluster().await?;
+    let cluster = TestSetup::start_local_test_cluster(None).await?;
 
     println!("Creating test site with {num_files} files...");
     let temp_dir = create_test_site(num_files)?;
@@ -72,7 +72,7 @@ async fn setup_test_cluster_and_site(
 async fn quilts_publish_with_specific_epochs() -> anyhow::Result<()> {
     const NUM_EPOCHS: u32 = 5;
 
-    let mut cluster = TestSetup::start_local_test_cluster().await?;
+    let mut cluster = TestSetup::start_local_test_cluster(None).await?;
 
     println!("Creating test site with {NUM_FILES} files...");
     let temp_dir = create_test_site(NUM_FILES)?;
@@ -136,7 +136,7 @@ async fn quilts_publish_with_specific_epochs() -> anyhow::Result<()> {
 #[tokio::test]
 #[ignore]
 async fn quilts_publish_with_epochs_max() -> anyhow::Result<()> {
-    let mut cluster = TestSetup::start_local_test_cluster().await?;
+    let mut cluster = TestSetup::start_local_test_cluster(None).await?;
 
     println!("Creating test site with {NUM_FILES} files...");
     let temp_dir = create_test_site(NUM_FILES)?;
@@ -289,7 +289,7 @@ async fn quilts_update_with_different_epochs() -> anyhow::Result<()> {
 #[tokio::test]
 #[ignore]
 async fn quilts_publish_with_earliest_expiry_time() -> anyhow::Result<()> {
-    let mut cluster = TestSetup::start_local_test_cluster().await?;
+    let mut cluster = TestSetup::start_local_test_cluster(None).await?;
 
     println!("Creating test site with {NUM_FILES} files...");
     let temp_dir = create_test_site(NUM_FILES)?;
@@ -440,7 +440,7 @@ async fn quilts_update_with_earliest_expiry_time() -> anyhow::Result<()> {
 #[tokio::test]
 #[ignore]
 async fn quilts_publish_with_end_epoch() -> anyhow::Result<()> {
-    let mut cluster = TestSetup::start_local_test_cluster().await?;
+    let mut cluster = TestSetup::start_local_test_cluster(None).await?;
     let current_epoch = cluster.current_walrus_epoch().await?;
     // Use an end_epoch that's realistic (within MAX_EPOCHS_AHEAD)
     let end_epoch = current_epoch + 50;

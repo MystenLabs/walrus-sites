@@ -12,7 +12,7 @@ use localnode::{args_builder::ArgsBuilder, TestSetup};
 #[tokio::test]
 #[ignore]
 async fn converts_random_site_id() -> anyhow::Result<()> {
-    let cluster = TestSetup::start_local_test_cluster().await?;
+    let cluster = TestSetup::start_local_test_cluster(None).await?;
 
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_path_buf()))
