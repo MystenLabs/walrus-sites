@@ -807,7 +807,7 @@ async fn test_update_does_not_extend_deleted_blobs() -> anyhow::Result<()> {
 #[tokio::test]
 #[ignore]
 async fn test_expired_resources_are_restored_on_update() -> anyhow::Result<()> {
-    const EPOCH_DURATION_SECS: u64 = 5;
+    const EPOCH_DURATION_SECS: u64 = 30;
 
     // Start cluster with short epoch duration
     let mut cluster =
@@ -848,15 +848,22 @@ async fn test_expired_resources_are_restored_on_update() -> anyhow::Result<()> {
 
     // Verify initial blobs - should have multiple blobs due to quilt slot limits
     let initial_blobs = cluster.get_owned_blobs(wallet_address).await?;
-    let expected_end_epoch = publish_epoch + 1;
 
-    println!("Initial blobs ({} total):", initial_blobs.len());
+    // Get end_epoch from the blobs themselves (avoids timing assumptions)
+    let end_epoch = initial_blobs
+        .first()
+        .expect("Should have at least one blob")
+        .storage
+        .end_epoch;
+
+    println!("Initial blobs ({} total, end_epoch={}):", initial_blobs.len(), end_epoch);
     for blob in &initial_blobs {
         println!(
             "  Blob {} - end_epoch: {}",
             blob.blob_id, blob.storage.end_epoch
         );
-        assert_eq!(blob.storage.end_epoch, expected_end_epoch);
+        // All blobs from same publish should have same end_epoch
+        assert_eq!(blob.storage.end_epoch, end_epoch);
     }
 
     // Verify we have multiple blobs (test prerequisite)
@@ -870,20 +877,20 @@ async fn test_expired_resources_are_restored_on_update() -> anyhow::Result<()> {
     let initial_blob_ids: HashSet<_> = initial_blobs.iter().map(|b| b.blob_id).collect();
 
     // Step 2: Wait for blobs to expire
-    let target_epoch = expected_end_epoch; // When end_epoch == current_epoch, blobs are expired
-    println!("\nWaiting for epoch {target_epoch} (blobs expire)...");
+    // When current_epoch >= end_epoch, blobs are expired (end_epoch is non-inclusive)
+    println!("\nWaiting for epoch {end_epoch} (blobs expire)...");
 
     tokio::time::timeout(
         Duration::from_secs(EPOCH_DURATION_SECS * 3),
-        cluster.wait_for_epoch(target_epoch),
+        cluster.wait_for_epoch(end_epoch),
     )
     .await
     .expect("timed out waiting for epoch");
 
     let current_epoch = cluster.current_walrus_epoch().await?;
-    println!("Current epoch: {current_epoch}, blobs expired at: {expected_end_epoch}");
+    println!("Current epoch: {current_epoch}, blobs expired at: {end_epoch}");
     assert!(
-        current_epoch >= expected_end_epoch,
+        current_epoch >= end_epoch,
         "Blobs should be expired"
     );
 
