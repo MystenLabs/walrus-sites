@@ -160,8 +160,14 @@ impl Walrus {
     }
 
     /// Issues a `delete` JSON command to the Walrus CLI, returning the parsed output.
-    pub async fn delete(&mut self, blob_ids: &[BlobId]) -> Result<Vec<DestroyOutput>> {
-        create_command!(self, delete, blob_ids)
+    ///
+    /// Accepts both blob IDs and object IDs to delete. At least one of them should be non-empty.
+    pub async fn delete(
+        &mut self,
+        blob_ids: &[BlobId],
+        object_ids: &[ObjectID],
+    ) -> Result<Vec<DestroyOutput>> {
+        create_command!(self, delete, blob_ids, object_ids)
     }
 
     /// Issues a `store with dry run arg` JSON command to the Walrus CLI, returning the parsed output.

@@ -135,7 +135,7 @@ impl SiteManager {
         // Deduplicate blob IDs to avoid redundant delete operations
         display::action("Running the delete commands on Walrus");
         let blob_ids_vec: Vec<BlobId> = blob_ids.iter().cloned().collect();
-        let output = self.walrus.delete(&blob_ids_vec).await?;
+        let output = self.walrus.delete(&blob_ids_vec, &[]).await?;
         display::done();
 
         for blob_output in output {
