@@ -3,6 +3,7 @@
 
 use std::{
     collections::{btree_map, BTreeSet, HashSet},
+    iter::Peekable,
     str::FromStr,
 };
 
@@ -19,7 +20,7 @@ use sui_sdk::{
 };
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
-    transaction::{CallArg, ProgrammableTransaction},
+    transaction::{CallArg, ProgrammableTransaction, TransactionData, TransactionDataAPI},
     Identifier,
 };
 use tracing::warn;
@@ -29,11 +30,8 @@ use walrus_sdk::sui::{
 };
 
 use super::{
-    builder::SitePtb,
+    builder::{SitePtb, SitePtbBuilderResultExt, PTB_MAX_MOVE_CALLS},
     resource::{Resource, ResourceSet, SiteOps},
-    SiteData,
-    SiteDataDiff,
-    SITE_MODULE,
 };
 use crate::{
     args::{EpochArg, EpochCountOrMax},
@@ -41,7 +39,7 @@ use crate::{
     config::Config,
     display,
     retry_client::RetriableSuiClient,
-    site::builder::{SitePtbBuilderResultExt, PTB_MAX_MOVE_CALLS},
+    site::{SiteData, SiteDataDiff, SITE_MODULE},
     summary::SiteDataDiffSummary,
     types::{ExtendOps, Metadata, MetadataOp, ObjectCache, RouteOps, SiteNameOp},
     util::{get_epochs_ahead, get_owned_blobs, get_site_id_from_response, sign_and_send_ptb},
@@ -113,6 +111,7 @@ impl SiteManager {
 
         // Check if there are any updates to the site on-chain.
         let result = if site_updates.has_updates() {
+            println!(); // Empty line before applying action for consistency
             display::action("Applying the Walrus Site object updates on Sui");
             self.execute_sui_updates(&site_updates, walrus_pkg)
                 .await
@@ -224,26 +223,21 @@ impl SiteManager {
         })
     }
 
-    /// Executes the updates on Sui.
-    async fn execute_sui_updates(
+    /// Builds the initial PTB for site creation/update with initial resources and
+    /// blob extension operations.
+    pub async fn build_initial_ptb<'a>(
         &mut self,
-        updates: &SiteDataDiff<'_>,
+        updates: &'a SiteDataDiff<'_>,
         walrus_pkg: ObjectID,
-    ) -> Result<SuiTransactionBlockResponse> {
-        tracing::debug!(
-            address=?self.active_address()?,
-            ?updates,
-            "starting to update site resources on chain",
-        );
-
+    ) -> Result<(
+        ProgrammableTransaction,
+        Peekable<std::slice::Iter<'a, SiteOps<'a>>>,
+        Peekable<btree_map::Iter<'a, String, String>>,
+    )> {
         // 1st iteration
         // Keep 4 operations for optional update_name + route deletion + creation + site-transfer
         const INITIAL_MAX: u16 = PTB_MAX_MOVE_CALLS - 4;
-        let mut ptb = SitePtb::<(), INITIAL_MAX>::new(
-            self.config.package,
-            Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
-            walrus_pkg,
-        );
+        let mut ptb = self.create_site_ptb::<INITIAL_MAX>(walrus_pkg);
 
         // Start with blob-extensions. Assuming it won't take a lot of space in the PTB.
         if let ExtendOps::Extend {
@@ -289,7 +283,8 @@ impl SiteManager {
         // Keep 3 operations for optional route deletion + creation + site-transfer
         let mut ptb = match &self.site_id {
             Some(site_id) => {
-                let ptb = ptb.with_call_arg(&self.wallet.get_object_ref(*site_id).await?.into())?;
+                let call_arg = self.fetch_site_call_arg(*site_id).await?;
+                let ptb = ptb.with_call_arg(&call_arg)?;
                 // Also update metadata if there is a diff
                 match updates.metadata_op {
                     MetadataOp::Update => {
@@ -338,12 +333,97 @@ impl SiteManager {
             ptb.transfer_site(self.active_address()?)?;
         }
 
-        let built_ptb = ptb.finish();
-        assert!(built_ptb.commands.len() <= PTB_MAX_MOVE_CALLS as usize);
+        Ok((ptb.finish(), resources_iter, routes_iter))
+    }
+
+    /// Fetches a fresh `CallArg` for the given site object from the chain.
+    async fn fetch_site_call_arg(&mut self, site_object_id: ObjectID) -> Result<CallArg> {
+        let mut site_object_ref = self.wallet.get_object_ref(site_object_id).await?;
+        site_object_ref = self.verify_object_ref_choose_latest(site_object_ref)?;
+        Ok(site_object_ref.into())
+    }
+
+    /// Creates a new SitePtb with common configuration.
+    pub fn create_site_ptb<const MAX_MOVE_CALLS: u16>(
+        &self,
+        walrus_pkg: ObjectID,
+    ) -> SitePtb<(), MAX_MOVE_CALLS> {
+        SitePtb::<(), MAX_MOVE_CALLS>::new(
+            self.config.package,
+            Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
+            walrus_pkg,
+        )
+    }
+
+    /// Dry runs a PTB using DevInspectTransactionBlock and returns the response
+    ///
+    /// It makes sense to use dev_inspect_transaction_block instead of dry_run_transaction_block
+    /// because the latter requires extended validations like signed transactions.
+    /// For our use case we actually need only high level verification and gas cost estimation.
+    pub async fn dry_run_ptb(
+        &mut self,
+        ptb: ProgrammableTransaction,
+        gas_coin: ObjectRef,
+    ) -> Result<sui_sdk::rpc_types::DevInspectResults> {
+        let retry_client = self.sui_client();
+        // Get the current reference gas price
+        let gas_price = retry_client
+            .client()
+            .read_api()
+            .get_reference_gas_price()
+            .await?;
+
+        let tx_data = TransactionData::new_programmable(
+            self.active_address()?,
+            vec![gas_coin],
+            ptb,
+            self.config.gas_budget(),
+            gas_price, // Use actual reference gas price
+        );
+
+        let response = retry_client
+            .client()
+            .read_api()
+            .dev_inspect_transaction_block(
+                self.active_address()?,
+                tx_data.into_kind(),
+                Some(gas_price.into()),
+                None, // epoch
+                Some(sui_sdk::rpc_types::DevInspectArgs {
+                    skip_checks: Some(true), // Skip validation checks
+                    gas_sponsor: None,
+                    gas_budget: None,
+                    gas_objects: None,
+                    show_raw_txn_data_and_effects: None,
+                }),
+            )
+            .await?;
+
+        Ok(response)
+    }
+
+    /// Executes the updates on Sui.
+    async fn execute_sui_updates(
+        &mut self,
+        updates: &SiteDataDiff<'_>,
+        walrus_pkg: ObjectID,
+    ) -> Result<SuiTransactionBlockResponse> {
+        tracing::debug!(
+            address=?self.active_address()?,
+            ?updates,
+            "starting to update site resources on chain",
+        );
+
+        // Build the initial PTB
+        let (initial_ptb, mut resources_iter, mut routes_iter) =
+            self.build_initial_ptb(updates, walrus_pkg).await?;
+
+        assert!(initial_ptb.commands.len() <= PTB_MAX_MOVE_CALLS as usize);
+
         // TODO(sew-498): Verify gas_ref. Currently, we do not have the last tx the user submitted
         // through walrus.
         let gas_ref = self.gas_coin_ref().await?;
-        let result = self.sign_and_send_ptb(built_ptb, gas_ref).await?;
+        let result = self.sign_and_send_ptb(initial_ptb, gas_ref).await?;
 
         // Check explicitly for execution failures.
         if let Some(SuiExecutionStatus::Failure { error }) =
@@ -365,17 +445,11 @@ impl SiteManager {
                 get_site_id_from_response(self.active_address()?, resp)?
             }
         };
-
-        // Keep iterating to load all resources and routes.
+        // Execute remaining PTBs
         while resources_iter.peek().is_some() || routes_iter.peek().is_some() {
-            let ptb: SitePtb<(), { PTB_MAX_MOVE_CALLS }> = SitePtb::new(
-                self.config.package,
-                Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
-                walrus_pkg,
-            );
-            let mut site_object_ref = self.wallet.get_object_ref(site_object_id).await?;
-            site_object_ref = self.verify_object_ref_choose_latest(site_object_ref)?;
-            let call_arg: CallArg = site_object_ref.into();
+            let call_arg = self.fetch_site_call_arg(site_object_id).await?;
+
+            let ptb = self.create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_pkg);
             let mut ptb = ptb.with_call_arg(&call_arg)?;
 
             ptb.add_resource_operations(&mut resources_iter)
@@ -414,7 +488,7 @@ impl SiteManager {
         Ok(())
     }
 
-    // Iterate over the a ResourceOperation vector and execute the PTB.
+    // Iterate over the a SiteOps vector and execute the PTB.
     // Handles automatically the object versions and gas objects.
     pub async fn execute_operations(&mut self, operations: Vec<SiteOps<'_>>) -> anyhow::Result<()> {
         let Some(site_id) = self.site_id else {
@@ -433,14 +507,9 @@ impl SiteManager {
 
         // Create PTBs until all operations are processed
         while operations_iter.peek().is_some() {
-            let ptb = SitePtb::<(), PTB_MAX_MOVE_CALLS>::new(
-                self.config.package,
-                Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
-                walrus_package,
-            );
-            let mut site_obj_ref = self.wallet.get_object_ref(site_id).await?;
-            site_obj_ref = self.verify_object_ref_choose_latest(site_obj_ref)?;
-            let call_arg: CallArg = site_obj_ref.into();
+            let call_arg = self.fetch_site_call_arg(site_id).await?;
+
+            let ptb = self.create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_package);
             let mut ptb = ptb.with_call_arg(&call_arg)?;
 
             ptb.add_resource_operations(&mut operations_iter)
@@ -494,7 +563,7 @@ impl SiteManager {
     // TODO: Why require a **single** gas-coin and not do select_coins?
     /// Returns the [`ObjectRef`] of an arbitrary gas coin owned by the active wallet
     /// with a sufficient balance for the gas budget specified in the config.
-    async fn gas_coin_ref(&mut self) -> Result<ObjectRef> {
+    pub async fn gas_coin_ref(&mut self) -> Result<ObjectRef> {
         // Keep re-fetching the coin, until it matches the latest state stored by our cache, as
         // older versions might show more balance than its actual balance.
         let mut backoff = self.backoff_config.get_strategy(rand::random());
@@ -563,6 +632,7 @@ impl SiteManager {
     }
 }
 
+#[derive(Clone)]
 pub enum BlobExtensions {
     Noop,
     Extend {
@@ -570,35 +640,6 @@ pub enum BlobExtensions {
         new_end_epoch: u32,
         storage_price: u64,
     },
-}
-
-impl BlobExtensions {
-    /// Returns the estimation for blob extensions: (blob_count, total_wal_cost).
-    /// Returns None if no extensions are needed.
-    pub fn estimate(&self) -> Option<(usize, u64)> {
-        match self {
-            BlobExtensions::Noop => None,
-            BlobExtensions::Extend {
-                blobs,
-                new_end_epoch,
-                storage_price,
-            } => {
-                let count = blobs.len();
-                let total_cost: u64 = blobs
-                    .iter()
-                    .map(|(sui_blob, _)| {
-                        let epochs_extended = *new_end_epoch - sui_blob.storage.end_epoch;
-                        price_for_encoded_length(
-                            sui_blob.storage.storage_size,
-                            *storage_price,
-                            epochs_extended,
-                        )
-                    })
-                    .sum();
-                Some((count, total_cost))
-            }
-        }
-    }
 }
 
 impl From<BlobExtensions> for ExtendOps {

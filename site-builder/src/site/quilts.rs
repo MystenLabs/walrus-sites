@@ -1,8 +1,6 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-//! Quilt storage manager for Walrus Sites.
-
 use std::num::NonZeroU16;
 
 use anyhow::{bail, Context, Result};
@@ -21,16 +19,6 @@ use crate::{
     },
 };
 
-/// Information for dry-run mode.
-///
-/// When passed to `store_quilts`, enables dry-run mode which shows cost estimates
-/// and asks for user confirmation before proceeding.
-pub struct DryRunInfo {
-    /// Blob extension estimate: (blob_count, total_wal_cost).
-    /// None if no blobs need extension (new site or all blobs already have sufficient lifetime).
-    pub extension_estimate: Option<(usize, u64)>,
-}
-
 /// Manages quilt storage operations for Walrus Sites.
 pub struct QuiltsManager {
     /// The controller for the Walrus CLI.
@@ -48,60 +36,14 @@ impl QuiltsManager {
 
     /// Store changed resources into quilts.
     ///
-    /// If `dry_run_info` is `Some`, shows estimated costs (including optional extension costs)
-    /// and asks for confirmation before uploading.
-    ///
     /// Returns the stored resources as a vector.
     pub async fn store_quilts(
         &mut self,
         changed_resources: Vec<ResourceData>,
         epochs: EpochArg,
         max_quilt_size: ByteSize,
-        dry_run_info: Option<DryRunInfo>,
     ) -> Result<Vec<Resource>> {
         let chunks = self.quilts_chunkify(changed_resources, max_quilt_size)?;
-
-        if let Some(DryRunInfo { extension_estimate }) = dry_run_info {
-            let mut total_storage_cost = 0;
-            for chunk in &chunks {
-                let quilt_file_inputs = chunk.iter().map(|(_, f)| f.clone()).collect_vec();
-                let wal_storage_cost = self
-                    .dry_run_resource_chunk(quilt_file_inputs, epochs.clone())
-                    .await?;
-                total_storage_cost += wal_storage_cost;
-            }
-
-            display::action(format!(
-                "Estimated Storage Cost for this publish/update (Gas Cost Excluded): {total_storage_cost} FROST"
-            ));
-
-            if let Some((blob_count, wal_cost)) = extension_estimate {
-                display::action(format!(
-                    "Blob extensions: {wal_cost} FROST ({blob_count} blob{})",
-                    if blob_count == 1 { "" } else { "s" }
-                ));
-            }
-
-            // Add user confirmation prompt.
-            #[cfg(test)]
-            display::action("Waiting for user confirmation...");
-            #[cfg(not(feature = "_testing-dry-run"))]
-            {
-                if !dialoguer::Confirm::new()
-                    .with_prompt("Do you want to proceed with these updates?")
-                    .default(true)
-                    .interact()?
-                {
-                    display::error("Update cancelled by user");
-                    bail!("Update cancelled by user");
-                }
-            }
-            #[cfg(feature = "_testing-dry-run")]
-            {
-                // In tests, automatically proceed without prompting
-                println!("Test mode: automatically proceeding with updates");
-            }
-        }
 
         let mut resources = vec![];
         tracing::debug!("Processing chunks for quilt storage");
@@ -183,7 +125,7 @@ impl QuiltsManager {
             .collect::<Result<Vec<_>>>()
     }
 
-    async fn dry_run_resource_chunk(
+    pub async fn dry_run_resource_chunk(
         &mut self,
         quilt_blob_inputs: Vec<QuiltBlobInput>,
         epochs: EpochArg,
@@ -207,7 +149,8 @@ impl QuiltsManager {
         Ok(store_resp.quilt_blob_output.storage_cost)
     }
 
-    fn quilts_chunkify(
+    /// Get the chunks for storing resources into quilts.
+    pub fn quilts_chunkify(
         &self,
         resources: Vec<ResourceData>,
         max_quilt_size: ByteSize,

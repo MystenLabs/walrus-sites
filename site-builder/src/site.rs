@@ -5,6 +5,7 @@ pub mod builder;
 pub mod config;
 pub mod content;
 pub mod contracts;
+pub mod estimates;
 pub mod manager;
 pub mod quilts;
 pub mod resource;
