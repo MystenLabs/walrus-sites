@@ -200,32 +200,31 @@ impl SiteManager {
         let owned_blobs =
             get_owned_blobs(retriable_client, walrus_pkg, self.active_address()?).await?;
 
-        let mut expired_blob_ids = HashSet::new();
-        // Use HashMap to deduplicate by blob_id - multiple resources can share the same blob
-        let mut to_extend: HashMap<BlobId, _> = HashMap::new();
+        // Get unique blob_ids from resources, then classify each as expired or needing extension
+        let unique_blob_ids: HashSet<BlobId> = resources.iter().map(|r| r.info.blob_id).collect();
 
-        // Check each resource to see if its blob needs extension or is expired
-        for resource in resources {
-            let blob_id = resource.info.blob_id;
-
-            match owned_blobs.get(&blob_id) {
-                Some((sui_blob, obj_ref)) => {
-                    // Check if blob is expired (current_epoch >= end_epoch means expired)
-                    if current_epoch >= sui_blob.storage.end_epoch {
-                        expired_blob_ids.insert(blob_id);
+        let (expired_blob_ids, to_extend) = unique_blob_ids.into_iter().fold(
+            (HashSet::new(), HashMap::new()),
+            |(mut expired, mut extend), blob_id| {
+                match owned_blobs.get(&blob_id) {
+                    // Blob is expired (current_epoch >= end_epoch)
+                    Some((sui_blob, _)) if current_epoch >= sui_blob.storage.end_epoch => {
+                        expired.insert(blob_id);
                     }
-                    // Check if blob needs extension (and not expired - we already handled that)
-                    else if sui_blob.storage.end_epoch < new_end_epoch {
-                        to_extend.insert(blob_id, (sui_blob.clone(), *obj_ref));
+                    // Blob needs extension (not expired, but lifetime too short)
+                    Some((sui_blob, obj_ref)) if sui_blob.storage.end_epoch < new_end_epoch => {
+                        extend.insert(blob_id, (sui_blob.clone(), *obj_ref));
+                    }
+                    // Blob has sufficient lifetime, nothing to do
+                    Some(_) => {}
+                    // Blob not owned - treat as expired/needs re-storage
+                    None => {
+                        expired.insert(blob_id);
                     }
                 }
-                None => {
-                    // Blob is not owned - treat as expired/needs re-storage
-                    // This handles cases like permanent blobs or blobs from different owners
-                    expired_blob_ids.insert(blob_id);
-                }
-            }
-        }
+                (expired, extend)
+            },
+        );
 
         let extensions = if to_extend.is_empty() {
             BlobExtensions::Noop
