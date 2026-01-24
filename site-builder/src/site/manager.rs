@@ -197,8 +197,8 @@ impl SiteManager {
         };
         let new_end_epoch = current_epoch + epochs_ahead;
 
-        let owned_blobs = get_owned_blobs(retriable_client, walrus_pkg, self.active_address()?)
-            .await?;
+        let owned_blobs =
+            get_owned_blobs(retriable_client, walrus_pkg, self.active_address()?).await?;
 
         let mut expired_blob_ids = HashSet::new();
         // Use HashMap to deduplicate by blob_id - multiple resources can share the same blob

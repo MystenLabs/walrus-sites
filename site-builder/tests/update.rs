@@ -1,11 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::time::Duration;
 use std::{
     fs::{self, File, OpenOptions},
     io::Write,
     path::PathBuf,
+    time::Duration,
 };
 
 use site_builder::{
@@ -855,7 +855,11 @@ async fn test_expired_resources_are_restored_on_update() -> anyhow::Result<()> {
         .storage
         .end_epoch;
 
-    println!("Initial blobs ({} total, end_epoch={}):", initial_blobs.len(), end_epoch);
+    println!(
+        "Initial blobs ({} total, end_epoch={}):",
+        initial_blobs.len(),
+        end_epoch
+    );
     for blob in &initial_blobs {
         println!(
             "  Blob {} - end_epoch: {}",
@@ -887,10 +891,7 @@ async fn test_expired_resources_are_restored_on_update() -> anyhow::Result<()> {
 
     let current_epoch = cluster.current_walrus_epoch().await?;
     println!("Current epoch: {current_epoch}, blobs expired at: {end_epoch}");
-    assert!(
-        current_epoch >= end_epoch,
-        "Blobs should be expired"
-    );
+    assert!(current_epoch >= end_epoch, "Blobs should be expired");
 
     // Step 3: Modify only 1 file and update
     println!("\nModifying file_0.html and updating site...");

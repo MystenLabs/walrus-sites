@@ -107,7 +107,7 @@ impl Resource {
     pub fn into_resource_data(self) -> ResourceData {
         let mut headers = self.info.headers;
         // Remove the quilt patch ID since we'll get a new one
-        headers.0.0.remove(Self::QUILT_PATCH_ID_INTERNAL_HEADER);
+        headers.0 .0.remove(Self::QUILT_PATCH_ID_INTERNAL_HEADER);
 
         ResourceData {
             unencoded_size: self.unencoded_size,
