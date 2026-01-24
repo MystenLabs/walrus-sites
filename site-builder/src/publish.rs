@@ -23,7 +23,7 @@ use crate::{
         estimates::Estimator,
         manager::{BlobExtensionResult, BlobExtensions, SiteManager},
         quilts::QuiltsManager,
-        resource::{ParsedResources, ResourceManager, ResourceSet, SiteOps},
+        resource::{ParsedResources, ResourceData, ResourceManager, ResourceSet, SiteOps},
         RemoteSiteFactory,
         SiteData,
     },
@@ -203,10 +203,8 @@ impl SiteEditor<EditOptions> {
             .partition(|r| !expired_blob_ids.contains(&r.info.blob_id));
 
         // Convert expired Resources back to ResourceData
-        let expired_resource_data: Vec<_> = expired_resources
-            .into_iter()
-            .map(|r| r.into_resource_data())
-            .collect();
+        let expired_resource_data: Vec<ResourceData> =
+            expired_resources.into_iter().map(Into::into).collect();
 
         // Combine original changed with newly expired resources
         let changed = [parsed.changed, expired_resource_data].concat();
