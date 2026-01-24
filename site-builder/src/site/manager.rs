@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{
-    collections::{btree_map, BTreeSet, HashSet},
+    collections::{btree_map, BTreeSet, HashMap, HashSet},
     iter::Peekable,
     str::FromStr,
 };
@@ -201,7 +201,8 @@ impl SiteManager {
             .await?;
 
         let mut expired_blob_ids = HashSet::new();
-        let mut to_extend = vec![];
+        // Use HashMap to deduplicate by blob_id - multiple resources can share the same blob
+        let mut to_extend: HashMap<BlobId, _> = HashMap::new();
 
         // Check each resource to see if its blob needs extension or is expired
         for resource in resources {
@@ -215,7 +216,7 @@ impl SiteManager {
                     }
                     // Check if blob needs extension (and not expired - we already handled that)
                     else if sui_blob.storage.end_epoch < new_end_epoch {
-                        to_extend.push((sui_blob.clone(), *obj_ref));
+                        to_extend.insert(blob_id, (sui_blob.clone(), *obj_ref));
                     }
                 }
                 None => {
@@ -235,7 +236,7 @@ impl SiteManager {
             let storage_price = sui_read_client.storage_price_per_unit_size().await?;
 
             BlobExtensions::Extend {
-                blobs: to_extend,
+                blobs: to_extend.into_values().collect(),
                 new_end_epoch,
                 storage_price,
             }
