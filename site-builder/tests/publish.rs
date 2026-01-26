@@ -38,7 +38,7 @@ use crate::helpers::{create_test_site, verify_resource_and_get_content};
 async fn quilts_publish_snake() -> anyhow::Result<()> {
     const SNAKE_FILES_UPLOAD_FILES: usize = 4;
 
-    let cluster = TestSetup::start_local_test_cluster().await?;
+    let cluster = TestSetup::start_local_test_cluster(None).await?;
     let snake_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
@@ -95,7 +95,7 @@ async fn quilts_publish_snake() -> anyhow::Result<()> {
 async fn publish_quilts_lots_of_files() -> anyhow::Result<()> {
     const N_FILES_IN_SITE: usize = 900;
 
-    let cluster = TestSetup::start_local_test_cluster().await?;
+    let cluster = TestSetup::start_local_test_cluster(None).await?;
 
     let temp_dir = create_test_site(N_FILES_IN_SITE)?;
     let directory = temp_dir.path();
@@ -133,7 +133,7 @@ async fn publish_quilts_lots_of_files() -> anyhow::Result<()> {
 #[tokio::test]
 #[ignore]
 async fn publish_quilts_lots_of_identical_files() -> anyhow::Result<()> {
-    let cluster = TestSetup::start_local_test_cluster().await?;
+    let cluster = TestSetup::start_local_test_cluster(None).await?;
 
     let n_shards = cluster.cluster_state.walrus_cluster.n_shards;
     let n_files_per_dir =
@@ -215,7 +215,7 @@ async fn publish_quilts_a_lot_of_headers() -> anyhow::Result<()> {
     const N_FILES_IN_SITE: usize = 10;
     const EXTRA_HEADERS_PER_HTML: usize = 200;
 
-    let cluster = TestSetup::start_local_test_cluster().await?;
+    let cluster = TestSetup::start_local_test_cluster(None).await?;
 
     let temp_dir = create_test_site(N_FILES_IN_SITE)?;
     let directory = temp_dir.path();
@@ -282,7 +282,7 @@ async fn publish_quilts_with_many_routes() -> anyhow::Result<()> {
     const N_RESOURCES: usize = 800;
     const N_ROUTES: usize = 400;
 
-    let cluster = TestSetup::start_local_test_cluster().await?;
+    let cluster = TestSetup::start_local_test_cluster(None).await?;
 
     // Create 800 HTML files (resources)
     let site_temp_dir = tempfile::tempdir()?;
@@ -358,7 +358,7 @@ async fn publish_quilts_with_two_large_files() -> anyhow::Result<()> {
     const N_FILES: usize = 2;
     const MAX_SYMBOL_SIZE: usize = 65534;
 
-    let mut cluster = TestSetup::start_local_test_cluster().await?;
+    let mut cluster = TestSetup::start_local_test_cluster(None).await?;
     let n_shards = cluster.cluster_state.walrus_cluster.n_shards;
     let (n_rows, n_cols) = walrus_sdk::core::encoding::source_symbols_for_n_shards(n_shards);
     // n_rows x (n_cols - index_cols) * MAX_SYMBOL_SIZE - QUILT_PATCH_OVERHEAD
@@ -407,7 +407,7 @@ async fn publish_quilts_with_two_large_files() -> anyhow::Result<()> {
 #[tokio::test]
 #[ignore]
 async fn publish_quilts_with_weird_filenames() -> anyhow::Result<()> {
-    let cluster = TestSetup::start_local_test_cluster().await?;
+    let cluster = TestSetup::start_local_test_cluster(None).await?;
 
     let temp_dir = tempfile::tempdir()?;
     let directory = temp_dir.path();

@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 use std::{
-    collections::HashMap,
+    collections::{hash_map::Entry, HashMap},
     path::{Path, PathBuf},
     str,
     time::SystemTime,
@@ -552,10 +552,47 @@ pub async fn get_owned_blobs(
     let type_map = sui_client
         .type_origin_map_for_package(walrus_package)
         .await?;
-    let blobs = sui_client
+    let all_blobs: Vec<_> = sui_client
         .get_owned_objects_of_type::<SuiBlob>(owner_address, &type_map, &[])
         .await?
-        .map(|blob| (blob.0.blob_id, blob))
         .collect();
-    Ok(blobs)
+
+    let mut result: HashMap<BlobId, (SuiBlob, ObjectRef)> = HashMap::new();
+
+    for (blob, obj_ref) in all_blobs {
+        let blob_id = blob.blob_id;
+        match result.entry(blob_id) {
+            Entry::Vacant(e) => {
+                e.insert((blob, obj_ref));
+            }
+            Entry::Occupied(mut e) => {
+                let existing = e.get();
+                let (keep_obj, discard_obj) =
+                    if blob.storage.end_epoch > existing.0.storage.end_epoch {
+                        (&blob, &existing.0)
+                    } else {
+                        (&existing.0, &blob)
+                    };
+                display::warning(format!(
+                    "Multiple blob objects found for blob_id {}. \
+                     Using {} (end_epoch {}) instead of {} (end_epoch {}). \
+                     Consider cleaning up the duplicate with \
+                     `walrus delete --object-ids {}` (keeps storage object for reuse) or \
+                     `walrus burn-blobs --object-ids {}` (if expired).",
+                    blob_id,
+                    keep_obj.id,
+                    keep_obj.storage.end_epoch,
+                    discard_obj.id,
+                    discard_obj.storage.end_epoch,
+                    discard_obj.id,
+                    discard_obj.id,
+                ));
+                if blob.storage.end_epoch > existing.0.storage.end_epoch {
+                    e.insert((blob, obj_ref));
+                }
+            }
+        }
+    }
+
+    Ok(result)
 }

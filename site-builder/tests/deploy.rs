@@ -36,7 +36,7 @@ use site_builder::MAX_IDENTIFIER_SIZE;
 #[tokio::test]
 #[ignore]
 async fn quilts_deploy_auto_update() -> anyhow::Result<()> {
-    let cluster = TestSetup::start_local_test_cluster().await?;
+    let cluster = TestSetup::start_local_test_cluster(None).await?;
 
     // Create test site with 1 file and reset ws-resources object_id
     let temp_dir = helpers::create_test_site(1)?;
@@ -147,7 +147,7 @@ async fn quilts_deploy_auto_update() -> anyhow::Result<()> {
 #[tokio::test]
 #[ignore]
 async fn deploy_and_destroy_site_with_1001_files() -> anyhow::Result<()> {
-    let mut cluster = TestSetup::start_local_test_cluster().await?;
+    let mut cluster = TestSetup::start_local_test_cluster(None).await?;
 
     // Create test site with 1001 files
     let temp_dir = helpers::create_test_site(1001)?;
@@ -268,7 +268,7 @@ async fn deploy_and_destroy_site_with_1001_files() -> anyhow::Result<()> {
 #[tokio::test]
 #[ignore]
 async fn quilts_deploy_with_explicit_object_id() -> anyhow::Result<()> {
-    let cluster = TestSetup::start_local_test_cluster().await?;
+    let cluster = TestSetup::start_local_test_cluster(None).await?;
 
     // Create test site for first site (1 file)
     let temp_dir_1 = helpers::create_test_site(1)?;
@@ -446,7 +446,7 @@ async fn quilts_deploy_with_explicit_object_id() -> anyhow::Result<()> {
 #[tokio::test]
 #[ignore]
 async fn quilts_deploy_updates_site_name() -> anyhow::Result<()> {
-    let cluster = TestSetup::start_local_test_cluster().await?;
+    let cluster = TestSetup::start_local_test_cluster(None).await?;
 
     // Create test site with 1 file
     let temp_dir = helpers::create_test_site(1)?;
@@ -536,7 +536,7 @@ async fn quilts_deploy_updates_site_name() -> anyhow::Result<()> {
 #[tokio::test]
 #[ignore]
 async fn deploy_quilts_with_slot_sized_files() -> anyhow::Result<()> {
-    let mut cluster = TestSetup::start_local_test_cluster().await?;
+    let mut cluster = TestSetup::start_local_test_cluster(None).await?;
     let n_shards = cluster.cluster_state.walrus_cluster.n_shards;
 
     // Calculate capacity per column (slot) in bytes
@@ -696,7 +696,7 @@ async fn deploy_quilts_with_slot_sized_files() -> anyhow::Result<()> {
 async fn test_deploy_discovers_walrus_config_from_xdg() -> anyhow::Result<()> {
     use localnode::create_sites_config;
 
-    let cluster = TestSetup::start_local_test_cluster().await?;
+    let cluster = TestSetup::start_local_test_cluster(None).await?;
 
     // Create XDG_CONFIG_HOME directory with walrus config.
     // Note: walrus_sdk looks for $XDG_CONFIG_HOME/client_config.yaml directly

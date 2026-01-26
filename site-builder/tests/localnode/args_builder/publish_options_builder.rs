@@ -98,4 +98,9 @@ impl PublishOptionsBuilder {
         self.walrus_options = self.walrus_options.with_dry_run(dry_run);
         self
     }
+
+    pub fn with_max_quilt_size(mut self, max_quilt_size: bytesize::ByteSize) -> Self {
+        self.walrus_options = self.walrus_options.with_max_quilt_size(max_quilt_size);
+        self
+    }
 }

@@ -138,7 +138,12 @@ pub enum Command {
     Delete {
         /// The the blob ID(s) of the blob(s) to delete.
         #[serde_as(as = "Vec<DisplayFromStr>")]
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
         blob_ids: Vec<BlobId>,
+        /// The object ID(s) of the blob object(s) to delete.
+        #[serde_as(as = "Vec<DisplayFromStr>")]
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        object_ids: Vec<ObjectID>,
         /// Disable checking the status of the blob after deletion.
         ///
         /// Checking the status adds delay and requires additional requests.
@@ -339,9 +344,10 @@ impl WalrusCmdBuilder {
     }
 
     /// Adds a [`Command::Delete`] command to the builder.
-    pub fn delete(self, blob_ids: &[BlobId]) -> WalrusCmdBuilder<Command> {
+    pub fn delete(self, blob_ids: &[BlobId], object_ids: &[ObjectID]) -> WalrusCmdBuilder<Command> {
         let command = Command::Delete {
             blob_ids: blob_ids.to_vec(),
+            object_ids: object_ids.to_vec(),
             no_status_check: false,
         };
         self.with_command(command)

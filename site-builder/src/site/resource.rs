@@ -136,6 +136,28 @@ impl Resource {
     }
 }
 
+/// Converts a [`Resource`] back to [`ResourceData`] for re-storage.
+///
+/// Used when a resource's blob has expired and needs to be stored again.
+/// The quilt patch ID header is removed since a new one will be assigned.
+impl From<Resource> for ResourceData {
+    fn from(resource: Resource) -> Self {
+        let mut headers = resource.info.headers;
+        headers
+            .0
+             .0
+            .remove(Resource::QUILT_PATCH_ID_INTERNAL_HEADER);
+
+        ResourceData {
+            unencoded_size: resource.unencoded_size,
+            full_path: resource.full_path,
+            resource_path: resource.info.path,
+            headers,
+            blob_hash: resource.info.blob_hash,
+        }
+    }
+}
+
 impl Display for Resource {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
