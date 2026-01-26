@@ -1,7 +1,7 @@
 {
     "name": "worker",
     "description": "The service-worker based implementation of the Walrus Sites portal.",
-    "version": "2.2.1",
+    "version": "2.3.0",
     "dependencies": {
         "@mysten/sui": "^1.12.0",
         "common": "workspace:common",
