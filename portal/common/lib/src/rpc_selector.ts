@@ -143,7 +143,15 @@ export class RPCSelector implements RPCSelectorInterface {
             return result;
         } catch (error) {
             const message = `Failed to contact fallback RPC clients.`
-            logger.error( message, { error: JSON.stringify(error) });
+            if (!(error instanceof AggregateError)) {
+                const errorInfo = error instanceof Error
+                    ? `Error: ${error.message}`
+                    : `unknown (${typeof error}): ${String(error)}`;
+                logger.error(message, { error: `Expected AggregateError but got ${errorInfo}` });
+            } else {
+                const errors = error.errors.map(e => e instanceof Error ? e.message : String(e));
+                logger.error(message, { errors });
+            }
             throw new Error(message);
         }
     }
