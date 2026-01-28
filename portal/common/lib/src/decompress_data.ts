@@ -37,7 +37,7 @@ export async function decompressData(
 			return decompressed;
 		}
 	} catch (e) {
-		logger.error("Failed to decompress data", { error: e });
+		logger.error("Failed to decompress data", { error: e instanceof Error ? e.message : String(e) });
 	}
 	return null;
 }
