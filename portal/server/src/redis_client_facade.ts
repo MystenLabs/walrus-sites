@@ -24,7 +24,8 @@ export default class RedisClientFacade {
             return !!value;
         } catch (error) {
             logger.error(
-				`Error Redis check: checking the presence of "${key}".`, { error }
+				`Error Redis check: checking the presence of "${key}".`,
+				{ error: error instanceof Error ? error.message : String(error) }
             );
             throw error;
         }
