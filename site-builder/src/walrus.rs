@@ -119,6 +119,9 @@ impl Walrus {
                 ignore_resources: false,
                 deletable,
                 share: false,
+                // TODO: re-enable once upstream issue is fixed.
+                // Disable child process uploads to ensure clean JSON output.
+                child_process_uploads: Some(false),
             }
         )
     }
@@ -142,6 +145,9 @@ impl Walrus {
                 ignore_resources: false,
                 deletable,
                 share: false,
+                // TODO: re-enable once upstream issue is fixed.
+                // Disable child process uploads to ensure clean JSON output.
+                child_process_uploads: Some(false),
             }
         )
     }
@@ -189,6 +195,9 @@ impl Walrus {
                 ignore_resources: false,
                 deletable,
                 share: false,
+                // TODO: re-enable once upstream issue is fixed.
+                // Disable child process uploads to ensure clean JSON output.
+                child_process_uploads: Some(false),
             }
         )
     }
@@ -212,6 +221,9 @@ impl Walrus {
                 ignore_resources: false,
                 deletable,
                 share: false,
+                // TODO: re-enable once upstream issue is fixed.
+                // Disable child process uploads to ensure clean JSON output.
+                child_process_uploads: Some(false),
             }
         )
     }

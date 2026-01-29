@@ -228,6 +228,13 @@ pub struct CommonStoreOptions {
     #[arg(long)]
     #[serde(default)]
     pub share: bool,
+    /// Disable child process uploads.
+    ///
+    /// When enabled (default on testnet), walrus spawns a child process for background uploads
+    /// which can pollute JSON output. Set to `false` to disable.
+    #[arg(long)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub child_process_uploads: Option<bool>,
 }
 
 /// Represents the Sui RPC endpoint argument.
@@ -440,6 +447,7 @@ mod tests {
             ignore_resources: false,
             deletable: false,
             share: false,
+            child_process_uploads: None,
         };
         let builder =
             WalrusCmdBuilder::new(config.clone(), context.clone(), wallet.clone(), gas_budget)
@@ -480,6 +488,7 @@ mod tests {
             ignore_resources: false,
             deletable: true,
             share: false,
+            child_process_uploads: None,
         };
         let builder = WalrusCmdBuilder::new(config, context, wallet, gas_budget).store_quilt(
             StoreQuiltInput::Blobs(vec![blob.clone()]),
