@@ -1,21 +1,16 @@
 name: Build the server-portal docker image and publish it on dockerhub
-run-name: Publish server-portal docker image for ${{ github.event.inputs.site-builder-tag || github.ref_name }} release
+run-name: Publish server-portal docker image for ${{ inputs.tag || github.ref_name }} release
 
 on:
   release:
     types: created
   workflow_dispatch:
     inputs:
-      branch:
-        description: Branch
-        type: string
-        required: true
-        default: mainnet
       tag:
-        description: The server-portal tag (e.g. mainnet-v1.0.0)
+        description: The server-portal tag (e.g. mainnet-v1.0.0). Defaults to the selected branch/tag.
         type: string
         required: false
-concurrency: ${{ github.workflow }}-${{ inputs.site-builder-tag || github.ref }}
+concurrency: ${{ github.workflow }}-${{ inputs.tag || github.ref }}
 jobs:
   release-build:
     name: Build & Publish Binaries
@@ -25,25 +20,10 @@ jobs:
       contents: read
       actions: write
     steps:
-      - name: Checkout walrus-sites repo ${{ inputs.branch }} branch
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # pin@v4.1.1
-        with:
-          repository: "MystenLabs/walrus-sites"
-          fetch-depth: 0
-          ref: ${{ inputs.branch }}
-
-      - name: Setup build tag
-        shell: bash
-        run: |
-          export commit=$(git rev-parse HEAD)
-          export short_commit_sha=$(git rev-parse --short ${commit})
-          export version=$(jq -r '.version' portal/server/package.json)
-          echo "portal_tag=${version}-${short_commit_sha}" >> $GITHUB_ENV
-
       - name: Dispatch Walrus Sites Portal To Dockerhub in MystenLabs/sui-operations
         uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # pin@v3.0.0
         with:
           repository: MystenLabs/sui-operations
           token: ${{ secrets.SUI_OPS_DISPATCH_TOKEN }}
           event-type: walrus-sites-portal-to-dockerhub
-          client-payload: '{"branch": "${{ github.ref_name }}", "tag": "${{ inputs.tag || env.portal_tag }}"}'
+          client-payload: '{"tag": "${{ inputs.tag || github.ref_name }}"}'
