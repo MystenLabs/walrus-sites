@@ -7,7 +7,7 @@ import CookieMonster from "src/cookie_monster";
 import { genericError } from "@lib/http/http_error_responses";
 import main from "src/main";
 import { setupTapelog } from "custom_logger";
-import logger from "@lib/logger";
+import logger, { formatErrorWithStack } from "@lib/logger";
 import { QUILT_PATCH_ID_INTERNAL_HEADER } from "@lib/url_fetcher";
 
 const PORT = 3000;
@@ -35,7 +35,7 @@ serve({
 			logger.error(
 				"Unexpected uncaught exception during processing request",
 				{
-					error: e instanceof Error ? { name: e.name, message: e.message, stack: e.stack } : e,
+					error: formatErrorWithStack(e),
 					// Get a subset of the request data to not include sensitive info.
 					request: {
 					  method: request.method,

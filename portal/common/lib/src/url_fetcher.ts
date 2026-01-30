@@ -23,7 +23,7 @@ import { toBase64 } from "@mysten/bcs";
 import { sha256 } from "@lib/crypto";
 import { WalrusSitesRouter } from "@lib/routing";
 import { HttpStatusCodes } from "@lib/http/http_status_codes";
-import logger from "@lib/logger";
+import logger, { formatError } from "@lib/logger";
 import BlocklistChecker from "@lib/blocklist_checker";
 import { QuiltPatch } from "@lib/quilt";
 import { instrumentationFacade } from "./instrumentation";
@@ -300,7 +300,7 @@ export class UrlFetcher {
                     {
                         attempt: attempt + 1,
                         totalAttempts: retries + 1,
-                        error: error instanceof Error ? error.message : error,
+                        error: formatError(error),
                     });
                 lastError = error;
             }

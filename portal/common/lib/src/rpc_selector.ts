@@ -9,7 +9,7 @@ import {
     SuiObjectResponse,
 } from "@mysten/sui/client";
 import { SuinsClient } from "@mysten/suins";
-import logger from "@lib/logger";
+import logger, { formatError } from "@lib/logger";
 import { NameRecord, Network } from "@lib/types";
 
 interface RPCSelectorInterface {
@@ -143,7 +143,12 @@ export class RPCSelector implements RPCSelectorInterface {
             return result;
         } catch (error) {
             const message = `Failed to contact fallback RPC clients.`
-            logger.error( message, { error: JSON.stringify(error) });
+            if (!(error instanceof AggregateError)) {
+                logger.error(message, { error: formatError(error), note: "Expected AggregateError" });
+            } else {
+                const errors = error.errors.map(formatError);
+                logger.error(message, { errors });
+            }
             throw new Error(message);
         }
     }
