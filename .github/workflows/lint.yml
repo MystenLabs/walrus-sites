@@ -55,7 +55,7 @@ jobs:
         working-directory: portal
         run: |
           bun install
-          bunx prettier --check "**/*.ts"
+          bunx prettier --check --editorconfig "**/*.ts"
 
   check-all:
     name: Check if all lint jobs succeeded
