@@ -45,6 +45,18 @@ jobs:
       - run: cargo install --git https://github.com/wbbradley/licensesnip --rev a1037505417d06a3 licensesnip
       - run: licensesnip check
 
+  prettier-portal:
+    runs-on: ubuntu-latest
+    name: Check portal formatting
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+      - name: Check formatting
+        working-directory: portal
+        run: |
+          bun install
+          bunx prettier --check "**/*.ts"
+
   check-all:
     name: Check if all lint jobs succeeded
     if: always()
@@ -53,6 +65,7 @@ jobs:
       - editorconfig
       - typos
       - license-headers
+      - prettier-portal
     runs-on: ubuntu-latest
     steps:
     - name: Decide whether all needed jobs succeeded
