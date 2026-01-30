@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { createClient } from 'redis';
-import logger from '@lib/logger';
+import logger, { formatError } from '@lib/logger';
 
 export default class RedisClientFacade {
     private readonly client;
@@ -24,8 +24,7 @@ export default class RedisClientFacade {
             return !!value;
         } catch (error) {
             logger.error(
-				`Error Redis check: checking the presence of "${key}".`,
-				{ error: error instanceof Error ? error.message : String(error) }
+				`Error Redis check: checking the presence of "${key}".`, { error: formatError(error) }
             );
             throw error;
         }

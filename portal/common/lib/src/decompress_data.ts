@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Inflate } from 'pako';
-import logger from '@lib/logger';
+import logger, { formatError } from '@lib/logger';
 
 /**
 * Decompresses the contents of the buffer according to the content encoding.
@@ -37,7 +37,7 @@ export async function decompressData(
 			return decompressed;
 		}
 	} catch (e) {
-		logger.error("Failed to decompress data", { error: e instanceof Error ? e.message : String(e) });
+		logger.error("Failed to decompress data", { error: formatError(e) });
 	}
 	return null;
 }

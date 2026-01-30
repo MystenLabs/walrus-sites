@@ -3,7 +3,7 @@
 
 /// Provides a simple logger interface function for
 /// logging messages on different runtimes.
-type LoggingPredicate  = (message: string, ...args: any[]) => void
+type LoggingPredicate = (message: string, ...args: any[]) => void
 
 /**
  * Logger used as an abstraction for logging messages on different runtimes.
@@ -11,7 +11,7 @@ type LoggingPredicate  = (message: string, ...args: any[]) => void
  * This allows for easy switching between different logging mechanisms,
  * integrating it with a log exporter, or disabling logging altogether.
  */
- class Logger {
+class Logger {
     private debugPredicate: LoggingPredicate;
     private infoPredicate: LoggingPredicate;
     private warnPredicate: LoggingPredicate;
@@ -27,7 +27,7 @@ type LoggingPredicate  = (message: string, ...args: any[]) => void
     /// @param warnPredicate Function for warning messages.
     /// @param errorPredicate Function for error messages.
     constructor(
-		debugPredicate: LoggingPredicate = (...args) => console.debug(...args),
+        debugPredicate: LoggingPredicate = (...args) => console.debug(...args),
         logPredicate: LoggingPredicate = (...args) => console.log(...args),
         warnPredicate: LoggingPredicate = (...args) => console.warn(...args),
         errorPredicate: LoggingPredicate = (...args) => console.error(...args)
@@ -74,6 +74,20 @@ type LoggingPredicate  = (message: string, ...args: any[]) => void
     setErrorPredicate(predicate: LoggingPredicate): void {
         this.errorPredicate = predicate;
     }
+}
+
+export function formatError(e: unknown): { name: string, message: string } | unknown {
+    if (e instanceof Error) {
+        return { name: e.name, message: e.message };
+    }
+    return e;
+}
+
+export function formatErrorWithStack(e: unknown): { name: string, message: string, stack?: string } | unknown {
+    if (e instanceof Error) {
+        return { name: e.name, message: e.message, stack: e.stack };
+    }
+    return e;
 }
 
 const logger = new Logger();
