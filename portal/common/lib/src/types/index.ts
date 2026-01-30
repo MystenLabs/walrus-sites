@@ -67,8 +67,8 @@ function rangeToHttpHeader(range: Range): string {
 
 export function optionalRangeToHeaders(range: Range | null): { [key: string]: string } {
     if (range) {
-    	let headers = rangeToHttpHeader(range)
-    	logger.info("Appending range headers", { headers });
+        let headers = rangeToHttpHeader(range);
+        logger.info("Appending range headers", { headers });
         return { range: headers };
     } else {
         logger.warn("No range headers provided");
@@ -126,17 +126,17 @@ export function isRoutes(obj: any): obj is Routes {
  * A NameRecord entry of SuiNS Names.
  */
 export type NameRecord = {
-	name: string;
-	nftId: string;
-	targetAddress: string;
-	expirationTimestampMs: number;
-	data: Record<string, string>;
-	avatar?: string;
-	contentHash?: string;
-	walrusSiteId?: string;
+    name: string;
+    nftId: string;
+    targetAddress: string;
+    expirationTimestampMs: number;
+    data: Record<string, string>;
+    avatar?: string;
+    contentHash?: string;
+    walrusSiteId?: string;
 };
 
 /**
  * The Sui client network type.
  */
-export type Network = 'testnet' | 'mainnet';
+export type Network = "testnet" | "mainnet";

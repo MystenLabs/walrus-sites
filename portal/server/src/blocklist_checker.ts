@@ -1,15 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { has } from '@vercel/edge-config';
+import { has } from "@vercel/edge-config";
 import BlocklistChecker from "@lib/blocklist_checker";
-import { config } from './configuration_loader';
-import RedisClientFacade from './redis_client_facade';
-import { StorageVariant } from './enums';
+import { config } from "./configuration_loader";
+import RedisClientFacade from "./redis_client_facade";
+import { StorageVariant } from "./enums";
 
 /**
-* Creates a blocklist checker instance based on the deduced storage variant.
-*/
+ * Creates a blocklist checker instance based on the deduced storage variant.
+ */
 export class BlocklistCheckerFactory {
     /// The map of storage variants to their respective blocklist checker constructors.
     /// Lazy instantiation is used to avoid unnecessary initialization of the checkers.
@@ -19,9 +19,9 @@ export class BlocklistCheckerFactory {
     } as const; // using const assertion to prevent accidental modification of the map's contents
 
     /**
-    * Builds a blocklist checker instance.
-    * @returns A blocklist checker instance or undefined if blocklist is disabled.
-    */
+     * Builds a blocklist checker instance.
+     * @returns A blocklist checker instance or undefined if blocklist is disabled.
+     */
     static build(): BlocklistChecker | undefined {
         if (!config.enableBlocklist) {
             return undefined;
@@ -31,9 +31,9 @@ export class BlocklistCheckerFactory {
     }
 
     /**
-    * Based on the environment variables set, deduces the storage variant to use.
-    * @returns Either the storage variant or undefined.
-    */
+     * Based on the environment variables set, deduces the storage variant to use.
+     * @returns Either the storage variant or undefined.
+     */
     private static deduceStorageVariant(): StorageVariant | undefined {
         if (config.edgeConfig) {
             return StorageVariant.VercelEdgeConfig;
@@ -75,8 +75,8 @@ class VercelEdgeConfigBlocklistChecker implements BlocklistChecker {
 }
 
 /**
-* Checks domains/IDs against a Redis blocklist.
-*/
+ * Checks domains/IDs against a Redis blocklist.
+ */
 class RedisBlocklistChecker implements BlocklistChecker {
     private client: RedisClientFacade;
 

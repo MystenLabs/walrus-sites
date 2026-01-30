@@ -12,17 +12,16 @@ const mockContentEncodedTo: Uint8Array = encoder.encode(mockContent);
 const gzipped: Uint8Array = Pako.gzip(mockContent);
 const deflated: Uint8Array = Pako.deflate(mockContent);
 
-
-describe('decompressData', () => {
-    bench('decompress plaintext encoding', async () => {
+describe("decompressData", () => {
+    bench("decompress plaintext encoding", async () => {
         await decompressData(mockContentEncodedTo, "plaintext");
     });
 
-    bench('decompress gzip encoding', async () => {
+    bench("decompress gzip encoding", async () => {
         await decompressData(gzipped, "gzip");
     });
 
-    bench('decompress deflate encoding', async () => {
+    bench("decompress deflate encoding", async () => {
         await decompressData(deflated, "deflate");
     });
 });

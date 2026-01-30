@@ -186,9 +186,9 @@ describe("HTTP Error Responses - Status Code Classification", () => {
 
         // Server errors (5xx) - these are infrastructure/backend issues
         const serverErrors = [
-            fullNodeFail(),      // Sui RPC unreachable
-            aggregatorFail(),    // aggregator unreachable
-            genericError(),      // Unhandled exception
+            fullNodeFail(), // Sui RPC unreachable
+            aggregatorFail(), // aggregator unreachable
+            genericError(), // Unhandled exception
         ];
 
         serverErrors.forEach((response) => {
@@ -200,8 +200,8 @@ describe("HTTP Error Responses - Status Code Classification", () => {
     it("infrastructure failures should never return 404", () => {
         // These represent infrastructure/backend failures, not "not found" errors
         const infrastructureFailures = [
-            fullNodeFail(),      // Sui RPC is down/unreachable
-            aggregatorFail(),    // aggregator is down/unreachable
+            fullNodeFail(), // Sui RPC is down/unreachable
+            aggregatorFail(), // aggregator is down/unreachable
         ];
 
         infrastructureFailures.forEach((response) => {

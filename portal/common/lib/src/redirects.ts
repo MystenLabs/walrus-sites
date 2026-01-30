@@ -24,10 +24,7 @@ export function redirectToPortalURLResponse(
 /**
  * Redirects to the aggregator URL.
  */
-export function redirectToAggregatorUrlResponse(
-    blobId: string,
-    aggregatorUrl: string,
-): Response {
+export function redirectToAggregatorUrlResponse(blobId: string, aggregatorUrl: string): Response {
     // Redirect to the walrus site for the specified domain and path
     const redirectUrl = blobAggregatorEndpoint(blobId, aggregatorUrl);
     logger.info("Redirecting to the Walrus Blob link", { redirectUrl: redirectUrl });

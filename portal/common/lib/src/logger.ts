@@ -3,7 +3,7 @@
 
 /// Provides a simple logger interface function for
 /// logging messages on different runtimes.
-type LoggingPredicate = (message: string, ...args: any[]) => void
+type LoggingPredicate = (message: string, ...args: any[]) => void;
 
 /**
  * Logger used as an abstraction for logging messages on different runtimes.
@@ -30,7 +30,7 @@ class Logger {
         debugPredicate: LoggingPredicate = (...args) => console.debug(...args),
         logPredicate: LoggingPredicate = (...args) => console.log(...args),
         warnPredicate: LoggingPredicate = (...args) => console.warn(...args),
-        errorPredicate: LoggingPredicate = (...args) => console.error(...args)
+        errorPredicate: LoggingPredicate = (...args) => console.error(...args),
     ) {
         this.debugPredicate = debugPredicate;
         this.infoPredicate = logPredicate;
@@ -76,14 +76,16 @@ class Logger {
     }
 }
 
-export function formatError(e: unknown): { name: string, message: string } | unknown {
+export function formatError(e: unknown): { name: string; message: string } | unknown {
     if (e instanceof Error) {
         return { name: e.name, message: e.message };
     }
     return e;
 }
 
-export function formatErrorWithStack(e: unknown): { name: string, message: string, stack?: string } | unknown {
+export function formatErrorWithStack(
+    e: unknown,
+): { name: string; message: string; stack?: string } | unknown {
     if (e instanceof Error) {
         return { name: e.name, message: e.message, stack: e.stack };
     }

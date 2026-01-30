@@ -22,13 +22,13 @@ import logger from "./logger";
  * @param {string} sitePackage - The package name of the site.
  */
 export class ResourceFetcher {
-	/// The string representing the ResourcePath struct in the walrus_site package.
-	private readonly resourcePathMoveType: string;
+    /// The string representing the ResourcePath struct in the walrus_site package.
+    private readonly resourcePathMoveType: string;
     constructor(
-    	private rpcSelector: RPCSelector,
-     	sitePackage: string,
+        private rpcSelector: RPCSelector,
+        sitePackage: string,
     ) {
-    	this.resourcePathMoveType = sitePackage + "::site::ResourcePath";
+        this.resourcePathMoveType = sitePackage + "::site::ResourcePath";
     }
 
     /**
@@ -55,7 +55,7 @@ export class ResourceFetcher {
         seenResources: Set<string>,
         depth: number = 0,
     ): Promise<VersionedResource | HttpStatusCodes> {
-    	logger.info('Fetching resource', { path })
+        logger.info("Fetching resource", { path });
         const error = this.checkRedirectLimits(objectId, seenResources, depth);
         if (error) return error;
 
@@ -67,10 +67,10 @@ export class ResourceFetcher {
             bcs.string().serialize(path).toBytes(),
         );
 
-        const [
-            primaryObjectResponse,
-            dynamicFieldResponse
-        ] = await this.fetchObjectPairData(objectId, dynamicFieldId);
+        const [primaryObjectResponse, dynamicFieldResponse] = await this.fetchObjectPairData(
+            objectId,
+            dynamicFieldId,
+        );
 
         seenResources.add(objectId);
 
@@ -83,59 +83,57 @@ export class ResourceFetcher {
     }
 
     /**
-    * Fetches the data of a parentObject and its' dynamicFieldObject.
-    * @param client: A SuiClient to interact with the Sui network.
-    * @param objectId: The objectId of the parentObject (e.g. site::Site).
-    * @param dynamicFieldId: The Id of the dynamicFieldObject (e.g. site::Resource).
-    * @returns A tuple of SuiObjectResponse[] or an HttpStatusCode in case of an error.
-    */
+     * Fetches the data of a parentObject and its' dynamicFieldObject.
+     * @param client: A SuiClient to interact with the Sui network.
+     * @param objectId: The objectId of the parentObject (e.g. site::Site).
+     * @param dynamicFieldId: The Id of the dynamicFieldObject (e.g. site::Resource).
+     * @returns A tuple of SuiObjectResponse[] or an HttpStatusCode in case of an error.
+     */
     private async fetchObjectPairData(
         objectId: string,
-        dynamicFieldId: string
+        dynamicFieldId: string,
     ): Promise<SuiObjectResponse[]> {
-    	logger.info('Fetching Display object and Dynamic Field object', {objectIdForDisplay: objectId, dynamicFieldId})
+        logger.info("Fetching Display object and Dynamic Field object", {
+            objectIdForDisplay: objectId,
+            dynamicFieldId,
+        });
         // MultiGetObjects returns the objects *always* in the order they were requested.
-        const pageData = await this.rpcSelector.multiGetObjects(
-            {
-                ids: [
-                    objectId,
-                    dynamicFieldId
-                ],
-                options: { showBcs: true, showDisplay: true }
-            },
-        );
+        const pageData = await this.rpcSelector.multiGetObjects({
+            ids: [objectId, dynamicFieldId],
+            options: { showBcs: true, showDisplay: true },
+        });
         // MultiGetObjects returns the objects *always* in the order they were requested.
         const primaryObjectResponse: SuiObjectResponse = pageData[0];
         const dynamicFieldResponse: SuiObjectResponse = pageData[1];
 
-        return [primaryObjectResponse, dynamicFieldResponse]
+        return [primaryObjectResponse, dynamicFieldResponse];
     }
 
     /**
-    * Extracts the resource data from the dynamicFieldObject.
-    * @param dynamicFieldResponse: contains the data of the dynamicFieldObject
-    * @param dynamicFieldId: The Id of the dynamicFieldObject (e.g. site::Resource).
-    * @returns A VersionedResource or an HttpStatusCode in case of an error.
-    */
+     * Extracts the resource data from the dynamicFieldObject.
+     * @param dynamicFieldResponse: contains the data of the dynamicFieldObject
+     * @param dynamicFieldId: The Id of the dynamicFieldObject (e.g. site::Resource).
+     * @returns A VersionedResource or an HttpStatusCode in case of an error.
+     */
     private extractResource(
         dynamicFieldResponse: SuiObjectResponse,
-        dynamicFieldId: string): VersionedResource | HttpStatusCodes
-    {
-    	logger.info('Extracting resource data from the dynamic field object', {dynamicFieldId})
+        dynamicFieldId: string,
+    ): VersionedResource | HttpStatusCodes {
+        logger.info("Extracting resource data from the dynamic field object", {
+            dynamicFieldId,
+        });
         if (!dynamicFieldResponse.data) {
-            logger.warn(
-                "No page resource data found for dynamic field object", {
-                dynamicFieldId: dynamicFieldId
+            logger.warn("No page resource data found for dynamic field object", {
+                dynamicFieldId: dynamicFieldId,
             });
             return HttpStatusCodes.NOT_FOUND;
         }
 
         const siteResource = this.getResourceFields(dynamicFieldResponse.data);
         if (!siteResource || !siteResource.blob_id) {
-            logger.error(
-                "No site resource found inside the dynamicFieldResponse:",
-                { error: dynamicFieldResponse }
-            );
+            logger.error("No site resource found inside the dynamicFieldResponse:", {
+                error: dynamicFieldResponse,
+            });
             return HttpStatusCodes.NOT_FOUND;
         }
 
@@ -147,15 +145,16 @@ export class ResourceFetcher {
     }
 
     /**
-    * Checks for loop detection and too many redirects.
-    * @param objectId
-    * @param seenResources
-    * @param depth
-    * @returns
-    */
+     * Checks for loop detection and too many redirects.
+     * @param objectId
+     * @param seenResources
+     * @param depth
+     * @returns
+     */
     private checkRedirectLimits(
         objectId: string,
-        seenResources: Set<string>, depth: number
+        seenResources: Set<string>,
+        depth: number,
     ): HttpStatusCodes | null {
         if (seenResources.has(objectId)) return HttpStatusCodes.LOOP_DETECTED;
         if (depth >= MAX_REDIRECT_DEPTH) return HttpStatusCodes.TOO_MANY_REDIRECTS;

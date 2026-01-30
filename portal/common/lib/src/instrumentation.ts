@@ -1,10 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { MeterProvider } from "@opentelemetry/sdk-metrics"
-import { PrometheusExporter } from "@opentelemetry/exporter-prometheus"
-import { Attributes, Counter, Meter, Histogram } from "@opentelemetry/api"
-import logger from "@lib/logger"
+import { MeterProvider } from "@opentelemetry/sdk-metrics";
+import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
+import { Attributes, Counter, Meter, Histogram } from "@opentelemetry/api";
+import logger from "@lib/logger";
 
 /**
  * Prometheus' instrumentation manager for minting backend.
@@ -78,13 +78,10 @@ export class InstrumentationFacade {
             },
         );
 
-        this.aggregatorTime = this.meter.createHistogram(
-            "ws_aggregator_fetching_time",
-            {
-                description: "Time spent fetching data from Walrus aggregator",
-                unit: "ms",
-            },
-        );
+        this.aggregatorTime = this.meter.createHistogram("ws_aggregator_fetching_time", {
+            description: "Time spent fetching data from Walrus aggregator",
+            unit: "ms",
+        });
 
         this.num_site_not_found_counter = this.meter.createCounter(
             "ws_num_site_not_found_counter",
@@ -170,7 +167,10 @@ export class InstrumentationFacade {
         this.resolveDomainAndFetchUrlHistogram.record(time, { resolvedObjectId });
     }
 
-    public recordAggregatorTime(time: number, data: { siteId: string; blobOrPatchId: string; path: string; }) {
+    public recordAggregatorTime(
+        time: number,
+        data: { siteId: string; blobOrPatchId: string; path: string },
+    ) {
         this.aggregatorTime.record(time, data);
     }
 

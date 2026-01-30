@@ -6,10 +6,10 @@ import { sha256 } from "@lib/crypto";
 import { toBase64 } from "@mysten/bcs";
 
 describe("sha256", () => {
-	it("hashing the a string should always yield the same result", async () => {
-		const arrayBuffer = new TextEncoder().encode("Decentralise the web!").buffer as ArrayBuffer;
-		const res = await sha256(arrayBuffer)
-		const resString = toBase64(res);
-		expect(resString).toEqual("yml5ecL3vnssrx78HsvpBypPVrsyhtk0XPGrVOYTNT4=");
-	});
+    it("hashing the a string should always yield the same result", async () => {
+        const arrayBuffer = new TextEncoder().encode("Decentralise the web!").buffer as ArrayBuffer;
+        const res = await sha256(arrayBuffer);
+        const resString = toBase64(res);
+        expect(resString).toEqual("yml5ecL3vnssrx78HsvpBypPVrsyhtk0XPGrVOYTNT4=");
+    });
 });

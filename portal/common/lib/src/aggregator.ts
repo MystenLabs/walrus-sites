@@ -8,8 +8,10 @@
  * @param aggregatorUrl - The aggregator URL string.
  */
 export function blobAggregatorEndpoint(blob_id: string, aggregatorUrl: string): URL {
-	const cleanAggregatorUrl = aggregatorUrl.endsWith("/") ? aggregatorUrl.slice(0, -1) : aggregatorUrl;
-	return new URL(`${cleanAggregatorUrl}/v1/blobs/${encodeURIComponent(blob_id)}`) as URL;
+    const cleanAggregatorUrl = aggregatorUrl.endsWith("/")
+        ? aggregatorUrl.slice(0, -1)
+        : aggregatorUrl;
+    return new URL(`${cleanAggregatorUrl}/v1/blobs/${encodeURIComponent(blob_id)}`) as URL;
 }
 
 /**
@@ -19,8 +21,10 @@ export function blobAggregatorEndpoint(blob_id: string, aggregatorUrl: string): 
  * @param aggregatorUrl - The aggregator URL string.
  */
 export function quiltAggregatorEndpoint(quilt_patch_id: string, aggregatorUrl: string): URL {
-	const cleanAggregatorUrl = aggregatorUrl.endsWith("/") ? aggregatorUrl.slice(0, -1) : aggregatorUrl;
-	return new URL(
-		`${cleanAggregatorUrl}/v1/blobs/by-quilt-patch-id/${encodeURIComponent(quilt_patch_id)}`,
-	) as URL;
+    const cleanAggregatorUrl = aggregatorUrl.endsWith("/")
+        ? aggregatorUrl.slice(0, -1)
+        : aggregatorUrl;
+    return new URL(
+        `${cleanAggregatorUrl}/v1/blobs/by-quilt-patch-id/${encodeURIComponent(quilt_patch_id)}`,
+    ) as URL;
 }

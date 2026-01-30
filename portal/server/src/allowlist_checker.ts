@@ -1,15 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { createClient, EdgeConfigClient } from '@vercel/edge-config';
-import { config } from './configuration_loader';
-import RedisClientFacade from './redis_client_facade';
-import { StorageVariant } from './enums';
-import AllowlistChecker from './allowlist_checker_interface';
+import { createClient, EdgeConfigClient } from "@vercel/edge-config";
+import { config } from "./configuration_loader";
+import RedisClientFacade from "./redis_client_facade";
+import { StorageVariant } from "./enums";
+import AllowlistChecker from "./allowlist_checker_interface";
 
 /**
-* Creates a allowlist checker instance based on the deduced storage variant.
-*/
+ * Creates a allowlist checker instance based on the deduced storage variant.
+ */
 export class AllowlistCheckerFactory {
     /// The map of storage variants to their respective allowlist checker constructors.
     /// Lazy instantiation is used to avoid unnecessary initialization of the checkers.
@@ -19,9 +19,9 @@ export class AllowlistCheckerFactory {
     } as const; // using const assertion to prevent accidental modification of the map's contents
 
     /**
-    * Builds a allowlist checker instance.
-    * @returns A allowlist checker instance or undefined if allowlist is disabled.
-    */
+     * Builds a allowlist checker instance.
+     * @returns A allowlist checker instance or undefined if allowlist is disabled.
+     */
     static build(): AllowlistChecker | undefined {
         if (!config.enableAllowlist) {
             return undefined;
@@ -31,9 +31,9 @@ export class AllowlistCheckerFactory {
     }
 
     /**
-    * Based on the environment variables set, deduces the storage variant to use.
-    * @returns Either the storage variant or undefined.
-    */
+     * Based on the environment variables set, deduces the storage variant to use.
+     * @returns Either the storage variant or undefined.
+     */
     private static deduceStorageVariant(): StorageVariant | undefined {
         if (config.edgeConfigAllowlist) {
             return StorageVariant.VercelEdgeConfig;
@@ -53,8 +53,8 @@ class VercelEdgeConfigAllowlistChecker implements AllowlistChecker {
     private edgeConfigAllowlistClient: EdgeConfigClient;
 
     constructor() {
-        if (!config.enableAllowlist){
-            throw new Error('ENABLE_ALLOWLIST variable is set to `false`.')
+        if (!config.enableAllowlist) {
+            throw new Error("ENABLE_ALLOWLIST variable is set to `false`.");
         }
         if (!config.edgeConfigAllowlist) {
             throw new Error("EDGE_CONFIG_ALLOWLIST variable is missing.");
@@ -79,8 +79,8 @@ class VercelEdgeConfigAllowlistChecker implements AllowlistChecker {
 }
 
 /**
-* Checks domains/IDs against a Redis allowlist.
-*/
+ * Checks domains/IDs against a Redis allowlist.
+ */
 class RedisAllowlistChecker implements AllowlistChecker {
     private client: RedisClientFacade;
 
