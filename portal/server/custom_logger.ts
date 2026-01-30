@@ -10,40 +10,38 @@ import { getLogger } from "@logtape/logtape";
  * integrating it with the existing logger.
  */
 export async function setupTapelog() {
-	// Tapelog configuration
-	await configure({
-		sinks: {
-			console: getConsoleSink({
-				formatter: getJsonLinesFormatter(),
-			})
-		},
-		loggers: [
-			{ category: "server-portal", lowestLevel: "debug", sinks: ["console"] }
-		],
-	});
-	const tapeLogger = getLogger(["server-portal"]);
+    // Tapelog configuration
+    await configure({
+        sinks: {
+            console: getConsoleSink({
+                formatter: getJsonLinesFormatter(),
+            }),
+        },
+        loggers: [{ category: "server-portal", lowestLevel: "debug", sinks: ["console"] }],
+    });
+    const tapeLogger = getLogger(["server-portal"]);
 
-	// Integrate Tapelog by connecting the logger predicates to the tapeLogger instance
-	logger.setInfoPredicate((...args: any[]) => {
-		const message = args[0];
-		tapeLogger.info(message, getPropertiesWithContext(...args), logger.context);
-	});
+    // Integrate Tapelog by connecting the logger predicates to the tapeLogger instance
+    logger.setInfoPredicate((...args: any[]) => {
+        const message = args[0];
+        tapeLogger.info(message, getPropertiesWithContext(...args), logger.context);
+    });
 
-	logger.setDebugPredicate((...args: any[]) => {
-		const message = args[0];
-		tapeLogger.debug(message, getPropertiesWithContext(...args), logger.context);
-	});
+    logger.setDebugPredicate((...args: any[]) => {
+        const message = args[0];
+        tapeLogger.debug(message, getPropertiesWithContext(...args), logger.context);
+    });
 
-	logger.setWarnPredicate((...args: any[]) => {
-		const message = args[0];
-		tapeLogger.warn(message, getPropertiesWithContext(...args), logger.context);
-	});
+    logger.setWarnPredicate((...args: any[]) => {
+        const message = args[0];
+        tapeLogger.warn(message, getPropertiesWithContext(...args), logger.context);
+    });
 
-	logger.setErrorPredicate((...args: any[]) => {
-		// If args contains only one element, pass undefined as structured data
-		const message = args[0];
-		tapeLogger.error(message, getPropertiesWithContext(...args), logger.context);
-	});
+    logger.setErrorPredicate((...args: any[]) => {
+        // If args contains only one element, pass undefined as structured data
+        const message = args[0];
+        tapeLogger.error(message, getPropertiesWithContext(...args), logger.context);
+    });
 }
 
 /**
@@ -54,11 +52,11 @@ export async function setupTapelog() {
  * @returns An object containing structured properties and the current logging context.
  */
 function getPropertiesWithContext(...args: any[]) {
-	let properties: any = args.length > 1 ? args.slice(1) : undefined;
-	if (properties) {
-		properties.context = logger.context;
-	} else {
-		properties = { context: logger.context! };
-	}
-	return properties;
+    let properties: any = args.length > 1 ? args.slice(1) : undefined;
+    if (properties) {
+        properties.context = logger.context;
+    } else {
+        properties = { context: logger.context! };
+    }
+    return properties;
 }

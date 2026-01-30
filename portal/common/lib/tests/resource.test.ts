@@ -10,10 +10,9 @@ import { checkRedirect } from "@lib/redirects";
 import { fromBase64 } from "@mysten/bcs";
 import { SuiObjectResponse } from "@mysten/sui/client";
 
-
 vi.mock("@mysten/sui/utils", () => ({
     deriveDynamicFieldID: vi.fn(() => "0xdynamicFieldId"),
-}))
+}));
 
 // Mock checkRedirect
 vi.mock("../src/redirects", () => ({
@@ -40,14 +39,11 @@ vi.mock("../src/bcs_data_parsing", async (importOriginal) => {
 });
 
 describe("fetchResource", () => {
-    console.log("RPC URLS:", process.env.RPC_URL_LIST!.split(','));
-    const rpcSelector = new RPCSelector(
-        process.env.RPC_URL_LIST!.split(','),
-        'testnet'
-    )
+    console.log("RPC URLS:", process.env.RPC_URL_LIST!.split(","));
+    const rpcSelector = new RPCSelector(process.env.RPC_URL_LIST!.split(","), "testnet");
     const resourceFetcher = new ResourceFetcher(rpcSelector, "0x123");
     // Mock SuiClient methods
-    const multiGetObjects = vi.spyOn(rpcSelector, 'multiGetObjects');
+    const multiGetObjects = vi.spyOn(rpcSelector, "multiGetObjects");
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -68,7 +64,6 @@ describe("fetchResource", () => {
     });
 
     test("should fetch resource without redirect", async () => {
-
         // Mock object response
         multiGetObjects.mockResolvedValueOnce([
             {
@@ -78,11 +73,11 @@ describe("fetchResource", () => {
                         bcsBytes: "mockBcsBytes",
                         hasPublicTransfer: true,
                         type: "mockType",
-                        version: undefined
+                        version: undefined,
                     },
                     digest: "",
                     objectId: "",
-                    version: undefined
+                    version: undefined,
                 },
             },
             {
@@ -92,11 +87,11 @@ describe("fetchResource", () => {
                         bcsBytes: "mockBcsBytes",
                         hasPublicTransfer: true,
                         type: "mockType",
-                        version: "1.0"
+                        version: "1.0",
                     },
                     digest: "",
                     objectId: "",
-                    version: undefined
+                    version: undefined,
                 },
             },
         ]);
@@ -119,7 +114,7 @@ describe("fetchResource", () => {
                     bcsBytes: "mockBcsBytes",
                     hasPublicTransfer: true,
                     type: "mockType",
-                    version: undefined
+                    version: undefined,
                 },
                 display: {
                     data: {
@@ -129,8 +124,8 @@ describe("fetchResource", () => {
                 },
                 digest: "",
                 objectId: "",
-                version: undefined
-            }
+                version: undefined,
+            },
         };
 
         const mockResource: SuiObjectResponse = {
@@ -150,10 +145,9 @@ describe("fetchResource", () => {
                 },
                 digest: "",
                 objectId: "",
-                version: undefined
-            }
+                version: undefined,
+            },
         };
-
 
         (checkRedirect as any).mockResolvedValueOnce(undefined);
 
@@ -164,7 +158,8 @@ describe("fetchResource", () => {
         const result = await resourceFetcher.fetchResource(
             "0x26dc2460093a9d6d31b58cb0ed1e72b19d140542a49be7472a6f25d542cb5cc3",
             "/path",
-            new Set());
+            new Set(),
+        );
 
         // Verify the results
         expect(result).toEqual({
@@ -186,12 +181,12 @@ describe("fetchResource", () => {
                         bcsBytes: "mockBcsBytes",
                         hasPublicTransfer: true,
                         type: "mockType",
-                        version: "1.0"
+                        version: "1.0",
                     },
-                digest: "",
-                objectId: "",
-                version: "1.0"
-                }
+                    digest: "",
+                    objectId: "",
+                    version: "1.0",
+                },
             },
             {},
         ]);
@@ -218,14 +213,14 @@ describe("fetchResource", () => {
                         bcsBytes: "mockBcsBytes",
                         hasPublicTransfer: true,
                         type: "mockType",
-                        version: "1.0"
+                        version: "1.0",
                     },
                     digest: "mockDigest",
                     objectId: "mockObjectId",
-                    version: "1.0"
-                }
+                    version: "1.0",
+                },
             },
-            {}
+            {},
         ]);
 
         const result = await resourceFetcher.fetchResource("0x1", "/path", seenResources);

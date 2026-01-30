@@ -18,7 +18,7 @@ export default async function resolveWithCache(
     const cachedResponse = await cache.match(urlString);
     const cacheWasFresh = !(await cleanExpiredCache(cachedResponse, urlString));
     if (cachedResponse && cacheWasFresh) {
-        console.log("Cache hit and fresh!")
+        console.log("Cache hit and fresh!");
         return cachedResponse;
     }
     console.log("Cache miss!", urlString);

@@ -25,17 +25,17 @@ const suinsClientNetwork = process.env.SUINS_CLIENT_NETWORK;
 if (!suinsClientNetwork) {
     throw new Error("Missing SUINS_CLIENT_NETWORK environment variable");
 }
-if (!['testnet', 'mainnet'].includes(suinsClientNetwork)) {
+if (!["testnet", "mainnet"].includes(suinsClientNetwork)) {
     throw new Error("Invalid SUINS_CLIENT_NETWORK environment variable");
 }
 const aggregatorUrl = process.env.AGGREGATOR_URL;
-const rpcSelector = new RPCSelector(rpcUrlList.split(','), suinsClientNetwork as Network);
+const rpcSelector = new RPCSelector(rpcUrlList.split(","), suinsClientNetwork as Network);
 export const urlFetcher = new UrlFetcher(
     new ResourceFetcher(rpcSelector, process.env.SITE_PACKAGE),
     new SuiNSResolver(rpcSelector),
     new WalrusSitesRouter(rpcSelector),
     aggregatorUrl,
-    true // b36 domain support should always be enabled for service workers.
+    true, // b36 domain support should always be enabled for service workers.
 );
 
 self.addEventListener("install", (_event) => {
@@ -83,7 +83,6 @@ self.addEventListener("fetch", async (event) => {
     console.log("Parsed URL: ", parsedUrl);
 
     if (requestDomain === portalDomain && parsedUrl && parsedUrl.subdomain) {
-
         // Fetches the page resources and handles the cache if it exists
         const handleFetchRequest = async (): Promise<Response> => {
             if ("caches" in self) {

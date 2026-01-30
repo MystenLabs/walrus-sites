@@ -14,11 +14,11 @@ export function getDomain(url: URL, portalNameLength?: Number): string | null {
 }
 
 /**
-* Given a URL, returns the subdomain and path.
-* @param url e.g. "https://subname.name.wal.app/"
-* @param portalNameLength The length of the domain name. e.g. example.com has a length of 11.
-* @returns domain details e.g. { subdomain: "subname", path: "/index.html"}
-*/
+ * Given a URL, returns the subdomain and path.
+ * @param url e.g. "https://subname.name.wal.app/"
+ * @param portalNameLength The length of the domain name. e.g. example.com has a length of 11.
+ * @returns domain details e.g. { subdomain: "subname", path: "/index.html"}
+ */
 export function getSubdomainAndPath(url: URL, portalNameLength?: Number): DomainDetails | null {
     const splitResult = splitUrl(url, portalNameLength);
     if (!splitResult.details) {
@@ -50,32 +50,32 @@ export function splitUrl(url: URL, portalNameLength?: Number): UrlExtract {
         // Special case where 'wal.app' is both the domain of the
         // portal, but also included in the public suffix list,
         // resulting in being mentioned in parsed.topLevelDomains.
-        if (parsed.topLevelDomains.join(".") == 'wal.app') {
-            domain = 'wal.app'
-            subdomain =	parsed.domain
+        if (parsed.topLevelDomains.join(".") == "wal.app") {
+            domain = "wal.app";
+            subdomain = parsed.domain;
         } else if (portalNameLength) {
-            domain = parsed.hostname.slice(-portalNameLength)
-            subdomain = parsed.hostname.slice(0, -portalNameLength - 1)
+            domain = parsed.hostname.slice(-portalNameLength);
+            subdomain = parsed.hostname.slice(0, -portalNameLength - 1);
         } else {
-            domain = parsed.domain + "." + parsed.topLevelDomains.join(".")
-            subdomain = parsed.subDomains.join(".")
+            domain = parsed.domain + "." + parsed.topLevelDomains.join(".");
+            subdomain = parsed.subDomains.join(".");
         }
     } else if (parsed.type === ParseResultType.Reserved) {
         domain = parsed.labels[parsed.labels.length - 1];
-        subdomain = parsed.labels.slice(0, parsed.labels.length - 1).join('.');
+        subdomain = parsed.labels.slice(0, parsed.labels.length - 1).join(".");
     } else {
         return {
             domain: null,
-            details: null
-        }
+            details: null,
+        };
     }
 
     return {
         domain,
         details: {
             subdomain,
-            path: url.pathname == "/" ? "/index.html" : removeLastSlash(url.pathname)
-        }
+            path: url.pathname == "/" ? "/index.html" : removeLastSlash(url.pathname),
+        },
     } as UrlExtract;
 }
 

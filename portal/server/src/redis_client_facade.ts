@@ -1,16 +1,16 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { createClient } from 'redis';
-import logger, { formatError } from '@lib/logger';
+import { createClient } from "redis";
+import logger, { formatError } from "@lib/logger";
 
 export default class RedisClientFacade {
     private readonly client;
 
     constructor(redisUrl: string) {
-        this.client = createClient({url: redisUrl})
-            .on('error', err => console.log('Redis Client Error', err))
-            .on('connect', () => console.log('Redis Client Connected'));
+        this.client = createClient({ url: redisUrl })
+            .on("error", (err) => console.log("Redis Client Error", err))
+            .on("connect", () => console.log("Redis Client Connected"));
     }
 
     /**
@@ -23,9 +23,9 @@ export default class RedisClientFacade {
             const value = await this.client.EXISTS(key);
             return !!value;
         } catch (error) {
-            logger.error(
-				`Error Redis check: checking the presence of "${key}".`, { error: formatError(error) }
-            );
+            logger.error(`Error Redis check: checking the presence of "${key}".`, {
+                error: formatError(error),
+            });
             throw error;
         }
     }
@@ -39,6 +39,6 @@ export default class RedisClientFacade {
     }
 
     async ping(): Promise<boolean> {
-        return await this.client.ping() === 'PONG';
+        return (await this.client.ping()) === "PONG";
     }
 }

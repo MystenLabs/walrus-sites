@@ -56,7 +56,7 @@ testCases.forEach(([requestPath, _]) => {
     });
 });
 
-describe('routing tests', () => {
+describe("routing tests", () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
@@ -67,47 +67,51 @@ describe('routing tests', () => {
             new SuiNSResolver(rpcSelector),
             wsRouter,
             aggregatorUrl,
-            true
+            true,
         );
 
-        const fetchUrlSpy = vi.spyOn(urlFetcher, 'fetchUrl');
+        const fetchUrlSpy = vi.spyOn(urlFetcher, "fetchUrl");
         // Mock the fetchUrl method to return a test.html and 404.html response
         fetchUrlSpy.mockImplementation(async (objectId: string, path: string) => {
             switch (path) {
-                case '/test.html':
+                case "/test.html":
                     return new Response("test.html content", { status: 200 });
-                case '/404.html':
+                case "/404.html":
                     return new Response("404 page content", { status: 200 });
                 default:
                     return new Response(null, { status: 404 });
             }
         });
 
-        const getRoutesSpy = vi.spyOn(wsRouter, 'getRoutes');
+        const getRoutesSpy = vi.spyOn(wsRouter, "getRoutes");
         // Mock the getRoutes method to return a test.html route
         getRoutesSpy.mockImplementation(async () => {
             return {
-                routes_list: new Map([
-                    ['/test', '/test.html']
-                ])
+                routes_list: new Map([["/test", "/test.html"]]),
             };
         });
 
         const siteObjectId = "0x0977d45a9adb8af8405c0698b0e049de05f8c89da75ca16ac6a6cba76031519f";
 
         // First get the actual content directly through resolveDomainAndFetchUrl
-        const directResponse = await urlFetcher.resolveDomainAndFetchUrl({
-            subdomain: siteObjectId,
-            path: "/test.html"
-        }, siteObjectId);
+        const directResponse = await urlFetcher.resolveDomainAndFetchUrl(
+            {
+                subdomain: siteObjectId,
+                path: "/test.html",
+            },
+            siteObjectId,
+        );
         expect(directResponse.status).toBe(200);
         const expectedContent = await directResponse.text();
 
         // Now test the routing flow
-        const routedResponse = await urlFetcher.resolveDomainAndFetchUrl({
-            subdomain: siteObjectId,
-            path: "/test"
-        }, siteObjectId);
+        const routedResponse = await urlFetcher.resolveDomainAndFetchUrl(
+            {
+                subdomain: siteObjectId,
+                path: "/test",
+            },
+            siteObjectId,
+        );
         expect(routedResponse.status).toBe(200);
         const actualContent = await routedResponse.text();
 
@@ -115,10 +119,13 @@ describe('routing tests', () => {
         expect(actualContent).toBe(expectedContent);
 
         // Also fetch 404.html to prove we got different content
-        const notFoundResponse = await urlFetcher.resolveDomainAndFetchUrl({
-            subdomain: siteObjectId,
-            path: "/404.html"
-        }, siteObjectId);
+        const notFoundResponse = await urlFetcher.resolveDomainAndFetchUrl(
+            {
+                subdomain: siteObjectId,
+                path: "/404.html",
+            },
+            siteObjectId,
+        );
         expect(notFoundResponse.status).toBe(200);
         const notFoundContent = await notFoundResponse.text();
 

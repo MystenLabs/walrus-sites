@@ -1,20 +1,20 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
-import { UrlFetcher } from '@lib/url_fetcher';
-import { ResourceFetcher } from '@lib/resource';
-import { SuiNSResolver } from '@lib/suins';
-import { WalrusSitesRouter } from '@lib/routing';
-import { RPCSelector } from '@lib/rpc_selector';
-import { instrumentationFacade } from '@lib/instrumentation';
-import { ResourceStruct, DynamicFieldStruct, ResourcePathStruct } from '@lib/bcs_data_parsing';
-import { toBase64 } from '@mysten/sui/utils';
-import { sha256 } from '@lib/crypto';
-import { createServer } from 'node:http';
-import type { Server } from 'node:http';
+import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
+import { UrlFetcher } from "@lib/url_fetcher";
+import { ResourceFetcher } from "@lib/resource";
+import { SuiNSResolver } from "@lib/suins";
+import { WalrusSitesRouter } from "@lib/routing";
+import { RPCSelector } from "@lib/rpc_selector";
+import { instrumentationFacade } from "@lib/instrumentation";
+import { ResourceStruct, DynamicFieldStruct, ResourcePathStruct } from "@lib/bcs_data_parsing";
+import { toBase64 } from "@mysten/sui/utils";
+import { sha256 } from "@lib/crypto";
+import { createServer } from "node:http";
+import type { Server } from "node:http";
 
-describe('UrlFetcher records aggregator timing with mock servers', () => {
+describe("UrlFetcher records aggregator timing with mock servers", () => {
     // TESTING STRATEGY: Mock at the network boundary
     // We create real HTTP servers that simulate Sui Full Node and Walrus Aggregator.
     // This allows all internal logic (URL construction, timing, instrumentation calls)
@@ -46,23 +46,23 @@ describe('UrlFetcher records aggregator timing with mock servers', () => {
         mockAggregatorServer.close();
     });
 
-    it('should record aggregator time when fetching a resource', async () => {
-        const rpcSelector = new RPCSelector([suiRpcUrl], 'testnet');
+    it("should record aggregator time when fetching a resource", async () => {
+        const rpcSelector = new RPCSelector([suiRpcUrl], "testnet");
         const wsRouter = new WalrusSitesRouter(rpcSelector);
-        const sitePackage = '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef';
+        const sitePackage = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
 
         const urlFetcher = new UrlFetcher(
             new ResourceFetcher(rpcSelector, sitePackage),
             new SuiNSResolver(rpcSelector),
             wsRouter,
             aggregatorUrl,
-            true
+            true,
         );
 
-        const siteObjectId = '0x7a95e4be3948415b852fb287d455166a276d7a52f1a567b4a26b6b5e9c753158';
-        const path = '/test.html';
+        const siteObjectId = "0x7a95e4be3948415b852fb287d455166a276d7a52f1a567b4a26b6b5e9c753158";
+        const path = "/test.html";
 
-        const recordTimeSpy = vi.spyOn(instrumentationFacade, 'recordAggregatorTime');
+        const recordTimeSpy = vi.spyOn(instrumentationFacade, "recordAggregatorTime");
 
         await urlFetcher.fetchUrl(siteObjectId, path);
 
@@ -73,13 +73,13 @@ describe('UrlFetcher records aggregator timing with mock servers', () => {
         const [duration, metadata] = recordTimeSpy.mock.calls[0];
 
         // Duration should be a non-negative number
-        expect(duration).toBeTypeOf('number');
+        expect(duration).toBeTypeOf("number");
         expect(duration).toBeGreaterThanOrEqual(0);
 
         // Metadata should have correct structure
         expect(metadata.siteId).toBe(siteObjectId);
         expect(metadata.path).toBe(path);
-        expect(metadata.blobOrPatchId).toBeTypeOf('string');
+        expect(metadata.blobOrPatchId).toBeTypeOf("string");
     });
 });
 
@@ -97,26 +97,23 @@ async function createMockSuiFullnode(testBlobData: Uint8Array): Promise<Server> 
         headers: new Map(),
         blob_id: "166116566679321753338010777976669723006",
         blob_hash: hashBigInt.toString(),
-        range: null
+        range: null,
     };
 
-    const dynamicField = DynamicFieldStruct(
-        ResourcePathStruct,
-        ResourceStruct
-    ).serialize({
+    const dynamicField = DynamicFieldStruct(ResourcePathStruct, ResourceStruct).serialize({
         parentId: "0x7a95e4be3948415b852fb287d455166a276d7a52f1a567b4a26b6b5e9c753158",
         name: { path: "/test.html" },
-        value: testResource
+        value: testResource,
     });
 
     const bcsBytes = toBase64(dynamicField.toBytes());
 
     const server = createServer(async (req, res) => {
-        let body = '';
-        req.on('data', chunk => {
+        let body = "";
+        req.on("data", (chunk) => {
             body += chunk.toString();
         });
-        req.on('end', () => {
+        req.on("end", () => {
             const parsedBody = JSON.parse(body);
             const ids = parsedBody.params[0] || [];
 
@@ -131,9 +128,9 @@ async function createMockSuiFullnode(testBlobData: Uint8Array): Promise<Server> 
                             digest: "PrimaryObjectDigest",
                             display: {
                                 data: null,
-                                error: null
-                            }
-                        }
+                                error: null,
+                            },
+                        },
                     },
                     {
                         data: {
@@ -145,11 +142,11 @@ async function createMockSuiFullnode(testBlobData: Uint8Array): Promise<Server> 
                                 bcsBytes,
                                 hasPublicTransfer: false,
                                 type: "0x2::dynamic_field::Field<0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef::site::ResourcePath, 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef::resource::Resource>",
-                                version: "1"
-                            }
-                        }
-                    }
-                ]
+                                version: "1",
+                            },
+                        },
+                    },
+                ],
             });
 
             res.writeHead(200, { "Content-Type": "application/json" });

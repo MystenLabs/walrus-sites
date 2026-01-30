@@ -12,7 +12,7 @@ export default interface AllowlistChecker {
      * @param id The object id or suins domain to check if it is in the allowlist.
      * @returns True if the id or suins domain is in the allowlist, false otherwise.
      */
-    isAllowed: (id: string) => Promise<boolean>
+    isAllowed: (id: string) => Promise<boolean>;
 
     /**
      * In case of any cleanup needed for the allowlist checker, this method should be called.

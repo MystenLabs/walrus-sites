@@ -41,41 +41,41 @@ describe("getDomain with portal name length", () => {
 });
 
 const getSubdomainAndPathTestCases: [string, DomainDetails][] = [
-	["https://subname.name.wal.app/", { subdomain: "subname.name", path: "/index.html" }],
-	["https://name.wal.app/", { subdomain: "name", path: "/index.html" }],
-	["http://name.localhost:8080/", { subdomain: "name", path: "/index.html" }],
-	["http://flatland.localhost:8080/", { subdomain: "flatland", path: "/index.html" }],
-	[
-		"http://subname.suinsname.localhost:8080/",
-		{ subdomain: "subname.suinsname", path: "/index.html" },
-	],
-	[
-		"https://subsubname.subname.suinsname.portalname.co.uk/",
-		{ subdomain: "subsubname.subname.suinsname", path: "/index.html" },
-	],
-	["http://docs.localhost/css/print.css", { subdomain: "docs", path: "/css/print.css" }],
-	[
-		"http://docs.localhost/assets/index-a242f32b.js",
-		{ subdomain: "docs", path: "/assets/index-a242f32b.js" },
-	],
-	[
-		"https://mystenlabs-logos.wal.app/02_Horizontal%20Logo/index.html",
-		{ subdomain: "mystenlabs-logos", path: "/02_Horizontal Logo/index.html" },
-	],
-	[
-		"http://my-site.localhost/files/report%2D2024.pdf",
-		{ subdomain: "my-site", path: "/files/report-2024.pdf" },
-	],
-	[
-		"http://my-site.localhost/files/report-2024.pdf",
-		{ subdomain: "my-site", path: "/files/report-2024.pdf" },
-	],
+    ["https://subname.name.wal.app/", { subdomain: "subname.name", path: "/index.html" }],
+    ["https://name.wal.app/", { subdomain: "name", path: "/index.html" }],
+    ["http://name.localhost:8080/", { subdomain: "name", path: "/index.html" }],
+    ["http://flatland.localhost:8080/", { subdomain: "flatland", path: "/index.html" }],
+    [
+        "http://subname.suinsname.localhost:8080/",
+        { subdomain: "subname.suinsname", path: "/index.html" },
+    ],
+    [
+        "https://subsubname.subname.suinsname.portalname.co.uk/",
+        { subdomain: "subsubname.subname.suinsname", path: "/index.html" },
+    ],
+    ["http://docs.localhost/css/print.css", { subdomain: "docs", path: "/css/print.css" }],
+    [
+        "http://docs.localhost/assets/index-a242f32b.js",
+        { subdomain: "docs", path: "/assets/index-a242f32b.js" },
+    ],
+    [
+        "https://mystenlabs-logos.wal.app/02_Horizontal%20Logo/index.html",
+        { subdomain: "mystenlabs-logos", path: "/02_Horizontal Logo/index.html" },
+    ],
+    [
+        "http://my-site.localhost/files/report%2D2024.pdf",
+        { subdomain: "my-site", path: "/files/report-2024.pdf" },
+    ],
+    [
+        "http://my-site.localhost/files/report-2024.pdf",
+        { subdomain: "my-site", path: "/files/report-2024.pdf" },
+    ],
 ];
 
 describe("getSubdomainAndPath", () => {
-	test.each(getSubdomainAndPathTestCases)("%s -> %s", (input, path) => {
-		expect(getSubdomainAndPath(new URL(input) as URL)).toEqual(path);
-	});
+    test.each(getSubdomainAndPathTestCases)("%s -> %s", (input, path) => {
+        expect(getSubdomainAndPath(new URL(input) as URL)).toEqual(path);
+    });
 });
 
 const getSubdomainAndPathWithPortalLengthTestCases: [string, DomainDetails][] = [
@@ -86,12 +86,7 @@ const getSubdomainAndPathWithPortalLengthTestCases: [string, DomainDetails][] = 
     ["https://name.sw-tnet.blocksite.net/", { subdomain: "name", path: "/index.html" }],
 ];
 describe("getSubdomainAndPath", () => {
-    test.each(getSubdomainAndPathWithPortalLengthTestCases)(
-        "%s -> %s",
-        (input, path) => {
-            expect(getSubdomainAndPath(new URL(input) as URL, PORTAL_DOMAIN_NAME_LENGTH)).toEqual(
-                path,
-            );
-        },
-    );
+    test.each(getSubdomainAndPathWithPortalLengthTestCases)("%s -> %s", (input, path) => {
+        expect(getSubdomainAndPath(new URL(input) as URL, PORTAL_DOMAIN_NAME_LENGTH)).toEqual(path);
+    });
 });
