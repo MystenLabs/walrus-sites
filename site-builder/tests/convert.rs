@@ -17,7 +17,7 @@ async fn converts_random_site_id() -> anyhow::Result<()> {
     let args = ArgsBuilder::default()
         .with_config(Some(cluster.sites_config_path().to_path_buf()))
         .with_command(Commands::Convert {
-            object_id: ObjectID::random(),
+            object_id_or_base36: ObjectID::random().to_string(),
         })
         .build()?;
     site_builder::run(args).await?;

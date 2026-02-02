@@ -148,6 +148,38 @@ pub fn bytes_to_base36(source: &[u8]) -> Result<String> {
     Ok(string)
 }
 
+pub fn base36_to_bytes(source: &str, expected_len: usize) -> Result<Vec<u8>> {
+    const BASE36: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyz";
+    let base = BASE36.len();
+
+    // Convert characters to their base36 values
+    let digits: Vec<usize> = source
+        .bytes()
+        .map(|c| {
+            BASE36
+                .iter()
+                .position(|&b| b == c)
+                .ok_or_else(|| anyhow!("invalid base36 character: {}", c as char))
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    // Convert from base36 to base256 (bytes)
+    let mut result = vec![0u8; expected_len];
+    for digit in digits {
+        let mut carry = digit;
+        for byte in result.iter_mut().rev() {
+            carry += (*byte as usize) * base;
+            *byte = (carry % 256) as u8;
+            carry /= 256;
+        }
+        if carry != 0 {
+            bail!("base36 value too large for {} bytes", expected_len);
+        }
+    }
+
+    Ok(result)
+}
+
 pub fn str_to_base36(input: &str) -> Result<String> {
     bytes_to_base36(input.as_bytes())
 }
@@ -504,6 +536,32 @@ mod test_util {
             &converted,
             "5d8t4gd5q8x4xcfyctpygyr5pnk85x54o7ndeq2j4pg9l7rmw"
         );
+    }
+
+    #[test]
+    fn test_base36_to_bytes() {
+        let base36 = "5d8t4gd5q8x4xcfyctpygyr5pnk85x54o7ndeq2j4pg9l7rmw";
+        let bytes = base36_to_bytes(base36, 32).unwrap();
+        let id = ObjectID::from_bytes(bytes).unwrap();
+        assert_eq!(
+            id,
+            ObjectID::from_hex_literal(
+                "0x05fb8843a23017cbf1c907bd559a2d6191b77bc595d4c83853cca14cc784c0a8"
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_base36_roundtrip() {
+        let original_bytes: [u8; 32] = [
+            0x05, 0xfb, 0x88, 0x43, 0xa2, 0x30, 0x17, 0xcb, 0xf1, 0xc9, 0x07, 0xbd, 0x55, 0x9a,
+            0x2d, 0x61, 0x91, 0xb7, 0x7b, 0xc5, 0x95, 0xd4, 0xc8, 0x38, 0x53, 0xcc, 0xa1, 0x4c,
+            0xc7, 0x84, 0xc0, 0xa8,
+        ];
+        let base36 = bytes_to_base36(&original_bytes).unwrap();
+        let recovered = base36_to_bytes(&base36, 32).unwrap();
+        assert_eq!(original_bytes.to_vec(), recovered);
     }
 }
 

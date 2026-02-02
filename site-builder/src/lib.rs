@@ -18,7 +18,8 @@ use site::{
     SiteData,
 };
 use sitemap::display_sitemap;
-use util::{id_to_base36, path_or_defaults_if_exist};
+use sui_types::base_types::{ObjectID, SuiAddress};
+use util::{base36_to_bytes, id_to_base36, path_or_defaults_if_exist};
 
 pub mod args;
 mod backoff;
@@ -121,7 +122,20 @@ async fn run_internal(
         Commands::Sitemap { site_to_map } => {
             display_sitemap(site_to_map, selected_context, config).await?;
         }
-        Commands::Convert { object_id } => println!("{}", id_to_base36(&object_id)?),
+        Commands::Convert { object_id_or_base36 } => {
+            if object_id_or_base36.starts_with("0x")
+                && object_id_or_base36[2..].chars().all(|c| c.is_ascii_hexdigit())
+            {
+                // Input is hex object ID -> convert to base36
+                let object_id = ObjectID::from_hex_literal(&object_id_or_base36)?;
+                println!("{}", id_to_base36(&object_id)?);
+            } else {
+                // Input is base36 -> convert to object ID
+                let bytes = base36_to_bytes(&object_id_or_base36, 32)?;
+                let address = SuiAddress::from_bytes(bytes)?;
+                println!("{}", address);
+            }
+        }
         Commands::ListDirectory { path, ws_resources } => {
             let (ws_resources_opt, _) = load_ws_resources(ws_resources.as_deref(), &path)?;
             let ws_res = ws_resources_opt;

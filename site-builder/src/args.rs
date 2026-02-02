@@ -302,12 +302,16 @@ pub enum Commands {
         /// The object ID of a partially published site to be completed.
         object_id: ObjectID,
     },
-    /// Convert an object ID in hex format to the equivalent Base36 format.
+    /// Convert between object ID (hex) and Base36 formats.
     ///
-    /// This command may be useful to browse a site, given it object ID.
+    /// Auto-detects the input format:
+    /// - If input starts with `0x` and contains only hex characters: converts to Base36
+    /// - Otherwise: assumes Base36 and converts to object ID (hex)
+    ///
+    /// This command may be useful to browse a site, given its object ID.
     Convert {
-        /// The object id (in hex format) to convert
-        object_id: ObjectID,
+        /// The object id (hex format starting with 0x) or base36 string to convert
+        object_id_or_base36: String,
     },
     /// Show the pages composing the site at the given object ID or the given SuiNS name.
     ///
