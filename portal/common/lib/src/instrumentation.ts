@@ -21,6 +21,7 @@ export class InstrumentationFacade {
     private num_aggregator_fail_counter: Counter;
     private num_hash_mismatch_counter: Counter;
     private num_no_object_id_found_counter: Counter;
+    private num_blob_unavailable_counter: Counter;
 
     private routingHistogram: Histogram<Attributes>;
     private fetchRoutesDynamicFieldObjectHistogram: Histogram<Attributes>;
@@ -121,6 +122,20 @@ export class InstrumentationFacade {
         this.num_hash_mismatch_counter = this.meter.createCounter("ws_num_hash_mismatch_counter", {
             description: "Number of hash mismatch requests",
         });
+
+        this.num_no_object_id_found_counter = this.meter.createCounter(
+            "ws_num_no_object_id_found_counter",
+            {
+                description: "Number of no object ID found requests",
+            },
+        );
+
+        this.num_blob_unavailable_counter = this.meter.createCounter(
+            "ws_num_blob_unavailable_counter",
+            {
+                description: "Number of blob unavailable requests (likely expired blobs)",
+            },
+        );
     }
 
     public increaseRequestsMade(total: number, _requestId: string) {
@@ -184,6 +199,10 @@ export class InstrumentationFacade {
 
     public recordHashMismatchRequests() {
         this.num_hash_mismatch_counter.add(1);
+    }
+
+    public bumpBlobUnavailableRequests() {
+        this.num_blob_unavailable_counter.add(1);
     }
 }
 

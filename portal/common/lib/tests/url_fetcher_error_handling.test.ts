@@ -15,6 +15,7 @@ vi.mock("@lib/instrumentation", () => ({
     instrumentationFacade: {
         recordAggregatorTime: vi.fn(),
         bumpAggregatorFailRequests: vi.fn(),
+        bumpBlobUnavailableRequests: vi.fn(),
         increaseRequestsMade: vi.fn(),
     },
 }));
@@ -106,7 +107,7 @@ describe("fetchWithRetry error handling", () => {
     }
 
     describe("aggregator 404 responses", () => {
-        it("should return resourceNotFound and not retry on 404", async () => {
+        it("should return blobUnavailable (404) and not retry on 404", async () => {
             responseStatus = 404;
             mockValidResource();
 
@@ -115,6 +116,10 @@ describe("fetchWithRetry error handling", () => {
 
             expect(response.status).toBe(HttpStatusCodes.NOT_FOUND);
             expect(requestCount).toBe(1);
+            // Response should contain blob unavailable message with blob ID
+            const text = await response.text();
+            expect(text).toContain("no longer available");
+            expect(text).toContain("123"); // blob_id from mockValidResource
         });
     });
 
@@ -154,16 +159,20 @@ describe("fetchWithRetry error handling", () => {
             expect(requestCount).toBe(1);
         });
 
-        it("should throw error and not retry on 403", async () => {
+        it("should return aggregatorFail (503) and not retry on 403", async () => {
+            // 403 from aggregator means blob size exceeds configured max - this is
+            // an aggregator configuration issue, so we return 503 Service Unavailable
             responseStatus = 403;
             mockValidResource();
 
             const urlFetcher = createUrlFetcher();
+            const response = await urlFetcher.fetchUrl("0x1", "/test.html");
 
-            await expect(urlFetcher.fetchUrl("0x1", "/test.html")).rejects.toThrow(
-                /Unhandled response status from aggregator/,
-            );
+            expect(response.status).toBe(HttpStatusCodes.SERVICE_UNAVAILABLE);
             expect(requestCount).toBe(1);
+            // Response should contain aggregator fail message
+            const text = await response.text();
+            expect(text).toContain("Failed to contact the aggregator");
         });
     });
 });

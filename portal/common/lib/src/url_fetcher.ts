@@ -17,6 +17,7 @@ import {
     resourceNotFound,
     custom404NotFound,
     aggregatorFail,
+    blobUnavailable,
 } from "@lib/http/http_error_responses";
 import { blobAggregatorEndpoint, quiltAggregatorEndpoint } from "@lib/aggregator";
 import { toBase64 } from "@mysten/bcs";
@@ -207,10 +208,28 @@ export class UrlFetcher {
             headers: range_header,
         });
         if (!response.ok) {
+            // Aggregator error codes (from aggregator_openapi.yaml):
+            // 403: Blob size exceeds maximum allowed size configured for this aggregator.
+            // 404: Blob not stored on Walrus (likely expired) or quilt patch doesn't exist.
+            // 416: Invalid byte range parameters (would indicate a bug since ranges come from on-chain data).
+            // 5xx: Internal server error.
             if (response.status === 404) {
-                // TODO: #SEW-516 This gets overridden by custom404NotFound from the caller of this
-                // function
-                return resourceNotFound();
+                // In walrus-sites context, 404 from aggregator typically means the blob expired
+                // since site-builder stores blobs before creating resources.
+                logger.warn("Blob not available on aggregator (likely expired).", {
+                    path: result.path,
+                    blobOrPatchId,
+                });
+                return blobUnavailable(blobOrPatchId);
+            } else if (response.status === 403) {
+                // 403 means blob size exceeds aggregator's configured max size.
+                // This is an aggregator configuration issue, not a user error.
+                logger.error("Aggregator rejected blob due to size limit.", {
+                    path: result.path,
+                    blobOrPatchId,
+                    status: response.status,
+                });
+                return aggregatorFail();
             } else if (response.status >= 500 && response.status < 600) {
                 logger.error(
                     "Failed to fetch resource! Response from aggregator endpoint not ok.",
@@ -218,8 +237,8 @@ export class UrlFetcher {
                 );
                 return aggregatorFail();
             } else {
-                // If we do not get one of the above, it makes sense to log it and throw
-                // another error in order to investigate how we to handle this new type of response.
+                // For any other unexpected status (e.g., 416 invalid range), log and throw.
+                // 416 would indicate a bug since range data comes from on-chain resources.
                 let contents = await response.text();
                 logger.warn("Unexpected response from aggregator.", {
                     aggregator_endpoint,
