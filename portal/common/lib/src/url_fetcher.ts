@@ -14,7 +14,6 @@ import {
     noObjectIdFound,
     fullNodeFail,
     generateHashErrorResponse,
-    resourceNotFound,
     custom404NotFound,
     aggregatorFail,
     blobUnavailable,
@@ -30,6 +29,39 @@ import { QuiltPatch } from "@lib/quilt";
 import { instrumentationFacade } from "./instrumentation";
 
 export const QUILT_PATCH_ID_INTERNAL_HEADER = "x-wal-quilt-patch-internal-id";
+
+/**
+ * The reason why fetching a URL failed.
+ *
+ * Used to distinguish between "resource not found on-chain" (which should
+ * trigger fallback routing) and terminal errors (which should be returned
+ * immediately to the client).
+ */
+export enum FetchUrlFailReason {
+    /** The on-chain resource for this path does not exist. */
+    ResourceNotFound = "ResourceNotFound",
+    /** The blob exists on-chain but is no longer available on Walrus (likely expired). */
+    BlobUnavailable = "BlobUnavailable",
+    /** The aggregator is unreachable or returned a server error. */
+    AggregatorFail = "AggregatorFail",
+    /** The blob hash from the aggregator doesn't match the on-chain hash. */
+    HashMismatch = "HashMismatch",
+}
+
+/**
+ * Discriminated union returned by `fetchUrl`.
+ *
+ * Callers must inspect `kind` to decide whether to try fallback paths
+ * ("notFound") or return a terminal response ("ok" / "error").
+ */
+export type FetchUrlResult =
+    | { kind: "ok"; response: Response }
+    | { kind: "notFound"; reason: FetchUrlFailReason.ResourceNotFound }
+    | {
+          kind: "error";
+          reason: FetchUrlFailReason;
+          response: Response;
+      };
 /**
  * Includes all the logic for fetching the URL contents of a walrus site.
  */
@@ -79,15 +111,16 @@ export class UrlFetcher {
         const routesPromise = this.wsRouter.getRoutes(resolvedObjectId);
 
         // Fetch the URL using the initial path.
-        const fetchPromise = await this.fetchUrl(resolvedObjectId, parsedUrl.path);
+        const fetchResult = await this.fetchUrl(resolvedObjectId, parsedUrl.path);
 
-        // If the fetch of the initial path succeeds, return the response.
-        if (fetchPromise.status !== HttpStatusCodes.NOT_FOUND) {
-            return fetchPromise;
+        // Only fall through to routing/fallbacks when the on-chain resource
+        // doesn't exist. Terminal errors (expired blob, aggregator failure, etc.)
+        // are returned immediately.
+        if (fetchResult.kind !== "notFound") {
+            return fetchResult.response;
         }
 
-        // If the fetch fails, check if the path can be matched using
-        // the Routes DF and fetch the redirected path.
+        // The on-chain resource was not found — try route matching and fallbacks.
         const routes = await routesPromise;
 
         if (!routes) {
@@ -101,10 +134,9 @@ export class UrlFetcher {
         if (routes) {
             const matchingRoute = this.wsRouter.matchPathToRoute(parsedUrl.path, routes);
             if (matchingRoute) {
-                // If the route is found, fetch the redirected path.
-                const routeResponse = await this.fetchUrl(resolvedObjectId, matchingRoute);
-                if (routeResponse.status !== HttpStatusCodes.NOT_FOUND) {
-                    return routeResponse;
+                const routeResult = await this.fetchUrl(resolvedObjectId, matchingRoute);
+                if (routeResult.kind !== "notFound") {
+                    return routeResult.response;
                 }
             } else {
                 logger.warn(`No matching route found for ${parsedUrl.path}`, {
@@ -115,12 +147,21 @@ export class UrlFetcher {
 
         // Try to fetch 404.html from the deployed site
         if (parsedUrl.path !== "/404.html") {
-            const notFoundPage = await this.fetchUrl(resolvedObjectId, "/404.html");
-            if (notFoundPage.status !== HttpStatusCodes.NOT_FOUND) {
-                return notFoundPage;
+            const notFoundResult = await this.fetchUrl(resolvedObjectId, "/404.html");
+            if (notFoundResult.kind === "ok") {
+                return notFoundResult.response;
             }
 
-            // Site doesn't have its own 404 page — use portal fallback
+            if (
+                notFoundResult.kind === "error" &&
+                notFoundResult.reason !== FetchUrlFailReason.BlobUnavailable
+            ) {
+                // Terminal errors (aggregator failure, hash mismatch) are returned as-is.
+                return notFoundResult.response;
+            }
+
+            // The site either doesn't have a 404 page, or the 404 page's blob
+            // has expired — either way, use the portal's own fallback.
             return custom404NotFound();
         }
 
@@ -166,15 +207,18 @@ export class UrlFetcher {
 
     /**
      * Fetches the URL of a walrus site.
+     *
+     * Returns a discriminated union so that the caller can distinguish between
+     * "resource doesn't exist on-chain" (eligible for fallback routing) and
+     * terminal errors like expired blobs or aggregator failures.
+     *
      * @param objectId - The object ID of the site object.
      * @param path - The path of the site resource to fetch. e.g. /index.html
      */
-    public async fetchUrl(objectId: string, path: string): Promise<Response> {
+    public async fetchUrl(objectId: string, path: string): Promise<FetchUrlResult> {
         const result = await this.resourceFetcher.fetchResource(objectId, path, new Set<string>());
         if (!isResource(result) || !result.blob_id) {
-            // TODO: #SEW-516 This gets overridden by custom404NotFound from the caller of this
-            // function
-            return resourceNotFound();
+            return { kind: "notFound", reason: FetchUrlFailReason.ResourceNotFound };
         }
 
         logger.info("Successfully fetched resource!", {
@@ -213,15 +257,19 @@ export class UrlFetcher {
             // 404: Blob not stored on Walrus (likely expired) or quilt patch doesn't exist.
             // 416: Invalid byte range parameters (would indicate a bug since ranges come from on-chain data).
             // 5xx: Internal server error.
-            if (response.status === 404) {
+            if (response.status === HttpStatusCodes.NOT_FOUND) {
                 // In walrus-sites context, 404 from aggregator typically means the blob expired
                 // since site-builder stores blobs before creating resources.
                 logger.warn("Blob not available on aggregator (likely expired).", {
                     path: result.path,
                     blobOrPatchId,
                 });
-                return blobUnavailable(blobOrPatchId);
-            } else if (response.status === 403) {
+                return {
+                    kind: "error",
+                    reason: FetchUrlFailReason.BlobUnavailable,
+                    response: blobUnavailable(blobOrPatchId),
+                };
+            } else if (response.status === HttpStatusCodes.FORBIDDEN) {
                 // 403 means blob size exceeds aggregator's configured max size.
                 // This is an aggregator configuration issue, not a user error.
                 logger.error("Aggregator rejected blob due to size limit.", {
@@ -229,13 +277,24 @@ export class UrlFetcher {
                     blobOrPatchId,
                     status: response.status,
                 });
-                return aggregatorFail();
-            } else if (response.status >= 500 && response.status < 600) {
+                return {
+                    kind: "error",
+                    reason: FetchUrlFailReason.AggregatorFail,
+                    response: aggregatorFail(),
+                };
+            } else if (
+                response.status >= HttpStatusCodes.INTERNAL_SERVER_ERROR &&
+                response.status < 600
+            ) {
                 logger.error(
                     "Failed to fetch resource! Response from aggregator endpoint not ok.",
                     { path: result.path, status: response.status },
                 );
-                return aggregatorFail();
+                return {
+                    kind: "error",
+                    reason: FetchUrlFailReason.AggregatorFail,
+                    response: aggregatorFail(),
+                };
             } else {
                 // For any other unexpected status (e.g., 416 invalid range), log and throw.
                 // 416 would indicate a bug since range data comes from on-chain resources.
@@ -245,7 +304,6 @@ export class UrlFetcher {
                     status: response.status,
                     contents,
                 });
-                // Will return genericError.
                 throw new Error(
                     `Unhandled response status from aggregator. Response status: ${response.status}`,
                 );
@@ -272,17 +330,24 @@ export class UrlFetcher {
                     aggrHash: h10b,
                 },
             );
-            return generateHashErrorResponse();
+            return {
+                kind: "error",
+                reason: FetchUrlFailReason.HashMismatch,
+                response: generateHashErrorResponse(),
+            };
         }
 
-        return new Response(body, {
-            headers: {
-                ...Object.fromEntries(result.headers),
-                "x-resource-sui-object-version": result.version,
-                "x-resource-sui-object-id": result.objectId,
-                "x-unix-time-cached": Date.now().toString(),
-            },
-        });
+        return {
+            kind: "ok",
+            response: new Response(body, {
+                headers: {
+                    ...Object.fromEntries(result.headers),
+                    "x-resource-sui-object-version": result.version,
+                    "x-resource-sui-object-id": result.objectId,
+                    "x-unix-time-cached": Date.now().toString(),
+                },
+            }),
+        };
     }
 
     /**
@@ -314,10 +379,13 @@ export class UrlFetcher {
             try {
                 const response = await fetch(input, init);
 
-                if (response.status === 404) {
+                if (response.status === HttpStatusCodes.NOT_FOUND) {
                     // If 404 error, log the response status and do not retry.
                     logger.info("Aggregator responded with NOT_FOUND (404)", { input });
-                } else if (response.status >= 500 && response.status < 600) {
+                } else if (
+                    response.status >= HttpStatusCodes.INTERNAL_SERVER_ERROR &&
+                    response.status < 600
+                ) {
                     if (attempt === retries) {
                         return response;
                     }

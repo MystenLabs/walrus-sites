@@ -67,29 +67,15 @@ export function blobUnavailable(blobId: string): Response {
     instrumentationFacade.bumpBlobUnavailableRequests();
 
     const secondaryMessage = `
-        <div style="text-align: left; max-width: 600px; margin: 0 auto;">
-            <p>This resource is no longer available on Walrus. It may have expired.</p>
-
-            <p style="margin-top: 1.5em; font-size: 0.9em; color: #666;">
-                <strong>Blob ID:</strong>
-                <code style="background: #f4f4f4; padding: 2px 6px; border-radius: 3px; word-break: break-all;">${blobId}</code>
-            </p>
-
-            <details style="margin-top: 1.5em; font-size: 0.85em; color: #555;">
-                <summary style="cursor: pointer; font-weight: bold;">Are you the site owner?</summary>
-                <div style="margin-top: 0.75em; padding-left: 1em;">
-                    <p>You can restore expired resources by updating your site:</p>
-                    <pre style="background: #f4f4f4; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 0.9em;">site-builder deploy &lt;directory&gt; --epochs &lt;N&gt;</pre>
-                    <p style="margin-top: 0.5em; font-size: 0.9em;">
-                        Or, using the explicit update command:
-                    </p>
-                    <pre style="background: #f4f4f4; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 0.9em;">site-builder update &lt;directory&gt; &lt;site-id&gt; --epochs &lt;N&gt;</pre>
-                    <p style="margin-top: 0.5em; font-size: 0.85em; color: #777;">
-                        This will automatically restore any expired blobs with the specified epoch duration.
-                    </p>
-                </div>
-            </details>
-        </div>
+        It may have expired.
+        <details>
+            <summary>Are you the site owner?</summary>
+            <p><strong>Blob ID:</strong> <code>${blobId}</code></p>
+            <p>You can restore expired resources by updating your site:</p>
+            <pre>site-builder deploy &lt;directory&gt; --epochs &lt;N&gt;</pre>
+            <p>Or, if you haven't migrated to the deploy command yet:</p>
+            <pre>site-builder update &lt;directory&gt; &lt;site-id&gt; --epochs &lt;N&gt;</pre>
+        </details>
     `;
 
     return Response404("This content is no longer available", secondaryMessage);
