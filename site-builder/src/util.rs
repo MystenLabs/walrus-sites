@@ -367,19 +367,26 @@ pub(crate) fn persist_site_id_and_name(
 ///
 /// # Returns
 /// Returns `true` if the resource path matches the pattern, `false` otherwise.
-/// If the pattern is invalid, returns `false`.
-pub(crate) fn is_pattern_match(pattern: &str, resource_path: &str) -> bool {
+///
+/// # Errors
+/// Returns an error if the glob pattern is invalid.
+pub(crate) fn is_pattern_match(pattern: &str, resource_path: &str) -> Result<bool> {
     Pattern::new(pattern)
         .map(|pattern| pattern.matches(resource_path))
-        .expect("Invalid glob pattern.")
+        .map_err(|e| anyhow!("Invalid glob pattern '{}': {}", pattern, e))
 }
 
 /// Checks if a resource path matches any of the provided ignore patterns.
 pub(crate) fn is_ignored<'a>(
-    mut ignore_patterns: impl Iterator<Item = &'a str>,
+    ignore_patterns: impl Iterator<Item = &'a str>,
     resource_path: &str,
-) -> bool {
-    ignore_patterns.any(|pattern| is_pattern_match(pattern, resource_path))
+) -> Result<bool> {
+    for pattern in ignore_patterns {
+        if is_pattern_match(pattern, resource_path)? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 /// Decodes a hexadecimal string (with "0x" prefix) into a vector of bytes.
