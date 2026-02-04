@@ -40,7 +40,8 @@ fn test_is_ignored() {
             .flatten()
             .map(String::as_str),
         "/foo/nested/bar.txt"
-    ));
+    )
+    .expect("is_ignored should not fail with valid patterns"));
 }
 
 #[test]
@@ -76,15 +77,19 @@ fn test_is_pattern_match() {
             path: "/test/foo-bar_baz.extension",
             expected: true,
         },
-        // PatternMatchTestCase {
-        //     pattern: "[invalid",
-        //     path: "/file",
-        //     expected: false,
-        // },
     ];
     for t in tests {
-        assert_eq!(is_pattern_match(t.pattern, t.path), t.expected);
+        assert_eq!(
+            is_pattern_match(t.pattern, t.path).expect("valid pattern should not fail"),
+            t.expected
+        );
     }
+}
+
+#[test]
+fn test_is_pattern_match_invalid_pattern() {
+    let result = is_pattern_match("[invalid", "/file");
+    assert!(result.is_err(), "invalid glob pattern should return an error");
 }
 
 // ============ update_cache_from_effects tests ============
