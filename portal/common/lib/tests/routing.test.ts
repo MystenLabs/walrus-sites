@@ -78,15 +78,17 @@ describe("routing tests", () => {
                 switch (path) {
                     case "/test.html":
                         return {
+                            status: "Ok",
                             response: new Response("test.html content", { status: 200 }),
                         };
                     case "/404.html":
                         return {
+                            status: "Ok",
                             response: new Response("404 page content", { status: 200 }),
                         };
                     default:
                         return {
-                            reason: "ResourceNotFound",
+                            status: "ResourceNotFound",
                         };
                 }
             },
@@ -157,12 +159,12 @@ describe("routing tests", () => {
             async (_objectId: string, path: string): Promise<FetchUrlResult> => {
                 if (path === "/404.html") {
                     return {
-                        reason: "BlobUnavailable",
+                        status: "BlobUnavailable",
                         response: new Response("blob unavailable", { status: 404 }),
                     };
                 }
                 return {
-                    reason: "ResourceNotFound",
+                    status: "ResourceNotFound",
                 };
             },
         );

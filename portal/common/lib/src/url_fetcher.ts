@@ -31,32 +31,24 @@ import { instrumentationFacade } from "./instrumentation";
 export const QUILT_PATCH_ID_INTERNAL_HEADER = "x-wal-quilt-patch-internal-id";
 
 /**
- * The reason why fetching a URL failed.
- *
- * Used to distinguish between "resource not found on-chain" (which should
- * trigger fallback routing) and terminal errors (which should be returned
- * immediately to the client).
- */
-export type FetchUrlFailReason =
-    /** The on-chain resource for this path does not exist. */
-    | "ResourceNotFound"
-    /** The blob exists on-chain but is no longer available on Walrus (likely expired). */
-    | "BlobUnavailable"
-    /** The aggregator is unreachable or returned a server error. */
-    | "AggregatorFail"
-    /** The blob hash from the aggregator doesn't match the on-chain hash. */
-    | "HashMismatch";
-
-/**
  * Discriminated union returned by `fetchUrl`.
  *
- * Callers check `'reason' in result` to distinguish success from failure.
- * On failure, check `result.reason` to decide whether to try fallback paths
- * (when `reason === "ResourceNotFound"`) or return a terminal response.
+ * Uses a `status` field as the discriminator, similar to Rust enums.
+ * TypeScript will narrow the type when you check `result.status`,
+ * forcing callers to handle each case before accessing the response.
+ *
+ * - `Ok`: Successfully fetched the resource
+ * - `ResourceNotFound`: The on-chain resource doesn't exist (try fallbacks)
+ * - `BlobUnavailable`: The blob exists on-chain but expired on Walrus
+ * - `AggregatorFail`: The aggregator is unreachable or returned a server error
+ * - `HashMismatch`: The blob hash doesn't match the on-chain hash
  */
 export type FetchUrlResult =
-    | { response: Response }
-    | { reason: FetchUrlFailReason; response?: Response };
+    | { status: "Ok"; response: Response }
+    | { status: "ResourceNotFound" }
+    | { status: "BlobUnavailable"; response: Response }
+    | { status: "AggregatorFail"; response: Response }
+    | { status: "HashMismatch"; response: Response };
 /**
  * Includes all the logic for fetching the URL contents of a walrus site.
  */
@@ -111,8 +103,8 @@ export class UrlFetcher {
         // Only fall through to routing/fallbacks when the on-chain resource
         // doesn't exist. Terminal errors (expired blob, aggregator failure, etc.)
         // are returned immediately.
-        if (!("reason" in fetchResult) || fetchResult.reason !== "ResourceNotFound") {
-            return fetchResult.response!;
+        if (fetchResult.status !== "ResourceNotFound") {
+            return fetchResult.response;
         }
 
         // The on-chain resource was not found — try route matching and fallbacks.
@@ -130,8 +122,8 @@ export class UrlFetcher {
             const matchingRoute = this.wsRouter.matchPathToRoute(parsedUrl.path, routes);
             if (matchingRoute) {
                 const routeResult = await this.fetchUrl(resolvedObjectId, matchingRoute);
-                if (!("reason" in routeResult) || routeResult.reason !== "ResourceNotFound") {
-                    return routeResult.response!;
+                if (routeResult.status !== "ResourceNotFound") {
+                    return routeResult.response;
                 }
             } else {
                 logger.warn(`No matching route found for ${parsedUrl.path}`, {
@@ -143,17 +135,17 @@ export class UrlFetcher {
         // Try to fetch 404.html from the deployed site
         if (parsedUrl.path !== "/404.html") {
             const notFoundResult = await this.fetchUrl(resolvedObjectId, "/404.html");
-            if (!("reason" in notFoundResult)) {
+            if (notFoundResult.status === "Ok") {
                 // Success - return the site's custom 404 page
                 return notFoundResult.response;
             }
 
             if (
-                notFoundResult.reason !== "ResourceNotFound" &&
-                notFoundResult.reason !== "BlobUnavailable"
+                notFoundResult.status !== "ResourceNotFound" &&
+                notFoundResult.status !== "BlobUnavailable"
             ) {
                 // Terminal errors (aggregator failure, hash mismatch) are returned as-is.
-                return notFoundResult.response!;
+                return notFoundResult.response;
             }
 
             // The site either doesn't have a 404 page, or the 404 page's blob
@@ -214,7 +206,7 @@ export class UrlFetcher {
     public async fetchUrl(objectId: string, path: string): Promise<FetchUrlResult> {
         const result = await this.resourceFetcher.fetchResource(objectId, path, new Set<string>());
         if (!isResource(result) || !result.blob_id) {
-            return { reason: "ResourceNotFound" };
+            return { status: "ResourceNotFound" };
         }
 
         logger.info("Successfully fetched resource!", {
@@ -261,7 +253,7 @@ export class UrlFetcher {
                     blobOrPatchId,
                 });
                 return {
-                    reason: "BlobUnavailable",
+                    status: "BlobUnavailable",
                     response: blobUnavailable(blobOrPatchId),
                 };
             } else if (response.status === HttpStatusCodes.FORBIDDEN) {
@@ -273,7 +265,7 @@ export class UrlFetcher {
                     status: response.status,
                 });
                 return {
-                    reason: "AggregatorFail",
+                    status: "AggregatorFail",
                     response: aggregatorFail(),
                 };
             } else if (
@@ -285,7 +277,7 @@ export class UrlFetcher {
                     { path: result.path, status: response.status },
                 );
                 return {
-                    reason: "AggregatorFail",
+                    status: "AggregatorFail",
                     response: aggregatorFail(),
                 };
             } else {
@@ -324,12 +316,13 @@ export class UrlFetcher {
                 },
             );
             return {
-                reason: "HashMismatch",
+                status: "HashMismatch",
                 response: generateHashErrorResponse(),
             };
         }
 
         return {
+            status: "Ok",
             response: new Response(body, {
                 status: path === "/404.html" ? 404 : 200,
                 headers: {

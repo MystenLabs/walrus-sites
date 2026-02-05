@@ -114,14 +114,13 @@ describe("fetchWithRetry error handling", () => {
             const urlFetcher = createUrlFetcher();
             const result = await urlFetcher.fetchUrl("0x1", "/test.html");
 
-            expect("reason" in result).toBe(true);
+            expect(result.status).toBe("BlobUnavailable");
             expect(requestCount).toBe(1);
 
             // Response should contain blob unavailable message with blob ID
-            if ("reason" in result) {
-                expect(result.reason).toBe("BlobUnavailable");
-                expect(result.response!.status).toBe(HttpStatusCodes.NOT_FOUND);
-                const text = await result.response!.text();
+            if (result.status === "BlobUnavailable") {
+                expect(result.response.status).toBe(HttpStatusCodes.NOT_FOUND);
+                const text = await result.response.text();
                 expect(text).toContain("no longer available");
                 expect(text).toContain("123"); // blob_id from mockValidResource
             }
@@ -136,10 +135,9 @@ describe("fetchWithRetry error handling", () => {
             const urlFetcher = createUrlFetcher();
             const result = await urlFetcher.fetchUrl("0x1", "/test.html");
 
-            expect("reason" in result).toBe(true);
-            if ("reason" in result) {
-                expect(result.reason).toBe("AggregatorFail");
-                expect(result.response!.status).toBe(HttpStatusCodes.SERVICE_UNAVAILABLE);
+            expect(result.status).toBe("AggregatorFail");
+            if (result.status === "AggregatorFail") {
+                expect(result.response.status).toBe(HttpStatusCodes.SERVICE_UNAVAILABLE);
             }
             expect(requestCount).toBe(3); // 1 initial + 2 retries
         });
@@ -151,10 +149,9 @@ describe("fetchWithRetry error handling", () => {
             const urlFetcher = createUrlFetcher();
             const result = await urlFetcher.fetchUrl("0x1", "/test.html");
 
-            expect("reason" in result).toBe(true);
-            if ("reason" in result) {
-                expect(result.reason).toBe("AggregatorFail");
-                expect(result.response!.status).toBe(HttpStatusCodes.SERVICE_UNAVAILABLE);
+            expect(result.status).toBe("AggregatorFail");
+            if (result.status === "AggregatorFail") {
+                expect(result.response.status).toBe(HttpStatusCodes.SERVICE_UNAVAILABLE);
             }
         });
     });
@@ -181,14 +178,13 @@ describe("fetchWithRetry error handling", () => {
             const urlFetcher = createUrlFetcher();
             const result = await urlFetcher.fetchUrl("0x1", "/test.html");
 
-            expect("reason" in result).toBe(true);
+            expect(result.status).toBe("AggregatorFail");
             expect(requestCount).toBe(1);
 
             // Response should contain aggregator fail message
-            if ("reason" in result) {
-                expect(result.reason).toBe("AggregatorFail");
-                expect(result.response!.status).toBe(HttpStatusCodes.SERVICE_UNAVAILABLE);
-                const text = await result.response!.text();
+            if (result.status === "AggregatorFail") {
+                expect(result.response.status).toBe(HttpStatusCodes.SERVICE_UNAVAILABLE);
+                const text = await result.response.text();
                 expect(text).toContain("Failed to contact the aggregator");
             }
         });
