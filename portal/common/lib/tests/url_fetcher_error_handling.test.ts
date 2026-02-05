@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from "vitest";
-import { UrlFetcher, FetchUrlFailReason } from "@lib/url_fetcher";
+import { UrlFetcher } from "@lib/url_fetcher";
 import { ResourceFetcher } from "@lib/resource";
 import { SuiNSResolver } from "@lib/suins";
 import { WalrusSitesRouter } from "@lib/routing";
@@ -114,14 +114,14 @@ describe("fetchWithRetry error handling", () => {
             const urlFetcher = createUrlFetcher();
             const result = await urlFetcher.fetchUrl("0x1", "/test.html");
 
-            expect(result.kind).toBe("error");
+            expect("reason" in result).toBe(true);
             expect(requestCount).toBe(1);
 
             // Response should contain blob unavailable message with blob ID
-            if (result.kind === "error") {
-                expect(result.reason).toBe(FetchUrlFailReason.BlobUnavailable);
-                expect(result.response.status).toBe(HttpStatusCodes.NOT_FOUND);
-                const text = await result.response.text();
+            if ("reason" in result) {
+                expect(result.reason).toBe("BlobUnavailable");
+                expect(result.response!.status).toBe(HttpStatusCodes.NOT_FOUND);
+                const text = await result.response!.text();
                 expect(text).toContain("no longer available");
                 expect(text).toContain("123"); // blob_id from mockValidResource
             }
@@ -136,10 +136,10 @@ describe("fetchWithRetry error handling", () => {
             const urlFetcher = createUrlFetcher();
             const result = await urlFetcher.fetchUrl("0x1", "/test.html");
 
-            expect(result.kind).toBe("error");
-            if (result.kind === "error") {
-                expect(result.reason).toBe(FetchUrlFailReason.AggregatorFail);
-                expect(result.response.status).toBe(HttpStatusCodes.SERVICE_UNAVAILABLE);
+            expect("reason" in result).toBe(true);
+            if ("reason" in result) {
+                expect(result.reason).toBe("AggregatorFail");
+                expect(result.response!.status).toBe(HttpStatusCodes.SERVICE_UNAVAILABLE);
             }
             expect(requestCount).toBe(3); // 1 initial + 2 retries
         });
@@ -151,10 +151,10 @@ describe("fetchWithRetry error handling", () => {
             const urlFetcher = createUrlFetcher();
             const result = await urlFetcher.fetchUrl("0x1", "/test.html");
 
-            expect(result.kind).toBe("error");
-            if (result.kind === "error") {
-                expect(result.reason).toBe(FetchUrlFailReason.AggregatorFail);
-                expect(result.response.status).toBe(HttpStatusCodes.SERVICE_UNAVAILABLE);
+            expect("reason" in result).toBe(true);
+            if ("reason" in result) {
+                expect(result.reason).toBe("AggregatorFail");
+                expect(result.response!.status).toBe(HttpStatusCodes.SERVICE_UNAVAILABLE);
             }
         });
     });
@@ -181,14 +181,14 @@ describe("fetchWithRetry error handling", () => {
             const urlFetcher = createUrlFetcher();
             const result = await urlFetcher.fetchUrl("0x1", "/test.html");
 
-            expect(result.kind).toBe("error");
+            expect("reason" in result).toBe(true);
             expect(requestCount).toBe(1);
 
             // Response should contain aggregator fail message
-            if (result.kind === "error") {
-                expect(result.reason).toBe(FetchUrlFailReason.AggregatorFail);
-                expect(result.response.status).toBe(HttpStatusCodes.SERVICE_UNAVAILABLE);
-                const text = await result.response.text();
+            if ("reason" in result) {
+                expect(result.reason).toBe("AggregatorFail");
+                expect(result.response!.status).toBe(HttpStatusCodes.SERVICE_UNAVAILABLE);
+                const text = await result.response!.text();
                 expect(text).toContain("Failed to contact the aggregator");
             }
         });

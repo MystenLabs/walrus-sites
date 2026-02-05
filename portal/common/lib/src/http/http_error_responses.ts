@@ -72,9 +72,9 @@ export function blobUnavailable(blobId: string): Response {
             <summary>Are you the site owner?</summary>
             <p><strong>Blob ID:</strong> <code>${blobId}</code></p>
             <p>You can restore expired resources by updating your site:</p>
-            <pre>site-builder deploy &lt;directory&gt; --epochs &lt;N&gt;</pre>
+            <pre>site-builder deploy --epochs &lt;N&gt; &lt;directory&gt;</pre>
             <p>Or, if you haven't migrated to the deploy command yet:</p>
-            <pre>site-builder update &lt;directory&gt; &lt;site-id&gt; --epochs &lt;N&gt;</pre>
+            <pre>site-builder update --epochs &lt;N&gt; &lt;directory&gt; &lt;site-id&gt;</pre>
         </details>
     `;
 

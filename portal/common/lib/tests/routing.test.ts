@@ -4,7 +4,7 @@
 import { WalrusSitesRouter } from "@lib/routing";
 import { test, expect, describe, vi, beforeEach } from "vitest";
 import { RPCSelector } from "@lib/rpc_selector";
-import { UrlFetcher, FetchUrlFailReason } from "@lib/url_fetcher";
+import { UrlFetcher } from "@lib/url_fetcher";
 import type { FetchUrlResult } from "@lib/url_fetcher";
 import { ResourceFetcher } from "@lib/resource";
 import { SuiNSResolver } from "@lib/suins";
@@ -74,22 +74,19 @@ describe("routing tests", () => {
         const fetchUrlSpy = vi.spyOn(urlFetcher, "fetchUrl");
         // Mock the fetchUrl method to return FetchUrlResult
         fetchUrlSpy.mockImplementation(
-            async (objectId: string, path: string): Promise<FetchUrlResult> => {
+            async (_objectId: string, path: string): Promise<FetchUrlResult> => {
                 switch (path) {
                     case "/test.html":
                         return {
-                            kind: "ok",
                             response: new Response("test.html content", { status: 200 }),
                         };
                     case "/404.html":
                         return {
-                            kind: "ok",
                             response: new Response("404 page content", { status: 200 }),
                         };
                     default:
                         return {
-                            kind: "notFound",
-                            reason: FetchUrlFailReason.ResourceNotFound,
+                            reason: "ResourceNotFound",
                         };
                 }
             },
@@ -157,17 +154,15 @@ describe("routing tests", () => {
         const fetchUrlSpy = vi.spyOn(urlFetcher, "fetchUrl");
         // The resource exists on-chain but the blob is expired on the aggregator.
         fetchUrlSpy.mockImplementation(
-            async (objectId: string, path: string): Promise<FetchUrlResult> => {
+            async (_objectId: string, path: string): Promise<FetchUrlResult> => {
                 if (path === "/404.html") {
                     return {
-                        kind: "error",
-                        reason: FetchUrlFailReason.BlobUnavailable,
+                        reason: "BlobUnavailable",
                         response: new Response("blob unavailable", { status: 404 }),
                     };
                 }
                 return {
-                    kind: "notFound",
-                    reason: FetchUrlFailReason.ResourceNotFound,
+                    reason: "ResourceNotFound",
                 };
             },
         );

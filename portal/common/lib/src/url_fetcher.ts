@@ -37,31 +37,26 @@ export const QUILT_PATCH_ID_INTERNAL_HEADER = "x-wal-quilt-patch-internal-id";
  * trigger fallback routing) and terminal errors (which should be returned
  * immediately to the client).
  */
-export enum FetchUrlFailReason {
+export type FetchUrlFailReason =
     /** The on-chain resource for this path does not exist. */
-    ResourceNotFound = "ResourceNotFound",
+    | "ResourceNotFound"
     /** The blob exists on-chain but is no longer available on Walrus (likely expired). */
-    BlobUnavailable = "BlobUnavailable",
+    | "BlobUnavailable"
     /** The aggregator is unreachable or returned a server error. */
-    AggregatorFail = "AggregatorFail",
+    | "AggregatorFail"
     /** The blob hash from the aggregator doesn't match the on-chain hash. */
-    HashMismatch = "HashMismatch",
-}
+    | "HashMismatch";
 
 /**
  * Discriminated union returned by `fetchUrl`.
  *
- * Callers must inspect `kind` to decide whether to try fallback paths
- * ("notFound") or return a terminal response ("ok" / "error").
+ * Callers check `'reason' in result` to distinguish success from failure.
+ * On failure, check `result.reason` to decide whether to try fallback paths
+ * (when `reason === "ResourceNotFound"`) or return a terminal response.
  */
 export type FetchUrlResult =
-    | { kind: "ok"; response: Response }
-    | { kind: "notFound"; reason: FetchUrlFailReason.ResourceNotFound }
-    | {
-          kind: "error";
-          reason: FetchUrlFailReason;
-          response: Response;
-      };
+    | { response: Response }
+    | { reason: FetchUrlFailReason; response?: Response };
 /**
  * Includes all the logic for fetching the URL contents of a walrus site.
  */
@@ -116,8 +111,8 @@ export class UrlFetcher {
         // Only fall through to routing/fallbacks when the on-chain resource
         // doesn't exist. Terminal errors (expired blob, aggregator failure, etc.)
         // are returned immediately.
-        if (fetchResult.kind !== "notFound") {
-            return fetchResult.response;
+        if (!("reason" in fetchResult) || fetchResult.reason !== "ResourceNotFound") {
+            return fetchResult.response!;
         }
 
         // The on-chain resource was not found — try route matching and fallbacks.
@@ -135,8 +130,8 @@ export class UrlFetcher {
             const matchingRoute = this.wsRouter.matchPathToRoute(parsedUrl.path, routes);
             if (matchingRoute) {
                 const routeResult = await this.fetchUrl(resolvedObjectId, matchingRoute);
-                if (routeResult.kind !== "notFound") {
-                    return routeResult.response;
+                if (!("reason" in routeResult) || routeResult.reason !== "ResourceNotFound") {
+                    return routeResult.response!;
                 }
             } else {
                 logger.warn(`No matching route found for ${parsedUrl.path}`, {
@@ -148,16 +143,17 @@ export class UrlFetcher {
         // Try to fetch 404.html from the deployed site
         if (parsedUrl.path !== "/404.html") {
             const notFoundResult = await this.fetchUrl(resolvedObjectId, "/404.html");
-            if (notFoundResult.kind === "ok") {
+            if (!("reason" in notFoundResult)) {
+                // Success - return the site's custom 404 page
                 return notFoundResult.response;
             }
 
             if (
-                notFoundResult.kind === "error" &&
-                notFoundResult.reason !== FetchUrlFailReason.BlobUnavailable
+                notFoundResult.reason !== "ResourceNotFound" &&
+                notFoundResult.reason !== "BlobUnavailable"
             ) {
                 // Terminal errors (aggregator failure, hash mismatch) are returned as-is.
-                return notFoundResult.response;
+                return notFoundResult.response!;
             }
 
             // The site either doesn't have a 404 page, or the 404 page's blob
@@ -218,7 +214,7 @@ export class UrlFetcher {
     public async fetchUrl(objectId: string, path: string): Promise<FetchUrlResult> {
         const result = await this.resourceFetcher.fetchResource(objectId, path, new Set<string>());
         if (!isResource(result) || !result.blob_id) {
-            return { kind: "notFound", reason: FetchUrlFailReason.ResourceNotFound };
+            return { reason: "ResourceNotFound" };
         }
 
         logger.info("Successfully fetched resource!", {
@@ -265,8 +261,7 @@ export class UrlFetcher {
                     blobOrPatchId,
                 });
                 return {
-                    kind: "error",
-                    reason: FetchUrlFailReason.BlobUnavailable,
+                    reason: "BlobUnavailable",
                     response: blobUnavailable(blobOrPatchId),
                 };
             } else if (response.status === HttpStatusCodes.FORBIDDEN) {
@@ -278,8 +273,7 @@ export class UrlFetcher {
                     status: response.status,
                 });
                 return {
-                    kind: "error",
-                    reason: FetchUrlFailReason.AggregatorFail,
+                    reason: "AggregatorFail",
                     response: aggregatorFail(),
                 };
             } else if (
@@ -291,8 +285,7 @@ export class UrlFetcher {
                     { path: result.path, status: response.status },
                 );
                 return {
-                    kind: "error",
-                    reason: FetchUrlFailReason.AggregatorFail,
+                    reason: "AggregatorFail",
                     response: aggregatorFail(),
                 };
             } else {
@@ -331,15 +324,14 @@ export class UrlFetcher {
                 },
             );
             return {
-                kind: "error",
-                reason: FetchUrlFailReason.HashMismatch,
+                reason: "HashMismatch",
                 response: generateHashErrorResponse(),
             };
         }
 
         return {
-            kind: "ok",
             response: new Response(body, {
+                status: path === "/404.html" ? 404 : 200,
                 headers: {
                     ...Object.fromEntries(result.headers),
                     "x-resource-sui-object-version": result.version,
