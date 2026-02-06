@@ -5,14 +5,15 @@ import { WalrusSitesRouter } from "@lib/routing";
 import { test, expect, describe, vi, beforeEach } from "vitest";
 import { RPCSelector } from "@lib/rpc_selector";
 import { UrlFetcher } from "@lib/url_fetcher";
+import type { FetchUrlResult } from "@lib/url_fetcher";
 import { ResourceFetcher } from "@lib/resource";
 import { SuiNSResolver } from "@lib/suins";
 
 const snakeSiteObjectId = "0x7a95e4be3948415b852fb287d455166a276d7a52f1a567b4a26b6b5e9c753158";
 const rpcSelector = new RPCSelector(process.env.RPC_URL_LIST!.split(","), "testnet");
 const wsRouter = new WalrusSitesRouter(rpcSelector);
-const aggregatorUrl = process.env.AGGREGATOR_URL;
-const sitePackage = process.env.SITE_PACKAGE;
+const aggregatorUrl = process.env.AGGREGATOR_URL!;
+const sitePackage = process.env.SITE_PACKAGE!;
 
 test.skip("getRoutes", async () => {
     // TODO: when you make sure get_routes fetches
@@ -71,17 +72,27 @@ describe("routing tests", () => {
         );
 
         const fetchUrlSpy = vi.spyOn(urlFetcher, "fetchUrl");
-        // Mock the fetchUrl method to return a test.html and 404.html response
-        fetchUrlSpy.mockImplementation(async (objectId: string, path: string) => {
-            switch (path) {
-                case "/test.html":
-                    return new Response("test.html content", { status: 200 });
-                case "/404.html":
-                    return new Response("404 page content", { status: 200 });
-                default:
-                    return new Response(null, { status: 404 });
-            }
-        });
+        // Mock the fetchUrl method to return FetchUrlResult
+        fetchUrlSpy.mockImplementation(
+            async (_objectId: string, path: string): Promise<FetchUrlResult> => {
+                switch (path) {
+                    case "/test.html":
+                        return {
+                            status: "Ok",
+                            response: new Response("test.html content", { status: 200 }),
+                        };
+                    case "/404.html":
+                        return {
+                            status: "Ok",
+                            response: new Response("404 page content", { status: 200 }),
+                        };
+                    default:
+                        return {
+                            status: "ResourceNotFound",
+                        };
+                }
+            },
+        );
 
         const getRoutesSpy = vi.spyOn(wsRouter, "getRoutes");
         // Mock the getRoutes method to return a test.html route
@@ -131,5 +142,49 @@ describe("routing tests", () => {
 
         // Verify we didn't get 404.html content
         expect(actualContent).not.toBe(notFoundContent);
+    });
+
+    test("should return portal fallback when site's 404.html blob is expired", async () => {
+        const urlFetcher = new UrlFetcher(
+            new ResourceFetcher(rpcSelector, sitePackage),
+            new SuiNSResolver(rpcSelector),
+            wsRouter,
+            aggregatorUrl,
+            true,
+        );
+
+        const fetchUrlSpy = vi.spyOn(urlFetcher, "fetchUrl");
+        // The resource exists on-chain but the blob is expired on the aggregator.
+        fetchUrlSpy.mockImplementation(
+            async (_objectId: string, path: string): Promise<FetchUrlResult> => {
+                if (path === "/404.html") {
+                    return {
+                        status: "BlobUnavailable",
+                        response: new Response("blob unavailable", { status: 404 }),
+                    };
+                }
+                return {
+                    status: "ResourceNotFound",
+                };
+            },
+        );
+
+        const getRoutesSpy = vi.spyOn(wsRouter, "getRoutes");
+        getRoutesSpy.mockImplementation(async () => {
+            return { routes_list: new Map() };
+        });
+
+        const siteObjectId = "0x0977d45a9adb8af8405c0698b0e049de05f8c89da75ca16ac6a6cba76031519f";
+
+        const response = await urlFetcher.resolveDomainAndFetchUrl(
+            { subdomain: siteObjectId, path: "/nonexistent" },
+            siteObjectId,
+        );
+
+        // Should get the portal's custom404NotFound, NOT the blobUnavailable page
+        expect(response.status).toBe(404);
+        const text = await response.text();
+        expect(text).not.toContain("no longer available");
+        expect(text).toContain("Page not found");
     });
 });

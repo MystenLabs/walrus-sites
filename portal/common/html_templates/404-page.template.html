@@ -82,7 +82,7 @@
             background: #97F0E5;
             color: #0C0F1D;
             padding: 1px 50px;
-            border: none;
+            border: 1px solid transparent;
             border-radius: 8px;
             font-size: 16px;
             cursor: pointer;
@@ -97,7 +97,7 @@
         .button:hover {
             background: #0C0F1D;
             color: #7ca19c;
-            border: 1px solid #7ca19c;
+            border-color: #7ca19c;
         }
 
         .globe {
@@ -107,6 +107,48 @@
             max-width: 1200px;
             opacity: 0.75;
             pointer-events: none;
+        }
+
+        .subtitle details {
+            margin-top: 2rem;
+            font-family: 'PP Neue Montreal', sans-serif;
+            font-size: 14px;
+            font-weight: normal;
+            line-height: 1.6;
+            text-align: left;
+            max-width: 500px;
+        }
+
+        .subtitle details summary {
+            cursor: pointer;
+            color: #97F0E5;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .subtitle details[open] summary {
+            margin-bottom: 1rem;
+        }
+
+        .subtitle details code {
+            background: rgba(151, 240, 229, 0.1);
+            padding: 2px 6px;
+            border-radius: 3px;
+            word-break: break-all;
+            font-size: 0.9em;
+        }
+
+        .subtitle details pre {
+            background: rgba(151, 240, 229, 0.08);
+            padding: 10px 14px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 13px;
+            border: 1px solid rgba(151, 240, 229, 0.15);
+        }
+
+        .subtitle details p {
+            color: #b0b0b0;
         }
 
         @media (max-width: 768px) {

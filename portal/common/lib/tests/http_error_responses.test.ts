@@ -29,6 +29,7 @@ import {
     fullNodeFail,
     aggregatorFail,
     resourceNotFound,
+    blobUnavailable,
     genericError,
     generateHashErrorResponse,
     bringYourOwnDomainDoesNotSupportSubdomainsYet,
@@ -59,6 +60,21 @@ describe("HTTP Error Responses - Status Codes", () => {
             const response = resourceNotFound();
             expect(response.status).toBe(404);
             expect(response.headers.get("Content-Type")).toBe("text/html");
+        });
+
+        it("blobUnavailable() should return 404", async () => {
+            const response = blobUnavailable("test-blob-id-123");
+            expect(response.status).toBe(404);
+            expect(response.headers.get("Content-Type")).toBe("text/html");
+        });
+
+        it("blobUnavailable() should include blob ID and site-builder instructions", async () => {
+            const blobId = "abc123xyz";
+            const response = blobUnavailable(blobId);
+            const text = await response.text();
+            expect(text).toContain(blobId);
+            expect(text).toContain("no longer available");
+            expect(text).toContain("site-builder");
         });
 
         it("bringYourOwnDomainDoesNotSupportSubdomainsYet() should return 404", async () => {
@@ -130,6 +146,7 @@ describe("HTTP Error Responses - Content", () => {
             fullNodeFail(),
             aggregatorFail(),
             resourceNotFound(),
+            blobUnavailable("test-blob-id"),
             genericError(),
             generateHashErrorResponse(),
             bringYourOwnDomainDoesNotSupportSubdomainsYet("example"),
@@ -149,6 +166,7 @@ describe("HTTP Error Responses - Content", () => {
             fullNodeFail(),
             aggregatorFail(),
             resourceNotFound(),
+            blobUnavailable("test-blob-id"),
             genericError(),
             generateHashErrorResponse(),
         ];
@@ -175,6 +193,7 @@ describe("HTTP Error Responses - Status Code Classification", () => {
             noObjectIdFound(),
             custom404NotFound(),
             resourceNotFound(),
+            blobUnavailable("test-blob-id"),
             bringYourOwnDomainDoesNotSupportSubdomainsYet("test"),
             generateHashErrorResponse(),
         ];

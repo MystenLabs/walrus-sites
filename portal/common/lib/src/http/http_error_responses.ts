@@ -58,6 +58,30 @@ export function resourceNotFound(): Response {
 }
 
 /**
+ * Returns 404 when a blob is not available on Walrus.
+ * In the context of walrus-sites, this typically means the blob has expired.
+ *
+ * @param blobId - The blob ID that was requested but is unavailable
+ */
+export function blobUnavailable(blobId: string): Response {
+    instrumentationFacade.bumpBlobUnavailableRequests();
+
+    const secondaryMessage = `
+        It may have expired.
+        <details>
+            <summary>Are you the site owner?</summary>
+            <p><strong>Blob ID:</strong> <code>${blobId}</code></p>
+            <p>You can restore expired resources by updating your site:</p>
+            <pre>site-builder deploy --epochs &lt;N&gt; &lt;directory&gt;</pre>
+            <p>Or, if you haven't migrated to the deploy command yet:</p>
+            <pre>site-builder update --epochs &lt;N&gt; &lt;directory&gt; &lt;site-id&gt;</pre>
+        </details>
+    `;
+
+    return Response404("This content is no longer available", secondaryMessage);
+}
+
+/**
  * Returns 500 Internal Server Error for unhandled exceptions.
  * This catches unexpected errors that occur during request processing.
  */
