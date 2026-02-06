@@ -34,6 +34,39 @@ fn test_derive_http_headers() {
     }
 }
 
+#[test]
+fn test_derive_http_headers_lowercases_keys() {
+    let headers_json = r#"{
+        "/*.html": {
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "public, max-age=3600"
+        }
+    }"#;
+    let headers: BTreeMap<String, HttpHeaders> = serde_json::from_str(headers_json).unwrap();
+    let ws_resources = Some(WSResources {
+        headers: Some(headers),
+        routes: None,
+        metadata: None,
+        site_name: None,
+        object_id: None,
+        ignore: None,
+    });
+
+    let result = ResourceData::derive_http_headers(ws_resources.as_ref(), "/index.html")
+        .expect("valid patterns should not fail");
+    assert_eq!(result.len(), 2);
+    assert!(
+        result.contains_key("content-type"),
+        "expected lowercase 'content-type' key, got keys: {:?}",
+        result.iter().map(|(k, _)| k).collect::<Vec<_>>()
+    );
+    assert!(
+        result.contains_key("cache-control"),
+        "expected lowercase 'cache-control' key, got keys: {:?}",
+        result.iter().map(|(k, _)| k).collect::<Vec<_>>()
+    );
+}
+
 /// Helper function for testing the `derive_http_headers` method.
 fn mock_ws_resources() -> Option<WSResources> {
     let headers_json = r#"{
