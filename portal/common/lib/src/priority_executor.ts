@@ -24,7 +24,7 @@ export type ExecuteResult<T> =
  * Format: URL|RETRIES|PRIORITY (e.g., "https://rpc.example.com|3|100")
  *
  * @param input - The comma-separated string of URL entries
- * @returns Array of PriorityUrl objects sorted by priority (ascending)
+ * @returns Array of PriorityUrl objects
  * @throws Error if any entry is invalid
  */
 export function parsePriorityUrlList(input: string): PriorityUrl[] {
@@ -72,8 +72,7 @@ export function parsePriorityUrlList(input: string): PriorityUrl[] {
         result.push({ url, retries, priority });
     }
 
-    // Sort by priority (ascending - lower number = higher priority)
-    return result.sort((a, b) => a.priority - b.priority);
+    return result;
 }
 
 // --- Executor ---
