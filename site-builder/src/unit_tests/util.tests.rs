@@ -89,7 +89,10 @@ fn test_is_pattern_match() {
 #[test]
 fn test_is_pattern_match_invalid_pattern() {
     let result = is_pattern_match("[invalid", "/file");
-    assert!(result.is_err(), "invalid glob pattern should return an error");
+    assert!(
+        result.is_err(),
+        "invalid glob pattern should return an error"
+    );
 }
 
 // ============ update_cache_from_effects tests ============
