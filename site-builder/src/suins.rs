@@ -3,8 +3,8 @@
 
 //! Utilities to resolve SuiNS addresses.
 
-use anyhow::{bail, Result};
-use sui_types::{base_types::ObjectID, TypeTag};
+use anyhow::{Result, bail};
+use sui_types::{TypeTag, base_types::ObjectID};
 
 use crate::{
     retry_client::RetriableSuiClient,
@@ -14,7 +14,7 @@ use crate::{
 
 /// A static config containing the SuiNS addresses for testnet and mainnet.
 mod suins_config {
-    use anyhow::{bail, Result};
+    use anyhow::{Result, bail};
     use sui_types::base_types::ObjectID;
 
     /// Returns the SuiNS registry object ID and the SuiNS package object ID for mainnet.

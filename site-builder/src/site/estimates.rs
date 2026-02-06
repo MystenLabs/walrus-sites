@@ -18,7 +18,7 @@ use crate::{
     args::EpochArg,
     display,
     site::{
-        builder::{SitePtbBuilderResultExt, PTB_MAX_MOVE_CALLS},
+        builder::{PTB_MAX_MOVE_CALLS, SitePtbBuilderResultExt},
         manager::{BlobExtensions, SiteManager},
         quilts::QuiltsManager,
         resource::ResourceData,

@@ -10,8 +10,8 @@ use thiserror::Error;
 pub mod publish_options_builder;
 #[allow(unused_imports)]
 pub use publish_options_builder::{
-    walrus_store_options_builder::WalrusStoreOptionsBuilder,
     PublishOptionsBuilder,
+    walrus_store_options_builder::WalrusStoreOptionsBuilder,
 };
 
 #[derive(Debug, Clone, Default)]

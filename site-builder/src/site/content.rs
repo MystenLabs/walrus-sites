@@ -3,7 +3,7 @@
 
 use std::fmt;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use clap::ValueEnum;
 
 #[derive(Debug, ValueEnum, Clone, Copy, PartialEq, Eq, Ord, PartialOrd)]
@@ -208,7 +208,7 @@ impl ContentType {
                 return Err(anyhow!(
                     "the content type for extension `{}` is currently not supported",
                     ext
-                ))
+                ));
             }
         })
     }

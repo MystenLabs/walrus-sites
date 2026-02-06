@@ -5,7 +5,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use sui_sdk::rpc_types::{
     SuiExecutionStatus,
     SuiTransactionBlockEffects,
@@ -19,13 +19,13 @@ use crate::{
     display,
     preprocessor::Preprocessor,
     site::{
+        RemoteSiteFactory,
+        SiteData,
         config::WSResources,
         estimates::Estimator,
         manager::{BlobExtensionResult, BlobExtensions, SiteManager},
         quilts::QuiltsManager,
         resource::{ParsedResources, ResourceData, ResourceManager, ResourceSet, SiteOps},
-        RemoteSiteFactory,
-        SiteData,
     },
     summary::{SiteDataDiffSummary, Summarizable},
     util::{

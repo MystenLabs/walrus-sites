@@ -8,7 +8,7 @@ use std::{collections::BTreeMap, num::NonZeroU16, path::PathBuf};
 use anyhow::Result;
 use clap::Args;
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, serde_as};
 use sui_types::base_types::ObjectID;
 
 use super::types::BlobId;

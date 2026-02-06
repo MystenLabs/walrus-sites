@@ -39,7 +39,9 @@ pub struct WalrusStoreOptionsBuilder {
 
 #[derive(Debug, Error)]
 pub enum InvalidWalrusStoreOptionsConfig {
-    #[error("PublishOptions needs epoch_arg. Try using `.with_epoch_count_or_max(epoch_arg_enum)` or `.with_earliest_expiry_time` or `.with_end_epoch`.")]
+    #[error(
+        "PublishOptions needs epoch_arg. Try using `.with_epoch_count_or_max(epoch_arg_enum)` or `.with_earliest_expiry_time` or `.with_end_epoch`."
+    )]
     MissingEpochs,
 }
 

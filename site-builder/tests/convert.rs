@@ -6,7 +6,7 @@ use sui_types::base_types::ObjectID;
 
 #[allow(dead_code)]
 mod localnode;
-use localnode::{args_builder::ArgsBuilder, TestSetup};
+use localnode::{TestSetup, args_builder::ArgsBuilder};
 
 // Important: For tests to pass, the system they are running on need to have walrus installed.
 #[tokio::test]

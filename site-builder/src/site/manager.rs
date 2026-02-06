@@ -2,48 +2,50 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{
-    collections::{btree_map, BTreeSet, HashMap, HashSet},
+    collections::{BTreeSet, HashMap, HashSet, btree_map},
     iter::Peekable,
     str::FromStr,
 };
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Context, Result, anyhow, bail};
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{
     rpc_types::{
         SuiExecutionStatus,
-        SuiObjectDataOptions,
         SuiTransactionBlockEffectsAPI as _,
         SuiTransactionBlockResponse,
     },
     wallet_context::WalletContext,
 };
 use sui_types::{
+    Identifier,
     base_types::{ObjectID, ObjectRef, SuiAddress},
     transaction::{CallArg, ProgrammableTransaction, TransactionData, TransactionDataAPI},
-    Identifier,
 };
 use tracing::warn;
-use walrus_sdk::sui::{
-    client::{ReadClient, SuiReadClient},
-    utils::price_for_encoded_length,
+use walrus_sdk::{
+    core_utils::backoff::ExponentialBackoffConfig,
+    sui::{
+        client::{ReadClient, SuiReadClient},
+        utils::price_for_encoded_length,
+    },
 };
+use walrus_sui::client::retry_client::retriable_sui_client::MAX_GAS_PAYMENT_OBJECTS;
 
 use super::{
-    builder::{SitePtb, SitePtbBuilderResultExt, PTB_MAX_MOVE_CALLS},
+    builder::{PTB_MAX_MOVE_CALLS, SitePtb, SitePtbBuilderResultExt},
     resource::{Resource, ResourceSet, SiteOps},
 };
 use crate::{
     args::{EpochArg, EpochCountOrMax},
-    backoff::ExponentialBackoffConfig,
     config::Config,
     display,
-    retry_client::RetriableSuiClient,
-    site::{SiteData, SiteDataDiff, SITE_MODULE},
+    retry_client::{RetriableSuiClient, new_retriable_sui_client},
+    site::{SITE_MODULE, SiteData, SiteDataDiff},
     summary::SiteDataDiffSummary,
     types::{ExtendOps, Metadata, MetadataOp, ObjectCache, RouteOps, SiteNameOp},
     util::{get_epochs_ahead, get_owned_blobs, get_site_id_from_response, sign_and_send_ptb},
-    walrus::{output::SuiBlob, types::BlobId, Walrus},
+    walrus::{Walrus, output::SuiBlob, types::BlobId},
 };
 
 #[cfg(test)]
@@ -55,7 +57,7 @@ pub struct SiteManager {
     pub walrus: Walrus,
     pub wallet: WalletContext,
     pub site_id: Option<ObjectID>,
-    pub backoff_config: ExponentialBackoffConfig,
+    pub _backoff_config: ExponentialBackoffConfig,
     pub metadata: Option<Metadata>,
     pub site_name: Option<String>,
     pub epochs: Option<EpochArg>,
@@ -75,14 +77,21 @@ impl SiteManager {
         let walrus = config.walrus_client();
         let wallet = config.load_wallet()?;
         let backoff_config = ExponentialBackoffConfig::default();
-        let sui_client =
-            RetriableSuiClient::new_from_wallet(&wallet, backoff_config.clone()).await?;
+        let sui_client = new_retriable_sui_client(
+            &wallet
+                .config
+                .get_env(&None)
+                .context("no default env specified in wallet config")?
+                .rpc,
+            backoff_config.clone(),
+        )
+        .context("failed to create retriable_sui_client")?;
         Ok(SiteManager {
             walrus,
             wallet,
             config,
             site_id,
-            backoff_config,
+            _backoff_config: backoff_config,
             metadata,
             site_name,
             object_cache: ObjectCache::new(),
@@ -173,7 +182,7 @@ impl SiteManager {
             .epochs
             .clone()
             .expect("epochs must be set when calling update_site"); // EpochArg is an ArgGroup with
-                                                                    // required true
+        // required true
         let epoch_info = self.walrus.epoch_info().await?;
         let current_epoch = epoch_info.current_epoch;
         let epochs_ahead = match (
@@ -229,9 +238,9 @@ impl SiteManager {
         let extensions = if to_extend.is_empty() {
             BlobExtensions::Noop
         } else {
-            let walrus_client = retriable_client.to_walrus_retriable_client()?;
+            let walrus_client = retriable_client;
             let walrus_config = self.config.general.walrus_config()?;
-            let sui_read_client = SuiReadClient::new(walrus_client, &walrus_config).await?;
+            let sui_read_client = SuiReadClient::new(walrus_client.clone(), &walrus_config).await?;
             let storage_price = sui_read_client.storage_price_per_unit_size().await?;
 
             BlobExtensions::Extend {
@@ -275,7 +284,7 @@ impl SiteManager {
             );
             let retriable_client = self.sui_client();
             let walrus_config = self.config.general.walrus_config()?;
-            let walrus_client = retriable_client.to_walrus_retriable_client()?;
+            let walrus_client = retriable_client;
 
             let wal_coin_type = {
                 let sui_read_client =
@@ -285,19 +294,18 @@ impl SiteManager {
             let coins = retriable_client
                 .select_coins(
                     self.active_address()?,
-                    Some(wal_coin_type),
+                    &wal_coin_type,
                     total_wal_cost as u128,
                     vec![],
+                    MAX_GAS_PAYMENT_OBJECTS,
                 )
                 .await?;
 
             let system_obj_id = walrus_config.system_object;
             let system_obj = retriable_client
-                .get_object_with_options(system_obj_id, SuiObjectDataOptions::new().with_owner())
+                .get_object(system_obj_id)
                 .await
-                .map_err(|e| anyhow!("Error getting blob-object from fullnode: {e}"))?
-                .data
-                .ok_or(anyhow!("Expected data in walrus System object response"))?;
+                .with_context(|| anyhow!("error getting blob-object from fullnode"))?;
             ptb.fill_walrus_system_and_coin(coins, system_obj)?;
 
             ptb.add_extend_operations(blobs_epochs)?;
@@ -391,8 +399,11 @@ impl SiteManager {
     ) -> Result<sui_sdk::rpc_types::DevInspectResults> {
         let retry_client = self.sui_client();
         // Get the current reference gas price
+        #[allow(deprecated)]
         let gas_price = retry_client
-            .client()
+            .get_current_client()
+            .await
+            .sui_client()
             .read_api()
             .get_reference_gas_price()
             .await?;
@@ -405,8 +416,11 @@ impl SiteManager {
             gas_price, // Use actual reference gas price
         );
 
+        #[allow(deprecated)]
         let response = retry_client
-            .client()
+            .get_current_client()
+            .await
+            .sui_client()
             .read_api()
             .dev_inspect_transaction_block(
                 self.active_address()?,
@@ -590,7 +604,7 @@ impl SiteManager {
     pub async fn gas_coin_ref(&mut self) -> Result<ObjectRef> {
         // Keep re-fetching the coin, until it matches the latest state stored by our cache, as
         // older versions might show more balance than its actual balance.
-        let mut backoff = self.backoff_config.get_strategy(rand::random());
+        let mut backoff = self._backoff_config.get_strategy(rand::random());
         loop {
             let gas_coin = self
                 .wallet
@@ -601,7 +615,7 @@ impl SiteManager {
                 )
                 .await?;
 
-            let gas_obj_ref = gas_coin.1.object_ref();
+            let gas_obj_ref = gas_coin.1.compute_object_reference();
             let latest = self.verify_object_ref_choose_latest(gas_obj_ref)?;
             if gas_obj_ref == latest {
                 return Ok(latest);
@@ -639,13 +653,17 @@ impl SiteManager {
             // older version? Does RetriableSuiClient mitigate this?
             // If the cached version is bigger than the fetched, just used the cached.
             Some(&cached) if cached.1 > object_ref.1 => {
-                warn!("Fullnode returned older object reference ({object_ref:?}) than its latest. Using latest cached ({cached:?}).");
+                warn!(
+                    "Fullnode returned older object reference ({object_ref:?}) than its latest. Using latest cached ({cached:?})."
+                );
                 Ok(cached)
             }
             Some(&cached) if cached != object_ref => {
                 // This should not happen as long as user is not executing transactions with this
                 // wallet-address in parallel.
-                bail!("Fullnode returned newer object version ({object_ref:?}) than the one cached ({cached:?}");
+                bail!(
+                    "Fullnode returned newer object version ({object_ref:?}) than the one cached ({cached:?}"
+                );
             }
             None => {
                 self.object_cache.insert(object_ref.0, object_ref);

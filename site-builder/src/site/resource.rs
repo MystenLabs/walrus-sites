@@ -11,9 +11,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{Context, Result, anyhow, bail};
 use fastcrypto::hash::{HashFunction, Sha256};
-use flate2::{write::GzEncoder, Compression};
+use flate2::{Compression, write::GzEncoder};
 use move_core_types::u256::U256;
 
 use super::SiteData;
@@ -143,10 +143,7 @@ impl Resource {
 impl From<Resource> for ResourceData {
     fn from(resource: Resource) -> Self {
         let mut headers = resource.info.headers;
-        headers
-            .0
-             .0
-            .remove(Resource::QUILT_PATCH_ID_INTERNAL_HEADER);
+        headers.0.0.remove(Resource::QUILT_PATCH_ID_INTERNAL_HEADER);
 
         ResourceData {
             unencoded_size: resource.unencoded_size,
