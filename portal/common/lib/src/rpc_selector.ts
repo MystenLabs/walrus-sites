@@ -79,14 +79,17 @@ export class RPCSelector implements RPCSelectorInterface {
                 // simplify invokeWithFailover to just handle retry logic.
                 // NOTE: As of early 2026, Bun's AbortSignal stops processing responses but
                 // requests still complete in the background. This may change in future versions.
-                // TODO: clearTimeout on success - currently the timer keeps running until it
-                // fires (then rejects into the void) if the method succeeds before timeout.
-                const timeoutPromise = new Promise<never>((_, reject) =>
-                    setTimeout(() => reject(new Error("Request timed out")), this.timeoutMs),
-                );
+                let timer: ReturnType<typeof setTimeout>;
+                const timeoutPromise = new Promise<never>((_, reject) => {
+                    timer = setTimeout(() => reject(new Error("Request timed out")), this.timeoutMs);
+                });
 
-                const result = await Promise.race([fn(client), timeoutPromise]);
-                return { status: "success", value: result };
+                try {
+                    const result = await Promise.race([fn(client), timeoutPromise]);
+                    return { status: "success", value: result };
+                } finally {
+                    clearTimeout(timer!);
+                }
             } catch (error) {
                 logger.warn("RPC call failed", { url, error: formatError(error) });
                 return {
