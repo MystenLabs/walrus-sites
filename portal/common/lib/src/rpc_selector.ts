@@ -46,12 +46,14 @@ class WrappedSuiClient extends SuiClient {
 export class RPCSelector implements RPCSelectorInterface {
     private executor: PriorityExecutor;
     private clients: Map<string, WrappedSuiClient>;
+    private readonly timeoutMs: number;
 
     constructor(priorityUrls: PriorityUrl[], network: Network) {
         this.executor = new PriorityExecutor(priorityUrls);
         this.clients = new Map(
             priorityUrls.map((p) => [p.url, new WrappedSuiClient(p.url, network)]),
         );
+        this.timeoutMs = Number(process.env.RPC_REQUEST_TIMEOUT_MS) || 7000;
     }
 
     // General method to call clients in priority order with failover.
@@ -79,9 +81,8 @@ export class RPCSelector implements RPCSelectorInterface {
                 // requests still complete in the background. This may change in future versions.
                 // TODO: clearTimeout on success - currently the timer keeps running until it
                 // fires (then rejects into the void) if the method succeeds before timeout.
-                const timeoutMs = Number(process.env.RPC_REQUEST_TIMEOUT_MS) || 7000;
                 const timeoutPromise = new Promise<never>((_, reject) =>
-                    setTimeout(() => reject(new Error("Request timed out")), timeoutMs),
+                    setTimeout(() => reject(new Error("Request timed out")), this.timeoutMs),
                 );
 
                 const result = await Promise.race([fn(client), timeoutPromise]);
