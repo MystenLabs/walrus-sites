@@ -72,7 +72,7 @@ async fn setup_test_cluster_and_site(
 async fn quilts_publish_with_specific_epochs() -> anyhow::Result<()> {
     const NUM_EPOCHS: u32 = 5;
 
-    let mut cluster = TestSetup::start_local_test_cluster(None).await?;
+    let cluster = TestSetup::start_local_test_cluster(None).await?;
 
     println!("Creating test site with {NUM_FILES} files...");
     let temp_dir = create_test_site(NUM_FILES)?;
@@ -106,7 +106,7 @@ async fn quilts_publish_with_specific_epochs() -> anyhow::Result<()> {
 
     // Verify the blobs have the correct end_epoch
     // Note: With quilts, multiple resources may share the same blob
-    let wallet_address = cluster.wallet.inner.active_address()?;
+    let wallet_address = cluster.wallet.inner.active_address();
     let blobs = get_blobs_for_resources(&cluster, wallet_address, &resources).await?;
 
     assert!(
@@ -136,7 +136,7 @@ async fn quilts_publish_with_specific_epochs() -> anyhow::Result<()> {
 #[tokio::test]
 #[ignore]
 async fn quilts_publish_with_epochs_max() -> anyhow::Result<()> {
-    let mut cluster = TestSetup::start_local_test_cluster(None).await?;
+    let cluster = TestSetup::start_local_test_cluster(None).await?;
 
     println!("Creating test site with {NUM_FILES} files...");
     let temp_dir = create_test_site(NUM_FILES)?;
@@ -168,7 +168,7 @@ async fn quilts_publish_with_epochs_max() -> anyhow::Result<()> {
 
     // Verify the blobs were created with max epochs
     // Note: With quilts, multiple resources may share the same blob
-    let wallet_address = cluster.wallet.inner.active_address()?;
+    let wallet_address = cluster.wallet.inner.active_address();
     let blobs = get_blobs_for_resources(&cluster, wallet_address, &resources).await?;
 
     assert!(
@@ -204,7 +204,7 @@ async fn quilts_update_with_different_epochs() -> anyhow::Result<()> {
     const INITIAL_EPOCHS: u32 = 2;
     const UPDATE_EPOCHS: u32 = 10;
 
-    let (mut cluster, _temp_dir, directory, site_id) = setup_test_cluster_and_site(
+    let (cluster, _temp_dir, directory, site_id) = setup_test_cluster_and_site(
         NUM_FILES,
         EpochArg {
             epochs: Some(EpochCountOrMax::Epochs(
@@ -253,7 +253,7 @@ async fn quilts_update_with_different_epochs() -> anyhow::Result<()> {
 
     // Verify the blobs have the updated epoch (from the update command)
     let current_epoch_after_update = cluster.current_walrus_epoch().await?;
-    let wallet_address = cluster.wallet.inner.active_address()?;
+    let wallet_address = cluster.wallet.inner.active_address();
     let blobs = cluster.get_owned_blobs(wallet_address).await?;
 
     // We should have NUM_FILES blobs (modified file gets new blob, unmodified files keep old blobs)
@@ -289,7 +289,7 @@ async fn quilts_update_with_different_epochs() -> anyhow::Result<()> {
 #[tokio::test]
 #[ignore]
 async fn quilts_publish_with_earliest_expiry_time() -> anyhow::Result<()> {
-    let mut cluster = TestSetup::start_local_test_cluster(None).await?;
+    let cluster = TestSetup::start_local_test_cluster(None).await?;
 
     println!("Creating test site with {NUM_FILES} files...");
     let temp_dir = create_test_site(NUM_FILES)?;
@@ -329,7 +329,7 @@ async fn quilts_publish_with_earliest_expiry_time() -> anyhow::Result<()> {
 
     // Verify the blobs have end_epoch that satisfies the expiry time requirement
     // Note: With quilts, multiple resources may share the same blob
-    let wallet_address = cluster.wallet.inner.active_address()?;
+    let wallet_address = cluster.wallet.inner.active_address();
     let blobs = get_blobs_for_resources(&cluster, wallet_address, &resources).await?;
 
     assert!(
@@ -367,7 +367,7 @@ async fn quilts_publish_with_earliest_expiry_time() -> anyhow::Result<()> {
 #[tokio::test]
 #[ignore]
 async fn quilts_update_with_earliest_expiry_time() -> anyhow::Result<()> {
-    let (mut cluster, _temp_dir, directory, site_id) = setup_test_cluster_and_site(
+    let (cluster, _temp_dir, directory, site_id) = setup_test_cluster_and_site(
         NUM_FILES,
         EpochArg {
             epochs: Some(EpochCountOrMax::Epochs(NonZeroU32::new(2).unwrap())),
@@ -413,7 +413,7 @@ async fn quilts_update_with_earliest_expiry_time() -> anyhow::Result<()> {
     println!("Successfully updated site using --earliest-expiry-time");
 
     // Verify updated blobs have appropriate end_epochs
-    let wallet_address = cluster.wallet.inner.active_address()?;
+    let wallet_address = cluster.wallet.inner.active_address();
     let blobs = cluster.get_owned_blobs(wallet_address).await?;
 
     let current_epoch = cluster.current_walrus_epoch().await?;
@@ -440,7 +440,7 @@ async fn quilts_update_with_earliest_expiry_time() -> anyhow::Result<()> {
 #[tokio::test]
 #[ignore]
 async fn quilts_publish_with_end_epoch() -> anyhow::Result<()> {
-    let mut cluster = TestSetup::start_local_test_cluster(None).await?;
+    let cluster = TestSetup::start_local_test_cluster(None).await?;
     let current_epoch = cluster.current_walrus_epoch().await?;
     // Use an end_epoch that's realistic (within MAX_EPOCHS_AHEAD)
     let end_epoch = current_epoch + 50;
@@ -476,7 +476,7 @@ async fn quilts_publish_with_end_epoch() -> anyhow::Result<()> {
 
     // Verify the blobs have the specified end_epoch
     // Note: With quilts, multiple resources may share the same blob
-    let wallet_address = cluster.wallet.inner.active_address()?;
+    let wallet_address = cluster.wallet.inner.active_address();
     let blobs = get_blobs_for_resources(&cluster, wallet_address, &resources).await?;
 
     assert!(
@@ -508,7 +508,7 @@ async fn quilts_update_with_end_epoch() -> anyhow::Result<()> {
     const INITIAL_END_EPOCH: u32 = 20;
     const UPDATE_END_EPOCH: u32 = 50;
 
-    let (mut cluster, _temp_dir, directory, site_id) = setup_test_cluster_and_site(
+    let (cluster, _temp_dir, directory, site_id) = setup_test_cluster_and_site(
         NUM_FILES,
         EpochArg {
             end_epoch: Some(NonZeroU32::new(INITIAL_END_EPOCH).unwrap()),
@@ -552,7 +552,7 @@ async fn quilts_update_with_end_epoch() -> anyhow::Result<()> {
     );
 
     // Verify blobs have the updated end_epoch
-    let wallet_address = cluster.wallet.inner.active_address()?;
+    let wallet_address = cluster.wallet.inner.active_address();
     let blobs = cluster.get_owned_blobs(wallet_address).await?;
 
     // We should have at least NUM_FILES blobs (modified file gets new blob with UPDATE_END_EPOCH)

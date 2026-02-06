@@ -16,9 +16,10 @@ use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
     id::UID,
 };
+use walrus_sdk::sui::contracts::StructTag;
 
 use crate::{
-    site::contracts::{self, AssociatedContractStruct, StructTag},
+    site::contracts::{self, AssociatedContractStruct},
     util::deserialize_bag_or_table,
     walrus::types::BlobId,
 };

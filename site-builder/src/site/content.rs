@@ -208,7 +208,7 @@ impl ContentType {
                 return Err(anyhow!(
                     "the content type for extension `{}` is currently not supported",
                     ext
-                ))
+                ));
             }
         })
     }

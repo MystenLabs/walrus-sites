@@ -702,7 +702,7 @@ async fn test_update_resources_does_not_extend_blobs() -> anyhow::Result<()> {
     site_builder::run(publish_args).await?;
 
     let site_id = *cluster.last_site_created().await?.id.object_id();
-    let wallet_address = cluster.wallet_active_address()?;
+    let wallet_address = cluster.wallet_active_address();
 
     println!("Published site with ID: {site_id}");
 
