@@ -47,7 +47,7 @@ export class BlocklistCheckerFactory {
  * Checks domains/IDs against Vercel's Edge Config blocklist.
  *
  * Validates whether a given identifier is present in the blocklist.
- * Requires blocklist to be enabled via ENABLE_ALLOWLIST environment variable.
+ * Requires blocklist to be enabled via ENABLE_BLOCKLIST environment variable.
  */
 class VercelEdgeConfigBlocklistChecker implements BlocklistChecker {
     constructor() {

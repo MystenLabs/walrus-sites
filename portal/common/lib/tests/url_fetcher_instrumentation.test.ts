@@ -7,6 +7,7 @@ import { ResourceFetcher } from "@lib/resource";
 import { SuiNSResolver } from "@lib/suins";
 import { WalrusSitesRouter } from "@lib/routing";
 import { RPCSelector } from "@lib/rpc_selector";
+import { PriorityExecutor, PriorityUrl } from "@lib/priority_executor";
 import { instrumentationFacade } from "@lib/instrumentation";
 import { ResourceStruct, DynamicFieldStruct, ResourcePathStruct } from "@lib/bcs_data_parsing";
 import { toBase64 } from "@mysten/sui/utils";
@@ -47,15 +48,21 @@ describe("UrlFetcher records aggregator timing with mock servers", () => {
     });
 
     it("should record aggregator time when fetching a resource", async () => {
-        const rpcSelector = new RPCSelector([suiRpcUrl], "testnet");
+        const rpcPriorityUrls: PriorityUrl[] = [{ url: suiRpcUrl, retries: 2, priority: 100 }];
+        const rpcSelector = new RPCSelector(rpcPriorityUrls, "testnet");
         const wsRouter = new WalrusSitesRouter(rpcSelector);
         const sitePackage = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+
+        const aggregatorPriorityUrls: PriorityUrl[] = [
+            { url: aggregatorUrl, retries: 2, priority: 100 },
+        ];
+        const aggregatorExecutor = new PriorityExecutor(aggregatorPriorityUrls);
 
         const urlFetcher = new UrlFetcher(
             new ResourceFetcher(rpcSelector, sitePackage),
             new SuiNSResolver(rpcSelector),
             wsRouter,
-            aggregatorUrl,
+            aggregatorExecutor,
             true,
         );
 

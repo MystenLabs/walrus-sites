@@ -9,6 +9,7 @@ import { HttpStatusCodes } from "@lib/http/http_status_codes";
 import { checkRedirect } from "@lib/redirects";
 import { fromBase64 } from "@mysten/bcs";
 import { SuiObjectResponse } from "@mysten/sui/client";
+import { parsePriorityUrlList } from "@lib/priority_executor";
 
 vi.mock("@mysten/sui/utils", () => ({
     deriveDynamicFieldID: vi.fn(() => "0xdynamicFieldId"),
@@ -39,8 +40,9 @@ vi.mock("../src/bcs_data_parsing", async (importOriginal) => {
 });
 
 describe("fetchResource", () => {
-    console.log("RPC URLS:", process.env.RPC_URL_LIST!.split(","));
-    const rpcSelector = new RPCSelector(process.env.RPC_URL_LIST!.split(","), "testnet");
+    const rpcPriorityUrls = parsePriorityUrlList(process.env.RPC_URL_LIST!);
+    console.log("RPC URLS:", rpcPriorityUrls);
+    const rpcSelector = new RPCSelector(rpcPriorityUrls, "testnet");
     const resourceFetcher = new ResourceFetcher(rpcSelector, "0x123");
     // Mock SuiClient methods
     const multiGetObjects = vi.spyOn(rpcSelector, "multiGetObjects");

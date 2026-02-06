@@ -8,12 +8,14 @@ import { UrlFetcher } from "@lib/url_fetcher";
 import type { FetchUrlResult } from "@lib/url_fetcher";
 import { ResourceFetcher } from "@lib/resource";
 import { SuiNSResolver } from "@lib/suins";
+import { parsePriorityUrlList, PriorityExecutor } from "@lib/priority_executor";
 
 const snakeSiteObjectId = "0x7a95e4be3948415b852fb287d455166a276d7a52f1a567b4a26b6b5e9c753158";
-const rpcSelector = new RPCSelector(process.env.RPC_URL_LIST!.split(","), "testnet");
+const rpcPriorityUrls = parsePriorityUrlList(process.env.RPC_URL_LIST!);
+const rpcSelector = new RPCSelector(rpcPriorityUrls, "testnet");
 const wsRouter = new WalrusSitesRouter(rpcSelector);
-const aggregatorUrl = process.env.AGGREGATOR_URL!;
-const sitePackage = process.env.SITE_PACKAGE!;
+const aggregatorPriorityUrls = parsePriorityUrlList(process.env.AGGREGATOR_URL_LIST!);
+const sitePackage = process.env.SITE_PACKAGE;
 
 test.skip("getRoutes", async () => {
     // TODO: when you make sure get_routes fetches
@@ -63,11 +65,12 @@ describe("routing tests", () => {
     });
 
     test("should check routes before 404.html", async () => {
+        const aggregatorExecutor = new PriorityExecutor(aggregatorPriorityUrls);
         const urlFetcher = new UrlFetcher(
-            new ResourceFetcher(rpcSelector, sitePackage),
+            new ResourceFetcher(rpcSelector, sitePackage!),
             new SuiNSResolver(rpcSelector),
             wsRouter,
-            aggregatorUrl,
+            aggregatorExecutor,
             true,
         );
 
@@ -149,7 +152,7 @@ describe("routing tests", () => {
             new ResourceFetcher(rpcSelector, sitePackage),
             new SuiNSResolver(rpcSelector),
             wsRouter,
-            aggregatorUrl,
+            new PriorityExecutor([{ url: "http://unused", retries: 0, priority: 100 }]),
             true,
         );
 

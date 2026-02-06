@@ -11,6 +11,7 @@ import {
 import { SuinsClient } from "@mysten/suins";
 import logger, { formatError } from "@lib/logger";
 import { NameRecord, Network } from "@lib/types";
+import { ExecuteResult, PriorityExecutor, PriorityUrl } from "@lib/priority_executor";
 
 interface RPCSelectorInterface {
     getObject(input: GetObjectParams): Promise<SuiObjectResponse>;
@@ -43,115 +44,61 @@ class WrappedSuiClient extends SuiClient {
 }
 
 export class RPCSelector implements RPCSelectorInterface {
-    private clients: WrappedSuiClient[];
-    private selectedClient: WrappedSuiClient | undefined;
+    private executor: PriorityExecutor;
+    private clients: Map<string, WrappedSuiClient>;
+    private readonly timeoutMs: number;
 
-    constructor(rpcURLs: string[], network: Network) {
-        // Initialize clients.
-        this.clients = rpcURLs.map((rpcUrl) => new WrappedSuiClient(rpcUrl, network));
-        this.selectedClient = undefined;
+    constructor(priorityUrls: PriorityUrl[], network: Network) {
+        this.executor = new PriorityExecutor(priorityUrls);
+        this.clients = new Map(
+            priorityUrls.map((p) => [p.url, new WrappedSuiClient(p.url, network)]),
+        );
+        this.timeoutMs = Number(process.env.RPC_REQUEST_TIMEOUT_MS) || 7000;
     }
 
-    // General method to call clients and return the first successful response.
-    private async invokeWithFailover<T>(methodName: string, args: any[]): Promise<T> {
-        if (this.clients.length === 0) {
+    // General method to call clients in priority order with failover.
+    private async invokeWithFailover<T>(fn: (client: WrappedSuiClient) => Promise<T>): Promise<T> {
+        if (this.clients.size === 0) {
             throw new Error("No available clients to handle the request.");
         }
 
-        const isNoSelectedClient = !this.selectedClient;
-        if (isNoSelectedClient) {
-            logger.info("No selected RPC, looking for fallback...");
-            return await this.callFallbackClients<T>(methodName, args);
-        }
-
-        try {
-            return await this.callSelectedClient<T>(methodName, args);
-        } catch (error) {
-            this.selectedClient = undefined;
-            return await this.callFallbackClients<T>(methodName, args);
-        }
-    }
-
-    // Attempt to call the method on the selected client with a timeout.
-    private async callSelectedClient<T>(methodName: string, args: any[]): Promise<T> {
-        if (!this.selectedClient) {
-            throw new Error("Expected an RPC client to be selected");
-        }
-        logger.info("RPCSelector: Calling existing client", {
-            clientName: this.selectedClient.getURL().toString(),
-            methodName,
-            arguments: args,
-        });
-        const method = (this.selectedClient as any)[methodName] as Function;
-        if (!method) {
-            throw new Error(`Method ${methodName} not found on selected client`);
-        }
-
-        const timeoutPromise = new Promise<never>((_, reject) =>
-            setTimeout(
-                () => reject(new Error("Request timed out")),
-                Number(process.env.RPC_REQUEST_TIMEOUT_MS) ?? 7000,
-            ),
-        );
-
-        const result = await Promise.race([
-            method.apply(this.selectedClient, args),
-            timeoutPromise,
-        ]);
-
-        if (result == null && this.selectedClient) {
-            logger.info("Result null from current client", {
-                nullCurrentRPCClientUrl: this.selectedClient.getURL().toString(),
-            });
-        }
-
-        return result;
-    }
-
-    // Fallback to querying all clients using Promise.any.
-    private async callFallbackClients<T>(methodName: string, args: any[]): Promise<T> {
-        logger.info("RPCSelector: Calling fallback clients", { methodName, arguments: args });
-        const clientPromises = this.clients.map(
-            (client) =>
-                new Promise<{ result: T; client: WrappedSuiClient }>(async (resolve, reject) => {
-                    try {
-                        const method = (client as any)[methodName] as Function;
-                        if (!method) {
-                            reject(new Error(`Method ${methodName} not found on client`));
-                            return;
-                        }
-                        const result = await method.apply(client, args);
-                        resolve({ result, client });
-                    } catch (error: any) {
-                        reject(error);
-                    }
-                }),
-        );
-
-        try {
-            const { result, client } = await Promise.any(clientPromises);
-            // Update the selected client for future calls.
-            this.selectedClient = client;
-            logger.info("RPCSelector: Client selected!", {
-                clientSelected: this.selectedClient.getURL().toString(),
-                methodName,
-                arguments: args,
-            });
-
-            return result;
-        } catch (error) {
-            const message = `Failed to contact fallback RPC clients.`;
-            if (!(error instanceof AggregateError)) {
-                logger.error(message, {
-                    error: formatError(error),
-                    note: "Expected AggregateError",
-                });
-            } else {
-                const errors = error.errors.map(formatError);
-                logger.error(message, { errors });
+        return this.executor.invoke(async (url): Promise<ExecuteResult<T>> => {
+            const client = this.clients.get(url);
+            if (!client) {
+                return {
+                    status: "stop",
+                    error: new Error(`No client found for URL: ${url}`),
+                };
             }
-            throw new Error(message);
-        }
+
+            try {
+                // TODO: Move timeout logic to WrappedSuiClient constructor by passing a
+                // custom fetch with AbortSignal.timeout() to SuiHTTPTransport. This would
+                // simplify invokeWithFailover to just handle retry logic.
+                // NOTE: As of early 2026, Bun's AbortSignal stops processing responses but
+                // requests still complete in the background. This may change in future versions.
+                let timer: ReturnType<typeof setTimeout>;
+                const timeoutPromise = new Promise<never>((_, reject) => {
+                    timer = setTimeout(
+                        () => reject(new Error("Request timed out")),
+                        this.timeoutMs,
+                    );
+                });
+
+                try {
+                    const result = await Promise.race([fn(client), timeoutPromise]);
+                    return { status: "success", value: result };
+                } finally {
+                    clearTimeout(timer!);
+                }
+            } catch (error) {
+                logger.warn("RPC call failed", { url, error: formatError(error) });
+                return {
+                    status: "retry-same",
+                    error: error instanceof Error ? error : new Error(String(error)),
+                };
+            }
+        });
     }
 
     private isValidGetObjectResponse(suiObjectResponse: SuiObjectResponse): boolean {
@@ -174,9 +121,10 @@ export class RPCSelector implements RPCSelectorInterface {
     }
 
     public async getObject(input: GetObjectParams): Promise<SuiObjectResponse> {
-        const suiObjectResponse = await this.invokeWithFailover<SuiObjectResponse>("getObject", [
-            input,
-        ]);
+        logger.info("RPCSelector: getObject", { input });
+        const suiObjectResponse = await this.invokeWithFailover((client) =>
+            client.getObject(input),
+        );
         if (this.isValidGetObjectResponse(suiObjectResponse)) {
             return suiObjectResponse;
         }
@@ -184,9 +132,9 @@ export class RPCSelector implements RPCSelectorInterface {
     }
 
     public async multiGetObjects(input: MultiGetObjectsParams): Promise<SuiObjectResponse[]> {
-        const suiObjectResponseArray = await this.invokeWithFailover<SuiObjectResponse[]>(
-            "multiGetObjects",
-            [input],
+        logger.info("RPCSelector: multiGetObjects", { input });
+        const suiObjectResponseArray = await this.invokeWithFailover((client) =>
+            client.multiGetObjects(input),
         );
         if (this.isValidMultiGetObjectResponse(suiObjectResponseArray)) {
             return suiObjectResponseArray;
@@ -197,9 +145,9 @@ export class RPCSelector implements RPCSelectorInterface {
     public async getDynamicFieldObject(
         input: GetDynamicFieldObjectParams,
     ): Promise<SuiObjectResponse> {
-        const suiObjectResponse = await this.invokeWithFailover<SuiObjectResponse>(
-            "getDynamicFieldObject",
-            [input],
+        logger.info("RPCSelector: getDynamicFieldObject", { input });
+        const suiObjectResponse = await this.invokeWithFailover((client) =>
+            client.getDynamicFieldObject(input),
         );
         if (this.isValidGetObjectResponse(suiObjectResponse)) {
             return suiObjectResponse;
@@ -208,7 +156,7 @@ export class RPCSelector implements RPCSelectorInterface {
     }
 
     public async getNameRecord(name: string): Promise<NameRecord | null> {
-        const nameRecord = await this.invokeWithFailover<NameRecord>("getNameRecord", [name]);
-        return nameRecord;
+        logger.info("RPCSelector: getNameRecord", { name });
+        return this.invokeWithFailover((client) => client.getNameRecord(name));
     }
 }

@@ -3,11 +3,10 @@
 
 import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 
-import allowlistChecker from "src/allowlist_checker";
 import { siteNotFound } from "@lib/http/http_error_responses";
 import blocklistChecker from "src/blocklist_checker";
 import { config } from "src/configuration_loader";
-import { standardUrlFetcher, premiumUrlFetcher } from "src/url_fetcher_factory";
+import { urlFetcher } from "src/url_fetcher_factory";
 import { Base36toHex } from "@lib/objectId_operations";
 import { instrumentationFacade } from "@lib/instrumentation";
 import { bringYourOwnDomainDoesNotSupportSubdomainsYet } from "@lib/http/http_error_responses";
@@ -28,10 +27,6 @@ export default async function main(req: Request) {
             return siteNotFound();
         }
 
-        const urlFetcher = (await allowlistChecker?.isAllowed(parsedUrl.subdomain ?? ""))
-            ? premiumUrlFetcher
-            : standardUrlFetcher;
-
         if (requestDomain == portalDomain && parsedUrl.subdomain) {
             const res = await urlFetcher.resolveDomainAndFetchUrl(
                 parsedUrl,
@@ -45,10 +40,8 @@ export default async function main(req: Request) {
     const atBaseUrl = portalDomain == url.host.split(":")[0];
     if (atBaseUrl) {
         console.log("Serving the landing page from walrus...");
-        // Always use the premium page fetcher for the landing page (when available).
         // The landing page is an exception to the B36_DOMAIN_RESOLUTION_SUPPORT rule.
         // It will always resolve to an objectId.
-        const urlFetcher = config.enableAllowlist ? premiumUrlFetcher : standardUrlFetcher;
         const response = await urlFetcher.resolveDomainAndFetchUrl(
             {
                 subdomain: config.landingPageOidB36,
