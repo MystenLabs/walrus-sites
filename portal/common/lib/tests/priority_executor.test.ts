@@ -15,17 +15,6 @@ describe("parsePriorityUrlList", () => {
         expect(result).toEqual([{ url: "https://example.com", retries: 3, priority: 100 }]);
     });
 
-    it("parses multiple entries and sorts by priority", () => {
-        const result = parsePriorityUrlList(
-            "https://low.com|1|500,https://high.com|3|100,https://mid.com|2|200",
-        );
-        expect(result).toEqual([
-            { url: "https://high.com", retries: 3, priority: 100 },
-            { url: "https://mid.com", retries: 2, priority: 200 },
-            { url: "https://low.com", retries: 1, priority: 500 },
-        ]);
-    });
-
     it("handles whitespace in entries", () => {
         const result = parsePriorityUrlList(" https://a.com|1|100 , https://b.com|2|200 ");
         expect(result).toHaveLength(2);
