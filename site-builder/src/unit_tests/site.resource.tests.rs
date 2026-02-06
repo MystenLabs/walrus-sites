@@ -27,7 +27,8 @@ fn test_derive_http_headers() {
     ];
     let ws_resources = mock_ws_resources();
     for (path, expected) in test_paths {
-        let result = ResourceData::derive_http_headers(ws_resources.as_ref(), path);
+        let result = ResourceData::derive_http_headers(ws_resources.as_ref(), path)
+            .expect("valid patterns should not fail");
         assert_eq!(result.len(), 1);
         assert!(result.contains_key(expected));
     }
