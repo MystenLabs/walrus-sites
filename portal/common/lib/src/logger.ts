@@ -78,7 +78,7 @@ class Logger {
 
 export function formatError(e: unknown): { name: string; message: string } | unknown {
     if (e instanceof Error) {
-        return { name: e.name, message: e.message };
+        return { name: e.name, message: e.message, cause: e.cause };
     }
     return e;
 }
@@ -87,7 +87,7 @@ export function formatErrorWithStack(
     e: unknown,
 ): { name: string; message: string; stack?: string } | unknown {
     if (e instanceof Error) {
-        return { name: e.name, message: e.message, stack: e.stack };
+        return { name: e.name, message: e.message, cause: e.cause, stack: e.stack };
     }
     return e;
 }
