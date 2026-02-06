@@ -11,9 +11,6 @@ RUN apt-get update -y
 RUN apt-get install -y ca-certificates
 
 # environment variables, can be overridden by docker build --build-arg <arg>=<value>
-ARG ENABLE_ALLOWLIST="false"
-ENV ENABLE_ALLOWLIST=${ENABLE_ALLOWLIST}
-
 ARG ENABLE_BLOCKLIST="false"
 ENV ENABLE_BLOCKLIST=${ENABLE_BLOCKLIST}
 
