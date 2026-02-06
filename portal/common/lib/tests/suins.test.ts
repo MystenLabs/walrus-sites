@@ -5,9 +5,11 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { SuiNSResolver } from "@lib/suins";
 import { RPCSelector } from "@lib/rpc_selector";
 import { NameRecord } from "@lib/types";
+import { parsePriorityUrlList } from "@lib/priority_executor";
 
 describe("resolveSuiNsAddress", () => {
-    const rpcSelector = new RPCSelector(process.env.RPC_URL_LIST!.split(","), "testnet");
+    const rpcPriorityUrls = parsePriorityUrlList(process.env.RPC_URL_LIST!);
+    const rpcSelector = new RPCSelector(rpcPriorityUrls, "testnet");
     const suiNSResolver = new SuiNSResolver(rpcSelector);
 
     beforeEach(() => {

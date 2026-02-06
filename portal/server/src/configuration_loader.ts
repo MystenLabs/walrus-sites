@@ -2,9 +2,23 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { z } from "zod";
+import { parsePriorityUrlList } from "@lib/priority_executor";
 
 // Define a transformer for string booleans
 const stringBoolean = z.enum(["true", "false"]).transform((val) => val === "true");
+
+// Custom Zod transformer for priority URL lists (format: URL|RETRIES|PRIORITY)
+const priorityUrlListSchema = z.string().transform((val, ctx) => {
+    try {
+        return parsePriorityUrlList(val);
+    } catch (e) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: e instanceof Error ? e.message : "Invalid priority URL list",
+        });
+        return z.NEVER;
+    }
+});
 
 const configurationSchema = z.preprocess(
     (env: any) => ({
@@ -14,12 +28,11 @@ const configurationSchema = z.preprocess(
         enableAllowlist: env.ENABLE_ALLOWLIST,
         landingPageOidB36: env.LANDING_PAGE_OID_B36,
         portalDomainNameLength: env.PORTAL_DOMAIN_NAME_LENGTH,
-        premiumRpcUrlList: env.PREMIUM_RPC_URL_LIST,
         rpcUrlList: env.RPC_URL_LIST,
         suinsClientNetwork: env.SUINS_CLIENT_NETWORK, // TODO(alex): rename this to NETWORK
         blocklistRedisUrl: env.BLOCKLIST_REDIS_URL,
         allowlistRedisUrl: env.ALLOWLIST_REDIS_URL,
-        aggregatorUrl: env.AGGREGATOR_URL,
+        aggregatorUrlList: env.AGGREGATOR_URL_LIST,
         sitePackage: env.SITE_PACKAGE,
         b36DomainResolutionSupport: env.B36_DOMAIN_RESOLUTION_SUPPORT,
         bringYourOwnDomain: env.BRING_YOUR_OWN_DOMAIN,
@@ -38,14 +51,8 @@ const configurationSchema = z.preprocess(
                 .refine((val) => val === undefined || val > 0, {
                     message: "PORTAL_DOMAIN_NAME_LENGTH must be a positive number",
                 }),
-            premiumRpcUrlList: z.preprocess(
-                (val) => (typeof val === "string" ? val.trim().split(",") : val),
-                z.array(z.string().url()),
-            ),
-            rpcUrlList: z.preprocess(
-                (val) => (typeof val === "string" ? val.trim().split(",") : val),
-                z.array(z.string().url()),
-            ),
+            rpcUrlList: priorityUrlListSchema,
+            aggregatorUrlList: priorityUrlListSchema,
             suinsClientNetwork: z.enum(["testnet", "mainnet"]),
             blocklistRedisUrl: z
                 .string()
@@ -71,7 +78,6 @@ const configurationSchema = z.preprocess(
                             "ALLOWLIST_REDIS_URL must end with '1' to use the allowlist database.",
                     },
                 ),
-            aggregatorUrl: z.string().url({ message: "AGGREGATOR_URL is not a valid URL!" }),
             sitePackage: z
                 .string()
                 .refine((val) => val.length === 66 && /^0x[0-9a-fA-F]+$/.test(val)),
