@@ -289,6 +289,7 @@ export class UrlFetcher {
                     status: response.status,
                     contents,
                 });
+                // Will return genericError
                 throw new Error(
                     `Unhandled response status from aggregator. Response status: ${response.status}`,
                 );
