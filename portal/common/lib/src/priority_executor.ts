@@ -89,7 +89,10 @@ export class PriorityExecutor {
     private readonly sortedItems: readonly PriorityUrl[];
     private readonly delayBetweenRetriesMs: number;
 
-    constructor(items: PriorityUrl[], delayBetweenRetriesMs: number = DEFAULT_DELAY_BETWEEN_RETRIES_MS) {
+    constructor(
+        items: PriorityUrl[],
+        delayBetweenRetriesMs: number = DEFAULT_DELAY_BETWEEN_RETRIES_MS,
+    ) {
         // Sort by priority (ascending) and freeze to prevent mutation
         this.sortedItems = Object.freeze([...items].sort((a, b) => a.priority - b.priority));
         this.delayBetweenRetriesMs = delayBetweenRetriesMs;
