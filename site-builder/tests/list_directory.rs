@@ -17,8 +17,8 @@ mod helpers;
 mod localnode;
 use helpers::{copy_dir, get_quilt_identifiers};
 use localnode::{
-    args_builder::{ArgsBuilder, PublishOptionsBuilder},
     TestSetup,
+    args_builder::{ArgsBuilder, PublishOptionsBuilder},
 };
 
 // Helper functions for list_directory tests
@@ -82,11 +82,13 @@ async fn preprocess_the_snake_example_with_list_directory_no_publish() -> anyhow
     assert!(!index_content.contains("<li><a href=\"/private/index.html\">private/</a></li>"));
     // Make sure that no `/private/index.html` file was generated, nor `/private/nested/index.html`
     assert!(!directory.join("private").join("index.html").exists());
-    assert!(!directory
-        .join("private")
-        .join("nested")
-        .join("index.html")
-        .exists());
+    assert!(
+        !directory
+            .join("private")
+            .join("nested")
+            .join("index.html")
+            .exists()
+    );
 
     Ok(())
 }
@@ -433,7 +435,7 @@ async fn deploy_quilts_with_list_directory_updates_ignored_files() -> anyhow::Re
     );
 
     // Step 9: Verify both quilts still exist (Quilt A is NOT deleted because file_4 references it)
-    let wallet_address = cluster.wallet_active_address()?;
+    let wallet_address = cluster.wallet_active_address();
     let owned_blobs = cluster.get_owned_blobs(wallet_address).await?;
     let owned_blob_ids: Vec<BlobId> = owned_blobs.iter().map(|b| b.blob_id).collect();
 

@@ -3,19 +3,19 @@
 
 use std::num::NonZeroU16;
 
-use anyhow::{bail, Context, Result};
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use anyhow::{Context, Result, bail};
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use bytesize::ByteSize;
 use itertools::Itertools;
 
-use super::resource::{Resource, ResourceData, MAX_IDENTIFIER_SIZE};
+use super::resource::{MAX_IDENTIFIER_SIZE, Resource, ResourceData};
 use crate::{
     args::EpochArg,
     display,
     walrus::{
+        Walrus,
         command::{QuiltBlobInput, StoreQuiltInput},
         types::BlobId,
-        Walrus,
     },
 };
 

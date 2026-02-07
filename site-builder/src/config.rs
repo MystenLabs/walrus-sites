@@ -5,7 +5,7 @@
 
 use std::{collections::HashMap, path::Path};
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{Context, Result, anyhow, bail};
 use serde::{Deserialize, Serialize};
 use sui_sdk::wallet_context::WalletContext;
 use sui_types::base_types::ObjectID;

@@ -16,7 +16,7 @@ async fn start_walrus_sites_cluster() -> anyhow::Result<()> {
     let TestSetup {
         cluster_state:
             WalrusSitesClusterState {
-                mut walrus_sites_publisher,
+                walrus_sites_publisher,
                 ..
             },
         walrus_sites_package_id,
@@ -29,7 +29,7 @@ async fn start_walrus_sites_cluster() -> anyhow::Result<()> {
 - from the address {} which is generated during Sui Cluster initialization.
 - Sites config:
 {}"#,
-        walrus_sites_publisher.inner.active_address()?,
+        walrus_sites_publisher.inner.active_address(),
         serde_yaml::to_string(&sites_config.inner.0)?
     );
     Ok(())

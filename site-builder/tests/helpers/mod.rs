@@ -14,7 +14,7 @@ use hex::FromHex;
 use move_core_types::u256::U256;
 use site_builder::types::SuiResource;
 use sui_types::base_types::SuiAddress;
-use walrus_sdk::core::{metadata::QuiltMetadata, BlobId, QuiltPatchId};
+use walrus_sdk::core::{BlobId, QuiltPatchId, metadata::QuiltMetadata};
 
 use crate::localnode::{TestBlob, TestSetup};
 
@@ -128,8 +128,8 @@ pub fn create_large_test_site(
     size_per_file_bytes: usize,
 ) -> anyhow::Result<()> {
     use rand::{
-        distributions::{Alphanumeric, DistString},
         SeedableRng,
+        distributions::{Alphanumeric, DistString},
     };
 
     // Use a seeded RNG for reproducibility in tests

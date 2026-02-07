@@ -5,7 +5,7 @@
 
 use std::{num::NonZeroU32, path::PathBuf, str::FromStr, time::SystemTime};
 
-use anyhow::{anyhow, bail, ensure, Result};
+use anyhow::{Result, anyhow, bail, ensure};
 use bytesize::ByteSize;
 use clap::{ArgGroup, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
@@ -14,7 +14,7 @@ use sui_types::base_types::{ObjectID, SuiAddress};
 pub use walrus_sdk::sui::client::contract_config::ContractConfig as WalrusContractConfig;
 
 use crate::{
-    retry_client::RetriableSuiClient,
+    retry_client::{RetriableSuiClient, get_staking_object},
     suins::SuiNsClient,
     util::load_wallet_context,
     walrus::output::EpochCount,
@@ -156,9 +156,7 @@ impl GeneralArgs {
             Some(pkg) => Ok(pkg),
             None => {
                 let walrus_config = self.walrus_config()?;
-                let staking = sui_client
-                    .get_staking_object(walrus_config.staking_object)
-                    .await?;
+                let staking = get_staking_object(sui_client, walrus_config.staking_object).await?;
                 Ok(staking.package_id)
             }
         }

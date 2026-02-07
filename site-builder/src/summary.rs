@@ -6,7 +6,7 @@
 use walrus_sdk::core::QuiltPatchId;
 
 use crate::{
-    site::{resource::SiteOps, SiteDataDiff},
+    site::{SiteDataDiff, resource::SiteOps},
     types::{ExtendOps, RouteOps},
     util::parse_quilt_patch_id,
     walrus::types::BlobId,

@@ -8,13 +8,13 @@ use std::{num::NonZeroU16, path::PathBuf};
 use anyhow::{Context, Result};
 use command::{InfoCommands, RpcArg};
 use output::{
-    try_from_output,
     BlobIdOutput,
     DryRunOutput,
     InfoEpochOutput,
     ReadOutput,
     StorageInfoOutput,
     StoreOutput,
+    try_from_output,
 };
 use sui_types::base_types::ObjectID;
 use tokio::process::Command as CliCommand;

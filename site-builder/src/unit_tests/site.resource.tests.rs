@@ -6,7 +6,7 @@ use std::{collections::BTreeMap, num::NonZeroU16, path::PathBuf};
 use bytesize::ByteSize;
 use move_core_types::u256::U256;
 
-use super::{full_path_to_resource_path, ResourceData, MAX_IDENTIFIER_SIZE};
+use super::{MAX_IDENTIFIER_SIZE, ResourceData, full_path_to_resource_path};
 use crate::{
     config::Walrus,
     site::quilts::QuiltsManager,
