@@ -452,6 +452,11 @@ impl SiteManager {
         // TODO(sew-498): Verify gas_ref. Currently, we do not have the last tx the user submitted
         // through walrus.
         let gas_ref = self.gas_coin_ref().await?;
+        tracing::debug!(
+            num_commands = initial_ptb.commands.len(),
+            ?gas_ref,
+            "sending initial site PTB"
+        );
         let result = self.sign_and_send_ptb(initial_ptb, gas_ref).await?;
 
         // Check explicitly for execution failures.
@@ -490,8 +495,14 @@ impl SiteManager {
                     .ok_if_limit_reached()?;
             }
 
+            let ptb = ptb.finish();
             let gas_ref = self.gas_coin_ref().await?;
-            let resource_result = self.sign_and_send_ptb(ptb.finish(), gas_ref).await?;
+            tracing::debug!(
+                num_commands = ptb.commands.len(),
+                ?gas_ref,
+                "sending continuation site PTB"
+            );
+            let resource_result = self.sign_and_send_ptb(ptb, gas_ref).await?;
             if let Some(SuiExecutionStatus::Failure { error }) =
                 resource_result.effects.as_ref().map(|e| e.status())
             {
