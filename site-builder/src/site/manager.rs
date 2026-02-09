@@ -198,12 +198,11 @@ impl SiteManager {
         let new_end_epoch = current_epoch + epochs_ahead;
 
         let owner_address = self.active_address()?;
-        let owned_blobs =
-            get_owned_blobs(retriable_client, walrus_pkg, owner_address)
-                .await
-                .context(format!(
-                    "Could not fetch owned blobs for address: {owner_address}"
-                ))?;
+        let owned_blobs = get_owned_blobs(retriable_client, walrus_pkg, owner_address)
+            .await
+            .context(format!(
+                "Could not fetch owned blobs for address: {owner_address}"
+            ))?;
 
         // Get unique blob_ids from resources, then classify each as expired or needing extension
         let unique_blob_ids: HashSet<BlobId> = resources.iter().map(|r| r.info.blob_id).collect();
