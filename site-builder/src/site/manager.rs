@@ -7,7 +7,7 @@ use std::{
     str::FromStr,
 };
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{
     rpc_types::{
@@ -197,8 +197,12 @@ impl SiteManager {
         };
         let new_end_epoch = current_epoch + epochs_ahead;
 
-        let owned_blobs =
-            get_owned_blobs(retriable_client, walrus_pkg, self.active_address()?).await?;
+        let owner_address = self.active_address()?;
+        let owned_blobs = get_owned_blobs(retriable_client, walrus_pkg, owner_address)
+            .await
+            .context(format!(
+                "Could not fetch owned blobs for address: {owner_address}"
+            ))?;
 
         // Get unique blob_ids from resources, then classify each as expired or needing extension
         let unique_blob_ids: HashSet<BlobId> = resources.iter().map(|r| r.info.blob_id).collect();
@@ -447,6 +451,11 @@ impl SiteManager {
         // TODO(sew-498): Verify gas_ref. Currently, we do not have the last tx the user submitted
         // through walrus.
         let gas_ref = self.gas_coin_ref().await?;
+        tracing::debug!(
+            num_commands = initial_ptb.commands.len(),
+            ?gas_ref,
+            "sending initial site PTB"
+        );
         let result = self.sign_and_send_ptb(initial_ptb, gas_ref).await?;
 
         // Check explicitly for execution failures.
@@ -485,8 +494,14 @@ impl SiteManager {
                     .ok_if_limit_reached()?;
             }
 
+            let ptb = ptb.finish();
             let gas_ref = self.gas_coin_ref().await?;
-            let resource_result = self.sign_and_send_ptb(ptb.finish(), gas_ref).await?;
+            tracing::debug!(
+                num_commands = ptb.commands.len(),
+                ?gas_ref,
+                "sending continuation site PTB"
+            );
+            let resource_result = self.sign_and_send_ptb(ptb, gas_ref).await?;
             if let Some(SuiExecutionStatus::Failure { error }) =
                 resource_result.effects.as_ref().map(|e| e.status())
             {
