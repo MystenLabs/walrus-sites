@@ -64,7 +64,12 @@ pub(crate) async fn display_sitemap(
         .ok_or_else(|| anyhow!("staking_object not defined in the config"))?;
     dbg!("Using staking object:", staking_object_id);
 
-    let staking_object = sui_client.get_staking_object(staking_object_id).await?;
+    let staking_object = sui_client
+        .get_staking_object(staking_object_id)
+        .await
+        .context(format!(
+            "Could not fetch staking object: {staking_object_id}"
+        ))?;
     let table = SiteMapTable::new(&site_data, &owned_blobs, &staking_object);
     table.printstd();
 
@@ -80,7 +85,10 @@ async fn get_site_resources_and_blobs(
     // Get all the blobs owned by the owner.
     let walrus_package = config.general.resolve_walrus_package(sui_client).await?;
     let owned_blobs = get_owned_blobs(sui_client, walrus_package, owner_address)
-        .await?
+        .await
+        .context(format!(
+            "Could not fetch owned blobs for address: {owner_address}"
+        ))?
         .into_iter()
         .map(|(blob_id, (sui_blob, _obj_ref))| (blob_id, sui_blob))
         .collect();
