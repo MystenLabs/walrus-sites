@@ -423,7 +423,9 @@ impl ResourceData {
         }
 
         let mut http_headers: VecMap<String, String> =
-            Self::derive_http_headers(ws_resources, &resource_path)?;
+            Self::derive_http_headers(ws_resources, &resource_path).context(
+                "malformed glob expression in the \"headers\" field of ws-resources.json",
+            )?;
         let extension = full_path
             .extension()
             .unwrap_or(
