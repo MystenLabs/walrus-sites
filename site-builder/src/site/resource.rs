@@ -416,14 +416,16 @@ impl ResourceData {
                 .into_iter()
                 .flatten()
                 .map(String::as_str);
-            if is_ignored(&mut ignore_iter, &resource_path) {
+            if is_ignored(&mut ignore_iter, &resource_path)? {
                 tracing::debug!(?resource_path, "ignoring resource due to ignore pattern");
                 return Ok(None);
             }
         }
 
         let mut http_headers: VecMap<String, String> =
-            Self::derive_http_headers(ws_resources, &resource_path);
+            Self::derive_http_headers(ws_resources, &resource_path).context(
+                "malformed glob expression in the \"headers\" field of ws-resources.json",
+            )?;
         let extension = full_path
             .extension()
             .unwrap_or(
@@ -478,17 +480,25 @@ impl ResourceData {
     fn derive_http_headers(
         ws_resources: Option<&WSResources>,
         resource_path: &str,
-    ) -> VecMap<String, String> {
-        ws_resources
-            .and_then(|config| config.headers.as_ref())
-            .and_then(|headers| {
-                headers
-                    .iter()
-                    .filter(|(path, _)| is_pattern_match(path, resource_path))
-                    .max_by_key(|(path, _)| path.split('/').count())
-                    .map(|(_, header_map)| header_map.0.clone())
-            })
-            .unwrap_or_default()
+    ) -> Result<VecMap<String, String>> {
+        let Some(headers) = ws_resources.and_then(|config| config.headers.as_ref()) else {
+            return Ok(VecMap::default());
+        };
+
+        let mut best_match: Option<&VecMap<String, String>> = None;
+        let mut best_depth = 0;
+
+        for (path, header_map) in headers.iter() {
+            if is_pattern_match(path, resource_path)? {
+                let depth = path.split('/').count();
+                if best_match.is_none() || depth > best_depth {
+                    best_match = Some(&header_map.0);
+                    best_depth = depth;
+                }
+            }
+        }
+
+        Ok(best_match.cloned().unwrap_or_default())
     }
 
     /// Returns the unencoded size of the resource.
