@@ -11,6 +11,9 @@ RUN apt-get update -y
 RUN apt-get install -y ca-certificates
 
 # environment variables, can be overridden by docker build --build-arg <arg>=<value>
+ARG ENABLE_ALLOWLIST="false"
+ENV ENABLE_ALLOWLIST=${ENABLE_ALLOWLIST}
+
 ARG ENABLE_BLOCKLIST="false"
 ENV ENABLE_BLOCKLIST=${ENABLE_BLOCKLIST}
 
@@ -19,6 +22,10 @@ ENV LANDING_PAGE_OID_B36=${LANDING_PAGE_OID_B36}
 
 ARG PORTAL_DOMAIN_NAME_LENGTH=""
 ENV PORTAL_DOMAIN_NAME_LENGTH=${PORTAL_DOMAIN_NAME_LENGTH}
+
+# Premium RPC URL list is only used when ENABLE_ALLOWLIST is true
+ARG PREMIUM_RPC_URL_LIST="https://fullnode.mainnet.sui.io|2|100"
+ENV PREMIUM_RPC_URL_LIST=${PREMIUM_RPC_URL_LIST}
 
 # Format: URL|RETRIES|PRIORITY (lower priority number = higher precedence)
 ARG RPC_URL_LIST="https://fullnode.mainnet.sui.io|2|100,https://mainnet.suiet.app|1|200"
