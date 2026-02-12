@@ -69,9 +69,7 @@ describe("parsePriorityUrlList", () => {
         });
 
         it("parses multiple legacy URLs with ascending priority", () => {
-            const result = parsePriorityUrlList(
-                "https://a.com,https://b.com,https://c.com",
-            );
+            const result = parsePriorityUrlList("https://a.com,https://b.com,https://c.com");
             expect(result).toEqual([
                 { url: "https://a.com", retries: 2, priority: 100 },
                 { url: "https://b.com", retries: 2, priority: 200 },
@@ -94,9 +92,9 @@ describe("parsePriorityUrlList", () => {
         });
 
         it("throws on mixed format", () => {
-            expect(() =>
-                parsePriorityUrlList("https://a.com,https://b.com|2|100"),
-            ).toThrow(/Mixed URL formats/);
+            expect(() => parsePriorityUrlList("https://a.com,https://b.com|2|100")).toThrow(
+                /Mixed URL formats/,
+            );
         });
 
         it("throws on invalid URL in legacy format", () => {

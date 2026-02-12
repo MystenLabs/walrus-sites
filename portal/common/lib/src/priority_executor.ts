@@ -60,7 +60,7 @@ export function parsePriorityUrlList(
         console.warn(
             "[DEPRECATED] Plain URL list format detected. " +
                 "Please migrate to the new format: URL|RETRIES|PRIORITY " +
-                "(e.g., \"https://rpc.example.com|3|100\").",
+                '(e.g., "https://rpc.example.com|3|100").',
         );
         return entries.map((url, index) => {
             try {
