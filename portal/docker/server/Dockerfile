@@ -23,17 +23,20 @@ ENV LANDING_PAGE_OID_B36=${LANDING_PAGE_OID_B36}
 ARG PORTAL_DOMAIN_NAME_LENGTH=""
 ENV PORTAL_DOMAIN_NAME_LENGTH=${PORTAL_DOMAIN_NAME_LENGTH}
 
-ARG PREMIUM_RPC_URL_LIST="https://fullnode.mainnet.sui.io"
+# Premium RPC URL list is only used when ENABLE_ALLOWLIST is true
+ARG PREMIUM_RPC_URL_LIST="https://fullnode.mainnet.sui.io|2|100"
 ENV PREMIUM_RPC_URL_LIST=${PREMIUM_RPC_URL_LIST}
 
-ARG RPC_URL_LIST="https://fullnode.mainnet.sui.io,https://mainnet.suiet.app"
+# Format: URL|RETRIES|PRIORITY (lower priority number = higher precedence)
+ARG RPC_URL_LIST="https://fullnode.mainnet.sui.io|2|100,https://mainnet.suiet.app|1|200"
 ENV RPC_URL_LIST=${RPC_URL_LIST}
 
 ARG SUINS_CLIENT_NETWORK="mainnet"
 ENV SUINS_CLIENT_NETWORK=${SUINS_CLIENT_NETWORK}
 
-ARG AGGREGATOR_URL="https://aggregator.walrus-mainnet.walrus.space"
-ENV AGGREGATOR_URL=${AGGREGATOR_URL}
+# Format: URL|RETRIES|PRIORITY (lower priority number = higher precedence)
+ARG AGGREGATOR_URL_LIST="https://aggregator.walrus-mainnet.walrus.space|2|100"
+ENV AGGREGATOR_URL_LIST=${AGGREGATOR_URL_LIST}
 
 ARG SITE_PACKAGE="0x26eb7ee8688da02c5f671679524e379f0b837a12f1d1d799f255b7eea260ad27"
 ENV SITE_PACKAGE=${SITE_PACKAGE}

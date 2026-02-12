@@ -22,11 +22,15 @@ import { blobAggregatorEndpoint, quiltAggregatorEndpoint } from "@lib/aggregator
 import { toBase64 } from "@mysten/bcs";
 import { sha256 } from "@lib/crypto";
 import { WalrusSitesRouter } from "@lib/routing";
-import { HttpStatusCodes } from "@lib/http/http_status_codes";
 import logger, { formatError } from "@lib/logger";
 import BlocklistChecker from "@lib/blocklist_checker";
 import { QuiltPatch } from "@lib/quilt";
 import { instrumentationFacade } from "./instrumentation";
+import { ExecuteResult, PriorityExecutor } from "@lib/priority_executor";
+
+type AggregatorResult =
+    | { type: "ok"; body: ArrayBuffer; elapsedMs: number }
+    | { type: "blob_unavailable" };
 
 export const QUILT_PATCH_ID_INTERNAL_HEADER = "x-wal-quilt-patch-internal-id";
 
@@ -57,7 +61,7 @@ export class UrlFetcher {
         private resourceFetcher: ResourceFetcher,
         private suinsResolver: SuiNSResolver,
         private wsRouter: WalrusSitesRouter,
-        private aggregatorUrl: string,
+        private aggregatorExecutor: PriorityExecutor,
         private b36DomainResolutionSupport: boolean,
     ) {}
 
@@ -214,95 +218,61 @@ export class UrlFetcher {
         });
 
         const quilt_patch_internal_id = result.headers.get(QUILT_PATCH_ID_INTERNAL_HEADER);
-        let aggregator_endpoint: URL;
         let blobOrPatchId: string;
+        let endpointBuilder: (aggregatorUrl: string) => URL;
         if (quilt_patch_internal_id) {
             const quilt_patch = new QuiltPatch(result.blob_id, quilt_patch_internal_id);
             const quilt_patch_id = quilt_patch.derive_id();
             blobOrPatchId = quilt_patch_id;
             logger.info("Resource is stored as a quilt patch.", { quilt_patch_id });
-            aggregator_endpoint = quiltAggregatorEndpoint(quilt_patch_id, this.aggregatorUrl);
+            endpointBuilder = (url) => quiltAggregatorEndpoint(quilt_patch_id, url);
         } else {
             logger.info("Resource is stored as a blob.", { blob_id: result.blob_id });
             blobOrPatchId = result.blob_id;
-            aggregator_endpoint = blobAggregatorEndpoint(result.blob_id, this.aggregatorUrl);
+            endpointBuilder = (url) => blobAggregatorEndpoint(result.blob_id, url);
         }
 
         // We have a resource, get the range header.
-        let range_header = optionalRangeToRequestHeaders(result.range);
-        logger.info("Fetching blob from aggregator", {
-            aggregatorUrl: this.aggregatorUrl,
-            blob_id: result.blob_id,
-        });
+        const range_header = optionalRangeToRequestHeaders(result.range);
+        logger.info("Fetching blob from aggregator", { blob_id: result.blob_id });
 
-        const aggregatorFetchingStart = Date.now();
-        const response = await this.fetchWithRetry(aggregator_endpoint, {
-            headers: range_header,
-        });
-        if (!response.ok) {
-            // Aggregator error codes (from aggregator_openapi.yaml):
-            // 403: Blob size exceeds maximum allowed size configured for this aggregator.
-            // 404: Blob not stored on Walrus (likely expired) or quilt patch doesn't exist.
-            // 416: Invalid byte range parameters (would indicate a bug since ranges come from on-chain data).
-            // 5xx: Internal server error.
-            if (response.status === HttpStatusCodes.NOT_FOUND) {
-                // In walrus-sites context, 404 from aggregator typically means the blob expired
-                // since site-builder stores blobs before creating resources.
-                logger.warn("Blob not available on aggregator (likely expired).", {
-                    path: result.path,
-                    blobOrPatchId,
-                });
-                return {
-                    status: "BlobUnavailable",
-                    response: blobUnavailable(blobOrPatchId),
-                };
-            } else if (response.status === HttpStatusCodes.FORBIDDEN) {
-                // 403 means blob size exceeds aggregator's configured max size.
-                // This is an aggregator configuration issue, not a user error.
-                logger.error("Aggregator rejected blob due to size limit.", {
-                    path: result.path,
-                    blobOrPatchId,
-                    status: response.status,
-                });
-                return {
-                    status: "AggregatorFail",
-                    response: aggregatorFail(),
-                };
-            } else if (
-                response.status >= HttpStatusCodes.INTERNAL_SERVER_ERROR &&
-                response.status < 600
-            ) {
-                logger.error(
-                    "Failed to fetch resource! Response from aggregator endpoint not ok.",
-                    { path: result.path, status: response.status },
-                );
-                return {
-                    status: "AggregatorFail",
-                    response: aggregatorFail(),
-                };
-            } else {
-                // For any other unexpected status (e.g., 416 invalid range), log and throw.
-                // 416 would indicate a bug since range data comes from on-chain resources.
-                let contents = await response.text();
-                logger.warn("Unexpected response from aggregator.", {
-                    aggregator_endpoint,
-                    status: response.status,
-                    contents,
-                });
-                // Will return genericError
-                throw new Error(
-                    `Unhandled response status from aggregator. Response status: ${response.status}`,
-                );
-            }
+        // Use priority executor for aggregator fallback
+        let aggregatorResult: AggregatorResult;
+        try {
+            aggregatorResult = await this.aggregatorExecutor.invoke(
+                async (aggregatorUrl): Promise<ExecuteResult<AggregatorResult>> => {
+                    const endpoint = endpointBuilder(aggregatorUrl);
+                    logger.debug("Trying aggregator", {
+                        aggregatorUrl,
+                        endpoint: endpoint.toString(),
+                    });
+                    return this.tryAggregator(endpoint, range_header);
+                },
+            );
+        } catch (error) {
+            // All aggregators failed (exhausted retries or stopped)
+            logger.error("All aggregators failed", { error: formatError(error) });
+            return {
+                status: "AggregatorFail",
+                response: aggregatorFail(),
+            };
         }
-        const aggregatorFetchingDuration = Date.now() - aggregatorFetchingStart;
-        instrumentationFacade.recordAggregatorTime(aggregatorFetchingDuration, {
+
+        // Handle semantic result
+        if (aggregatorResult.type === "blob_unavailable") {
+            return {
+                status: "BlobUnavailable",
+                response: blobUnavailable(blobOrPatchId),
+            };
+        }
+
+        instrumentationFacade.recordAggregatorTime(aggregatorResult.elapsedMs, {
             siteId: objectId,
             path,
             blobOrPatchId,
         });
 
-        const body = await response.arrayBuffer();
+        const body = aggregatorResult.body;
         // Verify the integrity of the aggregator response by hashing
         // the response contents.
         const h10b = toBase64(await sha256(body));
@@ -336,72 +306,86 @@ export class UrlFetcher {
         };
     }
 
-    /**
-     * Attempts to fetch a resource from the given input URL or Request object, with retry logic.
-     *
-     * Retries the fetch operation up to a specified number of attempts in case of failure,
-     * with a delay between each retry. Logs the status and error messages during retries.
-     *
-     * @param input - The URL string, URL object, or Request object representing the resource to fetch.
-     * @param init - Optional fetch options such as headers, method, and body.
-     * @param retries - The maximum number of retry attempts (default is 3).
-     * @param delayMs - The delay in milliseconds between retry attempts (default is 1000ms).
-     * @returns A promise that resolves with the successful `Response` object or rejects with the last error.
-     */
-    private async fetchWithRetry(
-        input: string | URL | globalThis.Request,
-        init?: RequestInit,
-        retries: number = 2,
-        delayMs: number = 1000,
-    ): Promise<Response> {
-        let lastError: unknown;
+    private async tryAggregator(
+        url: URL,
+        headers: { [key: string]: string },
+    ): Promise<ExecuteResult<AggregatorResult>> {
+        const start = Date.now();
 
-        if (retries < 0) {
-            logger.warn(`Invalid retries value (${retries}). Falling back to a single fetch call.`);
-            retries = 0;
-        }
+        try {
+            const response = await fetch(url, { headers });
 
-        for (let attempt = 0; attempt <= retries; attempt++) {
-            try {
-                const response = await fetch(input, init);
+            if (response.ok) {
+                const body = await response.arrayBuffer();
+                return {
+                    status: "success",
+                    value: { type: "ok", body, elapsedMs: Date.now() - start },
+                };
+            }
 
-                if (response.status === HttpStatusCodes.NOT_FOUND) {
-                    // If 404 error, log the response status and do not retry.
-                    logger.info("Aggregator responded with NOT_FOUND (404)", { input });
-                } else if (
-                    response.status >= HttpStatusCodes.INTERNAL_SERVER_ERROR &&
-                    response.status < 600
-                ) {
-                    if (attempt === retries) {
-                        return response;
-                    }
-                    throw new Error(`Server responded with status ${response.status}`);
-                } else if (!response.ok) {
-                    // If non-5xx error, log the response status and do not retry.
-                    logger.warn("Aggregator responded with unexpected status.", {
-                        input,
-                        status: response.status,
-                    });
-                }
+            // Aggregator error codes (from aggregator_openapi.yaml):
+            // 403: Blob size exceeds maximum allowed size configured for this aggregator.
+            // 404: Blob not stored on Walrus (likely expired) or quilt patch doesn't exist.
+            // 416: Invalid byte range parameters (would indicate a bug since ranges come from on-chain data).
+            // 5xx: Internal server error.
 
-                return response;
-            } catch (error) {
-                logger.error("Fetch attempt failed", {
-                    attempt: attempt + 1,
-                    totalAttempts: retries + 1,
-                    error: formatError(error),
+            if (response.status === 404) {
+                logger.warn("Blob not available on aggregator (likely expired)", {
+                    url: url.origin,
                 });
-                lastError = error;
+                return { status: "success", value: { type: "blob_unavailable" } };
             }
 
-            // Wait before retrying
-            if (attempt < retries) {
-                await new Promise((resolve) => setTimeout(resolve, delayMs));
+            if (response.status === 403) {
+                // Blob size exceeds this aggregator's configured max — try next aggregator
+                // which may have a higher limit.
+                logger.error("Aggregator rejected blob due to size limit", {
+                    url: url.origin,
+                });
+                return {
+                    status: "retry-next",
+                    error: new Error("Aggregator returned 403 (size limit)"),
+                };
             }
+
+            if (response.status === 502) {
+                logger.warn("Aggregator 502, trying next", { url: url.origin });
+                return {
+                    status: "retry-next",
+                    error: new Error(`Aggregator returned 502`),
+                };
+            }
+
+            if (response.status >= 500) {
+                logger.warn("Aggregator 5xx, retrying", {
+                    url: url.origin,
+                    status: response.status,
+                });
+                return {
+                    status: "retry-same",
+                    error: new Error(`Aggregator returned ${response.status}`),
+                };
+            }
+
+            // 4xx (except 404) - client error, stop
+            logger.error("Aggregator client error", {
+                url: url.origin,
+                status: response.status,
+            });
+            return {
+                status: "stop",
+                error: new Error(`Aggregator client error: ${response.status}`),
+            };
+        } catch (error) {
+            // Network error (connection refused, timeout, etc.)
+            logger.warn("Aggregator network error", {
+                url: url.origin,
+                error: formatError(error),
+            });
+            return {
+                status: "retry-next",
+                error: new Error("Aggregator network error", { cause: error }),
+            };
         }
-        // All retry attempts failed; throw the last encountered error.
-        throw lastError instanceof Error
-            ? lastError
-            : new Error("Unknown error occurred in fetchWithRetry");
     }
 }
