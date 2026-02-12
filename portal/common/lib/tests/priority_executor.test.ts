@@ -27,11 +27,8 @@ describe("parsePriorityUrlList", () => {
         expect(() => parsePriorityUrlList("   ")).toThrow("Priority URL list cannot be empty");
     });
 
-    it("throws on missing fields", () => {
+    it("throws on wrong pipe-delimited field count", () => {
         expect(() => parsePriorityUrlList("https://example.com|100")).toThrow(
-            /Expected format: URL\|RETRIES\|PRIORITY/,
-        );
-        expect(() => parsePriorityUrlList("https://example.com")).toThrow(
             /Expected format: URL\|RETRIES\|PRIORITY/,
         );
     });
@@ -63,6 +60,48 @@ describe("parsePriorityUrlList", () => {
     it("allows zero retries", () => {
         const result = parsePriorityUrlList("https://example.com|0|100");
         expect(result[0].retries).toBe(0);
+    });
+
+    describe("legacy format", () => {
+        it("parses a single legacy URL with defaults", () => {
+            const result = parsePriorityUrlList("https://example.com");
+            expect(result).toEqual([{ url: "https://example.com", retries: 2, priority: 100 }]);
+        });
+
+        it("parses multiple legacy URLs with ascending priority", () => {
+            const result = parsePriorityUrlList(
+                "https://a.com,https://b.com,https://c.com",
+            );
+            expect(result).toEqual([
+                { url: "https://a.com", retries: 2, priority: 100 },
+                { url: "https://b.com", retries: 2, priority: 200 },
+                { url: "https://c.com", retries: 2, priority: 300 },
+            ]);
+        });
+
+        it("respects custom defaultRetries parameter", () => {
+            const result = parsePriorityUrlList("https://a.com,https://b.com", 5);
+            expect(result[0].retries).toBe(5);
+            expect(result[1].retries).toBe(5);
+        });
+
+        it("emits console.warn deprecation warning", () => {
+            const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+            parsePriorityUrlList("https://example.com");
+            expect(warnSpy).toHaveBeenCalledOnce();
+            expect(warnSpy.mock.calls[0][0]).toContain("DEPRECATED");
+            warnSpy.mockRestore();
+        });
+
+        it("throws on mixed format", () => {
+            expect(() =>
+                parsePriorityUrlList("https://a.com,https://b.com|2|100"),
+            ).toThrow(/Mixed URL formats/);
+        });
+
+        it("throws on invalid URL in legacy format", () => {
+            expect(() => parsePriorityUrlList("not-a-url")).toThrow(/Invalid URL/);
+        });
     });
 });
 
@@ -167,7 +206,7 @@ describe("PriorityExecutor", () => {
             ]);
         });
 
-        it("delays 1 second between retry-same attempts", async () => {
+        it("delays 500ms between retry-same attempts", async () => {
             const items: PriorityUrl[] = [{ url: "https://a.com", retries: 2, priority: 100 }];
             const executor = createExecutor(items);
             const attemptTimes: number[] = [];
@@ -186,10 +225,10 @@ describe("PriorityExecutor", () => {
 
             expect(attemptTimes).toHaveLength(3);
             // First attempt at time 0
-            // Second attempt after 1000ms delay
-            // Third attempt after another 1000ms delay
-            expect(attemptTimes[1] - attemptTimes[0]).toBe(1000);
-            expect(attemptTimes[2] - attemptTimes[1]).toBe(1000);
+            // Second attempt after 500ms delay
+            // Third attempt after another 500ms delay
+            expect(attemptTimes[1] - attemptTimes[0]).toBe(500);
+            expect(attemptTimes[2] - attemptTimes[1]).toBe(500);
         });
     });
 

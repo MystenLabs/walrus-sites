@@ -1,7 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-const DEFAULT_DELAY_BETWEEN_RETRIES_MS = 1000;
+const DEFAULT_DELAY_BETWEEN_RETRIES_MS = 500;
+const DEFAULT_LEGACY_RETRIES = 2;
+const LEGACY_PRIORITY_INCREMENT = 100;
 
 // --- Types ---
 
@@ -21,19 +23,60 @@ export type ExecuteResult<T> =
 
 /**
  * Parses a comma-separated list of priority URL entries.
- * Format: URL|RETRIES|PRIORITY (e.g., "https://rpc.example.com|3|100")
+ *
+ * New format: URL|RETRIES|PRIORITY (e.g., "https://rpc.example.com|3|100")
+ * Legacy format: plain URLs (e.g., "https://a.com,https://b.com")
+ *   - auto-converted with `defaultRetries` and ascending priority (100, 200, ...)
  *
  * @param input - The comma-separated string of URL entries
+ * @param defaultRetries - Retries assigned to each URL in legacy format (default: 2)
  * @returns Array of PriorityUrl objects
- * @throws Error if any entry is invalid
+ * @throws Error if any entry is invalid or formats are mixed
  */
-export function parsePriorityUrlList(input: string): PriorityUrl[] {
+export function parsePriorityUrlList(
+    input: string,
+    defaultRetries: number = DEFAULT_LEGACY_RETRIES,
+): PriorityUrl[] {
     const trimmed = input.trim();
     if (!trimmed) {
         throw new Error("Priority URL list cannot be empty");
     }
 
     const entries = trimmed.split(",").map((entry) => entry.trim());
+
+    const hasPipe = entries.map((e) => e.includes("|"));
+    const allPipe = hasPipe.every(Boolean);
+    const nonePipe = hasPipe.every((v) => !v);
+
+    if (!allPipe && !nonePipe) {
+        throw new Error(
+            "Mixed URL formats detected: some entries use pipe-delimited format (URL|RETRIES|PRIORITY) " +
+                "and some do not. All entries must use the same format.",
+        );
+    }
+
+    if (nonePipe) {
+        // Legacy format: plain URLs
+        console.warn(
+            "[DEPRECATED] Plain URL list format detected. " +
+                "Please migrate to the new format: URL|RETRIES|PRIORITY " +
+                "(e.g., \"https://rpc.example.com|3|100\").",
+        );
+        return entries.map((url, index) => {
+            try {
+                new URL(url);
+            } catch {
+                throw new Error(`Invalid URL in priority URL entry: "${url}"`);
+            }
+            return {
+                url,
+                retries: defaultRetries,
+                priority: (index + 1) * LEGACY_PRIORITY_INCREMENT,
+            };
+        });
+    }
+
+    // New pipe-delimited format
     const result: PriorityUrl[] = [];
 
     for (const entry of entries) {

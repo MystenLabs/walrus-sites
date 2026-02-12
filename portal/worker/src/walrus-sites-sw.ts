@@ -29,13 +29,13 @@ if (!suinsClientNetwork) {
 if (!["testnet", "mainnet"].includes(suinsClientNetwork)) {
     throw new Error("Invalid SUINS_CLIENT_NETWORK environment variable");
 }
-const aggregatorUrlList = process.env.AGGREGATOR_URL_LIST;
+const aggregatorUrlList = process.env.AGGREGATOR_URL_LIST || process.env.AGGREGATOR_URL;
 if (!aggregatorUrlList) {
     throw new Error("Missing AGGREGATOR_URL_LIST environment variable");
 }
 
 const rpcPriorityUrls = parsePriorityUrlList(rpcUrlList);
-const aggregatorPriorityUrls = parsePriorityUrlList(aggregatorUrlList);
+const aggregatorPriorityUrls = parsePriorityUrlList(aggregatorUrlList, 3);
 
 const rpcSelector = new RPCSelector(rpcPriorityUrls, suinsClientNetwork as Network);
 const aggregatorExecutor = new PriorityExecutor(aggregatorPriorityUrls);

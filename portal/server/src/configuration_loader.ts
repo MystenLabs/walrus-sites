@@ -20,6 +20,19 @@ const priorityUrlListSchema = z.string().transform((val, ctx) => {
     }
 });
 
+// Aggregator-specific schema: legacy format gets 3 retries by default
+const aggregatorUrlListSchema = z.string().transform((val, ctx) => {
+    try {
+        return parsePriorityUrlList(val, 3);
+    } catch (e) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: e instanceof Error ? e.message : "Invalid priority URL list",
+        });
+        return z.NEVER;
+    }
+});
+
 const configurationSchema = z.preprocess(
     (env: any) => ({
         edgeConfig: env.EDGE_CONFIG,
@@ -33,7 +46,7 @@ const configurationSchema = z.preprocess(
         suinsClientNetwork: env.SUINS_CLIENT_NETWORK, // TODO(alex): rename this to NETWORK
         blocklistRedisUrl: env.BLOCKLIST_REDIS_URL,
         allowlistRedisUrl: env.ALLOWLIST_REDIS_URL,
-        aggregatorUrlList: env.AGGREGATOR_URL_LIST,
+        aggregatorUrlList: env.AGGREGATOR_URL_LIST || env.AGGREGATOR_URL,
         sitePackage: env.SITE_PACKAGE,
         b36DomainResolutionSupport: env.B36_DOMAIN_RESOLUTION_SUPPORT,
         bringYourOwnDomain: env.BRING_YOUR_OWN_DOMAIN,
@@ -79,7 +92,7 @@ const configurationSchema = z.preprocess(
                             "ALLOWLIST_REDIS_URL must end with '1' to use the allowlist database.",
                     },
                 ),
-            aggregatorUrlList: priorityUrlListSchema,
+            aggregatorUrlList: aggregatorUrlListSchema,
             sitePackage: z
                 .string()
                 .refine((val) => val.length === 66 && /^0x[0-9a-fA-F]+$/.test(val)),
