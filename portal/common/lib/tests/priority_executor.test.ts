@@ -29,7 +29,7 @@ describe("parsePriorityUrlList", () => {
 
     it("throws on wrong pipe-delimited field count", () => {
         expect(() => parsePriorityUrlList("https://example.com|100")).toThrow(
-            /Expected format: URL\|RETRIES\|PRIORITY/,
+            /Expected format: URL\|RETRIES\|METRIC/,
         );
     });
 
@@ -46,9 +46,9 @@ describe("parsePriorityUrlList", () => {
         );
     });
 
-    it("throws on invalid priority", () => {
+    it("throws on invalid metric", () => {
         expect(() => parsePriorityUrlList("https://example.com|1|abc")).toThrow(
-            /Invalid priority value/,
+            /Invalid metric value/,
         );
     });
 

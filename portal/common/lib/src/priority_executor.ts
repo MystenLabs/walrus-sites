@@ -24,7 +24,7 @@ export type ExecuteResult<T> =
 /**
  * Parses a comma-separated list of priority URL entries.
  *
- * New format: URL|RETRIES|PRIORITY (e.g., "https://rpc.example.com|3|100")
+ * New format: URL|RETRIES|METRIC (e.g., "https://rpc.example.com|3|100")
  * Legacy format: plain URLs (e.g., "https://a.com,https://b.com")
  *   - auto-converted with `defaultRetries` and ascending priority (100, 200, ...)
  *
@@ -50,7 +50,7 @@ export function parsePriorityUrlList(
 
     if (!allPipe && !nonePipe) {
         throw new Error(
-            "Mixed URL formats detected: some entries use pipe-delimited format (URL|RETRIES|PRIORITY) " +
+            "Mixed URL formats detected: some entries use pipe-delimited format (URL|RETRIES|METRIC) " +
                 "and some do not. All entries must use the same format.",
         );
     }
@@ -59,7 +59,7 @@ export function parsePriorityUrlList(
         // Legacy format: plain URLs
         console.warn(
             "[DEPRECATED] Plain URL list format detected. " +
-                "Please migrate to the new format: URL|RETRIES|PRIORITY " +
+                "Please migrate to the new format: URL|RETRIES|METRIC " +
                 '(e.g., "https://rpc.example.com|3|100").',
         );
         return entries.map((url, index) => {
@@ -83,7 +83,7 @@ export function parsePriorityUrlList(
         const parts = entry.split("|");
         if (parts.length !== 3) {
             throw new Error(
-                `Invalid priority URL entry: "${entry}". Expected format: URL|RETRIES|PRIORITY`,
+                `Invalid priority URL entry: "${entry}". Expected format: URL|RETRIES|METRIC`,
             );
         }
 
@@ -104,11 +104,11 @@ export function parsePriorityUrlList(
             );
         }
 
-        // Validate priority
+        // Validate metric
         const priority = parseInt(priorityStr, 10);
         if (isNaN(priority)) {
             throw new Error(
-                `Invalid priority value in priority URL entry: "${priorityStr}". Must be an integer.`,
+                `Invalid metric value in priority URL entry: "${priorityStr}". Must be an integer.`,
             );
         }
 
