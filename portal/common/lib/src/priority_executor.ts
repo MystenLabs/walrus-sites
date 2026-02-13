@@ -3,14 +3,14 @@
 
 const DEFAULT_DELAY_BETWEEN_RETRIES_MS = 500;
 const DEFAULT_LEGACY_RETRIES = 2;
-const LEGACY_PRIORITY_INCREMENT = 100;
+const LEGACY_METRIC_INCREMENT = 100;
 
 // --- Types ---
 
 export interface PriorityUrl {
     url: string;
     retries: number;
-    priority: number;
+    metric: number;
 }
 
 export type ExecuteResult<T> =
@@ -24,7 +24,7 @@ export type ExecuteResult<T> =
 /**
  * Parses a comma-separated list of priority URL entries.
  *
- * New format: URL|RETRIES|PRIORITY (e.g., "https://rpc.example.com|3|100")
+ * New format: URL|RETRIES|METRIC (e.g., "https://rpc.example.com|3|100")
  * Legacy format: plain URLs (e.g., "https://a.com,https://b.com")
  *   - auto-converted with `defaultRetries` and ascending priority (100, 200, ...)
  *
@@ -50,7 +50,7 @@ export function parsePriorityUrlList(
 
     if (!allPipe && !nonePipe) {
         throw new Error(
-            "Mixed URL formats detected: some entries use pipe-delimited format (URL|RETRIES|PRIORITY) " +
+            "Mixed URL formats detected: some entries use pipe-delimited format (URL|RETRIES|METRIC) " +
                 "and some do not. All entries must use the same format.",
         );
     }
@@ -59,7 +59,7 @@ export function parsePriorityUrlList(
         // Legacy format: plain URLs
         console.warn(
             "[DEPRECATED] Plain URL list format detected. " +
-                "Please migrate to the new format: URL|RETRIES|PRIORITY " +
+                "Please migrate to the new format: URL|RETRIES|METRIC " +
                 '(e.g., "https://rpc.example.com|3|100").',
         );
         return entries.map((url, index) => {
@@ -71,7 +71,7 @@ export function parsePriorityUrlList(
             return {
                 url,
                 retries: defaultRetries,
-                priority: (index + 1) * LEGACY_PRIORITY_INCREMENT,
+                metric: (index + 1) * LEGACY_METRIC_INCREMENT,
             };
         });
     }
@@ -83,11 +83,11 @@ export function parsePriorityUrlList(
         const parts = entry.split("|");
         if (parts.length !== 3) {
             throw new Error(
-                `Invalid priority URL entry: "${entry}". Expected format: URL|RETRIES|PRIORITY`,
+                `Invalid priority URL entry: "${entry}". Expected format: URL|RETRIES|METRIC`,
             );
         }
 
-        const [url, retriesStr, priorityStr] = parts;
+        const [url, retriesStr, metricStr] = parts;
 
         // Validate URL
         try {
@@ -104,15 +104,15 @@ export function parsePriorityUrlList(
             );
         }
 
-        // Validate priority
-        const priority = parseInt(priorityStr, 10);
-        if (isNaN(priority)) {
+        // Validate metric
+        const metric = parseInt(metricStr, 10);
+        if (isNaN(metric)) {
             throw new Error(
-                `Invalid priority value in priority URL entry: "${priorityStr}". Must be an integer.`,
+                `Invalid metric value in priority URL entry: "${metricStr}". Must be an integer.`,
             );
         }
 
-        result.push({ url, retries, priority });
+        result.push({ url, retries, metric });
     }
 
     return result;
@@ -137,7 +137,7 @@ export class PriorityExecutor {
         delayBetweenRetriesMs: number = DEFAULT_DELAY_BETWEEN_RETRIES_MS,
     ) {
         // Sort by priority (ascending) and freeze to prevent mutation
-        this.sortedItems = Object.freeze([...items].sort((a, b) => a.priority - b.priority));
+        this.sortedItems = Object.freeze([...items].sort((a, b) => a.metric - b.metric));
         this.delayBetweenRetriesMs = delayBetweenRetriesMs;
     }
 
