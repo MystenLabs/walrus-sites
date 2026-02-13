@@ -86,7 +86,7 @@ describe("aggregator error handling with priority executor", () => {
     });
 
     function createUrlFetcher(retries: number = 2) {
-        const priorityUrls: PriorityUrl[] = [{ url: aggregatorUrl, retries, priority: 100 }];
+        const priorityUrls: PriorityUrl[] = [{ url: aggregatorUrl, retries, metric: 100 }];
         const aggregatorExecutor = new PriorityExecutor(priorityUrls);
         return new UrlFetcher(
             mockResourceFetcher,
@@ -235,8 +235,8 @@ describe("aggregator error handling with priority executor", () => {
             });
 
             const priorityUrls: PriorityUrl[] = [
-                { url: aggregatorUrl, retries: 2, priority: 100 },
-                { url: aggregatorUrl2, retries: 2, priority: 200 },
+                { url: aggregatorUrl, retries: 2, metric: 100 },
+                { url: aggregatorUrl2, retries: 2, metric: 200 },
             ];
             const aggregatorExecutor = new PriorityExecutor(priorityUrls);
             const urlFetcher = new UrlFetcher(

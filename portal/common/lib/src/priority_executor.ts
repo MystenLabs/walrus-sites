@@ -3,14 +3,14 @@
 
 const DEFAULT_DELAY_BETWEEN_RETRIES_MS = 500;
 const DEFAULT_LEGACY_RETRIES = 2;
-const LEGACY_PRIORITY_INCREMENT = 100;
+const LEGACY_METRIC_INCREMENT = 100;
 
 // --- Types ---
 
 export interface PriorityUrl {
     url: string;
     retries: number;
-    priority: number;
+    metric: number;
 }
 
 export type ExecuteResult<T> =
@@ -71,7 +71,7 @@ export function parsePriorityUrlList(
             return {
                 url,
                 retries: defaultRetries,
-                priority: (index + 1) * LEGACY_PRIORITY_INCREMENT,
+                metric: (index + 1) * LEGACY_METRIC_INCREMENT,
             };
         });
     }
@@ -87,7 +87,7 @@ export function parsePriorityUrlList(
             );
         }
 
-        const [url, retriesStr, priorityStr] = parts;
+        const [url, retriesStr, metricStr] = parts;
 
         // Validate URL
         try {
@@ -105,14 +105,14 @@ export function parsePriorityUrlList(
         }
 
         // Validate metric
-        const priority = parseInt(priorityStr, 10);
-        if (isNaN(priority)) {
+        const metric = parseInt(metricStr, 10);
+        if (isNaN(metric)) {
             throw new Error(
-                `Invalid metric value in priority URL entry: "${priorityStr}". Must be an integer.`,
+                `Invalid metric value in priority URL entry: "${metricStr}". Must be an integer.`,
             );
         }
 
-        result.push({ url, retries, priority });
+        result.push({ url, retries, metric });
     }
 
     return result;
@@ -137,7 +137,7 @@ export class PriorityExecutor {
         delayBetweenRetriesMs: number = DEFAULT_DELAY_BETWEEN_RETRIES_MS,
     ) {
         // Sort by priority (ascending) and freeze to prevent mutation
-        this.sortedItems = Object.freeze([...items].sort((a, b) => a.priority - b.priority));
+        this.sortedItems = Object.freeze([...items].sort((a, b) => a.metric - b.metric));
         this.delayBetweenRetriesMs = delayBetweenRetriesMs;
     }
 
