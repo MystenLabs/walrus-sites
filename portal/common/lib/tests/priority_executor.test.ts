@@ -12,7 +12,7 @@ import {
 describe("parsePriorityUrlList", () => {
     it("parses a single entry correctly", () => {
         const result = parsePriorityUrlList("https://example.com|3|100");
-        expect(result).toEqual([{ url: "https://example.com", retries: 3, priority: 100 }]);
+        expect(result).toEqual([{ url: "https://example.com", retries: 3, metric: 100 }]);
     });
 
     it("handles whitespace in entries", () => {
@@ -29,7 +29,7 @@ describe("parsePriorityUrlList", () => {
 
     it("throws on wrong pipe-delimited field count", () => {
         expect(() => parsePriorityUrlList("https://example.com|100")).toThrow(
-            /Expected format: URL\|RETRIES\|PRIORITY/,
+            /Expected format: URL\|RETRIES\|METRIC/,
         );
     });
 
@@ -46,15 +46,15 @@ describe("parsePriorityUrlList", () => {
         );
     });
 
-    it("throws on invalid priority", () => {
+    it("throws on invalid metric", () => {
         expect(() => parsePriorityUrlList("https://example.com|1|abc")).toThrow(
-            /Invalid priority value/,
+            /Invalid metric value/,
         );
     });
 
     it("allows negative priority values", () => {
         const result = parsePriorityUrlList("https://example.com|1|-10");
-        expect(result[0].priority).toBe(-10);
+        expect(result[0].metric).toBe(-10);
     });
 
     it("allows zero retries", () => {
@@ -65,15 +65,15 @@ describe("parsePriorityUrlList", () => {
     describe("legacy format", () => {
         it("parses a single legacy URL with defaults", () => {
             const result = parsePriorityUrlList("https://example.com");
-            expect(result).toEqual([{ url: "https://example.com", retries: 2, priority: 100 }]);
+            expect(result).toEqual([{ url: "https://example.com", retries: 2, metric: 100 }]);
         });
 
         it("parses multiple legacy URLs with ascending priority", () => {
             const result = parsePriorityUrlList("https://a.com,https://b.com,https://c.com");
             expect(result).toEqual([
-                { url: "https://a.com", retries: 2, priority: 100 },
-                { url: "https://b.com", retries: 2, priority: 200 },
-                { url: "https://c.com", retries: 2, priority: 300 },
+                { url: "https://a.com", retries: 2, metric: 100 },
+                { url: "https://b.com", retries: 2, metric: 200 },
+                { url: "https://c.com", retries: 2, metric: 300 },
             ]);
         });
 
@@ -110,7 +110,7 @@ describe("PriorityExecutor", () => {
 
     describe("basic execution", () => {
         it("returns success value on first try", async () => {
-            const items: PriorityUrl[] = [{ url: "https://a.com", retries: 2, priority: 100 }];
+            const items: PriorityUrl[] = [{ url: "https://a.com", retries: 2, metric: 100 }];
             const executor = createExecutor(items);
 
             const result = await executor.invoke(async (url) => ({
@@ -133,9 +133,9 @@ describe("PriorityExecutor", () => {
     describe("getHighestPriorityUrl", () => {
         it("returns highest priority URL (lowest priority number)", () => {
             const items: PriorityUrl[] = [
-                { url: "https://low.com", retries: 1, priority: 500 },
-                { url: "https://high.com", retries: 3, priority: 100 },
-                { url: "https://mid.com", retries: 2, priority: 200 },
+                { url: "https://low.com", retries: 1, metric: 500 },
+                { url: "https://high.com", retries: 3, metric: 100 },
+                { url: "https://mid.com", retries: 2, metric: 200 },
             ];
             const executor = createExecutor(items);
 
@@ -158,7 +158,7 @@ describe("PriorityExecutor", () => {
         });
 
         it("retries same URL up to retries count", async () => {
-            const items: PriorityUrl[] = [{ url: "https://a.com", retries: 2, priority: 100 }];
+            const items: PriorityUrl[] = [{ url: "https://a.com", retries: 2, metric: 100 }];
             const executor = createExecutor(items);
             let attempts = 0;
 
@@ -179,8 +179,8 @@ describe("PriorityExecutor", () => {
 
         it("moves to next URL when retries exhausted", async () => {
             const items: PriorityUrl[] = [
-                { url: "https://a.com", retries: 1, priority: 100 },
-                { url: "https://b.com", retries: 0, priority: 200 },
+                { url: "https://a.com", retries: 1, metric: 100 },
+                { url: "https://b.com", retries: 0, metric: 200 },
             ];
             const executor = createExecutor(items);
             const urlsAttempted: string[] = [];
@@ -205,7 +205,7 @@ describe("PriorityExecutor", () => {
         });
 
         it("delays 500ms between retry-same attempts", async () => {
-            const items: PriorityUrl[] = [{ url: "https://a.com", retries: 2, priority: 100 }];
+            const items: PriorityUrl[] = [{ url: "https://a.com", retries: 2, metric: 100 }];
             const executor = createExecutor(items);
             const attemptTimes: number[] = [];
 
@@ -233,8 +233,8 @@ describe("PriorityExecutor", () => {
     describe("retry-next behavior", () => {
         it("immediately skips to next URL", async () => {
             const items: PriorityUrl[] = [
-                { url: "https://a.com", retries: 5, priority: 100 },
-                { url: "https://b.com", retries: 0, priority: 200 },
+                { url: "https://a.com", retries: 5, metric: 100 },
+                { url: "https://b.com", retries: 0, metric: 200 },
             ];
             const executor = createExecutor(items);
             const urlsAttempted: string[] = [];
@@ -256,8 +256,8 @@ describe("PriorityExecutor", () => {
     describe("stop behavior", () => {
         it("throws error immediately without trying other URLs", async () => {
             const items: PriorityUrl[] = [
-                { url: "https://a.com", retries: 2, priority: 100 },
-                { url: "https://b.com", retries: 2, priority: 200 },
+                { url: "https://a.com", retries: 2, metric: 100 },
+                { url: "https://b.com", retries: 2, metric: 200 },
             ];
             const executor = createExecutor(items);
             const urlsAttempted: string[] = [];
@@ -284,8 +284,8 @@ describe("PriorityExecutor", () => {
 
         it("throws AggregateError when all URLs exhausted", async () => {
             const items: PriorityUrl[] = [
-                { url: "https://a.com", retries: 1, priority: 100 },
-                { url: "https://b.com", retries: 1, priority: 200 },
+                { url: "https://a.com", retries: 1, metric: 100 },
+                { url: "https://b.com", retries: 1, metric: 200 },
             ];
             const executor = createExecutor(items);
 
@@ -314,8 +314,8 @@ describe("PriorityExecutor", () => {
 
         it("AggregateError contains all retry errors", async () => {
             const items: PriorityUrl[] = [
-                { url: "https://a.com", retries: 1, priority: 100 },
-                { url: "https://b.com", retries: 0, priority: 200 },
+                { url: "https://a.com", retries: 1, metric: 100 },
+                { url: "https://b.com", retries: 0, metric: 200 },
             ];
             const executor = createExecutor(items);
 
@@ -349,8 +349,8 @@ describe("PriorityExecutor", () => {
     describe("priority order", () => {
         it("tries URLs in priority order", async () => {
             const items: PriorityUrl[] = [
-                { url: "https://high.com", retries: 0, priority: 100 },
-                { url: "https://low.com", retries: 0, priority: 500 },
+                { url: "https://high.com", retries: 0, metric: 100 },
+                { url: "https://low.com", retries: 0, metric: 500 },
             ];
             const executor = createExecutor(items);
             const urlsAttempted: string[] = [];
@@ -379,9 +379,9 @@ describe("PriorityExecutor", () => {
 
         it("handles mixed retry behaviors correctly", async () => {
             const items: PriorityUrl[] = [
-                { url: "https://a.com", retries: 2, priority: 100 }, // Will retry-same twice
-                { url: "https://b.com", retries: 3, priority: 200 }, // Will retry-next
-                { url: "https://c.com", retries: 1, priority: 300 }, // Will succeed
+                { url: "https://a.com", retries: 2, metric: 100 }, // Will retry-same twice
+                { url: "https://b.com", retries: 3, metric: 200 }, // Will retry-next
+                { url: "https://c.com", retries: 1, metric: 300 }, // Will succeed
             ];
             const executor = createExecutor(items);
             const attempts: { url: string; attempt: number }[] = [];

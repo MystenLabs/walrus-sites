@@ -152,7 +152,7 @@ describe("routing tests", () => {
             new ResourceFetcher(rpcSelector, sitePackage),
             new SuiNSResolver(rpcSelector),
             wsRouter,
-            new PriorityExecutor([{ url: "http://unused", retries: 0, priority: 100 }]),
+            new PriorityExecutor([{ url: "http://unused", retries: 0, metric: 100 }]),
             true,
         );
 

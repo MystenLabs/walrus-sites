@@ -27,14 +27,14 @@ ENV PORTAL_DOMAIN_NAME_LENGTH=${PORTAL_DOMAIN_NAME_LENGTH}
 ARG PREMIUM_RPC_URL_LIST="https://fullnode.mainnet.sui.io|2|100"
 ENV PREMIUM_RPC_URL_LIST=${PREMIUM_RPC_URL_LIST}
 
-# Format: URL|RETRIES|PRIORITY (lower priority number = higher precedence)
+# Format: URL|RETRIES|METRIC (lower metric number = higher priority)
 ARG RPC_URL_LIST="https://fullnode.mainnet.sui.io|2|100,https://mainnet.suiet.app|1|200"
 ENV RPC_URL_LIST=${RPC_URL_LIST}
 
 ARG SUINS_CLIENT_NETWORK="mainnet"
 ENV SUINS_CLIENT_NETWORK=${SUINS_CLIENT_NETWORK}
 
-# Format: URL|RETRIES|PRIORITY (lower priority number = higher precedence)
+# Format: URL|RETRIES|METRIC (lower metric number = higher priority)
 ARG AGGREGATOR_URL_LIST="https://aggregator.walrus-mainnet.walrus.space|2|100"
 ENV AGGREGATOR_URL_LIST=${AGGREGATOR_URL_LIST}
 

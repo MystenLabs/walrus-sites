@@ -48,13 +48,13 @@ describe("UrlFetcher records aggregator timing with mock servers", () => {
     });
 
     it("should record aggregator time when fetching a resource", async () => {
-        const rpcPriorityUrls: PriorityUrl[] = [{ url: suiRpcUrl, retries: 2, priority: 100 }];
+        const rpcPriorityUrls: PriorityUrl[] = [{ url: suiRpcUrl, retries: 2, metric: 100 }];
         const rpcSelector = new RPCSelector(rpcPriorityUrls, "testnet");
         const wsRouter = new WalrusSitesRouter(rpcSelector);
         const sitePackage = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
 
         const aggregatorPriorityUrls: PriorityUrl[] = [
-            { url: aggregatorUrl, retries: 2, priority: 100 },
+            { url: aggregatorUrl, retries: 2, metric: 100 },
         ];
         const aggregatorExecutor = new PriorityExecutor(aggregatorPriorityUrls);
 

@@ -7,7 +7,7 @@ import { parsePriorityUrlList } from "@lib/priority_executor";
 // Define a transformer for string booleans
 const stringBoolean = z.enum(["true", "false"]).transform((val) => val === "true");
 
-// Custom Zod transformer for priority URL lists (format: URL|RETRIES|PRIORITY)
+// Custom Zod transformer for priority URL lists (format: URL|RETRIES|METRIC)
 const priorityUrlListSchema = z.string().transform((val, ctx) => {
     try {
         return parsePriorityUrlList(val);
