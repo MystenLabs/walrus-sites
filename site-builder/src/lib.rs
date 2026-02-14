@@ -21,7 +21,6 @@ use sitemap::display_sitemap;
 use util::{id_to_base36, path_or_defaults_if_exist};
 
 pub mod args;
-mod backoff;
 pub mod config;
 mod display;
 mod preprocessor;

@@ -14,7 +14,7 @@ use sui_types::base_types::{ObjectID, SuiAddress};
 pub use walrus_sdk::sui::client::contract_config::ContractConfig as WalrusContractConfig;
 
 use crate::{
-    retry_client::RetriableSuiClient,
+    retry_client::{get_staking_object, RetriableSuiClient},
     suins::SuiNsClient,
     util::load_wallet_context,
     walrus::output::EpochCount,
@@ -156,13 +156,14 @@ impl GeneralArgs {
             Some(pkg) => Ok(pkg),
             None => {
                 let walrus_config = self.walrus_config()?;
-                let staking = sui_client
-                    .get_staking_object(walrus_config.staking_object)
+                let staking = get_staking_object(sui_client, walrus_config.staking_object)
                     .await
-                    .context(format!(
-                        "Could not fetch staking object: {}",
-                        walrus_config.staking_object
-                    ))?;
+                    .with_context(|| {
+                        format!(
+                            "Could not fetch staking object: {}",
+                            walrus_config.staking_object
+                        )
+                    })?;
                 Ok(staking.package_id)
             }
         }

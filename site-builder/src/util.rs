@@ -29,6 +29,7 @@ use sui_types::{
     transaction::{ProgrammableTransaction, TransactionData},
 };
 use walrus_sdk::core::{BlobId as BlobIdOriginal, QuiltPatchId};
+use walrus_sui::client::SuiClientResult;
 
 use crate::{
     display,
@@ -63,7 +64,9 @@ pub(crate) async fn sign_and_send_ptb(
         gas_price,
     );
     let transaction = wallet.sign_transaction(&transaction).await;
-    let resp = retry_client.execute_transaction(transaction).await?;
+    let resp = retry_client
+        .execute_transaction(transaction, "sign_and_send_ptb")
+        .await?;
     let digest = resp.digest;
     let effects = resp
         .effects
@@ -90,11 +93,11 @@ fn update_cache_from_effects(object_cache: &mut ObjectCache, effects: &SuiTransa
 
 pub(crate) async fn handle_pagination<F, T, C, Fut>(
     closure: F,
-) -> Result<impl Iterator<Item = T>, sui_sdk::error::Error>
+) -> SuiClientResult<impl Iterator<Item = T>>
 where
     F: FnMut(Option<C>) -> Fut,
     T: 'static,
-    Fut: Future<Output = Result<Page<T, C>, sui_sdk::error::Error>>,
+    Fut: Future<Output = SuiClientResult<Page<T, C>>>,
 {
     handle_pagination_with_cursor(closure, None).await
 }
@@ -102,11 +105,11 @@ where
 pub(crate) async fn handle_pagination_with_cursor<F, T, C, Fut>(
     mut closure: F,
     mut cursor: Option<C>,
-) -> Result<impl Iterator<Item = T>, sui_sdk::error::Error>
+) -> SuiClientResult<impl Iterator<Item = T>>
 where
     F: FnMut(Option<C>) -> Fut,
     T: 'static,
-    Fut: Future<Output = Result<Page<T, C>, sui_sdk::error::Error>>,
+    Fut: Future<Output = SuiClientResult<Page<T, C>>>,
 {
     let mut cont = true;
     let mut iterators = vec![];
@@ -545,7 +548,9 @@ pub fn get_epochs_ahead(
     // Check that the number of epochs is lower than the number of epochs the blob can be stored
     // for.
     if epochs_ahead > max_epochs_ahead {
-        bail!("blobs can only be stored for up to {max_epochs_ahead} epochs ahead; {epochs_ahead} epochs were requested");
+        bail!(
+            "blobs can only be stored for up to {max_epochs_ahead} epochs ahead; {epochs_ahead} epochs were requested"
+        );
     }
 
     Ok(epochs_ahead)
@@ -561,8 +566,7 @@ pub async fn get_owned_blobs(
         .await?;
     let all_blobs: Vec<_> = sui_client
         .get_owned_objects_of_type::<SuiBlob>(owner_address, &type_map, &[])
-        .await?
-        .collect();
+        .await?;
 
     let mut result: HashMap<BlobId, (SuiBlob, ObjectRef)> = HashMap::new();
 

@@ -433,7 +433,7 @@ async fn deploy_quilts_with_list_directory_updates_ignored_files() -> anyhow::Re
     );
 
     // Step 9: Verify both quilts still exist (Quilt A is NOT deleted because file_4 references it)
-    let wallet_address = cluster.wallet_active_address()?;
+    let wallet_address = cluster.wallet_active_address();
     let owned_blobs = cluster.get_owned_blobs(wallet_address).await?;
     let owned_blob_ids: Vec<BlobId> = owned_blobs.iter().map(|b| b.blob_id).collect();
 

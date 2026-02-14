@@ -13,11 +13,11 @@ pub mod resource;
 use std::{collections::HashMap, time::Duration};
 
 use anyhow::{Context, Result};
-use contracts::TypeOriginMap;
 use futures::future::try_join_all;
 use resource::{ResourceSet, SiteOps};
 use sui_sdk::rpc_types::DynamicFieldInfo;
 use sui_types::{base_types::ObjectID, TypeTag};
+use walrus_sui::contracts::TypeOriginMap;
 
 use crate::{
     retry_client::RetriableSuiClient,
@@ -274,7 +274,7 @@ impl RemoteSiteFactory<'_> {
     }
 
     async fn get_site_fields(&self, site_id: ObjectID) -> anyhow::Result<SiteFields> {
-        self.sui_client.get_sui_object(site_id).await
+        Ok(self.sui_client.get_sui_object(site_id).await?)
     }
 
     /// Filters the dynamic fields to get the resource object IDs.

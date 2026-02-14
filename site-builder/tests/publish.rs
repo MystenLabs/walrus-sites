@@ -392,7 +392,7 @@ async fn publish_quilts_with_two_large_files() -> anyhow::Result<()> {
     println!("site: {}", site.id.object_id());
     assert_eq!(resources.len(), N_FILES);
 
-    let wallet_address = cluster.wallet_active_address()?;
+    let wallet_address = cluster.wallet_active_address();
     let blobs = cluster.get_owned_blobs(wallet_address).await?;
     assert_eq!(blobs.len(), N_FILES, "Should have {N_FILES} blobs");
 
