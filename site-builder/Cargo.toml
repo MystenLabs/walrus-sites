@@ -16,8 +16,8 @@ bin-version = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.65.
 bytesize = "2.1.0"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4.5.7", features = ["derive"] }
-crossterm = "0.29"
-dialoguer = "0.12"
+crossterm = "0.27"
+dialoguer = "0.11"
 fastcrypto = { git = "https://github.com/MystenLabs/fastcrypto" }
 flate2 = "1.0.30"
 futures = "0.3.30"
@@ -27,9 +27,9 @@ home = "0.5.9"
 humantime = "2.2.0"
 itertools = "0.14.0"
 move-core-types = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.65.2" }
-notify = "8.2.0"
+notify = "6.1.1"
 prettytable = "0.10.0"
-rand = "0.10.0"
+rand = "0.8.5"
 regex = "1.11.0"
 serde = { version = "1.0.203", features = ["derive"] }
 serde_json = "1.0.117"
@@ -46,7 +46,7 @@ tokio = { version = "=1.49.0", features = [
   "macros",
   "process",
 ] }
-toml = "1.0"
+toml = "0.8.14"
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
 walrus-sdk = { git = "https://github.com/MystenLabs/walrus", rev = "d00954179086797e253f1f3c1e8a9c71052eacdb" }
@@ -55,6 +55,7 @@ walrus-utils = { git = "https://github.com/MystenLabs/walrus", rev = "d009541790
 
 [dev-dependencies]
 gag = "1.0.0"
+move-package-alt = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.65.2" }
 sui-config = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.65.2" }
 sui-move-build = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.65.2" }
 tempfile = "3.20.0"

@@ -10,6 +10,7 @@ use std::{
 
 use anyhow::{anyhow, bail};
 use move_core_types::language_storage::StructTag;
+use move_package_alt::schema::Environment;
 use serde::Deserialize;
 use site_builder::{
     args::GeneralArgs,
@@ -538,7 +539,10 @@ async fn publish_walrus_sites(
         .join("move")
         .join("walrus_site");
     let path = path_buf.as_path();
-    let move_build_config = BuildConfig::new_for_testing();
+    let mut move_build_config = BuildConfig::new_for_testing();
+    // Use a non-matching environment name so the Move.lock [env.testnet] section
+    // doesn't resolve walrus_site to a previously-published address.
+    move_build_config.environment = Environment::new("testing".to_string(), "testing".to_string());
     let compiled_modules = move_build_config.build(path)?;
     let modules_bytes = compiled_modules.get_package_bytes(false);
 
