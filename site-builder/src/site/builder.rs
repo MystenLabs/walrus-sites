@@ -5,10 +5,9 @@ use std::collections::btree_map;
 
 use anyhow::Result;
 use serde::Serialize;
-use sui_sdk::rpc_types::{Coin, SuiObjectData};
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
-    object::Owner,
+    object::{Object, Owner},
     programmable_transaction_builder::ProgrammableTransactionBuilder,
     transaction::{
         Argument,
@@ -22,6 +21,7 @@ use sui_types::{
     TypeTag,
 };
 use thiserror::Error;
+use walrus_sui::coin::Coin;
 
 use super::{
     contracts::FunctionTag,
@@ -40,6 +40,16 @@ mod site_builder_tests;
 // triggered from `remove_resource_if_exists`
 // TODO?: Track multiple limits and behave accordingly.
 pub const PTB_MAX_MOVE_CALLS: u16 = 1000;
+
+trait HasIdentifier {
+    fn identifier(&self) -> Identifier;
+}
+
+impl HasIdentifier for FunctionTag<'_> {
+    fn identifier(&self) -> Identifier {
+        Identifier::new(self.name).expect("function name is a valid identifier")
+    }
+}
 
 /// Error type to differentiate max-move-calls limit reached from other unexpected `anyhow` errors.
 #[derive(Debug, Error)]
@@ -184,7 +194,7 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
     pub fn fill_walrus_system_and_coin(
         &mut self,
         coins: Vec<Coin>,
-        system_obj: SuiObjectData,
+        system_obj: Object,
     ) -> SitePtbBuilderResult<()> {
         if self.system_obj_arg.is_some() {
             return Err(anyhow::anyhow!("Tried to set walrus System argument twice.").into());
@@ -327,17 +337,15 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
         })
     }
 
-    fn extract_system_arg(&mut self, system_obj: SuiObjectData) -> anyhow::Result<Argument> {
+    fn extract_system_arg(&mut self, system_obj: Object) -> anyhow::Result<Argument> {
         let Owner::Shared {
             initial_shared_version,
-        } = system_obj
-            .owner
-            .ok_or(anyhow::anyhow!("Requested object with owner option"))?
+        } = system_obj.owner
         else {
             anyhow::bail!("Expect walrus System object to be shared");
         };
         self.pt_builder.obj(ObjectArg::SharedObject {
-            id: system_obj.object_id,
+            id: system_obj.id(),
             initial_shared_version,
             mutability: SharedObjectMutability::Mutable,
         })

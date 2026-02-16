@@ -14,12 +14,12 @@ use prettytable::{
     Table,
 };
 use sui_types::base_types::{ObjectID, SuiAddress};
+use walrus_sdk::core_utils::backoff::ExponentialBackoffConfig;
 
 use crate::{
     args::ObjectIdOrName,
-    backoff::ExponentialBackoffConfig,
     config::Config,
-    retry_client::RetriableSuiClient,
+    retry_client::{get_staking_object, new_retriable_sui_client, RetriableSuiClient},
     site::{RemoteSiteFactory, SiteData},
     types::Staking,
     util::{get_owned_blobs, parse_quilt_patch_id},
@@ -44,8 +44,14 @@ pub(crate) async fn display_sitemap(
     };
     let mut wallet = config.load_wallet()?;
     let owner_address = wallet.active_address()?;
-    let sui_client =
-        RetriableSuiClient::new_from_wallet(&wallet, ExponentialBackoffConfig::default()).await?;
+    let sui_client = new_retriable_sui_client(
+        &wallet
+            .config
+            .get_env(&None)
+            .context("no default network env specified in wallet config")?
+            .rpc,
+        ExponentialBackoffConfig::default(),
+    )?;
 
     let site_object_id = site_to_map
         .resolve_object_id(sui_client.clone(), &context)
@@ -64,12 +70,9 @@ pub(crate) async fn display_sitemap(
         .ok_or_else(|| anyhow!("staking_object not defined in the config"))?;
     dbg!("Using staking object:", staking_object_id);
 
-    let staking_object = sui_client
-        .get_staking_object(staking_object_id)
+    let staking_object = get_staking_object(&sui_client, staking_object_id)
         .await
-        .context(format!(
-            "Could not fetch staking object: {staking_object_id}"
-        ))?;
+        .with_context(|| format!("Could not fetch staking object: {staking_object_id}"))?;
     let table = SiteMapTable::new(&site_data, &owned_blobs, &staking_object);
     table.printstd();
 

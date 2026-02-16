@@ -10,6 +10,7 @@ use std::{
 
 use anyhow::{anyhow, bail};
 use move_core_types::language_storage::StructTag;
+use move_package_alt::schema::Environment;
 use serde::Deserialize;
 use site_builder::{
     args::GeneralArgs,
@@ -36,8 +37,8 @@ use sui_sdk::{
 use sui_types::{
     base_types::{ObjectID, SuiAddress},
     programmable_transaction_builder::ProgrammableTransactionBuilder,
-    quorum_driver_types::ExecuteTransactionRequestType,
     transaction::TransactionData,
+    transaction_driver_types::ExecuteTransactionRequestType,
     Identifier,
 };
 use tempfile::TempDir;
@@ -135,7 +136,7 @@ impl TestSetup {
         if let Some(duration) = epoch_duration {
             builder = builder.with_epoch_duration(duration);
         }
-        let (sui_cluster_handle, walrus_cluster, walrus_admin_client, system_context) =
+        let (sui_cluster_handle, walrus_cluster, walrus_admin_client, system_context, _) =
             builder.build().await?;
         let rpc_url = sui_cluster_handle.as_ref().lock().await.rpc_url();
         let sui_client = SuiClientBuilder::default().build(rpc_url).await?;
@@ -502,11 +503,11 @@ impl TestSetup {
         self.sites_config.inner.1.as_path()
     }
 
-    pub fn rpc_url(&self) -> anyhow::Result<String> {
+    pub fn rpc_url(&self) -> &str {
         self.wallet.inner.get_rpc_url()
     }
 
-    pub fn wallet_active_address(&mut self) -> anyhow::Result<SuiAddress> {
+    pub fn wallet_active_address(&mut self) -> SuiAddress {
         self.wallet.inner.active_address()
     }
 
@@ -517,8 +518,8 @@ impl TestSetup {
         // Simple readline wait
         let mut stdin = BufReader::new(io::stdin());
         let mut line = String::new();
-        println!("FN url: {}", self.rpc_url()?);
-        println!("Wallet address: {}", self.wallet_active_address()?);
+        println!("FN url: {}", self.rpc_url());
+        println!("Wallet address: {}", self.wallet_active_address());
         println!("Press Enter to continue...");
         stdin.read_line(&mut line).await?;
         Ok(())
@@ -538,11 +539,14 @@ async fn publish_walrus_sites(
         .join("move")
         .join("walrus_site");
     let path = path_buf.as_path();
-    let move_build_config = BuildConfig::new_for_testing();
+    let mut move_build_config = BuildConfig::new_for_testing();
+    // Use a non-matching environment name so the Move.lock [env.testnet] section
+    // doesn't resolve walrus_site to a previously-published address.
+    move_build_config.environment = Environment::new("testing".to_string(), "testing".to_string());
     let compiled_modules = move_build_config.build(path)?;
     let modules_bytes = compiled_modules.get_package_bytes(false);
 
-    let wallet_active_address = publisher.active_address()?;
+    let wallet_active_address = publisher.active_address();
     let gas_data = sui_client
         .coin_read_api()
         .select_coins(
@@ -615,9 +619,9 @@ pub async fn new_wallet_with_sui_and_wal(
     #[allow(clippy::inconsistent_digit_grouping)]
     const WAL_FUND: u64 = 1000_000_000_000;
 
-    let mut test_wallet = new_wallet_on_sui_test_cluster(sui_cluster_handle.clone()).await?;
+    let test_wallet = new_wallet_on_sui_test_cluster(sui_cluster_handle.clone()).await?;
     walrus_sui_client
-        .send_wal(WAL_FUND, test_wallet.inner.active_address()?)
+        .send_wal(WAL_FUND, test_wallet.inner.active_address())
         .await?;
     Ok(test_wallet)
 }

@@ -92,7 +92,7 @@ async fn update_snake() -> anyhow::Result<()> {
     // Verify that the user now has 2 blob objects:
     // - One from the old site (unchanged resources)
     // - One with only the updated index.html
-    let wallet_address = cluster.wallet_active_address()?;
+    let wallet_address = cluster.wallet_active_address();
     let owned_blobs = cluster.get_owned_blobs(wallet_address).await?;
     assert_eq!(
         owned_blobs.len(),
@@ -115,9 +115,11 @@ async fn update_snake() -> anyhow::Result<()> {
         if resource.path == "/index.html" {
             let content = String::from_utf8_lossy(&data);
             let updated_line_count = content.lines().count();
-            assert_eq!(updated_line_count, original_line_count + 1,
+            assert_eq!(
+                updated_line_count,
+                original_line_count + 1,
                 "index.html should have exactly one more line after update. Original: {original_line_count}, Updated: {updated_line_count}",
-                );
+            );
         }
     }
 
@@ -305,7 +307,7 @@ async fn quilts_update_check_quilt_lifetime() -> anyhow::Result<()> {
 
     println!("Published site with object ID: {site_object_id} for {PUBLISH_EPOCHS} epochs.");
 
-    let wallet_address = cluster.wallet_active_address()?;
+    let wallet_address = cluster.wallet_active_address();
     let owned_blobs = cluster.get_owned_blobs(wallet_address).await?;
 
     // Calculate expected end_epoch: current_epoch + PUBLISH_EPOCHS
@@ -692,7 +694,7 @@ async fn test_update_does_not_extend_deleted_blobs() -> anyhow::Result<()> {
 
     let site = cluster.last_site_created().await?;
     let site_object_id = *site.id.object_id();
-    let wallet_address = cluster.wallet_active_address()?;
+    let wallet_address = cluster.wallet_active_address();
 
     println!("Published site with object ID: {site_object_id}");
 
@@ -843,7 +845,7 @@ async fn test_expired_resources_are_restored_on_update() -> anyhow::Result<()> {
 
     let site = cluster.last_site_created().await?;
     let site_object_id = *site.id.object_id();
-    let wallet_address = cluster.wallet_active_address()?;
+    let wallet_address = cluster.wallet_active_address();
 
     // Verify initial blobs - should have multiple blobs due to quilt slot limits
     let initial_blobs = cluster.get_owned_blobs(wallet_address).await?;

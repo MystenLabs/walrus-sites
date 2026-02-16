@@ -16,9 +16,10 @@ use sui_types::{
     programmable_transaction_builder::ProgrammableTransactionBuilder,
 };
 use test_cluster::TestClusterBuilder;
+use walrus_sdk::core_utils::backoff::ExponentialBackoffConfig;
 
 use super::SiteManager;
-use crate::{args::GeneralArgs, backoff::ExponentialBackoffConfig, config::Config};
+use crate::{args::GeneralArgs, config::Config, retry_client::new_retriable_sui_client};
 
 /// Creates a test Config from a TestCluster's wallet.
 fn create_test_config(wallet_path: PathBuf, package_id: ObjectID) -> Config {
@@ -239,11 +240,10 @@ async fn test_site_manager_cache_protects_against_stale_fullnode() {
 
     // Create a RetriableSuiClient pointing to main (non-stale) fullnode for execution
     // using the original manager's wallet which still points to main fullnode
-    let main_retry_client = crate::retry_client::RetriableSuiClient::new_from_wallet(
-        &manager.wallet,
+    let main_retry_client = new_retriable_sui_client(
+        &manager.wallet.config.get_env(&None).unwrap().rpc,
         ExponentialBackoffConfig::default(),
     )
-    .await
     .unwrap();
 
     // stale_manager.wallet queries stale FN and returns V0

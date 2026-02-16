@@ -182,7 +182,7 @@ async fn deploy_and_destroy_site_with_1001_files() -> anyhow::Result<()> {
     );
 
     // Get wallet address for blob verification
-    let wallet_address = cluster.wallet_active_address()?;
+    let wallet_address = cluster.wallet_active_address();
 
     // Get initial blob count before destroy
     let blobs_before_destroy = cluster.get_owned_blobs(wallet_address).await?;
@@ -581,7 +581,7 @@ async fn deploy_quilts_with_slot_sized_files() -> anyhow::Result<()> {
     );
     assert_eq!(resources.len(), n_files);
 
-    let wallet_address = cluster.wallet_active_address()?;
+    let wallet_address = cluster.wallet_active_address();
     let blobs = cluster.get_owned_blobs(wallet_address).await?;
     assert_eq!(
         blobs.len(),
