@@ -56,6 +56,7 @@ To navigate the repository, these are the crucial directories you should know ab
 - [`move`](./move/) contains the smart contract for creating and updating Walrus Sites on chain.
 - In [`c4`](./c4/) there is the C4 model depicting the architecture of the project.
 
+
 ## Star History
 
 Walrus Sites is open source! Here is a graph showing the star history over time.
