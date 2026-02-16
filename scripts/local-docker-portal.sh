@@ -1,4 +1,7 @@
 #!/bin/bash
+# Copyright (c) Mysten Labs, Inc.
+# SPDX-License-Identifier: Apache-2.0
+
 # Runs the walrus-sites portal Docker image locally for a given network and version.
 set -euo pipefail
 
