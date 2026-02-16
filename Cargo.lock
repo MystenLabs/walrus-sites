@@ -9047,6 +9047,7 @@ dependencies = [
  "home",
  "humantime",
  "itertools 0.14.0",
+ "jsonrpsee",
  "move-core-types",
  "move-package-alt",
  "notify",
