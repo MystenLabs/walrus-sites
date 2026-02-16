@@ -449,31 +449,45 @@ impl SiteManager {
             "starting to update site resources on chain",
         );
 
-        // Build the initial PTB
-        let (initial_ptb, mut resources_iter, mut routes_iter) =
-            self.build_initial_ptb(updates, walrus_pkg).await?;
+        // Build the initial PTB with retry on object version conflicts.
+        let (result, mut resources_iter, mut routes_iter) = {
+            let mut backoff = self.backoff_config.get_strategy(rand::random());
+            loop {
+                let (initial_ptb, ri, roi) = self.build_initial_ptb(updates, walrus_pkg).await?;
 
-        assert!(initial_ptb.commands.len() <= PTB_MAX_MOVE_CALLS as usize);
+                assert!(initial_ptb.commands.len() <= PTB_MAX_MOVE_CALLS as usize);
 
-        // TODO(sew-498): Verify gas_ref. Currently, we do not have the last tx the user submitted
-        // through walrus.
-        let gas_ref = self.gas_coin_ref().await?;
-        tracing::debug!(
-            num_commands = initial_ptb.commands.len(),
-            ?gas_ref,
-            "sending initial site PTB"
-        );
-        let result = self.sign_and_send_ptb(initial_ptb, gas_ref).await?;
-
-        // Check explicitly for execution failures.
-        if let Some(SuiExecutionStatus::Failure { error }) =
-            result.effects.as_ref().map(|e| e.status())
-        {
-            bail!(
-                "site ptb failed with error: {error} [tx_digest={}]",
-                result.digest
-            );
-        }
+                let gas_ref = self.gas_coin_ref().await?;
+                tracing::debug!(
+                    num_commands = initial_ptb.commands.len(),
+                    ?gas_ref,
+                    "sending initial site PTB"
+                );
+                match self.sign_and_send_ptb(initial_ptb, gas_ref).await {
+                    Ok(result) => {
+                        // Check explicitly for execution failures.
+                        if let Some(SuiExecutionStatus::Failure { error }) =
+                            result.effects.as_ref().map(|e| e.status())
+                        {
+                            bail!(
+                                "site ptb failed with error: {error} [tx_digest={}]",
+                                result.digest
+                            );
+                        }
+                        break (result, ri, roi);
+                    }
+                    Err(e) if is_object_version_conflict(&e) => {
+                        if let Some(delay) = backoff.next() {
+                            warn!(?delay, "object version conflict on initial PTB; retrying");
+                            tokio::time::sleep(delay).await;
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                    Err(e) => return Err(e),
+                }
+            }
+        };
 
         let site_object_id = match &self.site_id {
             Some(site_id) => *site_id,
@@ -485,37 +499,60 @@ impl SiteManager {
                 get_site_id_from_response(self.active_address()?, resp)?
             }
         };
-        // Execute remaining PTBs
+        // Execute remaining PTBs with retry on object version conflicts.
         while resources_iter.peek().is_some() || routes_iter.peek().is_some() {
-            let call_arg = self.fetch_site_call_arg(site_object_id).await?;
+            let mut backoff = self.backoff_config.get_strategy(rand::random());
+            let resources_iter_snapshot = resources_iter.clone();
+            let routes_iter_snapshot = routes_iter.clone();
+            loop {
+                let call_arg = self.fetch_site_call_arg(site_object_id).await?;
 
-            let ptb = self.create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_pkg);
-            let mut ptb = ptb.with_call_arg(&call_arg)?;
+                let ptb = self.create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_pkg);
+                let mut ptb = ptb.with_call_arg(&call_arg)?;
 
-            ptb.add_resource_operations(&mut resources_iter)
-                .ok_if_limit_reached()?;
-
-            // Add routes only if all resources have been added.
-            if resources_iter.peek().is_none() {
-                ptb.add_route_operations(&mut routes_iter)
+                ptb.add_resource_operations(&mut resources_iter)
                     .ok_if_limit_reached()?;
-            }
 
-            let ptb = ptb.finish();
-            let gas_ref = self.gas_coin_ref().await?;
-            tracing::debug!(
-                num_commands = ptb.commands.len(),
-                ?gas_ref,
-                "sending continuation site PTB"
-            );
-            let resource_result = self.sign_and_send_ptb(ptb, gas_ref).await?;
-            if let Some(SuiExecutionStatus::Failure { error }) =
-                resource_result.effects.as_ref().map(|e| e.status())
-            {
-                anyhow::bail!(
-                    "resource ptb failed with error: {error} [tx_digest={}]",
-                    resource_result.digest
+                // Add routes only if all resources have been added.
+                if resources_iter.peek().is_none() {
+                    ptb.add_route_operations(&mut routes_iter)
+                        .ok_if_limit_reached()?;
+                }
+
+                let ptb = ptb.finish();
+                let gas_ref = self.gas_coin_ref().await?;
+                tracing::debug!(
+                    num_commands = ptb.commands.len(),
+                    ?gas_ref,
+                    "sending continuation site PTB"
                 );
+                match self.sign_and_send_ptb(ptb, gas_ref).await {
+                    Ok(resource_result) => {
+                        if let Some(SuiExecutionStatus::Failure { error }) =
+                            resource_result.effects.as_ref().map(|e| e.status())
+                        {
+                            anyhow::bail!(
+                                "resource ptb failed with error: {error} [tx_digest={}]",
+                                resource_result.digest
+                            );
+                        }
+                        break;
+                    }
+                    Err(e) if is_object_version_conflict(&e) => {
+                        if let Some(delay) = backoff.next() {
+                            warn!(
+                                ?delay,
+                                "object version conflict on continuation PTB; retrying"
+                            );
+                            resources_iter = resources_iter_snapshot.clone();
+                            routes_iter = routes_iter_snapshot.clone();
+                            tokio::time::sleep(delay).await;
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                    Err(e) => return Err(e),
+                }
             }
         }
 
@@ -551,18 +588,37 @@ impl SiteManager {
 
         tracing::debug!("modifying the site object on chain");
 
-        // Create PTBs until all operations are processed
+        // Create PTBs until all operations are processed, with retry on version conflicts.
         while operations_iter.peek().is_some() {
-            let call_arg = self.fetch_site_call_arg(site_id).await?;
+            let mut backoff = self.backoff_config.get_strategy(rand::random());
+            let operations_iter_snapshot = operations_iter.clone();
+            loop {
+                let call_arg = self.fetch_site_call_arg(site_id).await?;
 
-            let ptb = self.create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_package);
-            let mut ptb = ptb.with_call_arg(&call_arg)?;
+                let ptb = self.create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_package);
+                let mut ptb = ptb.with_call_arg(&call_arg)?;
 
-            ptb.add_resource_operations(&mut operations_iter)
-                .ok_if_limit_reached()?;
+                ptb.add_resource_operations(&mut operations_iter)
+                    .ok_if_limit_reached()?;
 
-            let gas_ref = self.gas_coin_ref().await?;
-            self.sign_and_send_ptb(ptb.finish(), gas_ref).await?;
+                let gas_ref = self.gas_coin_ref().await?;
+                match self.sign_and_send_ptb(ptb.finish(), gas_ref).await {
+                    Ok(_) => break,
+                    Err(e) if is_object_version_conflict(&e) => {
+                        if let Some(delay) = backoff.next() {
+                            warn!(
+                                ?delay,
+                                "object version conflict in execute_operations; retrying"
+                            );
+                            operations_iter = operations_iter_snapshot.clone();
+                            tokio::time::sleep(delay).await;
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                    Err(e) => return Err(e),
+                }
+            }
         }
         Ok(())
     }
@@ -729,6 +785,36 @@ impl From<BlobExtensions> for ExtendOps {
             blobs_epochs,
         }
     }
+}
+
+/// Returns `true` if the error is a Sui object version conflict (ServerError -32002).
+///
+/// This error occurs when a transaction references an object at a stale version,
+/// typically due to concurrent transactions consuming the same gas coin.
+fn is_object_version_conflict(err: &anyhow::Error) -> bool {
+    use jsonrpsee::core::ClientError;
+    use sui_sdk::error::Error as SuiSdkError;
+    use walrus_sui::client::SuiClientError;
+
+    let Some(SuiClientError::SuiSdkError(SuiSdkError::RpcError(ClientError::Call(error_obj)))) =
+        err.downcast_ref::<SuiClientError>()
+    else {
+        return false;
+    };
+
+    if error_obj.code() != -32002 {
+        return false;
+    }
+
+    let message = error_obj.message();
+    let re = regex::Regex::new(
+        r"Error checking transaction input objects: Object ID [x0-9a-f]+ Version [x0-9a-f]+ Digest [0-9a-zA-Z]+ is not available for consumption, current version: [x0-9a-f]+"
+    ).unwrap();
+    assert!(
+        re.is_match(message),
+        "Unexpected error message format for ServerError(-32002): {message}"
+    );
+    true
 }
 
 /// Collects the `BlobId`s from the site_updates Deleted ResourceOps.

@@ -26,6 +26,7 @@ hex = "0.4.3"
 home = "0.5.9"
 humantime = "2.2.0"
 itertools = "0.14.0"
+jsonrpsee = { version = "0.24", default-features = false }
 move-core-types = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.65.2" }
 notify = "6.1.1"
 prettytable = "0.10.0"
