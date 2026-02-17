@@ -251,7 +251,11 @@ export class UrlFetcher {
             );
         } catch (error) {
             // All aggregators failed (exhausted retries or stopped)
-            logger.error("All aggregators failed", { error: formatError(error), path, blobOrPatchId });
+            logger.error("All aggregators failed", {
+                error: formatError(error),
+                path,
+                blobOrPatchId,
+            });
             return {
                 status: "AggregatorFail",
                 response: aggregatorFail(),
