@@ -2,7 +2,8 @@
 # Copyright (c) Mysten Labs, Inc.
 # SPDX-License-Identifier: Apache-2.0
 
-# Runs the walrus-sites portal Docker image locally for a given network and version.
+# Runs the walrus-sites portal Docker image locally for a given network, using the
+# version of the locally installed site-builder.
 set -euo pipefail
 
 log() {
