@@ -450,6 +450,8 @@ impl SiteManager {
         );
 
         // Build the initial PTB with retry on object version conflicts.
+        // Version conflicts mean the PTB was rejected pre-execution (no on-chain effects),
+        // so retrying is safe with no risk of double-spend.
         let (result, mut resources_iter, mut routes_iter) = {
             let mut backoff = self.backoff_config.get_strategy(rand::random());
             loop {
@@ -465,7 +467,8 @@ impl SiteManager {
                 );
                 match self.sign_and_send_ptb(initial_ptb, gas_ref).await {
                     Ok(result) => {
-                        // Check explicitly for execution failures.
+                        // Execution failures are semantic (e.g., Move abort) and not
+                        // transient, so they should not be retried.
                         if let Some(SuiExecutionStatus::Failure { error }) =
                             result.effects.as_ref().map(|e| e.status())
                         {
@@ -500,6 +503,8 @@ impl SiteManager {
             }
         };
         // Execute remaining PTBs with retry on object version conflicts.
+        // Version conflicts mean the PTB was rejected pre-execution (no on-chain effects),
+        // so retrying is safe with no risk of double-spend.
         while resources_iter.peek().is_some() || routes_iter.peek().is_some() {
             let mut backoff = self.backoff_config.get_strategy(rand::random());
             let resources_iter_snapshot = resources_iter.clone();
@@ -528,6 +533,8 @@ impl SiteManager {
                 );
                 match self.sign_and_send_ptb(ptb, gas_ref).await {
                     Ok(resource_result) => {
+                        // Execution failures are semantic (e.g., Move abort) and not
+                        // transient, so they should not be retried.
                         if let Some(SuiExecutionStatus::Failure { error }) =
                             resource_result.effects.as_ref().map(|e| e.status())
                         {
@@ -589,6 +596,8 @@ impl SiteManager {
         tracing::debug!("modifying the site object on chain");
 
         // Create PTBs until all operations are processed, with retry on version conflicts.
+        // Version conflicts mean the PTB was rejected pre-execution (no on-chain effects),
+        // so retrying is safe with no risk of double-spend.
         while operations_iter.peek().is_some() {
             let mut backoff = self.backoff_config.get_strategy(rand::random());
             let operations_iter_snapshot = operations_iter.clone();
@@ -817,13 +826,15 @@ fn is_object_version_conflict(err: &anyhow::Error) -> bool {
     }
 
     let message = error_obj.message();
-    let re = regex::Regex::new(
-        r"Error checking transaction input objects: Object ID [x0-9a-f]+ Version [x0-9a-f]+ Digest [0-9a-zA-Z]+ is not available for consumption, current version: [x0-9a-f]+"
-    ).unwrap();
-    assert!(
-        re.is_match(message),
-        "Unexpected error message format for ServerError(-32002): {message}"
-    );
+    static RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+        regex::Regex::new(
+            r"Error checking transaction input objects: Object ID 0x[0-9a-f]+ Version 0x[0-9a-f]+ Digest [0-9a-zA-Z]+ is not available for consumption, current version: 0x[0-9a-f]+"
+        ).unwrap()
+    });
+    if !RE.is_match(message) {
+        warn!("Unexpected error message format for ServerError(-32002): {message}");
+        return false;
+    }
     true
 }
 
