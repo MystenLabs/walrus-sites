@@ -498,7 +498,12 @@ impl ResourceData {
             }
         }
 
-        Ok(best_match.cloned().unwrap_or_default())
+        Ok(best_match
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(k, v)| (k.to_lowercase(), v))
+            .collect())
     }
 
     /// Returns the unencoded size of the resource.
@@ -555,20 +560,6 @@ impl ResourceManager {
         ws_resources: Option<WSResources>,
         ws_resources_path: Option<PathBuf>,
     ) -> Result<Self> {
-        // Cast the keys to lowercase because http headers
-        //  are case-insensitive: RFC7230 sec. 2.7.3
-        if let Some(resources) = ws_resources.as_ref() {
-            if let Some(ref headers) = resources.headers {
-                for (_, header_map) in headers.clone().iter_mut() {
-                    header_map.0 = header_map
-                        .0
-                        .iter()
-                        .map(|(k, v)| (k.to_lowercase(), v.clone()))
-                        .collect();
-                }
-            }
-        }
-
         Ok(ResourceManager {
             ws_resources,
             ws_resources_path,

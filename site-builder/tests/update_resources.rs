@@ -468,11 +468,11 @@ async fn test_update_resources_respects_ws_resources() -> anyhow::Result<()> {
     for resource in &original_resources {
         if resource.path.ends_with(".html") {
             assert!(
-                resource.headers.0.contains_key("X-Custom-Header"),
+                resource.headers.0.contains_key("x-custom-header"),
                 "Original HTML files should have custom header"
             );
             assert_eq!(
-                resource.headers.0.get("X-Custom-Header").unwrap(),
+                resource.headers.0.get("x-custom-header").unwrap(),
                 "CustomValue",
                 "Original HTML files should have correct custom header value"
             );
