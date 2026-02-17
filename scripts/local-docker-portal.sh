@@ -64,4 +64,4 @@ docker run \
   -e SITE_PACKAGE="$(get-site-package)" \
   -e B36_DOMAIN_RESOLUTION_SUPPORT=true \
   -p 3000:3000 \
-  mysten/walrus-sites-server-portal:"$network"-"$version"
+  mysten/walrus-sites-server-portal:mainnet-"$version"
