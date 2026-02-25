@@ -1,0 +1,102 @@
+name: Bump Sui testnet version
+
+on:
+  workflow_dispatch:
+    inputs:
+      new_tag:
+        description: >
+          Sui testnet release tag (e.g. testnet-v1.66.0).
+          Leave empty to auto-detect the latest release.
+        required: false
+        type: string
+  repository_dispatch:
+    types: [update-walrus-sites-sui-testnet-tag]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    name: Bump Sui version and create PR
+    runs-on: ubuntu-ghcloud
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Resolve target tag
+        id: tag
+        env:
+          INPUT_TAG: ${{ inputs.new_tag || github.event.client_payload.new_tag || '' }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ -n "$INPUT_TAG" ]]; then
+            echo "tag=$INPUT_TAG" >> "$GITHUB_OUTPUT"
+          else
+            echo "No tag provided, fetching latest Sui testnet release ..."
+            LATEST=$(gh release list --repo MystenLabs/sui --limit 50 \
+              | awk '{print $1}' \
+              | grep -E '^testnet-v[0-9]+\.[0-9]+\.[0-9]+$' \
+              | head -1)
+            if [[ -z "$LATEST" ]]; then
+              echo "Error: could not determine latest Sui testnet release"
+              exit 1
+            fi
+            echo "Resolved latest tag: $LATEST"
+            echo "tag=$LATEST" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install Sui via suiup
+        run: |
+          curl -sSf https://raw.githubusercontent.com/MystenLabs/sui/refs/heads/main/scripts/suiup.sh \
+            | bash -s -- -v "${{ steps.tag.outputs.tag }}"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+
+      - name: Run bump script
+        run: ./scripts/bump_sui_testnet_version.sh "${{ steps.tag.outputs.tag }}"
+
+      - name: Check for changes
+        id: diff
+        run: |
+          if git diff --quiet; then
+            echo "No changes detected — already up to date."
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create PR
+        if: steps.diff.outputs.has_changes == 'true'
+        env:
+          NEW_TAG: ${{ steps.tag.outputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BRANCH="bump-sui-${NEW_TAG}-$(date +%s)"
+          git checkout -b "$BRANCH"
+          git add -A
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -m "chore: bump Sui testnet dependency to ${NEW_TAG}"
+          git push origin "$BRANCH"
+          gh pr create \
+            --title "chore: bump Sui testnet dependency to ${NEW_TAG}" \
+            --body "## Summary
+
+          Automated bump of Sui testnet dependency version.
+
+          **Files updated:**
+          - \`site-builder/Cargo.toml\` — git tag references
+          - \`.github/workflows/code.yml\` — \`SUI_TAG\` env var
+          - \`.github/workflows/move-tests.yml\` — Sui download version
+          - \`Cargo.lock\` — regenerated
+          - \`move/**/Move.lock\` — regenerated
+
+          ## Test plan
+
+          - [ ] CI passes (Rust build, clippy, tests)
+          - [ ] Move tests pass with new Sui version" \
+            --label "automated"
+          gh pr merge --auto --squash
