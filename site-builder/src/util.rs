@@ -80,6 +80,8 @@ pub(crate) async fn sign_and_send_ptb(
 ///
 /// Only objects with `AddressOwner` or `ObjectOwner` ownership are cached,
 /// as shared and immutable objects don't have version conflicts in the same way.
+// TODO(grpc-migration): Change to accept gRPC `TransactionEffects` instead of
+// `SuiTransactionBlockEffects` once walrus-sites uses gRPC for transaction execution.
 fn update_cache_from_effects(object_cache: &mut ObjectCache, effects: &SuiTransactionBlockEffects) {
     for obj in effects.all_changed_objects() {
         match obj.0.owner {

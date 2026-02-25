@@ -413,6 +413,9 @@ impl SiteManager {
             gas_price, // Use actual reference gas price
         );
 
+        // TODO(grpc-migration): Replace with gRPC-backed simulate/dev_inspect once the
+        // walrus-sui crate adds support. Currently goes through deprecated
+        // get_current_client() → sui_client() → read_api() → dev_inspect_transaction_block().
         #[allow(deprecated)]
         let response = retry_client
             .get_current_client()
