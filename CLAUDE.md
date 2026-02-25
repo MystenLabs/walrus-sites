@@ -113,11 +113,11 @@ The worker portal bundles the same common library into a service worker for clie
 
 ## Automation
 
-### Sui Version Bump
+### Dependency Version Bumps
 
-`scripts/bump_sui_testnet_version.sh <tag>` updates all Sui testnet version references across the repo and regenerates lock files. It can be run locally for testing.
+`scripts/bump_versions.sh` updates Sui and/or Walrus dependency versions across the repo and regenerates lock files. It accepts `--sui-tag <tag>` and/or `--walrus-ref <ref>` flags (at least one required), plus `--dry-run` to skip lock file regeneration for local testing.
 
-The `.github/workflows/gen-sui-upgrade-version-pr.yml` workflow automates this: it resolves the latest tag (or accepts one as input), runs the script, and creates a PR. Triggered via `workflow_dispatch` or `repository_dispatch` from the Walrus repo when Walrus bumps its Sui dependency.
+The `.github/workflows/gen-version-bump-pr.yml` workflow automates this: it resolves the latest Sui tag (or accepts one as input), accepts a Walrus ref, runs the script, and creates a PR. Triggered via `workflow_dispatch` or `repository_dispatch` (type: `bump-dependencies`) from the Walrus repo.
 
 ## Configuration
 
