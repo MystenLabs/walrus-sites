@@ -5,6 +5,7 @@
 
 use std::path::PathBuf;
 
+use move_core_types::language_storage::StructTag;
 use rand::rngs::OsRng;
 use sui_config::{node::RunWithRange, Config as _};
 use sui_sdk::{
@@ -56,14 +57,15 @@ async fn test_site_manager_cache_updated_after_transaction() {
     // Get a gas coin and execute a simple transaction
     let address = manager.active_address().unwrap();
 
-    let coins = cluster
-        .sui_client()
-        .coin_read_api()
-        .get_coins(address, None, None, None)
+    let sui_coin_type: StructTag = "0x2::coin::Coin<0x2::sui::SUI>".parse().unwrap();
+    let grpc = cluster.grpc_client();
+    let coin_objects = grpc
+        .get_owned_objects(address, Some(sui_coin_type.clone()), None, None)
         .await
-        .unwrap();
-    let coin = coins.data.first().unwrap();
-    let gas_ref = coin.object_ref();
+        .unwrap()
+        .items;
+    let coin = coin_objects.first().unwrap();
+    let gas_ref = coin.compute_object_reference();
 
     // Build empty PTB
     let ptb = ProgrammableTransactionBuilder::new().finish();
@@ -75,17 +77,16 @@ async fn test_site_manager_cache_updated_after_transaction() {
     assert!(!manager.object_cache.is_empty());
     assert!(manager.object_cache.contains_key(&gas_ref.0));
 
-    let new_coin_ref = cluster
-        .sui_client()
-        .coin_read_api()
-        .get_coins(address, None, None, None)
+    let coin_objects = grpc
+        .get_owned_objects(address, Some(sui_coin_type), None, None)
         .await
         .unwrap()
-        .data
-        .into_iter()
-        .find(|c| c.coin_object_id == gas_ref.0)
+        .items;
+    let new_coin_ref = coin_objects
+        .iter()
+        .find(|o| o.id() == gas_ref.0)
         .unwrap()
-        .object_ref();
+        .compute_object_reference();
 
     let cached = *manager.object_cache.get(&gas_ref.0).unwrap();
     assert_eq!(
@@ -123,14 +124,15 @@ async fn test_site_manager_cache_protects_against_stale_fullnode() {
     let address = manager.active_address().unwrap();
 
     // Get initial gas coin version (V0)
-    let coins = cluster
-        .sui_client()
-        .coin_read_api()
-        .get_coins(address, None, None, None)
+    let sui_coin_type: StructTag = "0x2::coin::Coin<0x2::sui::SUI>".parse().unwrap();
+    let grpc = cluster.grpc_client();
+    let coin_objects = grpc
+        .get_owned_objects(address, Some(sui_coin_type), None, None)
         .await
-        .unwrap();
-    let coin = coins.data.first().unwrap();
-    let initial_gas_ref = coin.object_ref(); // V0
+        .unwrap()
+        .items;
+    let coin = coin_objects.first().unwrap();
+    let initial_gas_ref = coin.compute_object_reference(); // V0
 
     // Get current checkpoint to stop stale fullnode at
     let current_checkpoint = cluster.fullnode_handle.sui_node.with(|node| {
