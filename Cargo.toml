@@ -3,7 +3,7 @@ resolver = "2"
 members = ["site-builder"]
 
 [workspace.package]
-version = "2.4.0"
+version = "2.5.0"
 authors = ["Mysten Labs <build@mystenlabs.com>"]
 edition = "2021"
 license = "Apache-2.0"
