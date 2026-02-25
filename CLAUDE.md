@@ -1,7 +1,5 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Project Overview
 
 Walrus Sites is a decentralized website hosting platform combining:
@@ -24,20 +22,12 @@ Walrus Sites is a decentralized website hosting platform combining:
 ### Rust (site-builder)
 
 ```bash
-cargo build                          # Build
-cargo test                           # Unit tests only
 cargo test --all-features -- --include-ignored  # All tests (requires Walrus CLI installed)
 cargo clippy --all-features -- -D warnings      # Lint (without tests)
 cargo clippy --all-features --tests -- -D warnings  # Lint (with tests)
 cargo fmt -- --config group_imports=StdExternalCrate,imports_granularity=Crate,imports_layout=HorizontalVertical  # Format
 cargo sort -w -c                     # Check dependency sorting
 cargo doc --no-deps --workspace      # Build docs (RUSTDOCFLAGS="-D warnings")
-```
-
-Run a single test:
-```bash
-cargo test test_name
-cargo test test_name -- --include-ignored  # If test is marked #[ignore]
 ```
 
 ### Portal (TypeScript/Bun)
@@ -74,22 +64,13 @@ All source files must include:
 
 Enforced by `licensesnip` in CI and pre-commit.
 
-### Rust Formatting
-
-Uses custom `rustfmt` config (not default):
-- `group_imports=StdExternalCrate` — separate std, external, and crate imports
-- `imports_granularity=Crate` — merge imports by crate
-- `imports_layout=HorizontalVertical` — horizontal then vertical layout
-
-Rust toolchain: **1.91** (see `rust-toolchain.toml`).
-
 ### TypeScript Formatting
 
 Uses `prettier` with `--editorconfig` flag. Formatting is checked from the `portal/` directory.
 
 ### PR Titles
 
-Must follow [Conventional Commits](https://www.conventionalcommits.org/) format (enforced by `amannn/action-semantic-pull-request`).
+Must follow Conventional Commits format (enforced by `amannn/action-semantic-pull-request`).
 
 ### EditorConfig
 
@@ -127,10 +108,8 @@ The worker portal bundles the same common library into a service worker for clie
 
 ## Key Dependencies
 
-- Sui SDK: pinned to `testnet-v1.65.2` tag
-- Walrus SDK: pinned to specific git rev
-- Tokio: pinned to `=1.49.0`
-- Bun: runtime for all portal TypeScript code
+- Walrus SDK: pinned to latest testnet release tag
+- Sui SDK: pinned to match Walrus's Sui dependency
 
 ## Automation
 
@@ -138,7 +117,7 @@ The worker portal bundles the same common library into a service worker for clie
 
 `scripts/bump_sui_testnet_version.sh <tag>` updates all Sui testnet version references across the repo and regenerates lock files. It can be run locally for testing.
 
-The `.github/workflows/gen-sui-upgrade-version-pr.yml` workflow automates this: it resolves the latest tag (or accepts one as input), runs the script, and creates a PR. Triggered via `workflow_dispatch` or `repository_dispatch`.
+The `.github/workflows/gen-sui-upgrade-version-pr.yml` workflow automates this: it resolves the latest tag (or accepts one as input), runs the script, and creates a PR. Triggered via `workflow_dispatch` or `repository_dispatch` from the Walrus repo when Walrus bumps its Sui dependency.
 
 ## Configuration
 
