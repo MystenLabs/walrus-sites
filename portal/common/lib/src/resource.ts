@@ -55,7 +55,7 @@ export class ResourceFetcher {
         seenResources: Set<string>,
         depth: number = 0,
     ): Promise<VersionedResource | HttpStatusCodes> {
-        logger.info("Fetching resource", { path });
+        logger.info("Fetching resource", { objectId, path });
         const error = this.checkRedirectLimits(objectId, seenResources, depth);
         if (error) return error;
 
@@ -124,7 +124,8 @@ export class ResourceFetcher {
         });
         if (!dynamicFieldResponse.data) {
             logger.warn("No page resource data found for dynamic field object", {
-                dynamicFieldId: dynamicFieldId,
+                dynamicFieldId,
+                dynamicFieldResponse,
             });
             return HttpStatusCodes.NOT_FOUND;
         }
@@ -132,6 +133,7 @@ export class ResourceFetcher {
         const siteResource = this.getResourceFields(dynamicFieldResponse.data);
         if (!siteResource || !siteResource.blob_id) {
             logger.error("No site resource found inside the dynamicFieldResponse:", {
+                dynamicFieldId,
                 error: dynamicFieldResponse,
             });
             return HttpStatusCodes.NOT_FOUND;

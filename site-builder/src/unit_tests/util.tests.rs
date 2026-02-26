@@ -1,6 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use move_core_types::language_storage::StructTag;
 use sui_sdk::rpc_types::{SuiTransactionBlockEffectsAPI, SuiTransactionBlockResponseOptions};
 use sui_types::{
     programmable_transaction_builder::ProgrammableTransactionBuilder,
@@ -106,33 +107,26 @@ async fn test_update_cache_from_effects_with_real_tx() {
     let address = cluster.get_address_0();
 
     // Get coins - we need at least 3 (one for gas, one to split, one unused)
-    let coins = cluster
-        .sui_client()
-        .coin_read_api()
-        .get_coins(address, None, None, None)
+    let sui_coin_type: StructTag = "0x2::coin::Coin<0x2::sui::SUI>".parse().unwrap();
+    let grpc = cluster.grpc_client();
+    let coin_objects = grpc
+        .get_owned_objects(address, Some(sui_coin_type), None, None)
         .await
-        .unwrap();
+        .unwrap()
+        .items;
 
-    let gas_coin = coins.data.first().unwrap();
-    let gas_ref = gas_coin.object_ref();
+    let gas_ref = coin_objects[0].compute_object_reference();
     let gas_object_id = gas_ref.0;
 
-    let coin_to_split = coins.data.get(1).unwrap();
-    let split_coin_ref = coin_to_split.object_ref();
+    let split_coin_ref = coin_objects[1].compute_object_reference();
     let split_coin_id = split_coin_ref.0;
 
     // Get a third coin that we'll pass as input but not use
-    let unused_coin = coins.data.get(2).unwrap();
-    let unused_coin_ref = unused_coin.object_ref();
+    let unused_coin_ref = coin_objects[2].compute_object_reference();
     let unused_coin_id = unused_coin_ref.0;
 
     // Build PTB that splits a coin
-    let gas_price = cluster
-        .sui_client()
-        .read_api()
-        .get_reference_gas_price()
-        .await
-        .unwrap();
+    let gas_price = grpc.get_reference_gas_price().await.unwrap();
 
     let mut ptb = ProgrammableTransactionBuilder::new();
     let coin_arg = ptb
@@ -161,6 +155,9 @@ async fn test_update_cache_from_effects_with_real_tx() {
         TransactionData::new_programmable(address, vec![gas_ref], pt, 10_000_000, gas_price);
 
     let tx = cluster.wallet.sign_transaction(&tx_data).await;
+    // Cannot migrate to grpc: update_cache_from_effects requires SuiTransactionBlockEffects
+    // (JSON-RPC type), not the gRPC TransactionEffects type.
+    #[allow(deprecated)]
     let response = cluster
         .sui_client()
         .quorum_driver_api()

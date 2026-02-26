@@ -251,7 +251,11 @@ export class UrlFetcher {
             );
         } catch (error) {
             // All aggregators failed (exhausted retries or stopped)
-            logger.error("All aggregators failed", { error: formatError(error) });
+            logger.error("All aggregators failed", {
+                error: formatError(error),
+                path,
+                blobOrPatchId,
+            });
             return {
                 status: "AggregatorFail",
                 response: aggregatorFail(),
@@ -331,7 +335,7 @@ export class UrlFetcher {
 
             if (response.status === 404) {
                 logger.warn("Blob not available on aggregator (likely expired)", {
-                    url: url.origin,
+                    url: `${url.origin}${url.pathname}`,
                 });
                 return { status: "success", value: { type: "blob_unavailable" } };
             }
@@ -340,7 +344,7 @@ export class UrlFetcher {
                 // Blob size exceeds this aggregator's configured max — try next aggregator
                 // which may have a higher limit.
                 logger.error("Aggregator rejected blob due to size limit", {
-                    url: url.origin,
+                    url: `${url.origin}${url.pathname}`,
                 });
                 return {
                     status: "retry-next",
@@ -349,7 +353,7 @@ export class UrlFetcher {
             }
 
             if (response.status === 502) {
-                logger.warn("Aggregator 502, trying next", { url: url.origin });
+                logger.warn("Aggregator 502, trying next", { url: `${url.origin}${url.pathname}` });
                 return {
                     status: "retry-next",
                     error: new Error(`Aggregator returned 502`),
@@ -358,7 +362,7 @@ export class UrlFetcher {
 
             if (response.status >= 500) {
                 logger.warn("Aggregator 5xx, retrying", {
-                    url: url.origin,
+                    url: `${url.origin}${url.pathname}`,
                     status: response.status,
                 });
                 return {
@@ -369,7 +373,7 @@ export class UrlFetcher {
 
             // 4xx (except 404) - client error, stop
             logger.error("Aggregator client error", {
-                url: url.origin,
+                url: `${url.origin}${url.pathname}`,
                 status: response.status,
             });
             return {
@@ -379,7 +383,7 @@ export class UrlFetcher {
         } catch (error) {
             // Network error (connection refused, timeout, etc.)
             logger.warn("Aggregator network error", {
-                url: url.origin,
+                url: `${url.origin}${url.pathname}`,
                 error: formatError(error),
             });
             return {
