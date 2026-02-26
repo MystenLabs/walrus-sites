@@ -61,6 +61,11 @@ jobs:
           SUI_TAG: ${{ steps.inputs.outputs.sui_tag }}
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Install suiup itself.
+          curl -sSfL https://raw.githubusercontent.com/MystenLabs/suiup/main/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.local/bin:$PATH"
+
           # Determine which Sui version to install.
           # Use provided tag, or auto-detect from the repo's current pinned version.
           TAG="$SUI_TAG"
@@ -68,8 +73,7 @@ jobs:
             TAG=$(grep -oP 'tag = "\Ktestnet-v[0-9]+\.[0-9]+\.[0-9]+' site-builder/Cargo.toml | head -1)
             echo "No Sui tag provided, using current pinned version: $TAG"
           fi
-          curl -sSf https://raw.githubusercontent.com/MystenLabs/sui/refs/heads/main/scripts/suiup.sh \
-            | bash -s -- -v "$TAG"
+          suiup install "sui@${TAG}" -y
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
