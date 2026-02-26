@@ -1,10 +1,46 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+const fs = require("fs");
 const path = require("path");
 const webpack = require("webpack");
 const CopyPlugin = require("copy-webpack-plugin");
+const YAML = require("yaml");
 require('dotenv').config({ path: '.env.local' });
+
+// --- Load YAML config at build time (if available) ---
+
+function loadYamlDefaults() {
+    const configPath = process.env.PORTAL_CONFIG || "portal-config.yaml";
+    if (!fs.existsSync(configPath)) {
+        return {};
+    }
+    console.log(`[webpack] Loading portal config from ${configPath}`);
+    const content = fs.readFileSync(configPath, "utf-8");
+    const yaml = YAML.parse(content);
+
+    // Convert YAML URL arrays to pipe-delimited format
+    const toPipeString = (urls) =>
+        urls.map((u) => `${u.url}|${u.retries}|${u.metric}`).join(",");
+
+    const defaults = {};
+    if (yaml.network) defaults.SUINS_CLIENT_NETWORK = yaml.network;
+    if (yaml.site_package) defaults.SITE_PACKAGE = yaml.site_package;
+    if (yaml.domain_name_length !== undefined) {
+        defaults.PORTAL_DOMAIN_NAME_LENGTH = String(yaml.domain_name_length);
+    }
+    if (yaml.rpc_urls) defaults.RPC_URL_LIST = toPipeString(yaml.rpc_urls);
+    if (yaml.aggregator_urls) defaults.AGGREGATOR_URL_LIST = toPipeString(yaml.aggregator_urls);
+
+    return defaults;
+}
+
+const yamlDefaults = loadYamlDefaults();
+
+// Helper: env var wins over YAML default
+function envOrYaml(envKey) {
+    return process.env[envKey] || yamlDefaults[envKey] || undefined;
+}
 
 module.exports = {
     watch: true,
@@ -47,19 +83,19 @@ module.exports = {
     plugins: [
         new webpack.DefinePlugin({
             'process.env.PORTAL_DOMAIN_NAME_LENGTH': JSON.stringify(
-                process.env.PORTAL_DOMAIN_NAME_LENGTH || undefined
+                envOrYaml('PORTAL_DOMAIN_NAME_LENGTH')
             ),
             'process.env.RPC_URL_LIST': JSON.stringify(
-                process.env.RPC_URL_LIST || undefined
+                envOrYaml('RPC_URL_LIST')
             ),
             'process.env.SUINS_CLIENT_NETWORK': JSON.stringify(
-                process.env.SUINS_CLIENT_NETWORK || undefined
+                envOrYaml('SUINS_CLIENT_NETWORK')
             ),
             'process.env.AGGREGATOR_URL_LIST': JSON.stringify(
-                process.env.AGGREGATOR_URL_LIST || undefined
+                envOrYaml('AGGREGATOR_URL_LIST')
             ),
             'process.env.SITE_PACKAGE': JSON.stringify(
-                process.env.SITE_PACKAGE || undefined
+                envOrYaml('SITE_PACKAGE')
             ),
         }),
         new CopyPlugin({
