@@ -155,24 +155,16 @@ const configurationSchema = z.preprocess(
                 .string()
                 .url({ message: "BLOCKLIST_REDIS_URL is not a valid URL!" })
                 .optional()
-                .refine(
-                    (val) => val === undefined || val.endsWith("0"),
-                    {
-                        message:
-                            "BLOCKLIST_REDIS_URL must end with '0' to use the blocklist database.",
-                    },
-                ),
+                .refine((val) => val === undefined || val.endsWith("0"), {
+                    message: "BLOCKLIST_REDIS_URL must end with '0' to use the blocklist database.",
+                }),
             allowlistRedisUrl: z
                 .string()
                 .url({ message: "ALLOWLIST_REDIS_URL is not a valid URL!" })
                 .optional()
-                .refine(
-                    (val) => val === undefined || val.endsWith("1"),
-                    {
-                        message:
-                            "ALLOWLIST_REDIS_URL must end with '1' to use the allowlist database.",
-                    },
-                ),
+                .refine((val) => val === undefined || val.endsWith("1"), {
+                    message: "ALLOWLIST_REDIS_URL must end with '1' to use the allowlist database.",
+                }),
             aggregatorUrlList: z.string().transform((val) => parsePriorityUrlList(val, 3)),
             sitePackage: z
                 .string()

@@ -4,8 +4,7 @@
 import { describe, it, expect } from "vitest";
 import { parsePortalConfigYaml } from "@lib/portal_config";
 
-const VALID_SITE_PACKAGE =
-    "0x26eb7ee8688da02c5f671679524e379f0b837a12f1d1d799f255b7eea260ad27";
+const VALID_SITE_PACKAGE = "0x26eb7ee8688da02c5f671679524e379f0b837a12f1d1d799f255b7eea260ad27";
 
 function makeValidYaml(overrides: Record<string, unknown> = {}): string {
     const base: Record<string, unknown> = {
@@ -13,9 +12,7 @@ function makeValidYaml(overrides: Record<string, unknown> = {}): string {
         site_package: VALID_SITE_PACKAGE,
         landing_page_oid_b36: "46f3881sp4r55fc6pcao9t93bieeejl4vr4k2uv8u4wwyx1a93",
         rpc_urls: [{ url: "https://rpc.example.com", retries: 2, metric: 100 }],
-        aggregator_urls: [
-            { url: "https://aggregator.example.com", retries: 3, metric: 100 },
-        ],
+        aggregator_urls: [{ url: "https://aggregator.example.com", retries: 3, metric: 100 }],
         b36_domain_resolution: true,
         enable_blocklist: false,
         enable_allowlist: false,
@@ -40,9 +37,7 @@ function toYaml(obj: Record<string, unknown>, indent = 0): string {
                     const entries = Object.entries(item as Record<string, unknown>);
                     lines.push(`${pad}  - ${entries[0][0]}: ${formatValue(entries[0][1])}`);
                     for (let i = 1; i < entries.length; i++) {
-                        lines.push(
-                            `${pad}    ${entries[i][0]}: ${formatValue(entries[i][1])}`,
-                        );
+                        lines.push(`${pad}    ${entries[i][0]}: ${formatValue(entries[i][1])}`);
                     }
                 } else {
                     lines.push(`${pad}  - ${formatValue(item)}`);
@@ -65,9 +60,7 @@ describe("parsePortalConfigYaml", () => {
     describe("valid configs", () => {
         it("parses a complete valid config with all fields", () => {
             const yaml = makeValidYaml({
-                premium_rpc_urls: [
-                    { url: "https://premium.example.com", retries: 1, metric: 50 },
-                ],
+                premium_rpc_urls: [{ url: "https://premium.example.com", retries: 1, metric: 50 }],
                 domain_name_length: 21,
                 bring_your_own_domain: false,
             });
@@ -181,8 +174,7 @@ describe("parsePortalConfigYaml", () => {
 
         it("rejects site_package with invalid hex chars", () => {
             const yaml = makeValidYaml({
-                site_package:
-                    "0xZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ",
+                site_package: "0xZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ",
             });
             expect(() => parsePortalConfigYaml(yaml)).toThrow(/site_package.*0x \+ 64 hex/);
         });
@@ -216,18 +208,14 @@ describe("parsePortalConfigYaml", () => {
             const yaml = makeValidYaml({
                 rpc_urls: [{ url: "https://a.com", retries: -1, metric: 100 }],
             });
-            expect(() => parsePortalConfigYaml(yaml)).toThrow(
-                /retries.*non-negative integer/,
-            );
+            expect(() => parsePortalConfigYaml(yaml)).toThrow(/retries.*non-negative integer/);
         });
 
         it("rejects non-integer retries", () => {
             const yaml = makeValidYaml({
                 rpc_urls: [{ url: "https://a.com", retries: 1.5, metric: 100 }],
             });
-            expect(() => parsePortalConfigYaml(yaml)).toThrow(
-                /retries.*non-negative integer/,
-            );
+            expect(() => parsePortalConfigYaml(yaml)).toThrow(/retries.*non-negative integer/);
         });
     });
 
@@ -248,9 +236,7 @@ describe("parsePortalConfigYaml", () => {
 
         it("rejects empty aggregator_urls", () => {
             const yaml = makeValidYaml({ aggregator_urls: [] });
-            expect(() => parsePortalConfigYaml(yaml)).toThrow(
-                /aggregator_urls.*must not be empty/,
-            );
+            expect(() => parsePortalConfigYaml(yaml)).toThrow(/aggregator_urls.*must not be empty/);
         });
     });
 
@@ -261,9 +247,7 @@ describe("parsePortalConfigYaml", () => {
                 network: "mainnet",
                 site_package: VALID_SITE_PACKAGE,
                 landing_page_oid_b36: "abc123",
-                aggregator_urls: [
-                    { url: "https://a.com", retries: 1, metric: 100 },
-                ],
+                aggregator_urls: [{ url: "https://a.com", retries: 1, metric: 100 }],
                 b36_domain_resolution: true,
                 enable_blocklist: false,
                 enable_allowlist: false,
@@ -276,16 +260,12 @@ describe("parsePortalConfigYaml", () => {
                 site_package: VALID_SITE_PACKAGE,
                 landing_page_oid_b36: "abc123",
                 rpc_urls: [{ url: "https://a.com", retries: 1, metric: 100 }],
-                aggregator_urls: [
-                    { url: "https://a.com", retries: 1, metric: 100 },
-                ],
+                aggregator_urls: [{ url: "https://a.com", retries: 1, metric: 100 }],
                 b36_domain_resolution: true,
                 enable_blocklist: false,
                 enable_allowlist: false,
             };
-            expect(() => parsePortalConfigYaml(toYaml(obj))).toThrow(
-                /network.*must be a string/,
-            );
+            expect(() => parsePortalConfigYaml(toYaml(obj))).toThrow(/network.*must be a string/);
         });
     });
 

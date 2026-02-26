@@ -91,9 +91,7 @@ export function parsePortalConfigYaml(yamlContent: string): PortalYamlConfig {
     try {
         raw = parseYaml(yamlContent);
     } catch (e) {
-        throw new Error(
-            `Failed to parse YAML: ${e instanceof Error ? e.message : String(e)}`,
-        );
+        throw new Error(`Failed to parse YAML: ${e instanceof Error ? e.message : String(e)}`);
     }
 
     if (typeof raw !== "object" || raw === null) {
@@ -110,9 +108,7 @@ export function parsePortalConfigYaml(yamlContent: string): PortalYamlConfig {
 
     const site_package = assertString(doc.site_package, "site_package");
     if (!/^0x[0-9a-fA-F]{64}$/.test(site_package)) {
-        throw new Error(
-            `'site_package' must match 0x + 64 hex chars, got "${site_package}"`,
-        );
+        throw new Error(`'site_package' must match 0x + 64 hex chars, got "${site_package}"`);
     }
 
     const landing_page_oid_b36 = assertString(doc.landing_page_oid_b36, "landing_page_oid_b36");
