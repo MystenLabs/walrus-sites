@@ -47,12 +47,15 @@ function buildRawConfig(
         config.enableAllowlist = yaml.enable_allowlist;
         config.b36DomainResolutionSupport = yaml.b36_domain_resolution;
         if (yaml.premium_rpc_urls !== undefined) config.premiumRpcUrlList = yaml.premium_rpc_urls;
-        if (yaml.domain_name_length !== undefined) config.portalDomainNameLength = yaml.domain_name_length;
-        if (yaml.bring_your_own_domain !== undefined) config.bringYourOwnDomain = yaml.bring_your_own_domain;
+        if (yaml.domain_name_length !== undefined)
+            config.portalDomainNameLength = yaml.domain_name_length;
+        if (yaml.bring_your_own_domain !== undefined)
+            config.bringYourOwnDomain = yaml.bring_your_own_domain;
     }
 
     // Override with parsed env vars (converted from strings to typed values)
-    if (env.SUINS_CLIENT_NETWORK !== undefined) config.suinsClientNetwork = env.SUINS_CLIENT_NETWORK;
+    if (env.SUINS_CLIENT_NETWORK !== undefined)
+        config.suinsClientNetwork = env.SUINS_CLIENT_NETWORK;
     if (env.SITE_PACKAGE !== undefined) config.sitePackage = env.SITE_PACKAGE;
     if (env.LANDING_PAGE_OID_B36 !== undefined) config.landingPageOidB36 = env.LANDING_PAGE_OID_B36;
     if (env.RPC_URL_LIST !== undefined) config.rpcUrlList = parsePriorityUrlList(env.RPC_URL_LIST);
@@ -64,17 +67,22 @@ function buildRawConfig(
     if (env.PREMIUM_RPC_URL_LIST !== undefined) {
         config.premiumRpcUrlList = parsePriorityUrlList(env.PREMIUM_RPC_URL_LIST);
     }
-    if (env.ENABLE_BLOCKLIST !== undefined) config.enableBlocklist = env.ENABLE_BLOCKLIST === "true";
-    if (env.ENABLE_ALLOWLIST !== undefined) config.enableAllowlist = env.ENABLE_ALLOWLIST === "true";
+    if (env.ENABLE_BLOCKLIST !== undefined)
+        config.enableBlocklist = env.ENABLE_BLOCKLIST === "true";
+    if (env.ENABLE_ALLOWLIST !== undefined)
+        config.enableAllowlist = env.ENABLE_ALLOWLIST === "true";
     if (env.B36_DOMAIN_RESOLUTION_SUPPORT !== undefined) {
         config.b36DomainResolutionSupport = env.B36_DOMAIN_RESOLUTION_SUPPORT === "true";
     }
-    if (env.BRING_YOUR_OWN_DOMAIN !== undefined) config.bringYourOwnDomain = env.BRING_YOUR_OWN_DOMAIN === "true";
-    if (env.PORTAL_DOMAIN_NAME_LENGTH !== undefined) config.portalDomainNameLength = Number(env.PORTAL_DOMAIN_NAME_LENGTH);
+    if (env.BRING_YOUR_OWN_DOMAIN !== undefined)
+        config.bringYourOwnDomain = env.BRING_YOUR_OWN_DOMAIN === "true";
+    if (env.PORTAL_DOMAIN_NAME_LENGTH !== undefined)
+        config.portalDomainNameLength = Number(env.PORTAL_DOMAIN_NAME_LENGTH);
 
     // Secrets (env-only, no YAML equivalent — contain credentials)
     if (env.EDGE_CONFIG !== undefined) config.edgeConfig = env.EDGE_CONFIG;
-    if (env.EDGE_CONFIG_ALLOWLIST !== undefined) config.edgeConfigAllowlist = env.EDGE_CONFIG_ALLOWLIST;
+    if (env.EDGE_CONFIG_ALLOWLIST !== undefined)
+        config.edgeConfigAllowlist = env.EDGE_CONFIG_ALLOWLIST;
     if (env.BLOCKLIST_REDIS_URL !== undefined) config.blocklistRedisUrl = env.BLOCKLIST_REDIS_URL;
     if (env.ALLOWLIST_REDIS_URL !== undefined) config.allowlistRedisUrl = env.ALLOWLIST_REDIS_URL;
 
@@ -115,9 +123,7 @@ const configurationSchema = z
                 message: "ALLOWLIST_REDIS_URL must end with '1' to use the allowlist database.",
             }),
         aggregatorUrlList: z.array(priorityUrlEntrySchema).nonempty(),
-        sitePackage: z
-            .string()
-            .refine((val) => val.length === 66 && /^0x[0-9a-fA-F]+$/.test(val)),
+        sitePackage: z.string().refine((val) => val.length === 66 && /^0x[0-9a-fA-F]+$/.test(val)),
         b36DomainResolutionSupport: z.boolean(),
         bringYourOwnDomain: z.boolean().default(false),
     })
