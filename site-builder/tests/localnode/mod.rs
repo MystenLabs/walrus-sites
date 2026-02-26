@@ -44,7 +44,7 @@ use sui_types::{
 use tempfile::TempDir;
 use tokio::sync::Mutex as TokioMutex;
 use walrus_sdk::{
-    client::WalrusNodeClient,
+    node_client::WalrusNodeClient,
     core::{
         encoding::{quilt_encoding::QuiltStoreBlob, Primary},
         metadata::QuiltMetadata,
