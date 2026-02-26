@@ -17,7 +17,7 @@ env/
 *.log
 temp-landing-page/
 .env*.local
-portal/portal-config.yaml
-portal/portal-config.*.yaml
-!portal/portal-config.*.yaml.example
+portal/server/portal-config.yaml
+portal/server/portal-config.*.yaml
+!portal/server/portal-config.*.yaml.example
 **/coverage
