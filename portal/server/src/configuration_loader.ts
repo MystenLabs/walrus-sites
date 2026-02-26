@@ -3,13 +3,20 @@
 
 import { z } from "zod";
 import { existsSync, readFileSync } from "fs";
+import { parse as parseYaml } from "yaml";
 import { parsePriorityUrlList } from "@lib/priority_executor";
-import { parsePortalConfigYaml, type PortalYamlConfig } from "@lib/portal_config";
 import logger from "@lib/logger";
 
 // --- YAML loading ---
 
-function loadYamlConfig(): PortalYamlConfig | null {
+// YAML's parseYaml returns `any`. For a top-level YAML mapping, the parsed result is
+// a plain JS object (not a Date, Map, or class instance), so narrowing with these
+// three checks is sufficient to treat it as Record<string, unknown>.
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function loadYamlConfig(): Record<string, unknown> | null {
     const configPath = process.env.PORTAL_CONFIG || "portal-config.yaml";
     if (!existsSync(configPath)) {
         if (process.env.PORTAL_CONFIG) {
@@ -20,7 +27,11 @@ function loadYamlConfig(): PortalYamlConfig | null {
     }
     logger.info(`Loading portal config from ${configPath}`);
     const content = readFileSync(configPath, "utf-8");
-    return parsePortalConfigYaml(content);
+    const parsed: unknown = parseYaml(content);
+    if (!isRecord(parsed)) {
+        throw new Error("Portal config YAML must be an object at the top level");
+    }
+    return parsed;
 }
 
 // --- Merge YAML + env vars → typed config object ---
@@ -31,7 +42,7 @@ function loadYamlConfig(): PortalYamlConfig | null {
  * Env vars override YAML values when set.
  */
 function buildRawConfig(
-    yaml: PortalYamlConfig | null,
+    yaml: Record<string, unknown> | null,
     env: Record<string, string | undefined> = process.env as Record<string, string | undefined>,
 ): Record<string, unknown> {
     const config: Record<string, unknown> = {};
@@ -177,12 +188,15 @@ export type Configuration = z.infer<typeof configurationSchema>;
 
 // --- Load and validate ---
 
-const yamlConfig = loadYamlConfig();
-const rawConfig = buildRawConfig(yamlConfig);
-const parsedConfig = configurationSchema.safeParse(rawConfig);
-
-if (!parsedConfig.success) {
-    throw new Error(`Configuration validation error: ${parsedConfig.error.message}`);
+export function loadAndValidateConfig(
+    yaml: unknown = loadYamlConfig(),
+    env: Record<string, string | undefined> = process.env as Record<string, string | undefined>,
+): Configuration {
+    const yamlRecord = isRecord(yaml) ? yaml : null;
+    const rawConfig = buildRawConfig(yamlRecord, env);
+    const parsedConfig = configurationSchema.safeParse(rawConfig);
+    if (!parsedConfig.success) {
+        throw new Error(`Configuration validation error: ${parsedConfig.error.message}`);
+    }
+    return parsedConfig.data;
 }
-
-export const config: Configuration = parsedConfig.data;

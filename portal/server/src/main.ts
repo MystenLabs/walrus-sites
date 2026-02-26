@@ -6,7 +6,7 @@ import { getDomain, getSubdomainAndPath } from "@lib/domain_parsing";
 import allowlistChecker from "src/allowlist_checker";
 import { siteNotFound } from "@lib/http/http_error_responses";
 import blocklistChecker from "src/blocklist_checker";
-import { config } from "src/configuration_loader";
+import { config } from "src/config";
 import { standardUrlFetcher, premiumUrlFetcher } from "src/url_fetcher_factory";
 import { Base36toHex } from "@lib/objectId_operations";
 import { instrumentationFacade } from "@lib/instrumentation";

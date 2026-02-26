@@ -7,7 +7,7 @@ import { RPCSelector } from "@lib/rpc_selector";
 import { SuiNSResolver } from "@lib/suins";
 import { WalrusSitesRouter } from "@lib/routing";
 import { PriorityExecutor } from "@lib/priority_executor";
-import { config } from "./configuration_loader";
+import { config } from "./config";
 
 /**
  * A factory class for creating page fetchers.
