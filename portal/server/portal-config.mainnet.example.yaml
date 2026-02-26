@@ -6,6 +6,12 @@ network: mainnet
 site_package: "0x26eb7ee8688da02c5f671679524e379f0b837a12f1d1d799f255b7eea260ad27"
 landing_page_oid_b36: "46f3881sp4r55fc6pcao9t93bieeejl4vr4k2uv8u4wwyx1a93"
 
+domain_name_length: 21
+b36_domain_resolution: true
+bring_your_own_domain: false
+enable_blocklist: false
+enable_allowlist: false
+
 # Format: url, retries (>= 0), metric (lower = higher priority)
 rpc_urls:
   - url: https://fullnode.mainnet.sui.io
@@ -22,9 +28,3 @@ aggregator_urls:
   - url: https://aggregator.walrus-mainnet.walrus.space
     retries: 3
     metric: 100
-
-domain_name_length: 21
-b36_domain_resolution: true
-bring_your_own_domain: false
-enable_blocklist: false
-enable_allowlist: false
