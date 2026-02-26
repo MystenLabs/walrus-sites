@@ -137,7 +137,7 @@ if [[ "$DRY_RUN" == true ]]; then
     echo "Dry run: skipping Move.lock regeneration (sui move build)"
 else
     echo "Regenerating Cargo.lock ..."
-    (cd "$REPO_ROOT" && cargo check)
+    (cd "$REPO_ROOT" && cargo update && cargo check)
 
     # Regenerate Move.lock files.
     while IFS= read -r move_toml; do
