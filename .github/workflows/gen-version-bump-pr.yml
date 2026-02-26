@@ -148,5 +148,5 @@ jobs:
               -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
               commit -m "$TITLE"
           git push origin "$BRANCH"
-          gh pr create --title "$TITLE" --body "$BODY" --label "automated"
+          gh pr create --title "$TITLE" --body "$BODY"
           gh pr merge --auto --squash
