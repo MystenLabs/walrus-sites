@@ -19,7 +19,7 @@ function loadYamlDefaults() {
     const content = fs.readFileSync(configPath, "utf-8");
     const yaml = YAML.parse(content);
 
-    // Convert YAML URL arrays to pipe-delimited format
+    // TODO: URL arrays are converted to pipe-delimited strings here, then parsed back in the worker
     const toPipeString = (urls) =>
         urls.map((u) => `${u.url}|${u.retries}|${u.metric}`).join(",");
 
