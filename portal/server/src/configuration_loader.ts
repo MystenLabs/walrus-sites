@@ -72,7 +72,7 @@ function buildRawConfig(
     if (env.BRING_YOUR_OWN_DOMAIN !== undefined) config.bringYourOwnDomain = env.BRING_YOUR_OWN_DOMAIN === "true";
     if (env.PORTAL_DOMAIN_NAME_LENGTH !== undefined) config.portalDomainNameLength = Number(env.PORTAL_DOMAIN_NAME_LENGTH);
 
-    // Secrets (string-only, no parsing needed)
+    // Secrets (env-only, no YAML equivalent — contain credentials)
     if (env.EDGE_CONFIG !== undefined) config.edgeConfig = env.EDGE_CONFIG;
     if (env.EDGE_CONFIG_ALLOWLIST !== undefined) config.edgeConfigAllowlist = env.EDGE_CONFIG_ALLOWLIST;
     if (env.BLOCKLIST_REDIS_URL !== undefined) config.blocklistRedisUrl = env.BLOCKLIST_REDIS_URL;
@@ -122,6 +122,7 @@ const configurationSchema = z
         bringYourOwnDomain: z.boolean().default(false),
     })
     /// Extra refinements - Relations between configuration fields:
+    // TODO: tighten to XOR — reject if both blocklistRedisUrl and edgeConfig are set
     .refine(
         (data) => {
             if (data.enableBlocklist) {
@@ -135,6 +136,7 @@ const configurationSchema = z
             path: ["enableBlocklist"],
         },
     )
+    // TODO: tighten to XOR — reject if both allowlistRedisUrl and edgeConfigAllowlist are set
     .refine(
         (data) => {
             if (data.enableAllowlist) {
