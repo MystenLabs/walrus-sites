@@ -6,9 +6,11 @@ on:
       - main
     paths:
       - move/**
+      - site-builder/Cargo.toml
   pull_request:
     paths:
       - move/**
+      - site-builder/Cargo.toml
 
 jobs:
   prettier_move:
@@ -37,7 +39,8 @@ jobs:
 
       - name: Download Sui
         run: |
-          VERSION=testnet-v1.51.3
+          VERSION=$(grep -oP 'tag = "\Ktestnet-v[0-9]+\.[0-9]+\.[0-9]+' "$GITHUB_WORKSPACE/site-builder/Cargo.toml" | head -1)
+          echo "Resolved Sui version: $VERSION"
           curl -L "https://github.com/MystenLabs/sui/releases/download/$VERSION/sui-$VERSION-ubuntu-x86_64.tgz" -o sui.tgz
           sudo tar -xvzf sui.tgz -C /usr/local/bin
 

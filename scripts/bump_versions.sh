@@ -96,15 +96,6 @@ if [[ -n "$SUI_TAG" ]]; then
     sed -i -E "s|(tag = \")testnet-v[0-9]+\.[0-9]+\.[0-9]+|\1${SUI_TAG}|g" \
         "$REPO_ROOT/site-builder/Cargo.toml"
 
-    # Update SUI_TAG in .github/workflows/code.yml.
-    echo "Updating .github/workflows/code.yml ..."
-    sed -i -E "s|(SUI_TAG: )testnet-v[0-9]+\.[0-9]+\.[0-9]+|\1${SUI_TAG}|g" \
-        "$REPO_ROOT/.github/workflows/code.yml"
-
-    # Update VERSION= in .github/workflows/move-tests.yml.
-    echo "Updating .github/workflows/move-tests.yml ..."
-    sed -i -E "s|(VERSION=)testnet-v[0-9]+\.[0-9]+\.[0-9]+|\1${SUI_TAG}|g" \
-        "$REPO_ROOT/.github/workflows/move-tests.yml"
 fi
 
 # --- Walrus bump ---
@@ -127,7 +118,7 @@ if [[ -n "$WALRUS_REF" ]]; then
 
     # Update rev references on lines containing github.com/MystenLabs/walrus.
     echo "Updating site-builder/Cargo.toml (Walrus revs) ..."
-    sed -i -E "/github\.com\/MystenLabs\/walrus/s|rev = \"[0-9a-f]{40}\"|rev = \"${WALRUS_SHA}\"|g" \
+    sed -i -E "/github\.com\/MystenLabs\/walrus/s|rev = \"[^\"]+\"|rev = \"${WALRUS_SHA}\"|g" \
         "$REPO_ROOT/site-builder/Cargo.toml"
 fi
 
@@ -137,7 +128,7 @@ if [[ "$DRY_RUN" == true ]]; then
     echo "Dry run: skipping Move.lock regeneration (sui move build)"
 else
     echo "Regenerating Cargo.lock ..."
-    (cd "$REPO_ROOT" && cargo check)
+    (cd "$REPO_ROOT" && cargo update && cargo check)
 
     # Regenerate Move.lock files.
     while IFS= read -r move_toml; do

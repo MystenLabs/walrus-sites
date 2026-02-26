@@ -61,6 +61,11 @@ jobs:
           SUI_TAG: ${{ steps.inputs.outputs.sui_tag }}
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Install suiup itself.
+          curl -sSfL https://raw.githubusercontent.com/MystenLabs/suiup/main/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.local/bin:$PATH"
+
           # Determine which Sui version to install.
           # Use provided tag, or auto-detect from the repo's current pinned version.
           TAG="$SUI_TAG"
@@ -68,8 +73,7 @@ jobs:
             TAG=$(grep -oP 'tag = "\Ktestnet-v[0-9]+\.[0-9]+\.[0-9]+' site-builder/Cargo.toml | head -1)
             echo "No Sui tag provided, using current pinned version: $TAG"
           fi
-          curl -sSf https://raw.githubusercontent.com/MystenLabs/sui/refs/heads/main/scripts/suiup.sh \
-            | bash -s -- -v "$TAG"
+          suiup install "sui@${TAG}" -y
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -112,8 +116,6 @@ jobs:
             PARTS+=("sui-${SUI_TAG}")
             TITLE_PARTS+=("Sui to ${SUI_TAG}")
             BODY_LINES+=("- \`site-builder/Cargo.toml\` — Sui git tag references")
-            BODY_LINES+=("- \`.github/workflows/code.yml\` — \`SUI_TAG\` env var")
-            BODY_LINES+=("- \`.github/workflows/move-tests.yml\` — Sui download version")
           fi
 
           if [[ -n "$WALRUS_REF" ]]; then
@@ -141,10 +143,10 @@ jobs:
           - [ ] Move tests pass"
 
           git checkout -b "$BRANCH"
-          git add -A
+          git add -u . ':!.github/workflows'
           git -c user.name="github-actions[bot]" \
               -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
               commit -m "$TITLE"
           git push origin "$BRANCH"
-          gh pr create --title "$TITLE" --body "$BODY" --label "automated"
+          gh pr create --title "$TITLE" --body "$BODY"
           gh pr merge --auto --squash
