@@ -127,7 +127,7 @@ if [[ -n "$WALRUS_REF" ]]; then
 
     # Update rev references on lines containing github.com/MystenLabs/walrus.
     echo "Updating site-builder/Cargo.toml (Walrus revs) ..."
-    sed -i -E "/github\.com\/MystenLabs\/walrus/s|rev = \"[0-9a-f]{40}\"|rev = \"${WALRUS_SHA}\"|g" \
+    sed -i -E "/github\.com\/MystenLabs\/walrus/s|rev = \"[^\"]+\"|rev = \"${WALRUS_SHA}\"|g" \
         "$REPO_ROOT/site-builder/Cargo.toml"
 fi
 
