@@ -156,6 +156,10 @@ const configurationSchema = z
             path: ["enableAllowlist"],
         },
     )
+    // TODO: reject bringYourOwnDomain together with enableAllowlist/premiumRpcUrlList - the
+    // allowlist switches between PREMIUM_RPC_URL_LIST and RPC_URL_LIST based on whether a site is
+    // allowlisted. When serving a single domain (BYOD), this differentiation is pointless - just
+    // configure the desired nodes in rpc_urls directly.
     .refine(
         (data) => {
             if (data.enableAllowlist) {
