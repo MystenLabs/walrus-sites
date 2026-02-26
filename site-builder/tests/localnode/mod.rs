@@ -44,7 +44,6 @@ use sui_types::{
 use tempfile::TempDir;
 use tokio::sync::Mutex as TokioMutex;
 use walrus_sdk::{
-    node_client::WalrusNodeClient,
     core::{
         encoding::{quilt_encoding::QuiltStoreBlob, Primary},
         metadata::QuiltMetadata,
@@ -52,6 +51,7 @@ use walrus_sdk::{
         QuiltPatchId,
     },
     error::ClientResult,
+    node_client::WalrusNodeClient,
     sui::{
         client::{contract_config::ContractConfig, SuiContractClient},
         test_utils::{
