@@ -95,6 +95,11 @@ if [[ -n "$SUI_TAG" ]]; then
     echo "Updating site-builder/Cargo.toml (Sui tags) ..."
     sed -i -E "s|(tag = \")testnet-v[0-9]+\.[0-9]+\.[0-9]+|\1${SUI_TAG}|g" \
         "$REPO_ROOT/site-builder/Cargo.toml"
+
+    # Update the Sui CLI version in the Move tests workflow.
+    echo "Updating .github/workflows/move-tests.yml (Sui CLI version) ..."
+    sed -i -E "s|VERSION=testnet-v[0-9]+\.[0-9]+\.[0-9]+|VERSION=${SUI_TAG}|g" \
+        "$REPO_ROOT/.github/workflows/move-tests.yml"
 fi
 
 # --- Walrus bump ---
