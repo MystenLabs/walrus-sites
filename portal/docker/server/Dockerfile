@@ -12,8 +12,8 @@ RUN apt-get install -y ca-certificates
 
 # Portal configuration is loaded from a YAML file at runtime (mounted via ConfigMap).
 # Set PORTAL_CONFIG to the path of the YAML file, or place portal-config.yaml in the CWD.
-# Env vars can still be used as overrides — see portal-config.*.yaml.example for the schema.
-ARG PORTAL_CONFIG=""
+# Env vars can still be used as overrides — see portal-config.*.example.yaml for the schema.
+ARG PORTAL_CONFIG="/etc/walrus-sites/portal-config.yaml"
 ENV PORTAL_CONFIG=${PORTAL_CONFIG}
 
 ARG PROMETHEUS_EXPORTER_PORT="9184"
