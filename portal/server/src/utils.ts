@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { getSubdomainAndPath } from "@lib/domain_parsing";
-import { config } from "./configuration_loader";
+import { config } from "./config";
 import crypto from "crypto";
 
 /**

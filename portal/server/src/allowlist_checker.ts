@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { createClient, EdgeConfigClient } from "@vercel/edge-config";
-import { config } from "./configuration_loader";
+import { config } from "./config";
 import RedisClientFacade from "./redis_client_facade";
 import { StorageVariant } from "./enums";
 import AllowlistChecker from "./allowlist_checker_interface";

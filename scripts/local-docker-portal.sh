@@ -38,9 +38,6 @@ default-landing-page-oid-b36() {
 landing_page_oid_b36="${1:-$(default-landing-page-oid-b36)}"
 shift || true
 
-log "running the walrus-sites portal Docker image for network: $network and version: $version"
-log "landing page oid (b36): $landing_page_oid_b36"
-
 # On-chain package address for the Walrus Sites Move package.
 get-site-package() {
   case "$network" in
@@ -50,18 +47,38 @@ get-site-package() {
   esac
 }
 
+log "running the walrus-sites portal Docker image for network: $network and version: $version"
+log "landing page oid (b36): $landing_page_oid_b36"
+
+# Generate a temporary YAML config file for the portal.
+config_file="/tmp/portal-config.$network.yaml"
+trap 'rm -f "$config_file"' EXIT
+
+cat > "$config_file" <<EOF
+network: $network
+site_package: "$(get-site-package)"
+landing_page_oid_b36: "$landing_page_oid_b36"
+
+enable_allowlist: false
+enable_blocklist: false
+b36_domain_resolution: true
+
+rpc_urls:
+  - url: https://fullnode.$network.sui.io:443
+    retries: 2
+    metric: 100
+
+aggregator_urls:
+  - url: https://aggregator.walrus-$network.walrus.space
+    retries: 3
+    metric: 100
+EOF
+
+log "generated portal config: $config_file"
+
 docker run \
   -it \
   --rm \
-  -e ENABLE_ALLOWLIST=false \
-  -e ENABLE_BLOCKLIST=false \
-  -e LANDING_PAGE_OID_B36="$landing_page_oid_b36" \
-  -e PORTAL_DOMAIN_NAME_LENGTH=21 \
-  -e PREMIUM_RPC_URL_LIST=https://fullnode."$network".sui.io \
-  -e RPC_URL_LIST=https://fullnode."$network".sui.io \
-  -e SUINS_CLIENT_NETWORK="$network" \
-  -e AGGREGATOR_URL=https://aggregator.walrus-"$network".walrus.space \
-  -e SITE_PACKAGE="$(get-site-package)" \
-  -e B36_DOMAIN_RESOLUTION_SUPPORT=true \
+  -v "$config_file":/etc/walrus-sites/portal-config.yaml:ro \
   -p 3000:3000 \
   mysten/walrus-sites-server-portal:mainnet-"$version"
