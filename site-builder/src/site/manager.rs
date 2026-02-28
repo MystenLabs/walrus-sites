@@ -732,9 +732,11 @@ impl SiteManager {
                 Ok(cached)
             }
             Some(&cached) if cached.1 < object_ref.1 => {
-                // The fullnode returned a newer version than our cache. This can happen when
-                // another component (e.g., Walrus CLI) executed transactions with the same
-                // wallet, or after a failed transaction retry. Accept the newer version.
+                // The fullnode returned a newer version than our cache.
+                // This usually happens at the first site tx where we have just finished storing new
+                // quilts. Theoretically it can trigger to next transactions too, depending on the
+                // coins modified previously, but this should be extremely rare.
+                // Accept the newer version.
                 warn!(
                     "Fullnode returned newer object reference ({object_ref:?}) than cached ({cached:?}). Updating cache."
                 );
@@ -748,10 +750,7 @@ impl SiteManager {
                     "Fullnode returned conflicting object reference ({object_ref:?}) for cached ({cached:?})"
                 );
             }
-            None => {
-                self.object_cache.insert(object_ref.0, object_ref);
-                Ok(object_ref)
-            }
+            // No entry in our cache or matching entry, just return the input
             _ => Ok(object_ref),
         }
     }
