@@ -263,7 +263,7 @@ impl SiteManager {
     /// Builds the initial PTB for site creation/update with initial resources and
     /// blob extension operations.
     pub async fn build_initial_ptb<'a>(
-        &mut self,
+        &self,
         updates: &'a SiteDataDiff<'_>,
         walrus_pkg: ObjectID,
     ) -> Result<(
@@ -373,7 +373,7 @@ impl SiteManager {
     }
 
     /// Fetches a fresh `CallArg` for the given site object from the chain.
-    async fn fetch_site_call_arg(&mut self, site_object_id: ObjectID) -> Result<CallArg> {
+    async fn fetch_site_call_arg(&self, site_object_id: ObjectID) -> Result<CallArg> {
         let mut site_object_ref = self.wallet.get_object_ref(site_object_id).await?;
         site_object_ref = self.verify_object_ref_choose_latest(site_object_ref)?;
         Ok(site_object_ref.into())
@@ -397,7 +397,7 @@ impl SiteManager {
     /// because the latter requires extended validations like signed transactions.
     /// For our use case we actually need only high level verification and gas cost estimation.
     pub async fn dry_run_ptb(
-        &mut self,
+        &self,
         ptb: ProgrammableTransaction,
         gas_coin: ObjectRef,
     ) -> Result<sui_sdk::rpc_types::DevInspectResults> {
@@ -677,7 +677,7 @@ impl SiteManager {
     // TODO: Why require a **single** gas-coin and not do select_coins?
     /// Returns the [`ObjectRef`] of an arbitrary gas coin owned by the active wallet
     /// with a sufficient balance for the gas budget specified in the config.
-    pub async fn gas_coin_ref(&mut self) -> Result<ObjectRef> {
+    pub async fn gas_coin_ref(&self) -> Result<ObjectRef> {
         // Keep re-fetching the coin, until it matches the latest state stored by our cache, as
         // older versions might show more balance than its actual balance.
         let mut backoff = self.backoff_config.get_strategy(rand::random());
@@ -720,7 +720,7 @@ impl SiteManager {
     }
 
     fn verify_object_ref_choose_latest(
-        &mut self,
+        &self,
         object_ref: ObjectRef,
     ) -> anyhow::Result<ObjectRef> {
         let cached: Option<&ObjectRef> = self.object_cache.get(&object_ref.0);
@@ -735,16 +735,11 @@ impl SiteManager {
                 Ok(cached)
             }
             Some(&cached) if cached.1 < object_ref.1 => {
-                // The fullnode returned a newer version than our cache.
-                // This usually happens at the first site tx where we have just finished storing new
-                // quilts. Theoretically it can trigger to next transactions too, depending on the
-                // coins modified previously, but this should be extremely rare.
-                // Accept the newer version.
-                warn!(
-                    "Fullnode returned newer object reference ({object_ref:?}) than cached ({cached:?}). Updating cache."
+                // The fullnode returned a newer version than our cache. This can only happen if
+                // the user is submitting txs in parallel. We should not continue on this case.
+                bail!(
+                    "Fullnode returned newer object reference ({object_ref:?}) than cached ({cached:?}). Is the same wallet submitting transactions in parallel?"
                 );
-                self.object_cache.insert(object_ref.0, object_ref);
-                Ok(object_ref)
             }
             Some(&cached) if cached != object_ref => {
                 // Same version but different digest — indicates data corruption or an unexpected
