@@ -719,10 +719,7 @@ impl SiteManager {
         self.site_id.is_none()
     }
 
-    fn verify_object_ref_choose_latest(
-        &self,
-        object_ref: ObjectRef,
-    ) -> anyhow::Result<ObjectRef> {
+    fn verify_object_ref_choose_latest(&self, object_ref: ObjectRef) -> anyhow::Result<ObjectRef> {
         let cached: Option<&ObjectRef> = self.object_cache.get(&object_ref.0);
         match cached {
             // TODO(sew-503): Will we have a problem if during the execute we use an FN with an
