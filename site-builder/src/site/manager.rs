@@ -10,6 +10,7 @@ use std::{
 use anyhow::{anyhow, bail, Context, Result};
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{
+    json_rpc_error::TRANSACTION_EXECUTION_CLIENT_ERROR_CODE,
     rpc_types::{
         SuiExecutionStatus,
         SuiTransactionBlockEffectsAPI as _,
@@ -800,7 +801,8 @@ impl From<BlobExtensions> for ExtendOps {
     }
 }
 
-/// Returns `true` if the error is a Sui object version conflict (ServerError -32002).
+/// Returns `true` if the error is a Sui object version conflict (ServerError
+/// TRANSACTION_EXECUTION_CLIENT_ERROR_CODE -32002).
 ///
 /// This error occurs when a transaction references an object at a stale version,
 /// typically due to concurrent transactions consuming the same gas coin.
@@ -815,7 +817,7 @@ fn is_object_version_conflict(err: &anyhow::Error) -> bool {
         return false;
     };
 
-    if error_obj.code() != -32002 {
+    if error_obj.code() != TRANSACTION_EXECUTION_CLIENT_ERROR_CODE {
         return false;
     }
 
@@ -826,7 +828,7 @@ fn is_object_version_conflict(err: &anyhow::Error) -> bool {
         ).unwrap()
     });
     if !RE.is_match(message) {
-        warn!("Unexpected error message format for ServerError(-32002): {message}");
+        warn!("Unexpected error message format for ServerError({TRANSACTION_EXECUTION_CLIENT_ERROR_CODE}): {message}");
         return false;
     }
     true
