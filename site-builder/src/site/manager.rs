@@ -11,11 +11,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{
     json_rpc_error::TRANSACTION_EXECUTION_CLIENT_ERROR_CODE,
-    rpc_types::{
-        SuiExecutionStatus,
-        SuiTransactionBlockEffectsAPI as _,
-        SuiTransactionBlockResponse,
-    },
+    rpc_types::SuiTransactionBlockResponse,
     wallet_context::WalletContext,
 };
 use sui_types::{
@@ -456,45 +452,20 @@ impl SiteManager {
         // Build the initial PTB with retry on object version conflicts.
         // Version conflicts mean the PTB was rejected pre-execution (no on-chain effects),
         // so retrying is safe with no risk of double-spend.
-        let (result, mut resources_iter, mut routes_iter) = {
-            let mut backoff = self.backoff_config.get_strategy(rand::random());
-            loop {
-                let (initial_ptb, ri, roi) = self.build_initial_ptb(updates, walrus_pkg).await?;
-
+        let mut resources_iter = None;
+        let mut routes_iter = None;
+        let result = self
+            .send_ptb_retry_on_version_conflict("initial PTB", async |s: &mut Self| {
+                let (initial_ptb, ri, roi) = s.build_initial_ptb(updates, walrus_pkg).await?;
                 assert!(initial_ptb.commands.len() <= PTB_MAX_MOVE_CALLS as usize);
-
-                let gas_ref = self.gas_coin_ref().await?;
-                tracing::debug!(
-                    num_commands = initial_ptb.commands.len(),
-                    ?gas_ref,
-                    "sending initial site PTB"
-                );
-                match self.sign_and_send_ptb(initial_ptb, gas_ref).await {
-                    Ok(result) => {
-                        // Execution failures are semantic (e.g., Move abort) and not
-                        // transient, so they should not be retried.
-                        if let Some(SuiExecutionStatus::Failure { error }) =
-                            result.effects.as_ref().map(|e| e.status())
-                        {
-                            bail!(
-                                "site ptb failed with error: {error} [tx_digest={}]",
-                                result.digest
-                            );
-                        }
-                        break (result, ri, roi);
-                    }
-                    Err(e) if is_object_version_conflict(&e) => {
-                        if let Some(delay) = backoff.next() {
-                            warn!(?delay, "object version conflict on initial PTB; retrying");
-                            tokio::time::sleep(delay).await;
-                        } else {
-                            return Err(e);
-                        }
-                    }
-                    Err(e) => return Err(e),
-                }
-            }
-        };
+                resources_iter = Some(ri);
+                routes_iter = Some(roi);
+                Ok(initial_ptb)
+            })
+            .await?;
+        // Unwrap is safe: the closure always sets these on the successful path.
+        let mut resources_iter = resources_iter.unwrap();
+        let mut routes_iter = routes_iter.unwrap();
 
         let site_object_id = match &self.site_id {
             Some(site_id) => *site_id,
@@ -510,64 +481,66 @@ impl SiteManager {
         // Version conflicts mean the PTB was rejected pre-execution (no on-chain effects),
         // so retrying is safe with no risk of double-spend.
         while resources_iter.peek().is_some() || routes_iter.peek().is_some() {
-            let mut backoff = self.backoff_config.get_strategy(rand::random());
-            let resources_iter_snapshot = resources_iter.clone();
-            let routes_iter_snapshot = routes_iter.clone();
-            loop {
-                let call_arg = self.fetch_site_call_arg(site_object_id).await?;
-
-                let ptb = self.create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_pkg);
+            let res_iter_snapshot = resources_iter.clone();
+            let rou_iter_snapshot = routes_iter.clone();
+            self.send_ptb_retry_on_version_conflict("continuation PTB", async |s: &mut Self| {
+                resources_iter = res_iter_snapshot.clone();
+                routes_iter = rou_iter_snapshot.clone();
+                let call_arg = s.fetch_site_call_arg(site_object_id).await?;
+                let ptb = s.create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_pkg);
                 let mut ptb = ptb.with_call_arg(&call_arg)?;
-
                 ptb.add_resource_operations(&mut resources_iter)
                     .ok_if_limit_reached()?;
-
                 // Add routes only if all resources have been added.
                 if resources_iter.peek().is_none() {
                     ptb.add_route_operations(&mut routes_iter)
                         .ok_if_limit_reached()?;
                 }
-
-                let ptb = ptb.finish();
-                let gas_ref = self.gas_coin_ref().await?;
-                tracing::debug!(
-                    num_commands = ptb.commands.len(),
-                    ?gas_ref,
-                    "sending continuation site PTB"
-                );
-                match self.sign_and_send_ptb(ptb, gas_ref).await {
-                    Ok(resource_result) => {
-                        // Execution failures are semantic (e.g., Move abort) and not
-                        // transient, so they should not be retried.
-                        if let Some(SuiExecutionStatus::Failure { error }) =
-                            resource_result.effects.as_ref().map(|e| e.status())
-                        {
-                            anyhow::bail!(
-                                "resource ptb failed with error: {error} [tx_digest={}]",
-                                resource_result.digest
-                            );
-                        }
-                        break;
-                    }
-                    Err(e) if is_object_version_conflict(&e) => {
-                        if let Some(delay) = backoff.next() {
-                            warn!(
-                                ?delay,
-                                "object version conflict on continuation PTB; retrying"
-                            );
-                            resources_iter = resources_iter_snapshot.clone();
-                            routes_iter = routes_iter_snapshot.clone();
-                            tokio::time::sleep(delay).await;
-                        } else {
-                            return Err(e);
-                        }
-                    }
-                    Err(e) => return Err(e),
-                }
-            }
+                Ok(ptb.finish())
+            })
+            .await?;
         }
 
         Ok(result)
+    }
+
+    /// Builds and sends a PTB with retry on object version conflicts.
+    ///
+    /// The closure builds a `ProgrammableTransaction` using the provided `&mut Self`.
+    /// The helper then fetches the gas coin, signs, and sends the PTB.
+    /// On object version conflict (a pre-execution rejection with no on-chain effects),
+    /// the entire build-and-send cycle is retried with exponential backoff.
+    async fn send_ptb_retry_on_version_conflict(
+        &mut self,
+        context: &str,
+        mut build_ptb: impl AsyncFnMut(&mut Self) -> Result<ProgrammableTransaction>,
+    ) -> Result<SuiTransactionBlockResponse> {
+        let mut backoff = self.backoff_config.get_strategy(rand::random());
+        loop {
+            let ptb = build_ptb(self).await?;
+            let gas_ref = self.gas_coin_ref().await?;
+            tracing::debug!(
+                num_commands = ptb.commands.len(),
+                ?gas_ref,
+                %context,
+                "sending PTB"
+            );
+            match self.sign_and_send_ptb(ptb, gas_ref).await {
+                Ok(result) if result.status_ok() == Some(true) => return Ok(result),
+                Ok(result) => {
+                    bail!("{context} transaction failed [tx_digest={}]", result.digest);
+                }
+                Err(e) if is_object_version_conflict(&e) => {
+                    if let Some(delay) = backoff.next() {
+                        warn!(?delay, %context, "object version conflict; retrying");
+                        tokio::time::sleep(delay).await;
+                    } else {
+                        return Err(e);
+                    }
+                }
+                Err(e) => return Err(e),
+            }
+        }
     }
 
     pub async fn update_resources(&mut self, resources: ResourceSet) -> Result<()> {
@@ -603,35 +576,17 @@ impl SiteManager {
         // Version conflicts mean the PTB was rejected pre-execution (no on-chain effects),
         // so retrying is safe with no risk of double-spend.
         while operations_iter.peek().is_some() {
-            let mut backoff = self.backoff_config.get_strategy(rand::random());
-            let operations_iter_snapshot = operations_iter.clone();
-            loop {
-                let call_arg = self.fetch_site_call_arg(site_id).await?;
-
-                let ptb = self.create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_package);
+            let op_iter_snapshot = operations_iter.clone();
+            self.send_ptb_retry_on_version_conflict("execute_operations", async |s: &mut Self| {
+                operations_iter = op_iter_snapshot.clone();
+                let call_arg = s.fetch_site_call_arg(site_id).await?;
+                let ptb = s.create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_package);
                 let mut ptb = ptb.with_call_arg(&call_arg)?;
-
                 ptb.add_resource_operations(&mut operations_iter)
                     .ok_if_limit_reached()?;
-
-                let gas_ref = self.gas_coin_ref().await?;
-                match self.sign_and_send_ptb(ptb.finish(), gas_ref).await {
-                    Ok(_) => break,
-                    Err(e) if is_object_version_conflict(&e) => {
-                        if let Some(delay) = backoff.next() {
-                            warn!(
-                                ?delay,
-                                "object version conflict in execute_operations; retrying"
-                            );
-                            operations_iter = operations_iter_snapshot.clone();
-                            tokio::time::sleep(delay).await;
-                        } else {
-                            return Err(e);
-                        }
-                    }
-                    Err(e) => return Err(e),
-                }
-            }
+                Ok(ptb.finish())
+            })
+            .await?;
         }
         Ok(())
     }
