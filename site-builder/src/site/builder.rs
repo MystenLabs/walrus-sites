@@ -36,10 +36,17 @@ use crate::{
 #[path = "../unit_tests/site.builder.tests.rs"]
 mod site_builder_tests;
 
-// We limit the max-move-calls to 1000 to protect also against max-dynamic-field-accesses per PTB,
-// triggered from `remove_resource_if_exists`
-// TODO?: Track multiple limits and behave accordingly.
-pub const PTB_MAX_MOVE_CALLS: u16 = 1000;
+/// Maximum move calls per PTB. Set conservatively below Sui's 1024-command cap to keep the
+/// serialized transaction under Sui's ~128KB size limit. Each command carries significant BCS
+/// overhead (object refs, type tags, argument encoding) that can exceed the byte limit well
+/// before hitting the command count cap. Also protects against max-dynamic-field-accesses per
+/// PTB, triggered from `remove_resource_if_exists`.
+pub const PTB_MAX_MOVE_CALLS: u16 = 512;
+
+/// Estimated byte-size threshold for PTB payload data (key/value strings, resource paths, blob
+/// IDs, and per-command overhead). When `bytes_estimate` exceeds this, the PTB is considered
+/// full. This is a secondary guard alongside the move-call limit.
+pub const PTB_MAX_BYTES: usize = 50_000;
 
 trait HasIdentifier {
     fn identifier(&self) -> Identifier;
@@ -79,6 +86,7 @@ impl<T> SitePtbBuilderResultExt<T> for SitePtbBuilderResult<T> {
 pub struct SitePtb<T = (), const MAX_MOVE_CALLS: u16 = PTB_MAX_MOVE_CALLS> {
     pt_builder: ProgrammableTransactionBuilder,
     move_call_counter: u16,
+    bytes_estimate: usize,
     site_argument: T,
     package: ObjectID,
     module: Identifier,
@@ -94,6 +102,7 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<(), MAX_MOVE_CALLS> {
         SitePtb {
             pt_builder,
             move_call_counter: 0,
+            bytes_estimate: 0,
             site_argument: (),
             package,
             module,
@@ -107,6 +116,7 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<(), MAX_MOVE_CALLS> {
         let Self {
             mut pt_builder,
             move_call_counter,
+            bytes_estimate,
             package,
             module,
             walrus_package,
@@ -118,6 +128,7 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<(), MAX_MOVE_CALLS> {
         Ok(SitePtb {
             pt_builder,
             move_call_counter,
+            bytes_estimate,
             site_argument,
             package,
             module,
@@ -131,6 +142,7 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<(), MAX_MOVE_CALLS> {
         let Self {
             pt_builder,
             move_call_counter,
+            bytes_estimate,
             package,
             module,
             walrus_package,
@@ -141,6 +153,7 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<(), MAX_MOVE_CALLS> {
         SitePtb {
             pt_builder,
             move_call_counter,
+            bytes_estimate,
             site_argument,
             package,
             module,
@@ -162,9 +175,12 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<(), MAX_MOVE_CALLS> {
 }
 
 impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
-    /// Transfer argument to address
+    /// Transfer argument to address.
+    ///
+    /// Bypasses the byte estimate check since transfer is always the final operation
+    /// and adds negligible overhead.
     fn transfer_arg(&mut self, recipient: SuiAddress, arg: Argument) -> SitePtbBuilderResult<()> {
-        self.increment_counter()?;
+        self.move_call_counter += 1;
         self.pt_builder.transfer_arg(recipient, arg);
         Ok(())
     }
@@ -251,6 +267,9 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
         type_arguments: Vec<TypeTag>,
         call_args: Vec<Argument>,
     ) -> SitePtbBuilderResult<Argument> {
+        // Each move call adds ~400 bytes overhead (package ID + module + function + args encoding
+        // + BCS serialization of inputs/results + object references).
+        self.bytes_estimate += 400;
         self.increment_counter()?;
         Ok(self.pt_builder.programmable_move_call(
             self.package,
@@ -273,6 +292,7 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
         let Self {
             pt_builder,
             move_call_counter,
+            bytes_estimate,
             site_argument,
             package,
             module,
@@ -283,6 +303,7 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
         SitePtb {
             pt_builder,
             move_call_counter,
+            bytes_estimate,
             site_argument,
             package,
             module,
@@ -352,14 +373,18 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
     }
 
     fn check_counter_in_advance(&self, move_calls_needed: u16) -> Result<(), SitePtbBuilderError> {
-        match move_calls_needed + self.move_call_counter {
-            c if c > MAX_MOVE_CALLS => Err(SitePtbBuilderError::TooManyMoveCalls(MAX_MOVE_CALLS)),
-            _ => Ok(()),
+        if move_calls_needed + self.move_call_counter > MAX_MOVE_CALLS
+            || self.bytes_estimate > PTB_MAX_BYTES
+        {
+            return Err(SitePtbBuilderError::TooManyMoveCalls(MAX_MOVE_CALLS));
         }
+        Ok(())
     }
 
     fn increment_counter(&mut self) -> SitePtbBuilderResult<()> {
-        if self.move_call_counter + 1 > MAX_MOVE_CALLS {
+        if self.move_call_counter + 1 > MAX_MOVE_CALLS
+            || self.bytes_estimate > PTB_MAX_BYTES
+        {
             return Err(SitePtbBuilderError::TooManyMoveCalls(MAX_MOVE_CALLS));
         }
         self.move_call_counter += 1;
@@ -383,6 +408,29 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
             calls.next();
         }
         Ok(())
+    }
+
+    /// Performs deferred route replacement if needed, then adds as many route insertions as fit.
+    ///
+    /// Returns `true` if route replacement is still pending (PTB was full).
+    pub fn add_routes_with_deferred_replace(
+        &mut self,
+        needs_replace: bool,
+        routes_iter: &mut std::iter::Peekable<btree_map::Iter<String, String>>,
+    ) -> Result<bool> {
+        if needs_replace {
+            let result = if routes_iter.peek().is_none() {
+                self.remove_routes()
+            } else {
+                self.replace_routes()
+            };
+            if result.ok_if_limit_reached()?.is_none() {
+                return Ok(true);
+            }
+        }
+        self.add_route_operations(routes_iter)
+            .ok_if_limit_reached()?;
+        Ok(false)
     }
 
     /// Adds move calls to update the routes on the object.
@@ -465,6 +513,8 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
     ///
     /// Returns the [`Argument`] for the newly-created resource.
     fn create_resource(&mut self, resource: &Resource) -> SitePtbBuilderResult<Argument> {
+        // Track estimated serialized size: path + blob_id (32 bytes) + blob_hash + overhead.
+        self.bytes_estimate += resource.info.path.len() + 32 + 32 + 50;
         let new_range_arg = self.create_range(&resource.info.range)?;
 
         let mut inputs = [
@@ -515,6 +565,8 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
         key: &str,
         value: &str,
     ) -> SitePtbBuilderResult<()> {
+        // Track estimated serialized size: key + value + BCS/command overhead.
+        self.bytes_estimate += key.len() + value.len() + 50;
         let name_input = self.pt_builder.input(pure_call_arg(&key.to_owned())?)?;
         let value_input = self.pt_builder.input(pure_call_arg(&value.to_owned())?)?;
         self.add_programmable_move_call(

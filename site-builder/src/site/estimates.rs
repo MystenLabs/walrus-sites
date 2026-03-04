@@ -160,7 +160,7 @@ impl Estimator {
         );
 
         // Build the initial PTB
-        let (initial_ptb, mut resources_iter, mut routes_iter) =
+        let (initial_ptb, mut resources_iter, mut routes_iter, mut needs_route_replace) =
             site_manager.build_initial_ptb(updates, walrus_pkg).await?;
 
         let gas_ref = site_manager.gas_coin_ref().await?;
@@ -197,7 +197,10 @@ impl Estimator {
         let fake_call_arg = fake_site_call_arg();
         let mut remaining_ptbs = Vec::new();
 
-        while resources_iter.peek().is_some() || routes_iter.peek().is_some() {
+        while resources_iter.peek().is_some()
+            || routes_iter.peek().is_some()
+            || needs_route_replace
+        {
             let ptb = site_manager.create_site_ptb::<{ PTB_MAX_MOVE_CALLS }>(walrus_pkg);
             let mut ptb = ptb.with_call_arg(&fake_call_arg)?;
 
@@ -206,8 +209,10 @@ impl Estimator {
 
             // Add routes only if all resources have been added.
             if resources_iter.peek().is_none() {
-                ptb.add_route_operations(&mut routes_iter)
-                    .ok_if_limit_reached()?;
+                needs_route_replace = ptb.add_routes_with_deferred_replace(
+                    needs_route_replace,
+                    &mut routes_iter,
+                )?;
             }
 
             remaining_ptbs.push(ptb.finish());
