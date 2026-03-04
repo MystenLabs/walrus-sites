@@ -84,6 +84,13 @@ jobs:
 
       - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
 
+      - name: Generate automerge token
+        id: automerge_token
+        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf # pin@v2.2.1
+        with:
+          app-id: ${{ secrets.WALRUS_AUTOMERGE_APP_ID }}
+          private-key: ${{ secrets.WALRUS_AUTOMERGE_PRIVATE_KEY }}
+
       - name: Run bump script
         env:
           SUI_TAG: ${{ steps.inputs.outputs.sui_tag }}
@@ -111,6 +118,7 @@ jobs:
           SUI_TAG: ${{ steps.inputs.outputs.sui_tag }}
           WALRUS_REF: ${{ steps.inputs.outputs.walrus_ref }}
           GH_TOKEN: ${{ github.token }}
+          AUTOMERGE_TOKEN: ${{ steps.automerge_token.outputs.token }}
         run: |
           # Build dynamic branch name, title, and body.
           PARTS=()
@@ -153,9 +161,14 @@ jobs:
               -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
               commit -m "$TITLE"
           git push origin "$BRANCH"
-          PR_URL=$(gh pr create --title "$TITLE" --body "$BODY")
+          PR_URL=$(gh pr create --title "$TITLE" --body "$BODY" \
+            --reviewer "wbbradley,nikos-terzo,geomel,ebmifa")
           echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
-          gh pr merge --auto --squash
+
+          # Use dedicated app token so the merge push triggers downstream CI workflows
+          # (merges with GITHUB_TOKEN suppress push events to prevent recursive loops).
+          MERGE_TOKEN="${AUTOMERGE_TOKEN:-$GH_TOKEN}"
+          GH_TOKEN="$MERGE_TOKEN" gh pr merge --auto --squash
 
   notify:
     name: Notify via Slack
