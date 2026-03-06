@@ -3,22 +3,16 @@
 
 use std::collections::btree_map;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use serde::Serialize;
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
     object::{Object, Owner},
     programmable_transaction_builder::ProgrammableTransactionBuilder,
     transaction::{
-        Argument,
-        CallArg,
-        Command,
-        ObjectArg,
-        ProgrammableTransaction,
-        SharedObjectMutability,
+        Argument, CallArg, Command, ObjectArg, ProgrammableTransaction, SharedObjectMutability,
     },
-    Identifier,
-    TypeTag,
+    Identifier, TypeTag,
 };
 use thiserror::Error;
 use walrus_sui::coin::Coin;
@@ -46,6 +40,11 @@ pub const PTB_MAX_MOVE_CALLS: u16 = 512;
 /// Estimated byte-size threshold for PTB payload data (key/value strings, resource paths, blob
 /// IDs, and per-command overhead). When `bytes_estimate` exceeds this, the PTB is considered
 /// full. This is a secondary guard alongside the move-call limit.
+/// Note: We do not track things that take up "constant" size in the PTB, like the site-argument,
+/// the routes df replacement (WIP), metadata replacement etc.
+// owned-object: 74 bytes
+// pure argument adds 2 bytes eg. u64: 10 bytes
+// move-call: ~73 + 3 x (arg) bytes -> 100 bytes
 pub const PTB_MAX_BYTES: usize = 50_000;
 
 trait HasIdentifier {
@@ -63,6 +62,8 @@ impl HasIdentifier for FunctionTag<'_> {
 pub enum SitePtbBuilderError {
     #[error("Exceeded maximum number of move-calls ({0}) in Transaction")]
     TooManyMoveCalls(u16),
+    #[error("Estimation of exceeded maximum Transaction size ({0})")]
+    PtbSizeEstimationExceeded(usize),
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
@@ -78,6 +79,7 @@ impl<T> SitePtbBuilderResultExt<T> for SitePtbBuilderResult<T> {
         match self {
             Ok(val) => Ok(Some(val)),
             Err(SitePtbBuilderError::TooManyMoveCalls(_)) => Ok(None),
+            Err(SitePtbBuilderError::PtbSizeEstimationExceeded(_)) => Ok(None),
             Err(SitePtbBuilderError::Other(e)) => Err(e),
         }
     }
@@ -86,6 +88,7 @@ impl<T> SitePtbBuilderResultExt<T> for SitePtbBuilderResult<T> {
 pub struct SitePtb<T = (), const MAX_MOVE_CALLS: u16 = PTB_MAX_MOVE_CALLS> {
     pt_builder: ProgrammableTransactionBuilder,
     move_call_counter: u16,
+    /// Erroring on the very high side.
     bytes_estimate: usize,
     site_argument: T,
     package: ObjectID,
@@ -95,6 +98,13 @@ pub struct SitePtb<T = (), const MAX_MOVE_CALLS: u16 = PTB_MAX_MOVE_CALLS> {
     wal_coin_arg: Option<Argument>,
 }
 
+// TBD: Now that we also have multiple limits, does it make sense to have `MAX_MOVE_CALLS` const
+// generic?
+// Arguments for yes:
+// - MAX_MOVE_CALLS is changed during one ptb to make sure some calls are inserted in one eg.
+// transfer
+// Arguments for no:
+// - It can be easily converted into a field inside the SitePtb and probably remove some code?
 /// A PTB to update a site.
 impl<const MAX_MOVE_CALLS: u16> SitePtb<(), MAX_MOVE_CALLS> {
     pub fn new(package: ObjectID, module: Identifier, walrus_package: ObjectID) -> Self {
@@ -177,10 +187,13 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<(), MAX_MOVE_CALLS> {
 impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
     /// Transfer argument to address.
     ///
-    /// Bypasses the byte estimate check since transfer is always the final operation
-    /// and adds negligible overhead.
+    /// In our case, transfer_arg is only used for the Site argument. If we cannot transfer the
+    /// newly created site, the transaction will abort. So, we error "hard" by not
+    /// returning `SitePtbBuilderError::TooManyMoveCalls`, and instead an anyhow::Error, so that it
+    /// cannot be skipped by `ok_if_limit_reached()`.
     fn transfer_arg(&mut self, recipient: SuiAddress, arg: Argument) -> SitePtbBuilderResult<()> {
-        self.move_call_counter += 1;
+        self.increment_move_call_counter()
+            .context("Could not fit transfer_arg into the PTB.")?;
         self.pt_builder.transfer_arg(recipient, arg);
         Ok(())
     }
@@ -193,7 +206,7 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
     ) -> SitePtbBuilderResult<Argument> {
         tracing::debug!(site=%site_name, "new Move call: creating site");
         // Needs metadata and site calls to happen atomically, one cannot happen without the other.
-        self.check_counter_in_advance(2)?; // create metadata + site
+        self.move_call_check(2)?; // create metadata + site
 
         let name_arg = self.pt_builder.input(pure_call_arg(&site_name)?)?;
         let metadata_arg = match metadata {
@@ -226,12 +239,17 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
         Ok(())
     }
 
+    // TODO: We should be handling extend operations similarly to resources and routes, and be able
+    // to split them between 2 ptbs.
+    // Due to Quilts, the case where we have a large number of extend-operations shouldn't be that
+    // high, HOWEVER, we cannot be sure how people use this tool, so better to enable this
+    // (splitting to multiple ptbs).
     pub fn add_extend_operations(
         &mut self,
         blobs_to_extend: impl IntoIterator<Item = (ObjectRef, u32), IntoIter: ExactSizeIterator>,
     ) -> SitePtbBuilderResult<()> {
         let blobs_to_extend = blobs_to_extend.into_iter();
-        self.check_counter_in_advance(blobs_to_extend.len() as u16)?;
+        self.move_call_check(blobs_to_extend.len() as u16)?;
         for (blob_ref, epochs) in blobs_to_extend {
             self.extend_blob(blob_ref, epochs)?;
         }
@@ -251,7 +269,7 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
         .map(|val| self.pt_builder.pure(val))
         .collect::<anyhow::Result<Vec<_>>>()?;
 
-        self.increment_counter()?;
+        self.increment_move_call_counter()?;
         Ok(self.pt_builder.programmable_move_call(
             self.package,
             Identifier::new("metadata").unwrap(),
@@ -261,16 +279,17 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
         ))
     }
 
+    // TODO: Every call of this does not use type_arguments. Let's remove it
     fn add_programmable_move_call(
         &mut self,
         function: Identifier,
         type_arguments: Vec<TypeTag>,
         call_args: Vec<Argument>,
     ) -> SitePtbBuilderResult<Argument> {
-        // Each move call adds ~400 bytes overhead (package ID + module + function + args encoding
-        // + BCS serialization of inputs/results + object references).
-        self.bytes_estimate += 400;
-        self.increment_counter()?;
+        // Each move call adds ~73 + 3 x (arg) bytes -> 100 bytes erroring on the high side.
+        // (package ID + module + function + args encoding - BCS serialization of inputs/results
+        // and object references are measured separately).
+        self.limits_check_and_update(1, 100 + call_args.len() * 3)?;
         Ok(self.pt_builder.programmable_move_call(
             self.package,
             self.module.clone(),
@@ -314,9 +333,11 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
     }
 
     fn extend_blob(&mut self, blob_ref: ObjectRef, epochs: u32) -> SitePtbBuilderResult<()> {
+        // owned-object: 74 + epochs: 10 = 84 -> 100 bytes
+        // move-call: ~73 + 3 x (arg) bytes -> 100 bytes
+        self.limits_check_and_update(1, 200)?;
         let blob_obj_arg = self.pt_builder.obj(ObjectArg::ImmOrOwnedObject(blob_ref))?;
         let epochs_move_arg = self.pt_builder.pure(epochs)?;
-        self.increment_counter()?;
         // Call walrus::system::extend_blob directly using the walrus package,
         // since add_programmable_move_call uses the sites package.
         self.pt_builder.programmable_move_call(
@@ -350,7 +371,7 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
             .collect::<anyhow::Result<Vec<_>, _>>()?;
         let wal_coin_arg = coin_args.remove(0);
         Ok(if !coin_args.is_empty() {
-            self.increment_counter()?;
+            self.increment_move_call_counter()?;
             self.pt_builder
                 .command(Command::MergeCoins(wal_coin_arg, coin_args))
         } else {
@@ -372,21 +393,47 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
         })
     }
 
-    fn check_counter_in_advance(&self, move_calls_needed: u16) -> Result<(), SitePtbBuilderError> {
-        if move_calls_needed + self.move_call_counter > MAX_MOVE_CALLS
-            || self.bytes_estimate > PTB_MAX_BYTES
-        {
+    /// Does not update the measurements. Only checks.
+    fn limits_check(&self, calls: u16, size: usize) -> Result<(), SitePtbBuilderError> {
+        self.move_call_check(calls)?;
+        self.ptb_size_check(size)
+    }
+
+    fn limits_check_and_update(
+        &mut self,
+        calls: u16,
+        size: usize,
+    ) -> Result<(), SitePtbBuilderError> {
+        self.limits_check(calls, size)?;
+        self.move_call_counter += calls;
+        self.bytes_estimate += size;
+        Ok(())
+    }
+
+    fn ptb_size_check(&self, size: usize) -> SitePtbBuilderResult<()> {
+        if self.bytes_estimate + size > PTB_MAX_BYTES {
+            return Err(SitePtbBuilderError::PtbSizeEstimationExceeded(
+                self.bytes_estimate + size,
+            ));
+        }
+        Ok(())
+    }
+
+    fn ptb_size_check_and_update(&mut self, size: usize) -> SitePtbBuilderResult<()> {
+        self.ptb_size_check(size)?;
+        self.bytes_estimate += size;
+        Ok(())
+    }
+
+    fn move_call_check(&self, move_calls_needed: u16) -> Result<(), SitePtbBuilderError> {
+        if move_calls_needed + self.move_call_counter > MAX_MOVE_CALLS {
             return Err(SitePtbBuilderError::TooManyMoveCalls(MAX_MOVE_CALLS));
         }
         Ok(())
     }
 
-    fn increment_counter(&mut self) -> SitePtbBuilderResult<()> {
-        if self.move_call_counter + 1 > MAX_MOVE_CALLS
-            || self.bytes_estimate > PTB_MAX_BYTES
-        {
-            return Err(SitePtbBuilderError::TooManyMoveCalls(MAX_MOVE_CALLS));
-        }
+    fn increment_move_call_counter(&mut self) -> SitePtbBuilderResult<()> {
+        self.move_call_check(1)?;
         self.move_call_counter += 1;
         Ok(())
     }
@@ -408,29 +455,6 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
             calls.next();
         }
         Ok(())
-    }
-
-    /// Performs deferred route replacement if needed, then adds as many route insertions as fit.
-    ///
-    /// Returns `true` if route replacement is still pending (PTB was full).
-    pub fn add_routes_with_deferred_replace(
-        &mut self,
-        needs_replace: bool,
-        routes_iter: &mut std::iter::Peekable<btree_map::Iter<String, String>>,
-    ) -> Result<bool> {
-        if needs_replace {
-            let result = if routes_iter.peek().is_none() {
-                self.remove_routes()
-            } else {
-                self.replace_routes()
-            };
-            if result.ok_if_limit_reached()?.is_none() {
-                return Ok(true);
-            }
-        }
-        self.add_route_operations(routes_iter)
-            .ok_if_limit_reached()?;
-        Ok(false)
     }
 
     /// Adds move calls to update the routes on the object.
@@ -465,6 +489,8 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
     /// Adds the move calls to remove a resource from the site, if the resource exists.
     pub fn remove_resource_if_exists(&mut self, resource: &Resource) -> SitePtbBuilderResult<()> {
         tracing::debug!(resource=%resource.info.path, "new Move call: removing resource");
+        // strings need string.len() + length_encoded bytes (4-6).
+        self.ptb_size_check_and_update(resource.info.path.len() + 10)?;
         let path_input = self.pt_builder.input(pure_call_arg(&resource.info.path)?)?;
         self.add_programmable_move_call(
             contracts::site::remove_resource_if_exists.identifier(),
@@ -489,7 +515,8 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
             )
             .into());
         };
-        self.check_counter_in_advance(move_calls_needed)?;
+        self.ptb_size_check_and_update(Self::new_resource_ptb_size_estimation(resource))?;
+        self.move_call_check(move_calls_needed)?;
 
         tracing::debug!(resource=%resource.info.path, "new Move call: adding resource");
         let new_resource_arg = self.create_resource(resource)?;
@@ -514,7 +541,6 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
     /// Returns the [`Argument`] for the newly-created resource.
     fn create_resource(&mut self, resource: &Resource) -> SitePtbBuilderResult<Argument> {
         // Track estimated serialized size: path + blob_id (32 bytes) + blob_hash + overhead.
-        self.bytes_estimate += resource.info.path.len() + 32 + 32 + 50;
         let new_range_arg = self.create_range(&resource.info.range)?;
 
         let mut inputs = [
@@ -529,6 +555,26 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
         inputs.push(new_range_arg);
 
         self.add_programmable_move_call(contracts::site::new_resource.identifier(), vec![], inputs)
+    }
+
+    fn new_resource_ptb_size_estimation(resource: &Resource) -> usize {
+        let headers_size = resource
+            .info
+            .headers
+            .iter()
+            .fold(0_usize, |size, h| size + h.0.len() + h.1.len() + 20);
+        let range_size = match resource.info.range {
+            // Two Option::None fields: 3 bytes each (CallArg tag + Pure vec len + option tag).
+            None => 6,
+            // Two Option::Some(u64) fields: 11 bytes each (3 + 8 bytes for u64).
+            Some(_) => 22,
+        };
+        // Track estimated serialized size: path + blob_id (32 bytes) + blob_hash + overhead
+        headers_size + range_size + resource.info.path.len() + 32 + 32 + 30 // each argument needs
+                                                                            // extra 2 bytes with
+                                                                            // the exception of
+                                                                            // string which needs
+                                                                            // more.
     }
 
     fn create_range(&mut self, range: &Option<Range>) -> SitePtbBuilderResult<Argument> {
@@ -565,8 +611,8 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
         key: &str,
         value: &str,
     ) -> SitePtbBuilderResult<()> {
-        // Track estimated serialized size: key + value + BCS/command overhead.
-        self.bytes_estimate += key.len() + value.len() + 50;
+        // Track estimated serialized size: key + value + BCS overhead.
+        self.ptb_size_check_and_update(key.len() + value.len() + 20)?;
         let name_input = self.pt_builder.input(pure_call_arg(&key.to_owned())?)?;
         let value_input = self.pt_builder.input(pure_call_arg(&value.to_owned())?)?;
         self.add_programmable_move_call(
@@ -591,7 +637,7 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
 
     /// Adds the move calls to remove and create new routes
     pub fn replace_routes(&mut self) -> SitePtbBuilderResult<()> {
-        self.check_counter_in_advance(2)?; // remove + create routes
+        self.move_call_check(2)?; // remove + create routes
         self.remove_routes()?;
         self.create_routes()?;
         Ok(())

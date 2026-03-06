@@ -270,7 +270,6 @@ impl SiteManager {
         ProgrammableTransaction,
         Peekable<std::slice::Iter<'a, SiteOps<'a>>>,
         Peekable<btree_map::Iter<'a, String, String>>,
-        bool, // needs_route_replace: true if route replacement was deferred
     )> {
         // 1st iteration
         // Keep 4 operations for optional update_name + route deletion + creation + site-transfer
@@ -278,6 +277,7 @@ impl SiteManager {
         let mut ptb = self.create_site_ptb::<INITIAL_MAX>(walrus_pkg);
 
         // Start with blob-extensions. Assuming it won't take a lot of space in the PTB.
+        // See also comment in SitePtb::add_extend_operations
         if let ExtendOps::Extend {
             total_wal_cost,
             blobs_epochs,
@@ -340,31 +340,28 @@ impl SiteManager {
             ptb.update_name(site_name)?;
         }
 
-        // Reserve headroom for transfer and route replacement commands.
-        const SAFE_MAX: u16 = PTB_MAX_MOVE_CALLS - 4;
-        let mut ptb = ptb.with_max_move_calls::<SAFE_MAX>();
+        // Add routes DF first to make sure it is included.
+        // Keep 1 spare PTB operation for transfer.
+        const TRANSFER_MAX: u16 = PTB_MAX_MOVE_CALLS - 1;
+        let mut ptb = ptb.with_max_move_calls::<TRANSFER_MAX>();
+
+        let mut routes_iter = btree_map::Iter::default().peekable();
+        // TODO: Could this logic be transferred inside `SitePtb`?
+        if let RouteOps::Replace(new_routes) = &updates.route_ops {
+            if new_routes.is_empty() {
+                ptb.remove_routes()
+            } else {
+                ptb.replace_routes()
+            }?;
+            routes_iter = new_routes.0.iter().peekable();
+        }
 
         let mut resources_iter = updates.resource_ops.iter().peekable();
         ptb.add_resource_operations(&mut resources_iter)
             .ok_if_limit_reached()?;
 
-        let mut routes_iter = btree_map::Iter::default().peekable();
-        let mut needs_route_replace = false;
-        if let RouteOps::Replace(new_routes) = &updates.route_ops {
-            routes_iter = new_routes.0.iter().peekable();
-            let replace_result = if new_routes.is_empty() {
-                ptb.remove_routes()
-            } else {
-                ptb.replace_routes()
-            };
-            // If the PTB is already full, defer route replacement to the continuation loop.
-            if replace_result.ok_if_limit_reached()?.is_none() {
-                needs_route_replace = true;
-            }
-        }
-
         // Add routes only if all resources have been added and route replace succeeded.
-        if resources_iter.peek().is_none() && !needs_route_replace {
+        if resources_iter.peek().is_none() {
             ptb.add_route_operations(&mut routes_iter)
                 .ok_if_limit_reached()?;
         }
@@ -374,7 +371,7 @@ impl SiteManager {
             ptb.transfer_site(self.active_address()?)?;
         }
 
-        Ok((ptb.finish(), resources_iter, routes_iter, needs_route_replace))
+        Ok((ptb.finish(), resources_iter, routes_iter))
     }
 
     /// Fetches a fresh `CallArg` for the given site object from the chain.
@@ -458,7 +455,7 @@ impl SiteManager {
         );
 
         // Build the initial PTB
-        let (initial_ptb, mut resources_iter, mut routes_iter, mut needs_route_replace) =
+        let (initial_ptb, mut resources_iter, mut routes_iter) =
             self.build_initial_ptb(updates, walrus_pkg).await?;
 
         assert!(initial_ptb.commands.len() <= PTB_MAX_MOVE_CALLS as usize);
@@ -494,10 +491,7 @@ impl SiteManager {
             }
         };
         // Execute remaining PTBs
-        while resources_iter.peek().is_some()
-            || routes_iter.peek().is_some()
-            || needs_route_replace
-        {
+        while resources_iter.peek().is_some() || routes_iter.peek().is_some() {
             let call_arg = self.fetch_site_call_arg(site_object_id).await?;
 
             let ptb = self.create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_pkg);
@@ -508,10 +502,8 @@ impl SiteManager {
 
             // Add routes only if all resources have been added.
             if resources_iter.peek().is_none() {
-                needs_route_replace = ptb.add_routes_with_deferred_replace(
-                    needs_route_replace,
-                    &mut routes_iter,
-                )?;
+                ptb.add_route_operations(&mut routes_iter)
+                    .ok_if_limit_reached()?;
             }
 
             let ptb = ptb.finish();
