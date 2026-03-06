@@ -20,14 +20,14 @@ fn create_test_site_ptb_with_arg<const MAX_MOVE_CALLS: u16>() -> SitePtb<Argumen
 #[test]
 fn test_check_counter_in_advance_within_limit() {
     let ptb = create_test_site_ptb::<10>();
-    assert!(ptb.check_counter_in_advance(5).is_ok());
-    assert!(ptb.check_counter_in_advance(10).is_ok());
+    assert!(ptb.move_call_check(5).is_ok());
+    assert!(ptb.move_call_check(10).is_ok());
 }
 
 #[test]
 fn test_check_counter_in_advance_exceeds_limit() {
     let ptb = create_test_site_ptb::<10>();
-    let result = ptb.check_counter_in_advance(11);
+    let result = ptb.move_call_check(11);
     assert!(result.is_err());
     match result.unwrap_err() {
         SitePtbBuilderError::TooManyMoveCalls(limit) => assert_eq!(limit, 10),
@@ -41,10 +41,10 @@ fn test_check_counter_in_advance_with_existing_counter() {
     ptb.move_call_counter = 8;
 
     // Should pass with 2 more calls
-    assert!(ptb.check_counter_in_advance(2).is_ok());
+    assert!(ptb.move_call_check(2).is_ok());
 
     // Should fail with 3 more calls
-    let result = ptb.check_counter_in_advance(3);
+    let result = ptb.move_call_check(3);
     assert!(result.is_err());
     match result.unwrap_err() {
         SitePtbBuilderError::TooManyMoveCalls(limit) => assert_eq!(limit, 10),
@@ -56,7 +56,7 @@ fn test_check_counter_in_advance_with_existing_counter() {
 fn test_increment_counter_within_limit() {
     let mut ptb = create_test_site_ptb::<10>();
     for i in 1..=10 {
-        assert!(ptb.increment_counter().is_ok());
+        assert!(ptb.increment_move_call_counter().is_ok());
         assert_eq!(ptb.move_call_counter, i);
     }
 }
@@ -66,7 +66,7 @@ fn test_increment_counter_exceeds_limit() {
     let mut ptb = create_test_site_ptb::<2>();
     ptb.move_call_counter = 3; // Manually set to exceed limit (> 2)
 
-    let result = ptb.increment_counter();
+    let result = ptb.increment_move_call_counter();
     assert!(result.is_err());
     match result.unwrap_err() {
         SitePtbBuilderError::TooManyMoveCalls(limit) => assert_eq!(limit, 2),
@@ -80,7 +80,7 @@ fn test_with_max_move_calls_reduces_limit() {
     let ptb_with_lower_limit = ptb.with_max_move_calls::<5>();
 
     // Test that the new limit is enforced
-    let result = ptb_with_lower_limit.check_counter_in_advance(6);
+    let result = ptb_with_lower_limit.move_call_check(6);
     assert!(result.is_err());
     match result.unwrap_err() {
         SitePtbBuilderError::TooManyMoveCalls(limit) => assert_eq!(limit, 5),
@@ -111,7 +111,7 @@ fn test_add_resource_operations_stops_on_limit() {
     ptb.move_call_counter = 2;
 
     // Try to increment - should fail
-    let result = ptb.increment_counter();
+    let result = ptb.increment_move_call_counter();
     assert!(result.is_err());
     match result.unwrap_err() {
         SitePtbBuilderError::TooManyMoveCalls(limit) => assert_eq!(limit, 1),
@@ -197,7 +197,7 @@ fn test_remove_resource_if_exists_respects_limit() {
     ptb.move_call_counter = 1; // Manually set to exceed limit (> 0)
 
     // Try any operation - should fail since we're over the limit
-    let result = ptb.increment_counter();
+    let result = ptb.increment_move_call_counter();
     assert!(result.is_err());
     match result.unwrap_err() {
         SitePtbBuilderError::TooManyMoveCalls(limit) => assert_eq!(limit, 0),
