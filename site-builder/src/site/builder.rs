@@ -10,9 +10,15 @@ use sui_types::{
     object::{Object, Owner},
     programmable_transaction_builder::ProgrammableTransactionBuilder,
     transaction::{
-        Argument, CallArg, Command, ObjectArg, ProgrammableTransaction, SharedObjectMutability,
+        Argument,
+        CallArg,
+        Command,
+        ObjectArg,
+        ProgrammableTransaction,
+        SharedObjectMutability,
     },
-    Identifier, TypeTag,
+    Identifier,
+    TypeTag,
 };
 use thiserror::Error;
 use walrus_sui::coin::Coin;
@@ -249,7 +255,12 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
         blobs_to_extend: impl IntoIterator<Item = (ObjectRef, u32), IntoIter: ExactSizeIterator>,
     ) -> SitePtbBuilderResult<()> {
         let blobs_to_extend = blobs_to_extend.into_iter();
-        self.move_call_check(blobs_to_extend.len() as u16)?;
+        let count = blobs_to_extend.len();
+        // Check limits in advance as we currently do not support splitting extend operations
+        // between ptbs.
+        // Each extend_blob costs ~200 bytes: owned-object (74) + epochs pure arg (10) +
+        // move-call (~100) + overhead, rounded up.
+        self.limits_check(count as u16, count * 200)?;
         for (blob_ref, epochs) in blobs_to_extend {
             self.extend_blob(blob_ref, epochs)?;
         }
