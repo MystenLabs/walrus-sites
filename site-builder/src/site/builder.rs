@@ -36,12 +36,10 @@ use crate::{
 #[path = "../unit_tests/site.builder.tests.rs"]
 mod site_builder_tests;
 
-/// Maximum move calls per PTB. Set conservatively below Sui's 1024-command cap to keep the
-/// serialized transaction under Sui's ~128KB size limit. Each command carries significant BCS
-/// overhead (object refs, type tags, argument encoding) that can exceed the byte limit well
-/// before hitting the command count cap. Also protects against max-dynamic-field-accesses per
-/// PTB, triggered from `remove_resource_if_exists`.
-pub const PTB_MAX_MOVE_CALLS: u16 = 512;
+/// Maximum move calls per PTB.
+/// We limit the max-move-calls to 1000 to protect also against max-dynamic-field-accesses per PTB,
+/// triggered from `remove_resource_if_exists`.
+pub const PTB_MAX_MOVE_CALLS: u16 = 1000;
 
 /// Estimated byte-size threshold for PTB payload data (key/value strings, resource paths, blob
 /// IDs, and per-command overhead). When `bytes_estimate` exceeds this, the PTB is considered
