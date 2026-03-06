@@ -265,9 +265,9 @@ impl SiteManager {
         walrus_pkg: ObjectID,
     ) -> Result<(
         ProgrammableTransaction,
-        Peekable<std::slice::Iter<'a, SiteOps<'a>>>,
+        (Peekable<std::slice::Iter<'a, SiteOps<'a>>>,
         Peekable<btree_map::Iter<'a, String, String>>,
-    )> {
+        ))> {
         // 1st iteration
         // Keep 4 operations for optional update_name + route deletion + creation + site-transfer
         const INITIAL_MAX: u16 = PTB_MAX_MOVE_CALLS - 4;
@@ -366,7 +366,7 @@ impl SiteManager {
             ptb.transfer_site(self.active_address()?)?;
         }
 
-        Ok((ptb.finish(), resources_iter, routes_iter))
+        Ok((ptb.finish(), (resources_iter, routes_iter)))
     }
 
     /// Fetches a fresh `CallArg` for the given site object from the chain.
@@ -452,20 +452,13 @@ impl SiteManager {
         // Build the initial PTB with retry on object version conflicts.
         // Version conflicts mean the PTB was rejected pre-execution (no on-chain effects),
         // so retrying is safe with no risk of double-spend.
-        let mut resources_iter = None;
-        let mut routes_iter = None;
-        let result = self
+        let (result, (mut resources_iter, mut routes_iter)) = self
             .send_ptb_retry_on_version_conflict("initial PTB", async |s: &mut Self| {
-                let (initial_ptb, ri, roi) = s.build_initial_ptb(updates, walrus_pkg).await?;
+                let (initial_ptb, iters) = s.build_initial_ptb(updates, walrus_pkg).await?;
                 assert!(initial_ptb.commands.len() <= PTB_MAX_MOVE_CALLS as usize);
-                resources_iter = Some(ri);
-                routes_iter = Some(roi);
-                Ok(initial_ptb)
+                Ok((initial_ptb, iters))
             })
             .await?;
-        // Unwrap is safe: the closure always sets these on the successful path.
-        let mut resources_iter = resources_iter.unwrap();
-        let mut routes_iter = routes_iter.unwrap();
 
         let site_object_id = match &self.site_id {
             Some(site_id) => *site_id,
@@ -481,24 +474,22 @@ impl SiteManager {
         // Version conflicts mean the PTB was rejected pre-execution (no on-chain effects),
         // so retrying is safe with no risk of double-spend.
         while resources_iter.peek().is_some() || routes_iter.peek().is_some() {
-            let res_iter_snapshot = resources_iter.clone();
-            let rou_iter_snapshot = routes_iter.clone();
-            self.send_ptb_retry_on_version_conflict("continuation PTB", async |s: &mut Self| {
-                resources_iter = res_iter_snapshot.clone();
-                routes_iter = rou_iter_snapshot.clone();
-                let call_arg = s.fetch_site_call_arg(site_object_id).await?;
-                let ptb = s.create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_pkg);
-                let mut ptb = ptb.with_call_arg(&call_arg)?;
-                ptb.add_resource_operations(&mut resources_iter)
-                    .ok_if_limit_reached()?;
-                // Add routes only if all resources have been added.
-                if resources_iter.peek().is_none() {
-                    ptb.add_route_operations(&mut routes_iter)
-                        .ok_if_limit_reached()?;
-                }
-                Ok(ptb.finish())
-            })
-            .await?;
+            let (_, iters) = self
+                .send_ptb_retry_on_version_conflict("continuation PTB", async |s: &mut Self| {
+                    let mut res_iter = resources_iter.clone();
+                    let mut rou_iter = routes_iter.clone();
+                    let call_arg = s.fetch_site_call_arg(site_object_id).await?;
+                    let ptb = s.create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_pkg);
+                    let mut ptb = ptb.with_call_arg(&call_arg)?;
+                    ptb.add_resource_operations(&mut res_iter).ok_if_limit_reached()?;
+                    // Add routes only if all resources have been added.
+                    if res_iter.peek().is_none() {
+                        ptb.add_route_operations(&mut rou_iter).ok_if_limit_reached()?;
+                    }
+                    Ok((ptb.finish(), (res_iter, rou_iter)))
+                })
+                .await?;
+            (resources_iter, routes_iter) = iters;
         }
 
         Ok(result)
@@ -510,14 +501,14 @@ impl SiteManager {
     /// The helper then fetches the gas coin, signs, and sends the PTB.
     /// On object version conflict (a pre-execution rejection with no on-chain effects),
     /// the entire build-and-send cycle is retried with exponential backoff.
-    async fn send_ptb_retry_on_version_conflict(
+    async fn send_ptb_retry_on_version_conflict<T>(
         &mut self,
         context: &str,
-        mut build_ptb: impl AsyncFnMut(&mut Self) -> Result<ProgrammableTransaction>,
-    ) -> Result<SuiTransactionBlockResponse> {
+        mut build_ptb: impl AsyncFnMut(&mut Self) -> Result<(ProgrammableTransaction, T)>,
+    ) -> Result<(SuiTransactionBlockResponse, T)> {
         let mut backoff = self.backoff_config.get_strategy(rand::random());
         loop {
-            let ptb = build_ptb(self).await?;
+            let (ptb, extra) = build_ptb(self).await?;
             let gas_ref = self.gas_coin_ref().await?;
             tracing::debug!(
                 num_commands = ptb.commands.len(),
@@ -526,7 +517,7 @@ impl SiteManager {
                 "sending PTB"
             );
             match self.sign_and_send_ptb(ptb, gas_ref).await {
-                Ok(result) if result.status_ok() == Some(true) => return Ok(result),
+                Ok(result) if result.status_ok() == Some(true) => return Ok((result, extra)),
                 Ok(result) => {
                     bail!("{context} transaction failed [tx_digest={}]", result.digest);
                 }
@@ -576,17 +567,17 @@ impl SiteManager {
         // Version conflicts mean the PTB was rejected pre-execution (no on-chain effects),
         // so retrying is safe with no risk of double-spend.
         while operations_iter.peek().is_some() {
-            let op_iter_snapshot = operations_iter.clone();
-            self.send_ptb_retry_on_version_conflict("execute_operations", async |s: &mut Self| {
-                operations_iter = op_iter_snapshot.clone();
-                let call_arg = s.fetch_site_call_arg(site_id).await?;
-                let ptb = s.create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_package);
-                let mut ptb = ptb.with_call_arg(&call_arg)?;
-                ptb.add_resource_operations(&mut operations_iter)
-                    .ok_if_limit_reached()?;
-                Ok(ptb.finish())
-            })
-            .await?;
+            let (_, op_iter) = self
+                .send_ptb_retry_on_version_conflict("execute_operations", async |s: &mut Self| {
+                    let mut op_iter = operations_iter.clone();
+                    let call_arg = s.fetch_site_call_arg(site_id).await?;
+                    let ptb = s.create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_package);
+                    let mut ptb = ptb.with_call_arg(&call_arg)?;
+                    ptb.add_resource_operations(&mut op_iter).ok_if_limit_reached()?;
+                    Ok((ptb.finish(), op_iter))
+                })
+                .await?;
+            operations_iter = op_iter;
         }
         Ok(())
     }
