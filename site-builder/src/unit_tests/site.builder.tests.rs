@@ -299,3 +299,156 @@ fn test_create_routes_respects_limit() {
         _ => panic!("Expected TooManyMoveCalls error"),
     }
 }
+
+// BCS size estimation const validation tests.
+//
+// These tests verify that our PTB size estimation constants are >= the actual BCS-serialized sizes.
+// If Sui changes the serialization of these types, these tests will catch it.
+mod ptb_size_consts {
+    use move_core_types::u256::U256;
+    use sui_types::{
+        base_types::{ObjectDigest, ObjectID, SequenceNumber},
+        digests::TransactionDigest,
+        transaction::{Argument, CallArg, Command, ObjectArg, ProgrammableMoveCall},
+        Identifier,
+    };
+
+    use super::super::*;
+
+    /// Helper: BCS-serialized size of a value.
+    fn bcs_size<T: serde::Serialize>(val: &T) -> usize {
+        bcs::serialized_size(val).expect("BCS serialization should succeed")
+    }
+
+    #[test]
+    fn test_ptb_argument_ref_size() {
+        // Argument::Input(u16) = enum tag (1) + u16 (2) = 3
+        assert!(PTB_ARGUMENT_REF_SIZE >= bcs_size(&Argument::Input(0)));
+        assert!(PTB_ARGUMENT_REF_SIZE >= bcs_size(&Argument::Input(u16::MAX)));
+        assert!(PTB_ARGUMENT_REF_SIZE >= bcs_size(&Argument::Result(0)));
+        assert_eq!(PTB_ARGUMENT_REF_SIZE, bcs_size(&Argument::Input(0)));
+    }
+
+    #[test]
+    fn test_ptb_move_call_size() {
+        // Test with the longest function name we use: "remove_all_routes_if_exist" (26 chars)
+        // and module "site" (4 chars).
+        let longest_call = Command::MoveCall(Box::new(ProgrammableMoveCall {
+            package: ObjectID::ZERO,
+            module: "site".to_string(),
+            function: "remove_all_routes_if_exist".to_string(),
+            type_arguments: vec![],
+            arguments: vec![], // argument refs are tracked separately
+        }));
+        let actual = bcs_size(&longest_call);
+        assert!(
+            PTB_MOVE_CALL_SIZE >= actual,
+            "PTB_MOVE_CALL_SIZE ({PTB_MOVE_CALL_SIZE}) < actual BCS size ({actual}) \
+             for longest move call"
+        );
+    }
+
+    #[test]
+    fn test_ptb_string_pure_arg_overhead() {
+        // Test with various string lengths to verify overhead is constant and <= our const.
+        for s in ["", "a", "test.txt", "long/path/to/some/resource.html"] {
+            let call_arg = CallArg::Pure(bcs::to_bytes(&s.to_string()).unwrap());
+            let actual_overhead = bcs_size(&call_arg) - s.len();
+            assert!(
+                PTB_STRING_PURE_ARG_OVERHEAD >= actual_overhead,
+                "PTB_STRING_PURE_ARG_OVERHEAD ({PTB_STRING_PURE_ARG_OVERHEAD}) < \
+                 actual overhead ({actual_overhead}) for string \"{s}\""
+            );
+        }
+    }
+
+    #[test]
+    fn test_ptb_u256_pure_arg_size() {
+        let call_arg = CallArg::Pure(bcs::to_bytes(&U256::zero()).unwrap());
+        let actual = bcs_size(&call_arg);
+        assert!(
+            PTB_U256_PURE_ARG_SIZE >= actual,
+            "PTB_U256_PURE_ARG_SIZE ({PTB_U256_PURE_ARG_SIZE}) < actual BCS size ({actual})"
+        );
+
+        // Also test with max value (same size since u256 is fixed-width).
+        let call_arg_max = CallArg::Pure(bcs::to_bytes(&U256::max_value()).unwrap());
+        assert_eq!(bcs_size(&call_arg_max), actual);
+    }
+
+    #[test]
+    fn test_ptb_range_none_size() {
+        // Two Option::None pure args.
+        let none_arg = CallArg::Pure(bcs::to_bytes(&Option::<u64>::None).unwrap());
+        let actual = 2 * bcs_size(&none_arg);
+        assert!(
+            PTB_RANGE_NONE_SIZE >= actual,
+            "PTB_RANGE_NONE_SIZE ({PTB_RANGE_NONE_SIZE}) < actual BCS size ({actual})"
+        );
+        assert_eq!(PTB_RANGE_NONE_SIZE, actual);
+    }
+
+    #[test]
+    fn test_ptb_range_some_size() {
+        // Two Option::Some(u64) pure args.
+        let some_arg = CallArg::Pure(bcs::to_bytes(&Some(u64::MAX)).unwrap());
+        let actual = 2 * bcs_size(&some_arg);
+        assert!(
+            PTB_RANGE_SOME_SIZE >= actual,
+            "PTB_RANGE_SOME_SIZE ({PTB_RANGE_SOME_SIZE}) < actual BCS size ({actual})"
+        );
+        assert_eq!(PTB_RANGE_SOME_SIZE, actual);
+    }
+
+    #[test]
+    fn test_ptb_extend_operation_size() {
+        use sui_types::programmable_transaction_builder::ProgrammableTransactionBuilder;
+
+        fn obj_digest() -> ObjectDigest {
+            ObjectDigest::new(TransactionDigest::default().into_inner())
+        }
+        fn owned_obj(id: ObjectID) -> ObjectArg {
+            ObjectArg::ImmOrOwnedObject((id, SequenceNumber::new(), obj_digest()))
+        }
+
+        let system_id = ObjectID::random();
+        let coin_id = ObjectID::random();
+        let package_id = ObjectID::random();
+
+        // Build a PTB with 4 extend_blob operations and verify the total fits within
+        // 4 * PTB_EXTEND_OPERATION_SIZE. The constant overhead from system + coin inputs
+        // is absorbed by the generous per-operation estimate.
+        let mut pt_builder = ProgrammableTransactionBuilder::new();
+        let system_arg = pt_builder
+            .obj(ObjectArg::SharedObject {
+                id: system_id,
+                initial_shared_version: SequenceNumber::new(),
+                mutability: sui_types::transaction::SharedObjectMutability::Mutable,
+            })
+            .unwrap();
+        let coin_arg = pt_builder.obj(owned_obj(coin_id)).unwrap();
+
+        for _ in 0..4 {
+            let blob_arg = pt_builder.obj(owned_obj(ObjectID::random())).unwrap();
+            let epochs_arg = pt_builder.pure(1u32).unwrap();
+            pt_builder.programmable_move_call(
+                package_id,
+                Identifier::new("system").unwrap(),
+                Identifier::new("extend_blob").unwrap(),
+                vec![],
+                vec![system_arg, blob_arg, epochs_arg, coin_arg],
+            );
+        }
+
+        let total = bcs_size(&pt_builder.finish());
+        assert!(
+            4 * PTB_EXTEND_OPERATION_SIZE >= total,
+            "4 * PTB_EXTEND_OPERATION_SIZE ({}) < actual total BCS size ({total})",
+            4 * PTB_EXTEND_OPERATION_SIZE,
+        );
+        println!(
+            "4 * PTB_EXTEND_OPERATION_SIZE ({}) < actual total BCS size ({total})",
+            4 * PTB_EXTEND_OPERATION_SIZE,
+        );
+    }
+}

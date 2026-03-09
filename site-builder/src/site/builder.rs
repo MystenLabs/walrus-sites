@@ -61,13 +61,13 @@ const PTB_MOVE_CALL_SIZE: usize = 100;
 /// enum variant tag (1) + u16 index (2) = 3 bytes.
 const PTB_ARGUMENT_REF_SIZE: usize = 3;
 
-/// BCS size of an `extend_blob` operation: owned object input (74) + u32 epochs pure arg (8) +
+/// BCS size of an `extend_blob` operation: owned object input (74) + u32 epochs pure arg (6) +
 /// move call (~100) + overhead, rounded up to 200.
 const PTB_EXTEND_OPERATION_SIZE: usize = 200;
 
-/// BCS overhead for a `String` pure argument: CallArg enum tag (1) + Pure `Vec<u8>` length (1-2)
-/// + BCS string length prefix (1-2) + padding. Rounded up to 10.
-/// The total size of a string input is `string.len() + PTB_STRING_PURE_ARG_OVERHEAD`.
+/// BCS overhead for a `String` pure argument: CallArg enum tag (1) + Pure `Vec<u8>` length (1-2) +
+/// BCS string length prefix (1-2) + padding. Rounded up to 10. The total size of a string input is
+/// `string.len() + PTB_STRING_PURE_ARG_OVERHEAD`.
 const PTB_STRING_PURE_ARG_OVERHEAD: usize = 10;
 
 /// BCS size of a `u256` pure argument: CallArg enum tag (1) + Pure `Vec<u8>` length (1) +
