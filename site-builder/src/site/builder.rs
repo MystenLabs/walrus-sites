@@ -66,7 +66,7 @@ impl HasIdentifier for FunctionTag<'_> {
 pub enum SitePtbBuilderError {
     #[error("Exceeded maximum number of move-calls ({0}) in Transaction")]
     TooManyMoveCalls(u16),
-    #[error("Estimation of exceeded maximum Transaction size ({0})")]
+    #[error("Estimated Transaction size ({0} bytes) exceeds maximum ({PTB_MAX_BYTES})")]
     PtbSizeEstimationExceeded(usize),
     #[error(transparent)]
     Other(#[from] anyhow::Error),
