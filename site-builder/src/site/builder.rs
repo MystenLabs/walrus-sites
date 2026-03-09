@@ -45,11 +45,11 @@ pub const PTB_MAX_MOVE_CALLS: u16 = 1000;
 /// IDs, and per-command overhead). When `bytes_estimate` exceeds this, the PTB is considered
 /// full. This is a secondary guard alongside the move-call limit.
 /// Note: We do not track things that take up "constant" size in the PTB, like the site-argument,
-/// the routes df replacement (WIP), metadata replacement etc.
+/// the routes df replacement, metadata replacement etc.
 // owned-object: 74 bytes
 // pure argument adds 2 bytes eg. u64: 10 bytes
 // move-call: ~73 + 3 x (arg) bytes -> 100 bytes
-pub const PTB_MAX_BYTES: usize = 50_000;
+pub const PTB_MAX_BYTES: usize = 120_000;
 
 trait HasIdentifier {
     fn identifier(&self) -> Identifier;

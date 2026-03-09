@@ -27,6 +27,7 @@ use sui_sdk::{
         SuiExecutionStatus,
         SuiObjectDataOptions,
         SuiTransactionBlockEffectsAPI,
+        SuiTransactionBlockResponse,
         SuiTransactionBlockResponseOptions,
         SuiTransactionBlockResponseQuery,
         TransactionFilter,
@@ -495,6 +496,44 @@ impl TestSetup {
         }
 
         Ok(blob_object_ids)
+    }
+
+    /// Returns transaction blocks that called any of the given `(module, function)` pairs on the
+    /// walrus_sites package.
+    pub async fn transaction_blocks_with_functions(
+        &self,
+        functions: &[(&str, &str)],
+    ) -> anyhow::Result<Vec<SuiTransactionBlockResponse>> {
+        let mut txs = std::collections::HashMap::new();
+        for &(module, function) in functions {
+            let resp = self
+                .client
+                .read_api()
+                .query_transaction_blocks(
+                    SuiTransactionBlockResponseQuery::new(
+                        Some(TransactionFilter::MoveFunction {
+                            package: self.walrus_sites_package_id,
+                            module: Some(module.to_string()),
+                            function: Some(function.to_string()),
+                        }),
+                        Some(SuiTransactionBlockResponseOptions {
+                            show_input: true,
+                            show_raw_input: true,
+                            ..Default::default()
+                        }),
+                    ),
+                    None,
+                    None,
+                    false,
+                )
+                .await?;
+            for tx in resp.data {
+                txs.entry(tx.digest).or_insert(tx);
+            }
+        }
+        let mut result: Vec<_> = txs.into_values().collect();
+        result.sort_by_key(|tx| tx.timestamp_ms.unwrap_or(0));
+        Ok(result)
     }
 
     // ============ Convenient accessors ============
