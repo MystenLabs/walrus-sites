@@ -160,7 +160,7 @@ impl Estimator {
         );
 
         // Build the initial PTB
-        let (initial_ptb, mut resources_iter, mut routes_iter) =
+        let (initial_ptb, (mut resources_iter, mut routes_iter)) =
             site_manager.build_initial_ptb(updates, walrus_pkg).await?;
 
         let gas_ref = site_manager.gas_coin_ref().await?;

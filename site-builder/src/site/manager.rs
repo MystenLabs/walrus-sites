@@ -10,11 +10,8 @@ use std::{
 use anyhow::{anyhow, bail, Context, Result};
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{
-    rpc_types::{
-        SuiExecutionStatus,
-        SuiTransactionBlockEffectsAPI as _,
-        SuiTransactionBlockResponse,
-    },
+    json_rpc_error::TRANSACTION_EXECUTION_CLIENT_ERROR_CODE,
+    rpc_types::SuiTransactionBlockResponse,
     wallet_context::WalletContext,
 };
 use sui_types::{
@@ -263,13 +260,15 @@ impl SiteManager {
     /// Builds the initial PTB for site creation/update with initial resources and
     /// blob extension operations.
     pub async fn build_initial_ptb<'a>(
-        &mut self,
+        &self,
         updates: &'a SiteDataDiff<'_>,
         walrus_pkg: ObjectID,
     ) -> Result<(
         ProgrammableTransaction,
-        Peekable<std::slice::Iter<'a, SiteOps<'a>>>,
-        Peekable<btree_map::Iter<'a, String, String>>,
+        (
+            Peekable<std::slice::Iter<'a, SiteOps<'a>>>,
+            Peekable<btree_map::Iter<'a, String, String>>,
+        ),
     )> {
         // 1st iteration
         // Keep 4 operations for optional update_name + route deletion + creation + site-transfer
@@ -371,11 +370,11 @@ impl SiteManager {
             ptb.transfer_site(self.active_address()?)?;
         }
 
-        Ok((ptb.finish(), resources_iter, routes_iter))
+        Ok((ptb.finish(), (resources_iter, routes_iter)))
     }
 
     /// Fetches a fresh `CallArg` for the given site object from the chain.
-    async fn fetch_site_call_arg(&mut self, site_object_id: ObjectID) -> Result<CallArg> {
+    async fn fetch_site_call_arg(&self, site_object_id: ObjectID) -> Result<CallArg> {
         let mut site_object_ref = self.wallet.get_object_ref(site_object_id).await?;
         site_object_ref = self.verify_object_ref_choose_latest(site_object_ref)?;
         Ok(site_object_ref.into())
@@ -399,7 +398,7 @@ impl SiteManager {
     /// because the latter requires extended validations like signed transactions.
     /// For our use case we actually need only high level verification and gas cost estimation.
     pub async fn dry_run_ptb(
-        &mut self,
+        &self,
         ptb: ProgrammableTransaction,
         gas_coin: ObjectRef,
     ) -> Result<sui_sdk::rpc_types::DevInspectResults> {
@@ -454,31 +453,16 @@ impl SiteManager {
             "starting to update site resources on chain",
         );
 
-        // Build the initial PTB
-        let (initial_ptb, mut resources_iter, mut routes_iter) =
-            self.build_initial_ptb(updates, walrus_pkg).await?;
-
-        assert!(initial_ptb.commands.len() <= PTB_MAX_MOVE_CALLS as usize);
-
-        // TODO(sew-498): Verify gas_ref. Currently, we do not have the last tx the user submitted
-        // through walrus.
-        let gas_ref = self.gas_coin_ref().await?;
-        tracing::debug!(
-            num_commands = initial_ptb.commands.len(),
-            ?gas_ref,
-            "sending initial site PTB"
-        );
-        let result = self.sign_and_send_ptb(initial_ptb, gas_ref).await?;
-
-        // Check explicitly for execution failures.
-        if let Some(SuiExecutionStatus::Failure { error }) =
-            result.effects.as_ref().map(|e| e.status())
-        {
-            bail!(
-                "site ptb failed with error: {error} [tx_digest={}]",
-                result.digest
-            );
-        }
+        // Build the initial PTB with retry on object version conflicts.
+        // Version conflicts mean the PTB was rejected pre-execution (no on-chain effects),
+        // so retrying is safe with no risk of double-spend.
+        let (result, (mut resources_iter, mut routes_iter)) = self
+            .send_ptb_retry_on_version_conflict("initial PTB", async |s: &mut Self| {
+                let (initial_ptb, iters) = s.build_initial_ptb(updates, walrus_pkg).await?;
+                assert!(initial_ptb.commands.len() <= PTB_MAX_MOVE_CALLS as usize);
+                Ok((initial_ptb, iters))
+            })
+            .await?;
 
         let site_object_id = match &self.site_id {
             Some(site_id) => *site_id,
@@ -490,41 +474,73 @@ impl SiteManager {
                 get_site_id_from_response(self.active_address()?, resp)?
             }
         };
-        // Execute remaining PTBs
+        // Execute remaining PTBs with retry on object version conflicts.
+        // Version conflicts mean the PTB was rejected pre-execution (no on-chain effects),
+        // so retrying is safe with no risk of double-spend.
         while resources_iter.peek().is_some() || routes_iter.peek().is_some() {
-            let call_arg = self.fetch_site_call_arg(site_object_id).await?;
+            (_, (resources_iter, routes_iter)) = self
+                .send_ptb_retry_on_version_conflict(
+                    "continuation PTB",
+                    async |site_manager: &mut Self| {
+                        // Clone the iterators so retries restart from the same position.
+                        let mut resources_iter = resources_iter.clone();
+                        let mut routes_iter = routes_iter.clone();
+                        let call_arg = site_manager.fetch_site_call_arg(site_object_id).await?;
+                        let ptb = site_manager.create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_pkg);
+                        let mut ptb = ptb.with_call_arg(&call_arg)?;
+                        ptb.add_resource_operations(&mut resources_iter)
+                            .ok_if_limit_reached()?;
+                        // Add routes only if all resources have been added.
+                        if resources_iter.peek().is_none() {
+                            ptb.add_route_operations(&mut routes_iter)
+                                .ok_if_limit_reached()?;
+                        }
+                        Ok((ptb.finish(), (resources_iter, routes_iter)))
+                    },
+                )
+                .await?;
+        }
 
-            let ptb = self.create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_pkg);
-            let mut ptb = ptb.with_call_arg(&call_arg)?;
+        Ok(result)
+    }
 
-            ptb.add_resource_operations(&mut resources_iter)
-                .ok_if_limit_reached()?;
-
-            // Add routes only if all resources have been added.
-            if resources_iter.peek().is_none() {
-                ptb.add_route_operations(&mut routes_iter)
-                    .ok_if_limit_reached()?;
-            }
-
-            let ptb = ptb.finish();
+    /// Builds and sends a PTB with retry on object version conflicts.
+    ///
+    /// The closure builds a `ProgrammableTransaction` using the provided `&mut Self`.
+    /// The helper then fetches the gas coin, signs, and sends the PTB.
+    /// On object version conflict (a pre-execution rejection with no on-chain effects),
+    /// the entire build-and-send cycle is retried with exponential backoff.
+    async fn send_ptb_retry_on_version_conflict<T>(
+        &mut self,
+        context: &str,
+        mut build_ptb: impl AsyncFnMut(&mut Self) -> Result<(ProgrammableTransaction, T)>,
+    ) -> Result<(SuiTransactionBlockResponse, T)> {
+        let mut backoff = self.backoff_config.get_strategy(rand::random());
+        loop {
+            let (ptb, extra) = build_ptb(self).await?;
             let gas_ref = self.gas_coin_ref().await?;
             tracing::debug!(
                 num_commands = ptb.commands.len(),
                 ?gas_ref,
-                "sending continuation site PTB"
+                %context,
+                "sending PTB"
             );
-            let resource_result = self.sign_and_send_ptb(ptb, gas_ref).await?;
-            if let Some(SuiExecutionStatus::Failure { error }) =
-                resource_result.effects.as_ref().map(|e| e.status())
-            {
-                anyhow::bail!(
-                    "resource ptb failed with error: {error} [tx_digest={}]",
-                    resource_result.digest
-                );
+            match self.sign_and_send_ptb(ptb, gas_ref).await {
+                Ok(result) if result.status_ok() == Some(true) => return Ok((result, extra)),
+                Ok(result) => {
+                    bail!("{context} transaction failed [tx_digest={}]", result.digest);
+                }
+                Err(e) if is_object_version_conflict(&e) => {
+                    if let Some(delay) = backoff.next() {
+                        warn!(?delay, %context, "object version conflict; retrying");
+                        tokio::time::sleep(delay).await;
+                    } else {
+                        return Err(e);
+                    }
+                }
+                Err(e) => return Err(e),
             }
         }
-
-        Ok(result)
     }
 
     pub async fn update_resources(&mut self, resources: ResourceSet) -> Result<()> {
@@ -556,18 +572,26 @@ impl SiteManager {
 
         tracing::debug!("modifying the site object on chain");
 
-        // Create PTBs until all operations are processed
+        // Create PTBs until all operations are processed, with retry on version conflicts.
+        // Version conflicts mean the PTB was rejected pre-execution (no on-chain effects),
+        // so retrying is safe with no risk of double-spend.
         while operations_iter.peek().is_some() {
-            let call_arg = self.fetch_site_call_arg(site_id).await?;
-
-            let ptb = self.create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_package);
-            let mut ptb = ptb.with_call_arg(&call_arg)?;
-
-            ptb.add_resource_operations(&mut operations_iter)
-                .ok_if_limit_reached()?;
-
-            let gas_ref = self.gas_coin_ref().await?;
-            self.sign_and_send_ptb(ptb.finish(), gas_ref).await?;
+            (_, operations_iter) = self
+                .send_ptb_retry_on_version_conflict(
+                    "execute_operations",
+                    async |site_manager: &mut Self| {
+                        // Clone the iterator so retries restart from the same position.
+                        let mut operations_iter = operations_iter.clone();
+                        let call_arg = site_manager.fetch_site_call_arg(site_id).await?;
+                        let mut ptb = site_manager
+                            .create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_package)
+                            .with_call_arg(&call_arg)?;
+                        ptb.add_resource_operations(&mut operations_iter)
+                            .ok_if_limit_reached()?;
+                        Ok((ptb.finish(), operations_iter))
+                    },
+                )
+                .await?;
         }
         Ok(())
     }
@@ -614,7 +638,7 @@ impl SiteManager {
     // TODO: Why require a **single** gas-coin and not do select_coins?
     /// Returns the [`ObjectRef`] of an arbitrary gas coin owned by the active wallet
     /// with a sufficient balance for the gas budget specified in the config.
-    pub async fn gas_coin_ref(&mut self) -> Result<ObjectRef> {
+    pub async fn gas_coin_ref(&self) -> Result<ObjectRef> {
         // Keep re-fetching the coin, until it matches the latest state stored by our cache, as
         // older versions might show more balance than its actual balance.
         let mut backoff = self.backoff_config.get_strategy(rand::random());
@@ -656,10 +680,7 @@ impl SiteManager {
         self.site_id.is_none()
     }
 
-    fn verify_object_ref_choose_latest(
-        &mut self,
-        object_ref: ObjectRef,
-    ) -> anyhow::Result<ObjectRef> {
+    fn verify_object_ref_choose_latest(&self, object_ref: ObjectRef) -> anyhow::Result<ObjectRef> {
         let cached: Option<&ObjectRef> = self.object_cache.get(&object_ref.0);
         match cached {
             // TODO(sew-503): Will we have a problem if during the execute we use an FN with an
@@ -671,17 +692,21 @@ impl SiteManager {
                 );
                 Ok(cached)
             }
-            Some(&cached) if cached != object_ref => {
-                // This should not happen as long as user is not executing transactions with this
-                // wallet-address in parallel.
+            Some(&cached) if cached.1 < object_ref.1 => {
+                // The fullnode returned a newer version than our cache. This can only happen if
+                // the user is submitting txs in parallel. We should not continue on this case.
                 bail!(
-                    "Fullnode returned newer object version ({object_ref:?}) than the one cached ({cached:?}"
+                    "Fullnode returned newer object reference ({object_ref:?}) than cached ({cached:?}). Is the same wallet submitting transactions in parallel?"
                 );
             }
-            None => {
-                self.object_cache.insert(object_ref.0, object_ref);
-                Ok(object_ref)
+            Some(&cached) if cached != object_ref => {
+                // Same version but different digest — indicates data corruption or an unexpected
+                // state.
+                bail!(
+                    "Fullnode returned conflicting object reference ({object_ref:?}) for cached ({cached:?})"
+                );
             }
+            // No entry in our cache or matching entry, just return the input
             _ => Ok(object_ref),
         }
     }
@@ -734,6 +759,39 @@ impl From<BlobExtensions> for ExtendOps {
             blobs_epochs,
         }
     }
+}
+
+/// Returns `true` if the error is a Sui object version conflict (ServerError
+/// TRANSACTION_EXECUTION_CLIENT_ERROR_CODE -32002).
+///
+/// This error occurs when a transaction references an object at a stale version,
+/// typically due to concurrent transactions consuming the same gas coin.
+fn is_object_version_conflict(err: &anyhow::Error) -> bool {
+    use jsonrpsee::core::ClientError;
+    use sui_sdk::error::Error as SuiSdkError;
+    use walrus_sui::client::SuiClientError;
+
+    let Some(SuiClientError::SuiSdkError(SuiSdkError::RpcError(ClientError::Call(error_obj)))) =
+        err.downcast_ref::<SuiClientError>()
+    else {
+        return false;
+    };
+
+    if error_obj.code() != TRANSACTION_EXECUTION_CLIENT_ERROR_CODE {
+        return false;
+    }
+
+    let message = error_obj.message();
+    static RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+        regex::Regex::new(
+            r"Error checking transaction input objects: Object ID 0x[0-9a-f]+ Version 0x[0-9a-f]+ Digest [0-9a-zA-Z]+ is not available for consumption, current version: 0x[0-9a-f]+"
+        ).unwrap()
+    });
+    if !RE.is_match(message) {
+        warn!("Unexpected error message format for ServerError({TRANSACTION_EXECUTION_CLIENT_ERROR_CODE}): {message}");
+        return false;
+    }
+    true
 }
 
 /// Collects the `BlobId`s from the site_updates Deleted ResourceOps.

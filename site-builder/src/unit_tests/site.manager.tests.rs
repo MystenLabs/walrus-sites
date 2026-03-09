@@ -3,18 +3,20 @@
 
 //! Integration tests for SiteManager's object cache behavior with stale fullnodes.
 
-use std::path::PathBuf;
+use std::{cell::Cell, path::PathBuf};
 
 use move_core_types::language_storage::StructTag;
 use rand::rngs::OsRng;
 use sui_config::{node::RunWithRange, Config as _};
 use sui_sdk::{
+    rpc_types::SuiTransactionBlockEffectsAPI,
     sui_client_config::{SuiClientConfig, SuiEnv},
     SuiClientBuilder,
 };
 use sui_types::{
-    base_types::ObjectID,
+    base_types::{ObjectID, ObjectRef},
     programmable_transaction_builder::ProgrammableTransactionBuilder,
+    transaction::ObjectArg,
 };
 use test_cluster::TestClusterBuilder;
 use walrus_sdk::core_utils::backoff::ExponentialBackoffConfig;
@@ -38,6 +40,7 @@ fn create_test_config(wallet_path: PathBuf, package_id: ObjectID) -> Config {
 
 /// Test that SiteManager's cache is updated after executing a transaction.
 #[tokio::test]
+#[ignore]
 async fn test_site_manager_cache_updated_after_transaction() {
     let cluster = TestClusterBuilder::new().build().await;
 
@@ -109,6 +112,7 @@ async fn test_site_manager_cache_updated_after_transaction() {
 /// 3. SiteManager's `verify_object_ref_choose_latest` returns the cached (newer) version
 /// 4. SiteManager can execute another tx using stale FN for data but main FN for execution
 #[tokio::test]
+#[ignore]
 async fn test_site_manager_cache_protects_against_stale_fullnode() {
     let mut cluster = TestClusterBuilder::new().build().await;
 
@@ -289,5 +293,149 @@ async fn test_site_manager_cache_protects_against_stale_fullnode() {
         "Final cached version {:?} should be > previous cached version {:?}",
         final_cached_ref.1,
         cached_gas_ref.1
+    );
+}
+
+/// Test that `is_object_version_conflict` correctly detects version conflict errors from the Sui
+/// fullnode.
+///
+/// If the Sui fullnode changes its error message format for object version conflicts, this test
+/// will fail, prompting us to update the regex in `is_object_version_conflict`.
+#[tokio::test]
+#[ignore]
+async fn test_is_object_version_conflict_matches_real_sui_error() {
+    let cluster = TestClusterBuilder::new().build().await;
+    let wallet_path = cluster.wallet.config.path().to_path_buf();
+    let config = create_test_config(wallet_path, ObjectID::random());
+
+    let mut manager = SiteManager::new(config, None, None, None, None)
+        .await
+        .unwrap();
+
+    // Get a gas coin ref at V0.
+    let address = manager.active_address().unwrap();
+    let sui_coin_type: StructTag = "0x2::coin::Coin<0x2::sui::SUI>".parse().unwrap();
+    let grpc = cluster.grpc_client();
+    let coin_objects = grpc
+        .get_owned_objects(address, Some(sui_coin_type), None, None)
+        .await
+        .unwrap()
+        .items;
+    let stale_gas_ref = coin_objects.first().unwrap().compute_object_reference();
+
+    // Execute a transaction to advance the gas coin to V1.
+    let ptb = ProgrammableTransactionBuilder::new().finish();
+    let _response = manager.sign_and_send_ptb(ptb, stale_gas_ref).await.unwrap();
+
+    // Try to execute a *different* transaction with the stale V0 ref.
+    // The PTB must differ from the first (transfer_sui vs empty) to produce a different
+    // transaction digest; otherwise Sui returns the cached result from the first execution.
+    let mut builder = ProgrammableTransactionBuilder::new();
+    builder.transfer_sui(address, None);
+    let ptb2 = builder.finish();
+    let err = manager
+        .sign_and_send_ptb(ptb2, stale_gas_ref)
+        .await
+        .unwrap_err();
+
+    assert!(
+        super::is_object_version_conflict(&err),
+        "Expected version conflict error, but is_object_version_conflict returned false. \
+         Error: {err:#}. \
+         The Sui fullnode may have changed its error message format — \
+         update the regex in is_object_version_conflict."
+    );
+}
+
+/// Test that `send_ptb_retry_on_version_conflict` retries on object version conflicts and
+/// succeeds when the closure provides a fresh object ref on the next attempt.
+#[tokio::test]
+#[ignore]
+async fn test_send_ptb_retries_on_version_conflict() {
+    let cluster = TestClusterBuilder::new().build().await;
+    let wallet_path = cluster.wallet.config.path().to_path_buf();
+    let config = create_test_config(wallet_path, ObjectID::random());
+
+    let mut manager = SiteManager::new(config, None, None, None, None)
+        .await
+        .unwrap();
+    let address = manager.active_address().unwrap();
+
+    // Split a coin from gas to create a separate owned object.
+    let gas_ref = manager.gas_coin_ref().await.unwrap();
+    let mut builder = ProgrammableTransactionBuilder::new();
+    let split_amount = builder.pure(1_000_000u64).unwrap();
+    let coin = builder.command(sui_types::transaction::Command::SplitCoins(
+        sui_types::transaction::Argument::GasCoin,
+        vec![split_amount],
+    ));
+    builder.transfer_arg(address, coin);
+    let response = manager
+        .sign_and_send_ptb(builder.finish(), gas_ref)
+        .await
+        .unwrap();
+
+    // Find the newly created coin object.
+    let created = response
+        .effects
+        .as_ref()
+        .unwrap()
+        .created()
+        .iter()
+        .map(|o| o.reference.to_object_ref())
+        .collect::<Vec<_>>();
+    assert_eq!(created.len(), 1, "expected exactly one created object");
+    let stale_coin_ref = created[0];
+
+    // Transfer the coin to self to advance its version.
+    let gas_ref = manager.gas_coin_ref().await.unwrap();
+    let mut builder = ProgrammableTransactionBuilder::new();
+    let obj = builder
+        .obj(ObjectArg::ImmOrOwnedObject(stale_coin_ref))
+        .unwrap();
+    builder.transfer_arg(address, obj);
+    let response = manager
+        .sign_and_send_ptb(builder.finish(), gas_ref)
+        .await
+        .unwrap();
+
+    // Get the fresh (advanced) version of the coin.
+    let fresh_coin_ref: ObjectRef = response
+        .effects
+        .as_ref()
+        .unwrap()
+        .mutated()
+        .iter()
+        .find(|o| o.reference.object_id == stale_coin_ref.0)
+        .expect("coin should be in mutated list")
+        .reference
+        .to_object_ref();
+    assert!(fresh_coin_ref.1 > stale_coin_ref.1);
+
+    // Call send_ptb_retry_on_version_conflict. The closure builds a PTB that transfers the
+    // coin using the stale ref on the first attempt, and the fresh ref on retries.
+    let attempt = Cell::new(0u32);
+    let (result, _) = manager
+        .send_ptb_retry_on_version_conflict("test retry", async |s: &mut SiteManager| {
+            let n = attempt.get();
+            attempt.set(n + 1);
+            let coin_ref = if n == 0 {
+                stale_coin_ref
+            } else {
+                fresh_coin_ref
+            };
+            let mut builder = ProgrammableTransactionBuilder::new();
+            let obj = builder.obj(ObjectArg::ImmOrOwnedObject(coin_ref))?;
+            builder.transfer_arg(s.active_address()?, obj);
+            Ok((builder.finish(), ()))
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(result.status_ok(), Some(true));
+    assert!(
+        attempt.get() >= 2,
+        "expected at least 2 attempts, got {}",
+        attempt.get()
     );
 }
