@@ -276,6 +276,7 @@ impl SiteManager {
         let mut ptb = self.create_site_ptb::<INITIAL_MAX>(walrus_pkg);
 
         // Start with blob-extensions. Assuming it won't take a lot of space in the PTB.
+        // See also comment in SitePtb::add_extend_operations
         if let ExtendOps::Extend {
             total_wal_cost,
             blobs_epochs,
@@ -338,11 +339,8 @@ impl SiteManager {
             ptb.update_name(site_name)?;
         }
 
-        let mut resources_iter = updates.resource_ops.iter().peekable();
-        ptb.add_resource_operations(&mut resources_iter)
-            .ok_if_limit_reached()?;
-
-        // Update ptb limit to add routes. Keep 1 operation for transfer.
+        // Add routes DF first to make sure it is included.
+        // Keep 1 spare PTB operation for transfer.
         const TRANSFER_MAX: u16 = PTB_MAX_MOVE_CALLS - 1;
         let mut ptb = ptb.with_max_move_calls::<TRANSFER_MAX>();
 
@@ -357,7 +355,11 @@ impl SiteManager {
             routes_iter = new_routes.0.iter().peekable();
         }
 
-        // Add routes only if all resources have been added.
+        let mut resources_iter = updates.resource_ops.iter().peekable();
+        ptb.add_resource_operations(&mut resources_iter)
+            .ok_if_limit_reached()?;
+
+        // Add routes only if all resources have been added and route replace succeeded.
         if resources_iter.peek().is_none() {
             ptb.add_route_operations(&mut routes_iter)
                 .ok_if_limit_reached()?;
