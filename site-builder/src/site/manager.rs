@@ -265,9 +265,11 @@ impl SiteManager {
         walrus_pkg: ObjectID,
     ) -> Result<(
         ProgrammableTransaction,
-        (Peekable<std::slice::Iter<'a, SiteOps<'a>>>,
-        Peekable<btree_map::Iter<'a, String, String>>,
-        ))> {
+        (
+            Peekable<std::slice::Iter<'a, SiteOps<'a>>>,
+            Peekable<btree_map::Iter<'a, String, String>>,
+        ),
+    )> {
         // 1st iteration
         // Keep 4 operations for optional update_name + route deletion + creation + site-transfer
         const INITIAL_MAX: u16 = PTB_MAX_MOVE_CALLS - 4;
@@ -474,22 +476,27 @@ impl SiteManager {
         // Version conflicts mean the PTB was rejected pre-execution (no on-chain effects),
         // so retrying is safe with no risk of double-spend.
         while resources_iter.peek().is_some() || routes_iter.peek().is_some() {
-            let (_, iters) = self
-                .send_ptb_retry_on_version_conflict("continuation PTB", async |s: &mut Self| {
-                    let mut res_iter = resources_iter.clone();
-                    let mut rou_iter = routes_iter.clone();
-                    let call_arg = s.fetch_site_call_arg(site_object_id).await?;
-                    let ptb = s.create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_pkg);
-                    let mut ptb = ptb.with_call_arg(&call_arg)?;
-                    ptb.add_resource_operations(&mut res_iter).ok_if_limit_reached()?;
-                    // Add routes only if all resources have been added.
-                    if res_iter.peek().is_none() {
-                        ptb.add_route_operations(&mut rou_iter).ok_if_limit_reached()?;
-                    }
-                    Ok((ptb.finish(), (res_iter, rou_iter)))
-                })
+            (_, (resources_iter, routes_iter)) = self
+                .send_ptb_retry_on_version_conflict(
+                    "continuation PTB",
+                    async |site_manager: &mut Self| {
+                        // Clone the iterators so retries restart from the same position.
+                        let mut resources_iter = resources_iter.clone();
+                        let mut routes_iter = routes_iter.clone();
+                        let call_arg = site_manager.fetch_site_call_arg(site_object_id).await?;
+                        let ptb = site_manager.create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_pkg);
+                        let mut ptb = ptb.with_call_arg(&call_arg)?;
+                        ptb.add_resource_operations(&mut resources_iter)
+                            .ok_if_limit_reached()?;
+                        // Add routes only if all resources have been added.
+                        if resources_iter.peek().is_none() {
+                            ptb.add_route_operations(&mut routes_iter)
+                                .ok_if_limit_reached()?;
+                        }
+                        Ok((ptb.finish(), (resources_iter, routes_iter)))
+                    },
+                )
                 .await?;
-            (resources_iter, routes_iter) = iters;
         }
 
         Ok(result)
@@ -567,17 +574,22 @@ impl SiteManager {
         // Version conflicts mean the PTB was rejected pre-execution (no on-chain effects),
         // so retrying is safe with no risk of double-spend.
         while operations_iter.peek().is_some() {
-            let (_, op_iter) = self
-                .send_ptb_retry_on_version_conflict("execute_operations", async |s: &mut Self| {
-                    let mut op_iter = operations_iter.clone();
-                    let call_arg = s.fetch_site_call_arg(site_id).await?;
-                    let mut ptb = s.create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_package)
-                        .with_call_arg(&call_arg)?;
-                    ptb.add_resource_operations(&mut op_iter).ok_if_limit_reached()?;
-                    Ok((ptb.finish(), op_iter))
-                })
+            (_, operations_iter) = self
+                .send_ptb_retry_on_version_conflict(
+                    "execute_operations",
+                    async |site_manager: &mut Self| {
+                        // Clone the iterator so retries restart from the same position.
+                        let mut operations_iter = operations_iter.clone();
+                        let call_arg = site_manager.fetch_site_call_arg(site_id).await?;
+                        let mut ptb = site_manager
+                            .create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_package)
+                            .with_call_arg(&call_arg)?;
+                        ptb.add_resource_operations(&mut operations_iter)
+                            .ok_if_limit_reached()?;
+                        Ok((ptb.finish(), operations_iter))
+                    },
+                )
                 .await?;
-            operations_iter = op_iter;
         }
         Ok(())
     }
