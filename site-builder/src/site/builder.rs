@@ -51,6 +51,38 @@ pub const PTB_MAX_MOVE_CALLS: u16 = 1000;
 // move-call: ~73 + 3 x (arg) bytes -> 100 bytes
 pub const PTB_MAX_BYTES: usize = 120_000;
 
+/// BCS size of a `Command::MoveCall` excluding argument references: enum tag (1) + package
+/// ObjectID (32) + module string (~16) + function string (~21) + empty type_arguments vec (1) +
+/// arguments vec length prefix (1). Rounds up to 100 to err on the high side.
+/// Input sizes (owned objects, pure args) are tracked separately.
+const PTB_MOVE_CALL_SIZE: usize = 100;
+
+/// BCS size of a single `Argument` reference inside a MoveCall's arguments vector:
+/// enum variant tag (1) + u16 index (2) = 3 bytes.
+const PTB_ARGUMENT_REF_SIZE: usize = 3;
+
+/// BCS size of an `extend_blob` operation: owned object input (74) + u32 epochs pure arg (8) +
+/// move call (~100) + overhead, rounded up to 200.
+const PTB_EXTEND_OPERATION_SIZE: usize = 200;
+
+/// BCS overhead for a `String` pure argument: CallArg enum tag (1) + Pure `Vec<u8>` length (1-2)
+/// + BCS string length prefix (1-2) + padding. Rounded up to 10.
+/// The total size of a string input is `string.len() + PTB_STRING_PURE_ARG_OVERHEAD`.
+const PTB_STRING_PURE_ARG_OVERHEAD: usize = 10;
+
+/// BCS size of a `u256` pure argument: CallArg enum tag (1) + Pure `Vec<u8>` length (1) +
+/// 32 bytes payload = 34. Rounded up to 40.
+const PTB_U256_PURE_ARG_SIZE: usize = 40;
+
+/// BCS size of an `Option<Range>` pure input when both fields are `None`: two `Option::None`
+/// pure args, each 3 bytes (CallArg tag (1) + Pure vec len (1) + ULEB128 length 0 (1)).
+const PTB_RANGE_NONE_SIZE: usize = 6;
+
+/// BCS size of an `Option<Range>` pure input when both fields are `Some(u64)`: two
+/// `Option::Some(u64)` pure args, each 11 bytes (CallArg tag (1) + Pure vec len (1) +
+/// ULEB128 length 1 (1) + u64 (8)).
+const PTB_RANGE_SOME_SIZE: usize = 22;
+
 trait HasIdentifier {
     fn identifier(&self) -> Identifier;
 }
@@ -256,9 +288,7 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
         let count = blobs_to_extend.len();
         // Check limits in advance as we currently do not support splitting extend operations
         // between ptbs.
-        // Each extend_blob costs ~200 bytes: owned-object (74) + epochs pure arg (10) +
-        // move-call (~100) + overhead, rounded up.
-        self.limits_check(count as u16, count * 200)?;
+        self.limits_check(count as u16, count * PTB_EXTEND_OPERATION_SIZE)?;
         for (blob_ref, epochs) in blobs_to_extend {
             self.extend_blob(blob_ref, epochs)?;
         }
@@ -298,7 +328,10 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
         // Each move call adds ~73 + 3 x (arg) bytes -> 100 bytes erroring on the high side.
         // (package ID + module + function + args encoding - BCS serialization of inputs/results
         // and object references are measured separately).
-        self.limits_check_and_update(1, 100 + call_args.len() * 3)?;
+        self.limits_check_and_update(
+            1,
+            PTB_MOVE_CALL_SIZE + call_args.len() * PTB_ARGUMENT_REF_SIZE,
+        )?;
         Ok(self.pt_builder.programmable_move_call(
             self.package,
             self.module.clone(),
@@ -342,9 +375,7 @@ impl<T, const MAX_MOVE_CALLS: u16> SitePtb<T, MAX_MOVE_CALLS> {
     }
 
     fn extend_blob(&mut self, blob_ref: ObjectRef, epochs: u32) -> SitePtbBuilderResult<()> {
-        // owned-object: 74 + epochs: 10 = 84 -> 100 bytes
-        // move-call: ~73 + 3 x (arg) bytes -> 100 bytes
-        self.limits_check_and_update(1, 200)?;
+        self.limits_check_and_update(1, PTB_EXTEND_OPERATION_SIZE)?;
         let blob_obj_arg = self.pt_builder.obj(ObjectArg::ImmOrOwnedObject(blob_ref))?;
         let epochs_move_arg = self.pt_builder.pure(epochs)?;
         // Call walrus::system::extend_blob directly using the walrus package,
@@ -498,8 +529,7 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
     /// Adds the move calls to remove a resource from the site, if the resource exists.
     pub fn remove_resource_if_exists(&mut self, resource: &Resource) -> SitePtbBuilderResult<()> {
         tracing::debug!(resource=%resource.info.path, "new Move call: removing resource");
-        // strings need string.len() + length_encoded bytes (4-6).
-        self.ptb_size_check_and_update(resource.info.path.len() + 10)?;
+        self.ptb_size_check_and_update(resource.info.path.len() + PTB_STRING_PURE_ARG_OVERHEAD)?;
         let path_input = self.pt_builder.input(pure_call_arg(&resource.info.path)?)?;
         self.add_programmable_move_call(
             contracts::site::remove_resource_if_exists.identifier(),
@@ -567,23 +597,18 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
     }
 
     fn new_resource_ptb_size_estimation(resource: &Resource) -> usize {
-        let headers_size = resource
-            .info
-            .headers
-            .iter()
-            .fold(0_usize, |size, h| size + h.0.len() + h.1.len() + 20);
+        let headers_size = resource.info.headers.iter().fold(0_usize, |size, h| {
+            size + h.0.len() + h.1.len() + 2 * PTB_STRING_PURE_ARG_OVERHEAD
+        });
         let range_size = match resource.info.range {
-            // Two Option::None fields: 3 bytes each (CallArg tag + Pure vec len + option tag).
-            None => 6,
-            // Two Option::Some(u64) fields: 11 bytes each (3 + 8 bytes for u64).
-            Some(_) => 22,
+            None => PTB_RANGE_NONE_SIZE,
+            Some(_) => PTB_RANGE_SOME_SIZE,
         };
-        // Track estimated serialized size: path + blob_id (32 bytes) + blob_hash + overhead
-        headers_size + range_size + resource.info.path.len() + 32 + 32 + 30 // each argument needs
-                                                                            // extra 2 bytes with
-                                                                            // the exception of
-                                                                            // string which needs
-                                                                            // more.
+        headers_size
+            + range_size
+            + resource.info.path.len()
+            + PTB_STRING_PURE_ARG_OVERHEAD
+            + 2 * PTB_U256_PURE_ARG_SIZE
     }
 
     fn create_range(&mut self, range: &Option<Range>) -> SitePtbBuilderResult<Argument> {
@@ -621,7 +646,7 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
         value: &str,
     ) -> SitePtbBuilderResult<()> {
         // Track estimated serialized size: key + value + BCS overhead.
-        self.ptb_size_check_and_update(key.len() + value.len() + 20)?;
+        self.ptb_size_check_and_update(key.len() + value.len() + 2 * PTB_STRING_PURE_ARG_OVERHEAD)?;
         let name_input = self.pt_builder.input(pure_call_arg(&key.to_owned())?)?;
         let value_input = self.pt_builder.input(pure_call_arg(&value.to_owned())?)?;
         self.add_programmable_move_call(
