@@ -571,8 +571,8 @@ impl SiteManager {
                 .send_ptb_retry_on_version_conflict("execute_operations", async |s: &mut Self| {
                     let mut op_iter = operations_iter.clone();
                     let call_arg = s.fetch_site_call_arg(site_id).await?;
-                    let ptb = s.create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_package);
-                    let mut ptb = ptb.with_call_arg(&call_arg)?;
+                    let mut ptb = s.create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_package)
+                        .with_call_arg(&call_arg)?;
                     ptb.add_resource_operations(&mut op_iter).ok_if_limit_reached()?;
                     Ok((ptb.finish(), op_iter))
                 })
