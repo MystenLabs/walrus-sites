@@ -122,7 +122,7 @@ if [[ -n "$WALRUS_REF" ]]; then
 
     # Replace whichever of rev/tag is currently used on Walrus dependency lines.
     echo "Updating site-builder/Cargo.toml (Walrus deps) ..."
-    sed -i -E "/github\.com\/MystenLabs\/walrus/s|(rev|tag) = \"[^\"]+\"|${WALRUS_KEY} = \"${WALRUS_VAL}\"|g" \
+    sed -i -E "/github\.com\/MystenLabs\/walrus/s#(rev|tag) = \"[^\"]+\"#${WALRUS_KEY} = \"${WALRUS_VAL}\"#g" \
         "$REPO_ROOT/site-builder/Cargo.toml"
 fi
 
