@@ -100,25 +100,29 @@ fi
 
 # --- Walrus bump ---
 if [[ -n "$WALRUS_REF" ]]; then
-    # Resolve non-SHA refs via git ls-remote.
     if [[ "$WALRUS_REF" =~ ^[0-9a-f]{40}$ ]]; then
-        WALRUS_SHA="$WALRUS_REF"
+        # Raw SHA: use rev.
+        WALRUS_KEY="rev"
+        WALRUS_VAL="$WALRUS_REF"
     else
-        echo "Resolving Walrus ref '$WALRUS_REF' via git ls-remote ..."
-        WALRUS_SHA=$(git ls-remote "https://github.com/MystenLabs/walrus" "$WALRUS_REF" \
+        # Verify the ref exists on the remote.
+        RESOLVED=$(git ls-remote "https://github.com/MystenLabs/walrus" "$WALRUS_REF" \
             | head -1 | awk '{print $1}')
-        if [[ -z "$WALRUS_SHA" || ! "$WALRUS_SHA" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "Error: could not resolve '$WALRUS_REF' to a commit SHA"
+        if [[ -z "$RESOLVED" || ! "$RESOLVED" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Error: could not resolve '$WALRUS_REF' on the remote"
             exit 1
         fi
-        echo "Resolved to SHA: $WALRUS_SHA"
+        echo "Verified ref '$WALRUS_REF' resolves to $RESOLVED"
+        # Tag or branch name: use tag so Cargo.toml stays human-readable.
+        WALRUS_KEY="tag"
+        WALRUS_VAL="$WALRUS_REF"
     fi
 
-    echo "=== Bumping Walrus rev to $WALRUS_SHA ==="
+    echo "=== Bumping Walrus to $WALRUS_KEY = \"$WALRUS_VAL\" ==="
 
-    # Update rev references on lines containing github.com/MystenLabs/walrus.
-    echo "Updating site-builder/Cargo.toml (Walrus revs) ..."
-    sed -i -E "/github\.com\/MystenLabs\/walrus/s|rev = \"[^\"]+\"|rev = \"${WALRUS_SHA}\"|g" \
+    # Replace whichever of rev/tag is currently used on Walrus dependency lines.
+    echo "Updating site-builder/Cargo.toml (Walrus deps) ..."
+    sed -i -E "/github\.com\/MystenLabs\/walrus/s|(rev|tag) = \"[^\"]+\"|${WALRUS_KEY} = \"${WALRUS_VAL}\"|g" \
         "$REPO_ROOT/site-builder/Cargo.toml"
 fi
 
@@ -141,4 +145,4 @@ fi
 echo ""
 echo "=== Done ==="
 if [[ -n "$SUI_TAG" ]]; then echo "  Sui: $SUI_TAG"; fi
-if [[ -n "$WALRUS_REF" ]]; then echo "  Walrus: $WALRUS_SHA"; fi
+if [[ -n "$WALRUS_REF" ]]; then echo "  Walrus: $WALRUS_KEY = \"$WALRUS_VAL\""; fi
