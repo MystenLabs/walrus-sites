@@ -160,7 +160,15 @@ jobs:
           git -c user.name="github-actions[bot]" \
               -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
               commit -m "$TITLE"
-          git push origin "$BRANCH"
+          # Push using AUTOMERGE_TOKEN so the push comes from the walrus-automerge app
+          # instead of github-actions[bot]. Pushes made with GITHUB_TOKEN do not trigger
+          # CI workflows (GitHub suppresses them to prevent recursive loops).
+          if [[ -n "${AUTOMERGE_TOKEN:-}" ]]; then
+            git -c "http.https://github.com/.extraheader=Authorization: basic $(echo -n "x-access-token:${AUTOMERGE_TOKEN}" | base64)" \
+              push -u origin "$BRANCH"
+          else
+            git push -u origin "$BRANCH"
+          fi
           PR_URL=$(gh pr create --title "$TITLE" --body "$BODY" \
             --reviewer "wbbradley,nikos-terzo,geomel,ebmifa")
           echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
