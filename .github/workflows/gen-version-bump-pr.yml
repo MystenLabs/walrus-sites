@@ -147,7 +147,12 @@ jobs:
           fi
 
           if [[ -n "$WALRUS_REF" ]]; then
-            SHORT_REF="${WALRUS_REF:0:8}"
+            # Only truncate if the ref is a full SHA; keep tags/branches as-is.
+            if [[ "$WALRUS_REF" =~ ^[0-9a-f]{40}$ ]]; then
+              SHORT_REF="${WALRUS_REF:0:8}"
+            else
+              SHORT_REF="$WALRUS_REF"
+            fi
             PARTS+=("walrus-${SHORT_REF}")
             TITLE_PARTS+=("Walrus to ${SHORT_REF}")
             BODY_LINES+=("- \`site-builder/Cargo.toml\` — Walrus rev references")
