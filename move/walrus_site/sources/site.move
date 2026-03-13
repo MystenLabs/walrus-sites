@@ -2,14 +2,24 @@
 module walrus_site::site;
 
 use std::string::String;
-use sui::{display::{Self, Display}, dynamic_field as df, package::{Self, Publisher}, vec_map};
-use walrus_site::{events::{emit_site_created, emit_site_burned}, metadata::Metadata};
+use sui::display::{Self, Display};
+use sui::dynamic_field as df;
+use sui::package::{Self, Publisher};
+use sui::vec_map;
+use walrus_site::events::{emit_site_created, emit_site_burned};
+use walrus_site::metadata::Metadata;
+use walrus_site::redirects::{Redirects, redirects_field};
+
+use fun df::add as UID.df_add;
+use fun df::borrow_mut as UID.df_mut;
+use fun df::remove as UID.df_remove;
+use fun df::remove_if_exists as UID.df_remove_if_exists;
 
 /// The name of the dynamic field containing the routes.
 const ROUTES_FIELD: vector<u8> = b"routes";
 
-/// An insertion of route was attempted, but the related resource does not exist.
-const EResourceDoesNotExist: u64 = 0;
+// Abort code no longer used in new version
+// const EResourceDoesNotExist: u64 = 0;
 const ERangeStartGreaterThanRangeEnd: u64 = 1;
 const EStartAndEndRangeAreNone: u64 = 2;
 
@@ -44,7 +54,7 @@ public struct Resource has drop, store {
 
 public struct Range has drop, store {
     start: Option<u64>, // inclusive lower bound
-    end: Option<u64>, // exclusive upper bound
+    end: Option<u64>, // inclusive upper bound
 }
 
 /// Representation of the resource path.
@@ -211,6 +221,17 @@ public fun create_routes(site: &mut Site) {
     df::add(&mut site.id, ROUTES_FIELD, routes);
 }
 
+/// Populates the routes dynamic field with the given entries.
+///
+/// Entries are inserted in reverse order (via `zip_do_reverse!`), so the caller
+/// should pass the vectors in reverse of the desired VecMap order, if ordering is important.
+///
+/// Aborts if any route source is duplicated.
+public fun fill_routes(self: &mut Site, from: vector<String>, to: vector<String>) {
+    let Routes { route_list } = self.id.df_mut(ROUTES_FIELD);
+    from.zip_do_reverse!(to, |from, to| route_list.insert(from, to));
+}
+
 /// Remove all routes from the site.
 public fun remove_all_routes_if_exist(site: &mut Site): Option<Routes> {
     df::remove_if_exists(&mut site.id, ROUTES_FIELD)
@@ -218,12 +239,8 @@ public fun remove_all_routes_if_exist(site: &mut Site): Option<Routes> {
 
 /// Add a route to the site.
 ///
-/// The insertion operation fails:
-/// - if the route already exists; or
-/// - if the related resource path does not already exist as a dynamic field on the site.
+/// The insertion operation fails if the route already exists.
 public fun insert_route(site: &mut Site, route: String, resource_path: String) {
-    let path_obj = new_path(resource_path);
-    assert!(df::exists_(&site.id, path_obj), EResourceDoesNotExist);
     let routes = df::borrow_mut(&mut site.id, ROUTES_FIELD);
     routes_insert(routes, route, resource_path);
 }
@@ -232,6 +249,58 @@ public fun insert_route(site: &mut Site, route: String, resource_path: String) {
 public fun remove_route(site: &mut Site, route: &String): (String, String) {
     let routes = df::borrow_mut(&mut site.id, ROUTES_FIELD);
     routes_remove(routes, route)
+}
+
+// === redirects ===
+
+/// Adds the redirects dynamic field to the site.
+public fun set_redirects(self: &mut Site, redirects: Redirects) {
+    self.id.df_add(redirects_field!(), redirects);
+}
+
+/// Populates the redirects dynamic field with the given entries.
+///
+/// Entries are inserted in reverse order (via `pop_back`), so the caller should
+/// pass the vectors in reverse of the desired VecMap order, if ordering is important.
+///
+/// Aborts if the vectors have different lengths, any status code is invalid,
+/// or any path is duplicated.
+public fun fill_redirects(
+    self: &mut Site,
+    from: vector<String>,
+    to: vector<String>,
+    status_codes: vector<u16>,
+) {
+    let redirects: &mut Redirects = self.id.df_mut(redirects_field!());
+    redirects.fill(from, to, status_codes)
+}
+
+/// Removes and returns the redirects dynamic field from the site.
+///
+/// Aborts if the redirects dynamic field does not exist.
+public fun take_redirects(self: &mut Site): Redirects {
+    self.id.df_remove(redirects_field!())
+}
+
+/// Removes and returns the redirects dynamic field if it exists.
+public fun take_redirects_if_exist(self: &mut Site): Option<Redirects> {
+    self.id.df_remove_if_exists(redirects_field!())
+}
+
+/// Adds a single redirect to the site.
+///
+/// Aborts if the path already exists or the status code is invalid.
+public fun insert_redirect(self: &mut Site, from: String, to: String, status_code: u16) {
+    let redirects: &mut Redirects = self.id.df_mut(redirects_field!());
+    redirects.insert(from, to, status_code)
+}
+
+/// Removes a single redirect from the site.
+///
+/// Aborts if the redirect does not exist.
+public fun remove_redirect(self: &mut Site, from: &String): (String, String, u16) {
+    let redirects: &mut Redirects = self.id.df_mut(redirects_field!());
+    redirects.remove(from)
 }
 
 /// Deletes a site object.
