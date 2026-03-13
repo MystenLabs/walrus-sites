@@ -11,17 +11,23 @@ use walrus_site::metadata::Metadata;
 use walrus_site::redirects::{Redirects, redirects_field};
 
 use fun df::add as UID.df_add;
+use fun df::borrow as UID.df;
 use fun df::borrow_mut as UID.df_mut;
+use fun df::exists_ as UID.df_exists;
 use fun df::remove as UID.df_remove;
 use fun df::remove_if_exists as UID.df_remove_if_exists;
 
 /// The name of the dynamic field containing the routes.
 const ROUTES_FIELD: vector<u8> = b"routes";
 
-// Abort code no longer used in new version
+// Abort code no longer used
 // const EResourceDoesNotExist: u64 = 0;
 const ERangeStartGreaterThanRangeEnd: u64 = 1;
 const EStartAndEndRangeAreNone: u64 = 2;
+/// Redirects must be removed before burning a site to reclaim storage rebates.
+const ERemoveRedirectsFirst: u64 = 3;
+/// Routes must be removed before burning a site to reclaim storage rebates.
+const ERemoveRoutesFirst: u64 = 4;
 
 /// The site published on Sui.
 public struct Site has key, store {
@@ -253,7 +259,16 @@ public fun remove_route(site: &mut Site, route: &String): (String, String) {
 
 // === redirects ===
 
+/// Returns an immutable reference to the redirects dynamic field.
+///
+/// Aborts if the redirects dynamic field does not exist.
+public fun redirects(self: &Site): &Redirects {
+    self.id.df(redirects_field!())
+}
+
 /// Adds the redirects dynamic field to the site.
+///
+/// Aborts if the redirects dynamic field already exists.
 public fun set_redirects(self: &mut Site, redirects: Redirects) {
     self.id.df_add(redirects_field!(), redirects);
 }
@@ -305,16 +320,22 @@ public fun remove_redirect(self: &mut Site, from: &String): (String, String, u16
 
 /// Deletes a site object.
 ///
-/// NB: This function does **NOT** delete the dynamic fields! Make sure to call this function
-/// after deleting manually all the dynamic fields attached to the sites object. If you don't
-/// delete the dynamic fields, they will become unaccessible and you will not be able to delete
-/// them in the future.
+/// Routes and redirects must be removed before calling this function, so
+/// that their storage rebates are returned to the caller. Aborts with
+/// `ERemoveRoutesFirst` or `ERemoveRedirectsFirst` if either dynamic field
+/// still exists.
+///
+/// NB: Resource dynamic fields are **not** checked — the caller is responsible
+/// for removing them beforehand. Any resources left attached become
+/// inaccessible and their storage rebates are lost.
 public fun burn(site: Site) {
-    emit_site_burned(object::id(&site));
     let Site {
         id,
         ..,
     } = site;
+    assert!(!id.df_exists(ROUTES_FIELD), ERemoveRoutesFirst);
+    assert!(!id.df_exists(redirects_field!()), ERemoveRedirectsFirst);
+    emit_site_burned(id.to_inner());
     id.delete();
 }
 

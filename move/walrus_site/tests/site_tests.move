@@ -4,6 +4,8 @@ module walrus_site::site_tests;
 use sui::test_scenario;
 use walrus_site::site::{
     ERangeStartGreaterThanRangeEnd,
+    ERemoveRedirectsFirst,
+    ERemoveRoutesFirst,
     EStartAndEndRangeAreNone,
     Site,
     Range,
@@ -477,6 +479,88 @@ fun test_site_insert_redirect_invalid_status_code() {
 
         site.insert_redirect(b"/a".to_string(), b"/b".to_string(), 500);
 
+        site.take_redirects();
+        walrus_site::site::burn(site);
+    };
+    scenario.end();
+}
+
+// === burn assertions ===
+
+#[test]
+#[expected_failure(abort_code = ERemoveRoutesFirst)]
+fun test_burn_fails_with_routes() {
+    let owner = @0xCAFE;
+    let mut scenario = test_scenario::begin(owner);
+    {
+        let metadata = walrus_site::metadata::new_metadata(
+            option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
+        );
+        let mut site = walrus_site::site::new_site(
+            b"Test".to_string(),
+            metadata,
+            scenario.ctx(),
+        );
+
+        walrus_site::site::create_routes(&mut site);
+        walrus_site::site::burn(site);
+    };
+    scenario.end();
+}
+
+#[test]
+#[expected_failure(abort_code = ERemoveRedirectsFirst)]
+fun test_burn_fails_with_redirects() {
+    let owner = @0xCAFE;
+    let mut scenario = test_scenario::begin(owner);
+    {
+        let metadata = walrus_site::metadata::new_metadata(
+            option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
+        );
+        let mut site = walrus_site::site::new_site(
+            b"Test".to_string(),
+            metadata,
+            scenario.ctx(),
+        );
+
+        let redirects = walrus_site::redirects::empty();
+        site.set_redirects(redirects);
+        walrus_site::site::burn(site);
+    };
+    scenario.end();
+}
+
+#[test]
+fun test_burn_succeeds_after_removing_routes_and_redirects() {
+    let owner = @0xCAFE;
+    let mut scenario = test_scenario::begin(owner);
+    {
+        let metadata = walrus_site::metadata::new_metadata(
+            option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
+        );
+        let mut site = walrus_site::site::new_site(
+            b"Test".to_string(),
+            metadata,
+            scenario.ctx(),
+        );
+
+        walrus_site::site::create_routes(&mut site);
+        let redirects = walrus_site::redirects::empty();
+        site.set_redirects(redirects);
+
+        walrus_site::site::remove_all_routes_if_exist(&mut site);
         site.take_redirects();
         walrus_site::site::burn(site);
     };
