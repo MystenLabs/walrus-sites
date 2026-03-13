@@ -57,8 +57,23 @@ jobs:
             echo "Resolved latest Sui tag: $SUI_TAG"
           fi
 
+          # When bumping Walrus without an explicit Sui tag, extract the Sui
+          # version that the Walrus ref depends on so both stay in lockstep.
+          if [[ -n "$WALRUS_REF" && -z "$SUI_TAG" ]]; then
+            echo "Detecting Sui version from Walrus ref '$WALRUS_REF' ..."
+            SUI_TAG=$(gh api "repos/MystenLabs/walrus/contents/Cargo.toml?ref=$WALRUS_REF" \
+              --jq '.content' | base64 -d \
+              | grep -P '^sui-types\s*=' | grep -oP 'tag = "\Ktestnet-v[0-9]+\.[0-9]+\.[0-9]+')
+            if [[ -z "$SUI_TAG" ]]; then
+              echo "Error: could not extract Sui tag from Walrus Cargo.toml at ref '$WALRUS_REF'"
+              exit 1
+            fi
+            echo "Resolved Sui tag from Walrus: $SUI_TAG"
+          fi
+
           echo "sui_tag=$SUI_TAG" >> "$GITHUB_OUTPUT"
           echo "walrus_ref=$WALRUS_REF" >> "$GITHUB_OUTPUT"
+          echo "Resolved inputs — sui_tag: '${SUI_TAG:-<empty>}', walrus_ref: '${WALRUS_REF:-<empty>}'"
 
       - name: Install Sui via suiup
         env:
@@ -132,7 +147,12 @@ jobs:
           fi
 
           if [[ -n "$WALRUS_REF" ]]; then
-            SHORT_REF="${WALRUS_REF:0:8}"
+            # Only truncate if the ref is a full SHA; keep tags/branches as-is.
+            if [[ "$WALRUS_REF" =~ ^[0-9a-f]{40}$ ]]; then
+              SHORT_REF="${WALRUS_REF:0:8}"
+            else
+              SHORT_REF="$WALRUS_REF"
+            fi
             PARTS+=("walrus-${SHORT_REF}")
             TITLE_PARTS+=("Walrus to ${SHORT_REF}")
             BODY_LINES+=("- \`site-builder/Cargo.toml\` — Walrus rev references")
