@@ -239,11 +239,16 @@ fun test_site_fill_routes() {
     let mut scenario = test_scenario::begin(owner);
     {
         let metadata = walrus_site::metadata::new_metadata(
-            option::none(), option::none(), option::none(),
-            option::none(), option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
         );
         let mut site = walrus_site::site::new_site(
-            b"Test".to_string(), metadata, scenario.ctx(),
+            b"Test".to_string(),
+            metadata,
+            scenario.ctx(),
         );
 
         walrus_site::site::create_routes(&mut site);
@@ -270,11 +275,16 @@ fun test_site_set_and_take_redirects() {
     let mut scenario = test_scenario::begin(owner);
     {
         let metadata = walrus_site::metadata::new_metadata(
-            option::none(), option::none(), option::none(),
-            option::none(), option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
         );
         let mut site = walrus_site::site::new_site(
-            b"Test".to_string(), metadata, scenario.ctx(),
+            b"Test".to_string(),
+            metadata,
+            scenario.ctx(),
         );
 
         let redirects = walrus_site::redirects::filled(
@@ -301,11 +311,16 @@ fun test_site_insert_and_remove_redirect() {
     let mut scenario = test_scenario::begin(owner);
     {
         let metadata = walrus_site::metadata::new_metadata(
-            option::none(), option::none(), option::none(),
-            option::none(), option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
         );
         let mut site = walrus_site::site::new_site(
-            b"Test".to_string(), metadata, scenario.ctx(),
+            b"Test".to_string(),
+            metadata,
+            scenario.ctx(),
         );
 
         let redirects = walrus_site::redirects::empty();
@@ -332,11 +347,16 @@ fun test_site_fill_redirects() {
     let mut scenario = test_scenario::begin(owner);
     {
         let metadata = walrus_site::metadata::new_metadata(
-            option::none(), option::none(), option::none(),
-            option::none(), option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
         );
         let mut site = walrus_site::site::new_site(
-            b"Test".to_string(), metadata, scenario.ctx(),
+            b"Test".to_string(),
+            metadata,
+            scenario.ctx(),
         );
 
         let redirects = walrus_site::redirects::empty();
@@ -368,11 +388,16 @@ fun test_site_take_redirects_if_exist() {
     let mut scenario = test_scenario::begin(owner);
     {
         let metadata = walrus_site::metadata::new_metadata(
-            option::none(), option::none(), option::none(),
-            option::none(), option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
         );
         let mut site = walrus_site::site::new_site(
-            b"Test".to_string(), metadata, scenario.ctx(),
+            b"Test".to_string(),
+            metadata,
+            scenario.ctx(),
         );
 
         // No redirects set yet — should return none.
@@ -401,11 +426,16 @@ fun test_site_fill_redirects_invalid_status_code() {
     let mut scenario = test_scenario::begin(owner);
     {
         let metadata = walrus_site::metadata::new_metadata(
-            option::none(), option::none(), option::none(),
-            option::none(), option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
         );
         let mut site = walrus_site::site::new_site(
-            b"Test".to_string(), metadata, scenario.ctx(),
+            b"Test".to_string(),
+            metadata,
+            scenario.ctx(),
         );
 
         let redirects = walrus_site::redirects::empty();
@@ -430,11 +460,16 @@ fun test_site_insert_redirect_invalid_status_code() {
     let mut scenario = test_scenario::begin(owner);
     {
         let metadata = walrus_site::metadata::new_metadata(
-            option::none(), option::none(), option::none(),
-            option::none(), option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
         );
         let mut site = walrus_site::site::new_site(
-            b"Test".to_string(), metadata, scenario.ctx(),
+            b"Test".to_string(),
+            metadata,
+            scenario.ctx(),
         );
 
         let redirects = walrus_site::redirects::empty();

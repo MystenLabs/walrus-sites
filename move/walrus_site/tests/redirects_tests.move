@@ -8,7 +8,7 @@ use walrus_site::redirects::{
     Self,
     EInvalidRedirectStatusCode,
     ELocationsLength,
-    EStatusCodesLengths,
+    EStatusCodesLengths
 };
 
 // === filled ===
@@ -141,8 +141,20 @@ fun test_all_valid_status_codes_via_insert() {
 #[test]
 fun test_all_valid_status_codes_via_fill() {
     let _redirects = redirects::filled(
-        vector[b"/a".to_string(), b"/b".to_string(), b"/c".to_string(), b"/d".to_string(), b"/e".to_string()],
-        vector[b"/1".to_string(), b"/2".to_string(), b"/3".to_string(), b"/4".to_string(), b"/5".to_string()],
+        vector[
+            b"/a".to_string(),
+            b"/b".to_string(),
+            b"/c".to_string(),
+            b"/d".to_string(),
+            b"/e".to_string(),
+        ],
+        vector[
+            b"/1".to_string(),
+            b"/2".to_string(),
+            b"/3".to_string(),
+            b"/4".to_string(),
+            b"/5".to_string(),
+        ],
         vector[301, 302, 303, 307, 308],
     );
 }
