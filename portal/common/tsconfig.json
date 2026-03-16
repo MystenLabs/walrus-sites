@@ -4,18 +4,19 @@
     "composite": true,
     "target": "esnext",
     "module": "esnext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "lib": ["esnext"],
     "baseUrl": "./",
     "paths": {
       "@lib/*": ["lib/src/*"],
       "@templates/*": ["html_templates/*"]
     },
-    "strict": true
+    "strict": true,
+    "skipLibCheck": true,
+    "types": []
   },
   "rootDir": "lib/src",
   "outDir": "dist",
-  "skipLibCheck": true,
   "include": ["lib/src/**/*", "lib/tests/**/*"],
   "exclude": ["node_modules", "dist"]
 }

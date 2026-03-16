@@ -92,7 +92,7 @@ describe("UrlFetcher records aggregator timing with mock servers", () => {
 
 // Helper: Create mock Sui Full Node server
 async function createMockSuiFullnode(testBlobData: Uint8Array): Promise<Server> {
-    const testBlobDataHashBytes = await sha256(testBlobData.buffer);
+    const testBlobDataHashBytes = await sha256(testBlobData.buffer as ArrayBuffer);
 
     let hashBigInt = 0n;
     for (let i = testBlobDataHashBytes.length - 1; i >= 0; i--) {

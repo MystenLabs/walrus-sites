@@ -21,3 +21,4 @@ portal/server/portal-config.yaml
 portal/server/portal-config.*.yaml
 !portal/server/portal-config.*.example.yaml
 **/coverage
+*.tsbuildinfo

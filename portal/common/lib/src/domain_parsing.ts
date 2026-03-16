@@ -52,7 +52,7 @@ export function splitUrl(url: URL, portalNameLength?: Number): UrlExtract {
         // resulting in being mentioned in parsed.topLevelDomains.
         if (parsed.topLevelDomains.join(".") == "wal.app") {
             domain = "wal.app";
-            subdomain = parsed.domain;
+            subdomain = parsed.domain ?? null;
         } else if (portalNameLength) {
             domain = parsed.hostname.slice(-portalNameLength);
             subdomain = parsed.hostname.slice(0, -portalNameLength - 1);

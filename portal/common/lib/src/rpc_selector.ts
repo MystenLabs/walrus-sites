@@ -5,9 +5,9 @@ import {
     GetDynamicFieldObjectParams,
     GetObjectParams,
     MultiGetObjectsParams,
-    SuiClient,
+    SuiJsonRpcClient,
     SuiObjectResponse,
-} from "@mysten/sui/client";
+} from "@mysten/sui/jsonRpc";
 import { SuinsClient } from "@mysten/suins";
 import logger, { formatError } from "@lib/logger";
 import { NameRecord, Network } from "@lib/types";
@@ -19,15 +19,15 @@ interface RPCSelectorInterface {
     getDynamicFieldObject(input: GetDynamicFieldObjectParams): Promise<SuiObjectResponse>;
 }
 
-class WrappedSuiClient extends SuiClient {
+class WrappedSuiClient extends SuiJsonRpcClient {
     private url: string;
     private suinsClient: SuinsClient;
 
     constructor(url: string, network: Network) {
-        super({ url });
+        super({ url, network });
         this.url = url;
         this.suinsClient = new SuinsClient({
-            client: this as SuiClient,
+            client: this,
             network,
         });
     }

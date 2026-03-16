@@ -4,7 +4,7 @@
 import { DomainDetails } from "@lib/types/index";
 import { getDomain } from "@lib/domain_parsing";
 import { blobAggregatorEndpoint } from "@lib/aggregator";
-import { SuiObjectResponse } from "@mysten/sui/client";
+import { SuiObjectResponse } from "@mysten/sui/jsonRpc";
 import logger from "@lib/logger";
 
 /**

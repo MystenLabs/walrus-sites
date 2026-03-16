@@ -27,7 +27,7 @@ export class SuiNSResolver {
                 resolveSuiNsAddressDuration,
                 nameRecord.name,
             );
-            return resolvedSuiNSObjectId;
+            return resolvedSuiNSObjectId ?? null;
         }
         return null;
     }

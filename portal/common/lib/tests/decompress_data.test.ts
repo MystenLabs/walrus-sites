@@ -12,7 +12,7 @@ const mockContentEncodedTo: Uint8Array = encoder.encode(mockContent);
 
 describe("decompressData", () => {
     test("decompress plaintext encoding", async () => {
-        const result: Uint8Array = await decompressData(mockContentEncodedTo, "plaintext");
+        const result = (await decompressData(mockContentEncodedTo, "plaintext"))!;
         expect(result).toEqual(mockContentEncodedTo);
         expect(mockContent).toEqual(decoder.decode(result));
     });

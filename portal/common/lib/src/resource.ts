@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { HttpStatusCodes } from "@lib/http/http_status_codes";
-import { SuiObjectData, SuiObjectResponse } from "@mysten/sui/client";
+import { SuiObjectData, SuiObjectResponse } from "@mysten/sui/jsonRpc";
 import { Resource, VersionedResource } from "@lib/types";
 import { MAX_REDIRECT_DEPTH } from "@lib/constants";
 import { checkRedirect } from "@lib/redirects";

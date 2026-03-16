@@ -36,7 +36,7 @@ describe("resolveSuiNsAddress", () => {
 
         for (const [input, expected] of cases) {
             vi.spyOn(rpcSelector, "getNameRecord").mockResolvedValueOnce(expected as NameRecord);
-            const result: string = await suiNSResolver.resolveSuiNsAddress(input as string);
+            const result = await suiNSResolver.resolveSuiNsAddress(input as string);
             expect(result).toBe("0x57414C525553");
             expect(rpcSelector.getNameRecord).toHaveBeenCalledWith(`${input}.sui`);
         }
