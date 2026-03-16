@@ -6,6 +6,8 @@ use sui::display::{Self, Display};
 use sui::dynamic_field as df;
 use sui::package::{Self, Publisher};
 use sui::vec_map;
+use suins::controller;
+use suins::suins::SuiNS;
 use walrus_site::events::{emit_site_created, emit_site_burned};
 use walrus_site::metadata::Metadata;
 use walrus_site::redirects::{Redirects, redirects_field};
@@ -339,6 +341,12 @@ public fun burn(site: Site) {
     id.delete();
 }
 
+// ============================================= SuiNS =============================================
+
+public fun set_suins_reverse_lookup(self: &mut Site, suins: &mut SuiNS, domain_name: String) {
+    controller::set_object_reverse_lookup(suins, self.uid_mut(), domain_name);
+}
+
 /// Define a Display for the Site objects.
 fun init_site_display(publisher: &Publisher, ctx: &mut TxContext): Display<Site> {
     let keys = vector[
@@ -392,6 +400,12 @@ public fun get_site_project_url(site: &Site): Option<String> {
 
 public fun get_site_creator(site: &Site): Option<String> {
     site.creator
+}
+
+// ============================== public(package) ==============================
+
+public(package) fun uid_mut(self: &mut Site): &mut UID {
+    &mut self.id
 }
 
 #[test_only]
