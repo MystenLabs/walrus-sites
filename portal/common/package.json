@@ -8,6 +8,7 @@
         "@opentelemetry/sdk-metrics": "^2.1.0",
         "@vitest/coverage-v8": "^3.2.4",
         "base-x": "^4.0.1",
+        "buffer": "^6.0.3",
         "https-browserify": "^1.0.0",
         "pako": "^2.1.0",
         "parse-domain": "8.2.2",
