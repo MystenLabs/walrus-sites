@@ -42,6 +42,19 @@ describe("resolveSuiNsAddress", () => {
         }
     });
 
+    test("should return null when name record exists but has no walrusSiteId", async () => {
+        const nameRecord: NameRecord = {
+            name: "nosite",
+            nftId: "dummyNftId",
+            targetAddress: "dummyTargetAddress",
+            expirationTimestampMs: 1234567890,
+            data: {},
+        };
+        vi.spyOn(rpcSelector, "getNameRecord").mockResolvedValueOnce(nameRecord);
+        const result = await suiNSResolver.resolveSuiNsAddress("nosite");
+        expect(result).toBeNull();
+    });
+
     test("should return null for an unknown SuiNS address", async () => {
         vi.spyOn(rpcSelector, "getNameRecord").mockResolvedValueOnce(null);
         const result = await suiNSResolver.resolveSuiNsAddress("unknown");
