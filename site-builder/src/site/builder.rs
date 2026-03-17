@@ -706,10 +706,10 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
 
     // Redirects
 
-    /// Adds the move calls to create a new redirects object.
+    /// Adds the move calls to create an empty redirects DF on the site.
     fn create_redirects(&mut self) -> SitePtbBuilderResult<()> {
         self.add_programmable_move_call(
-            contracts::site::set_redirects.identifier(),
+            contracts::site::create_redirects.identifier(),
             vec![],
             vec![self.site_argument],
         )?;
