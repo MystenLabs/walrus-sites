@@ -265,8 +265,8 @@ impl RemoteSiteFactory<'_> {
         })
     }
 
-    /// Fetches routes and redirects by deriving their DF object IDs from the known keys,
-    /// then looking them up in the already-fetched dynamic fields list.
+    /// Fetches routes and redirects by deriving their DF object IDs from the known keys
+    /// and batch-fetching them in a single RPC call.
     async fn get_routes_and_redirects(
         &self,
         site_id: ObjectID,
