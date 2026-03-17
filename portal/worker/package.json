@@ -4,6 +4,7 @@
     "version": "2.7.0",
     "dependencies": {
         "@mysten/sui": "^2.8.0",
+        "buffer": "^6.0.3",
         "common": "workspace:common",
         "ts-loader": "^9.5.1",
         "tsc": "^2.0.4",
