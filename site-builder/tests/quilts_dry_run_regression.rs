@@ -115,6 +115,7 @@ async fn test_dry_run(site_type: &str, expected_file_count: usize) -> anyhow::Re
         WSResources {
             headers: None,
             routes: None,
+            redirects: None,
             metadata: None,
             site_name: Some(format!("Test {site_type} Site")),
             object_id: None,

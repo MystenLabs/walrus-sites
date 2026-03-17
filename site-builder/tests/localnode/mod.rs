@@ -718,7 +718,7 @@ pub fn create_sites_config(
 
     let sites_config = SitesConfig {
         portal: "".to_string(),
-        package: walrus_sites_package_id,
+        package: Some(walrus_sites_package_id),
         general: GeneralArgs {
             wallet: Some(wallet_path),
             walrus_config: walrus_config_path,

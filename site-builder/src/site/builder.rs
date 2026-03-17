@@ -29,7 +29,7 @@ use super::{
 };
 use crate::{
     site::contracts,
-    types::{Metadata, Range},
+    types::{Metadata, Range, Redirect},
 };
 
 #[cfg(test)]
@@ -73,6 +73,10 @@ const PTB_STRING_PURE_ARG_OVERHEAD: usize = 10;
 /// BCS size of a `u256` pure argument: CallArg enum tag (1) + Pure `Vec<u8>` length (1) +
 /// 32 bytes payload = 34. Rounded up to 40.
 const PTB_U256_PURE_ARG_SIZE: usize = 40;
+
+/// BCS size of a `u16` pure argument: CallArg enum tag (1) + Pure `Vec<u8>` length (1) +
+/// 2 bytes payload = 4. Rounded up to 6.
+const PTB_U16_PURE_ARG_SIZE: usize = 6;
 
 /// BCS size of an `Option<Range>` pure input when both fields are `None`: two `Option::None`
 /// pure args, each 3 bytes (CallArg tag (1) + Pure vec len (1) + ULEB128 length 0 (1)).
@@ -489,6 +493,7 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
                 SiteOps::Deleted(resource) => self.remove_resource_if_exists(resource)?,
                 SiteOps::Created(resource) => self.add_resource(resource)?,
                 SiteOps::RemovedRoutes => self.remove_routes()?,
+                SiteOps::RemovedRedirects => self.remove_redirects()?,
                 SiteOps::BurnedSite => self.burn()?,
                 SiteOps::Unchanged(_) => (),
             }
@@ -697,6 +702,81 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
             name,
             value,
         )
+    }
+
+    // Redirects
+
+    /// Adds the move calls to create a new redirects object.
+    fn create_redirects(&mut self) -> SitePtbBuilderResult<()> {
+        self.add_programmable_move_call(
+            contracts::site::set_redirects.identifier(),
+            vec![],
+            vec![self.site_argument],
+        )?;
+        Ok(())
+    }
+
+    /// Adds the move calls to remove the redirects object.
+    pub fn remove_redirects(&mut self) -> SitePtbBuilderResult<()> {
+        self.add_programmable_move_call(
+            contracts::site::take_redirects_if_exist.identifier(),
+            vec![],
+            vec![self.site_argument],
+        )?;
+        Ok(())
+    }
+
+    /// Adds the move calls to remove and create new redirects.
+    pub fn replace_redirects(&mut self) -> SitePtbBuilderResult<()> {
+        self.move_call_check(2)?; // remove + create redirects
+        self.remove_redirects()?;
+        self.create_redirects()?;
+        Ok(())
+    }
+
+    /// Adds the move calls to add a redirect to the redirects object.
+    fn add_redirect(
+        &mut self,
+        path: &str,
+        redirect: &Redirect,
+    ) -> SitePtbBuilderResult<()> {
+        tracing::debug!(path=%path, location=%redirect.location, status=%redirect.status_code, "new Move call: adding redirect");
+        self.ptb_size_check_and_update(
+            path.len()
+                + redirect.location.len()
+                + 2 * PTB_STRING_PURE_ARG_OVERHEAD
+                + PTB_U16_PURE_ARG_SIZE,
+        )?;
+        let path_input = self.pt_builder.input(pure_call_arg(&path.to_owned())?)?;
+        let location_input = self
+            .pt_builder
+            .input(pure_call_arg(&redirect.location)?)?;
+        let status_code_input = self.pt_builder.input(pure_call_arg(&redirect.status_code)?)?;
+        self.add_programmable_move_call(
+            contracts::site::insert_redirect.identifier(),
+            vec![],
+            vec![
+                self.site_argument,
+                path_input,
+                location_input,
+                status_code_input,
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Adds move calls to insert all redirect entries.
+    pub fn add_redirect_operations(
+        &mut self,
+        new_redirects_iter: &mut std::iter::Peekable<
+            std::collections::btree_map::Iter<String, Redirect>,
+        >,
+    ) -> SitePtbBuilderResult<()> {
+        while let Some((path, redirect)) = new_redirects_iter.peek() {
+            self.add_redirect(path, redirect)?;
+            new_redirects_iter.next();
+        }
+        Ok(())
     }
 
     pub fn update_name(&mut self, name: &str) -> SitePtbBuilderResult<()> {

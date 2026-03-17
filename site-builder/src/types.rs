@@ -225,6 +225,56 @@ impl RouteOps {
     }
 }
 
+/// A single redirect entry (location + status_code).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Redirect {
+    pub location: String,
+    pub status_code: u16,
+}
+
+/// The redirects of a site.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Redirects {
+    pub redirect_list: VecMap<String, Redirect>,
+}
+
+impl Redirects {
+    pub fn empty() -> Self {
+        Redirects {
+            redirect_list: VecMap::new(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.redirect_list.is_empty()
+    }
+
+    /// Checks if the redirects are different.
+    pub fn diff(&self, start: &Self) -> RedirectOps {
+        if self.redirect_list == start.redirect_list {
+            RedirectOps::Unchanged
+        } else {
+            RedirectOps::Replace(self.clone())
+        }
+    }
+}
+
+impl AssociatedContractStruct for Redirects {
+    const CONTRACT_STRUCT: StructTag<'static> = contracts::redirects::Redirects;
+}
+
+#[derive(Debug, Clone)]
+pub enum RedirectOps {
+    Unchanged,
+    Replace(Redirects),
+}
+
+impl RedirectOps {
+    pub fn is_unchanged(&self) -> bool {
+        matches!(self, RedirectOps::Unchanged)
+    }
+}
+
 /// Range of bytes for a resource.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct Range {

@@ -29,7 +29,8 @@ pub(crate) enum MultiConfig {
 pub struct Config {
     #[serde(default = "default_portal")]
     pub portal: String,
-    pub package: ObjectID,
+    #[serde(default)]
+    pub package: Option<ObjectID>,
     #[serde(default)]
     pub general: GeneralArgs,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -46,6 +47,12 @@ impl Config {
     /// The values in `other_general` take precedence.
     pub fn merge(&mut self, other_general: &GeneralArgs) {
         self.general.merge(other_general);
+    }
+
+    /// Returns the package ID, panicking if it has not been resolved.
+    pub fn package(&self) -> ObjectID {
+        self.package
+            .expect("package must be set (either in config or resolved via MVR)")
     }
 
     pub fn walrus_binary(&self) -> String {

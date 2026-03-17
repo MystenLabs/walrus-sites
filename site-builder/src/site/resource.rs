@@ -179,6 +179,7 @@ pub enum SiteOps<'a> {
     Created(&'a Resource),
     Unchanged(&'a Resource),
     RemovedRoutes,
+    RemovedRedirects,
     BurnedSite,
 }
 
@@ -189,6 +190,7 @@ impl fmt::Debug for SiteOps<'_> {
             SiteOps::Created(resource) => ("create", &resource.info.path),
             SiteOps::Unchanged(resource) => ("unchanged", &resource.info.path),
             SiteOps::RemovedRoutes => ("remove routes", &"".to_string()),
+            SiteOps::RemovedRedirects => ("remove redirects", &"".to_string()),
             SiteOps::BurnedSite => ("burn site", &"".to_string()),
         };
         f.debug_struct("ResourceOp")
@@ -206,6 +208,7 @@ impl<'a> SiteOps<'a> {
             SiteOps::Created(resource) => Some(resource),
             SiteOps::Unchanged(resource) => Some(resource),
             SiteOps::RemovedRoutes => None,
+            SiteOps::RemovedRedirects => None,
             SiteOps::BurnedSite => None,
         }
     }
@@ -217,7 +220,10 @@ impl<'a> SiteOps<'a> {
 
     /// Returns true if the operation modifies a resource.
     pub fn is_change(&self) -> bool {
-        matches!(self, SiteOps::Created(_) | SiteOps::Deleted(_))
+        matches!(
+            self,
+            SiteOps::Created(_) | SiteOps::Deleted(_) | SiteOps::RemovedRedirects
+        )
     }
 }
 
@@ -694,6 +700,9 @@ impl ResourceManager {
             self.ws_resources
                 .as_ref()
                 .and_then(|config| config.routes.clone()),
+            self.ws_resources
+                .as_ref()
+                .and_then(|config| config.redirects.clone()),
             self.ws_resources
                 .as_ref()
                 .and_then(|config| config.metadata.clone()),

@@ -7,7 +7,7 @@ use walrus_sdk::core::QuiltPatchId;
 
 use crate::{
     site::{resource::SiteOps, SiteDataDiff},
-    types::{ExtendOps, RouteOps},
+    types::{ExtendOps, RedirectOps, RouteOps},
     util::parse_quilt_patch_id,
     walrus::types::BlobId,
 };
@@ -32,6 +32,9 @@ impl From<&SiteOps<'_>> for ResourceOpSummary {
             SiteOps::Unchanged(resource) => ("unchanged".to_owned(), &resource.info),
             SiteOps::RemovedRoutes => {
                 unreachable!("RemovedRoutes should not be converted into ResourceOpSummary")
+            }
+            SiteOps::RemovedRedirects => {
+                unreachable!("RemovedRedirects should not be converted into ResourceOpSummary")
             }
             SiteOps::BurnedSite => {
                 unreachable!("BurnedSite should not be converted into ResourceOpSummary")
@@ -71,6 +74,15 @@ impl Summarizable for RouteOps {
     }
 }
 
+impl Summarizable for RedirectOps {
+    fn to_summary(&self) -> String {
+        match self {
+            RedirectOps::Unchanged => "The site redirects were left unchanged.".to_owned(),
+            RedirectOps::Replace(_) => "The site redirects were modified.".to_owned(),
+        }
+    }
+}
+
 impl Summarizable for ExtendOps {
     fn to_summary(&self) -> String {
         match self {
@@ -101,6 +113,7 @@ impl Summarizable for Vec<ResourceOpSummary> {
 pub struct SiteDataDiffSummary {
     pub resource_ops: Vec<ResourceOpSummary>,
     pub route_ops: RouteOps,
+    pub redirect_ops: RedirectOps,
     pub metadata_updated: bool,
     pub site_name_updated: bool,
     pub extend_ops: ExtendOps,
@@ -111,6 +124,7 @@ impl From<&SiteDataDiff<'_>> for SiteDataDiffSummary {
         SiteDataDiffSummary {
             resource_ops: value.resource_ops.iter().map(|op| op.into()).collect(),
             route_ops: value.route_ops.clone(),
+            redirect_ops: value.redirect_ops.clone(),
             metadata_updated: !value.metadata_op.is_noop(),
             site_name_updated: !value.site_name_op.is_noop(),
             extend_ops: value.extend_ops.clone(),
@@ -128,6 +142,7 @@ impl Summarizable for SiteDataDiffSummary {
     fn to_summary(&self) -> String {
         if self.resource_ops.is_empty()
             && self.route_ops.is_unchanged()
+            && self.redirect_ops.is_unchanged()
             && !self.metadata_updated
             && !self.site_name_updated
             && self.extend_ops.is_noop()
@@ -145,6 +160,7 @@ impl Summarizable for SiteDataDiffSummary {
             "No resource operations performed.".to_owned()
         };
         let route_str = self.route_ops.to_summary();
+        let redirect_str = self.redirect_ops.to_summary();
         let metadata_str = if self.metadata_updated {
             "Metadata updated."
         } else {
@@ -157,6 +173,6 @@ impl Summarizable for SiteDataDiffSummary {
         };
         let extend_str = self.extend_ops.to_summary();
 
-        format!("{resource_str}\n{route_str}\n{metadata_str}\n{site_name_str}\n{extend_str}")
+        format!("{resource_str}\n{route_str}\n{redirect_str}\n{metadata_str}\n{site_name_str}\n{extend_str}")
     }
 }

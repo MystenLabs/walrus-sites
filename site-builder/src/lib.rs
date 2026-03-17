@@ -30,6 +30,7 @@ mod site;
 // TODO(sew-251): This can be a standalone crate, helping integration testing and other projects
 // using our contract.
 pub use site::{config as site_config, contracts, resource::MAX_IDENTIFIER_SIZE};
+mod mvr;
 mod sitemap;
 mod suins;
 mod summary;
@@ -72,6 +73,14 @@ async fn run_internal(
     // Merge the configs and the CLI args. Serde default ensures that the `walrus_binary` and
     // `gas_budget` exist.
     config.merge(&general);
+
+    // Resolve package via MVR if not set in config.
+    if config.package.is_none() {
+        let network = context.as_deref().unwrap_or("mainnet");
+        let package_id = mvr::resolve_walrus_sites_package(network).await?;
+        config.package = Some(package_id);
+    }
+
     tracing::info!(?config, "configuration loaded");
 
     match command {
@@ -183,7 +192,7 @@ async fn run_internal(
                 // Get existing site data for accurate estimation
                 let existing_site = if site_manager.site_id.is_some() {
                     let retriable_client = site_manager.sui_client();
-                    let package_id = config.package;
+                    let package_id = config.package();
                     RemoteSiteFactory::new(retriable_client, package_id)
                         .await?
                         .get_from_chain(site_manager.site_id.unwrap())
