@@ -67,20 +67,12 @@ async fn run_internal(
 
     tracing::info!(?config_path, "loading sites configuration");
     let (mut config, selected_context) =
-        Config::load_from_multi_config(config_path, context.as_deref())?;
+        Config::load_from_multi_config(config_path, context.as_deref()).await?;
     tracing::debug!(?config, "configuration before merging");
 
     // Merge the configs and the CLI args. Serde default ensures that the `walrus_binary` and
     // `gas_budget` exist.
     config.merge(&general);
-
-    // Resolve package via MVR if not set in config.
-    if config.package.is_none() {
-        let network = context.as_deref().unwrap_or("mainnet");
-        let package_id = mvr::resolve_walrus_sites_package(network).await?;
-        config.package = Some(package_id);
-    }
-
     tracing::info!(?config, "configuration loaded");
 
     match command {

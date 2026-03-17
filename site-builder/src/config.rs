@@ -12,16 +12,24 @@ use sui_types::base_types::ObjectID;
 
 pub(crate) use crate::{args::GeneralArgs, walrus::Walrus};
 
+#[cfg(test)]
+#[path = "unit_tests/config.tests.rs"]
+mod config_tests;
+
 /// Configuration for the site builder, complete with separate context for networks.
 #[derive(Deserialize, Debug, Clone)]
 #[serde(untagged)]
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum MultiConfig {
-    SingletonConfig(Config),
+    // NB: `MultiConfig` must precede `SingletonConfig` — with `#[serde(untagged)]`, serde
+    // tries variants in order. `SingletonConfig(Config)` accepts any map (all fields are
+    // optional), so it must be last to allow `MultiConfig` (which requires `contexts` +
+    // `default_context`) to match first.
     MultiConfig {
         contexts: HashMap<String, Config>,
         default_context: String,
     },
+    SingletonConfig(Config),
 }
 
 /// The configuration for the site builder.
@@ -49,7 +57,10 @@ impl Config {
         self.general.merge(other_general);
     }
 
-    /// Returns the package ID, panicking if it has not been resolved.
+    /// Returns the package ID.
+    ///
+    /// The package is either set in the config file or resolved via MVR during
+    /// [`Config::load_from_multi_config`].
     pub fn package(&self) -> ObjectID {
         self.package
             .expect("package must be set (either in config or resolved via MVR)")
@@ -76,7 +87,11 @@ impl Config {
 
     /// Returns the configuration for the given context or the default context if no context is
     /// provided and the config is a multi config.
-    pub fn load_from_multi_config(
+    ///
+    /// For singleton configs, `package` must be specified in the config file.
+    /// For multi configs, if `package` is not specified, it is resolved via MVR using the
+    /// context name (e.g. "testnet", "mainnet") as the network.
+    pub async fn load_from_multi_config(
         path: impl AsRef<Path>,
         context: Option<&str>,
     ) -> Result<(Self, Option<String>)> {
@@ -100,6 +115,12 @@ impl Config {
                         context
                     );
                 }
+                if config.package.is_none() {
+                    bail!(
+                        "the `package` field is required in a singleton config file ({})",
+                        path.as_ref().display()
+                    );
+                }
                 Ok((config, context.map(|s| s.to_owned())))
             }
             MultiConfig::MultiConfig {
@@ -108,16 +129,18 @@ impl Config {
             } => {
                 let context = context.unwrap_or(&default_context);
                 tracing::info!(?context, "loading the multi config");
-                Ok((
-                    contexts.remove(context).ok_or_else(|| {
-                        anyhow!(
-                            "could not find the context '{}' in site builder config file '{}'",
-                            context,
-                            path.as_ref().display()
-                        )
-                    })?,
-                    Some(context.to_owned()),
-                ))
+                let mut config = contexts.remove(context).ok_or_else(|| {
+                    anyhow!(
+                        "could not find the context '{}' in site builder config file '{}'",
+                        context,
+                        path.as_ref().display()
+                    )
+                })?;
+                if config.package.is_none() {
+                    let package_id = crate::mvr::resolve_walrus_sites_package(context).await?;
+                    config.package = Some(package_id);
+                }
+                Ok((config, Some(context.to_owned())))
             }
         }
     }

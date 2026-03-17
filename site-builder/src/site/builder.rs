@@ -735,11 +735,7 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
     }
 
     /// Adds the move calls to add a redirect to the redirects object.
-    fn add_redirect(
-        &mut self,
-        path: &str,
-        redirect: &Redirect,
-    ) -> SitePtbBuilderResult<()> {
+    fn add_redirect(&mut self, path: &str, redirect: &Redirect) -> SitePtbBuilderResult<()> {
         tracing::debug!(path=%path, location=%redirect.location, status=%redirect.status_code, "new Move call: adding redirect");
         self.ptb_size_check_and_update(
             path.len()
@@ -748,10 +744,10 @@ impl<const MAX_MOVE_CALLS: u16> SitePtb<Argument, MAX_MOVE_CALLS> {
                 + PTB_U16_PURE_ARG_SIZE,
         )?;
         let path_input = self.pt_builder.input(pure_call_arg(&path.to_owned())?)?;
-        let location_input = self
+        let location_input = self.pt_builder.input(pure_call_arg(&redirect.location)?)?;
+        let status_code_input = self
             .pt_builder
-            .input(pure_call_arg(&redirect.location)?)?;
-        let status_code_input = self.pt_builder.input(pure_call_arg(&redirect.status_code)?)?;
+            .input(pure_call_arg(&redirect.status_code)?)?;
         self.add_programmable_move_call(
             contracts::site::insert_redirect.identifier(),
             vec![],

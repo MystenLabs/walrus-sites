@@ -41,7 +41,14 @@ use crate::{
     site::{SiteData, SiteDataDiff, SITE_MODULE},
     summary::SiteDataDiffSummary,
     types::{
-        ExtendOps, Metadata, MetadataOp, ObjectCache, Redirect, RedirectOps, RouteOps, SiteNameOp,
+        ExtendOps,
+        Metadata,
+        MetadataOp,
+        ObjectCache,
+        Redirect,
+        RedirectOps,
+        RouteOps,
+        SiteNameOp,
     },
     util::{get_epochs_ahead, get_owned_blobs, get_site_id_from_response, sign_and_send_ptb},
     walrus::{output::SuiBlob, types::BlobId, Walrus},
@@ -523,10 +530,7 @@ impl SiteManager {
                             ptb.add_redirect_operations(&mut redirects_iter)
                                 .ok_if_limit_reached()?;
                         }
-                        Ok((
-                            ptb.finish(),
-                            (resources_iter, routes_iter, redirects_iter),
-                        ))
+                        Ok((ptb.finish(), (resources_iter, routes_iter, redirects_iter)))
                     },
                 )
                 .await?;
