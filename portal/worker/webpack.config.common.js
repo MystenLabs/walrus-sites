@@ -73,6 +73,7 @@ module.exports = {
         },
         extensions: [".ts", ".js", ".html"],
         fallback: {
+            "buffer": require.resolve("buffer/"),
             "http": require.resolve("stream-http"),
             "https": require.resolve("https-browserify"),
             "stream": require.resolve("stream-browserify"),

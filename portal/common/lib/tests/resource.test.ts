@@ -8,7 +8,7 @@ import { RPCSelector } from "@lib/rpc_selector";
 import { HttpStatusCodes } from "@lib/http/http_status_codes";
 import { checkRedirect } from "@lib/redirects";
 import { fromBase64 } from "@mysten/bcs";
-import { SuiObjectResponse } from "@mysten/sui/client";
+import { SuiObjectResponse } from "@mysten/sui/jsonRpc";
 import { parsePriorityUrlList } from "@lib/priority_executor";
 
 vi.mock("@mysten/sui/utils", () => ({
@@ -75,11 +75,11 @@ describe("fetchResource", () => {
                         bcsBytes: "mockBcsBytes",
                         hasPublicTransfer: true,
                         type: "mockType",
-                        version: undefined,
+                        version: "1",
                     },
                     digest: "",
                     objectId: "",
-                    version: undefined,
+                    version: "1",
                 },
             },
             {
@@ -93,7 +93,7 @@ describe("fetchResource", () => {
                     },
                     digest: "",
                     objectId: "",
-                    version: undefined,
+                    version: "1",
                 },
             },
         ]);
@@ -103,7 +103,7 @@ describe("fetchResource", () => {
         expect(result).toEqual({
             blob_id: "0xresourceBlobId",
             objectId: "0xdynamicFieldId",
-            version: undefined,
+            version: "1",
         });
         expect(checkRedirect).toHaveBeenCalledTimes(1);
     });
@@ -116,7 +116,7 @@ describe("fetchResource", () => {
                     bcsBytes: "mockBcsBytes",
                     hasPublicTransfer: true,
                     type: "mockType",
-                    version: undefined,
+                    version: "1",
                 },
                 display: {
                     data: {
@@ -126,7 +126,7 @@ describe("fetchResource", () => {
                 },
                 digest: "",
                 objectId: "",
-                version: undefined,
+                version: "1",
             },
         };
 
@@ -137,7 +137,7 @@ describe("fetchResource", () => {
                     bcsBytes: "mockBcsBytes",
                     hasPublicTransfer: true,
                     type: "mockType",
-                    version: undefined,
+                    version: "1",
                 },
                 display: {
                     data: {
@@ -147,7 +147,7 @@ describe("fetchResource", () => {
                 },
                 digest: "",
                 objectId: "",
-                version: undefined,
+                version: "1",
             },
         };
 
@@ -167,7 +167,7 @@ describe("fetchResource", () => {
         expect(result).toEqual({
             blob_id: "0xresourceBlobId",
             objectId: "0xdynamicFieldId",
-            version: undefined,
+            version: "1",
         });
         expect(checkRedirect).toHaveBeenCalledTimes(2);
     });

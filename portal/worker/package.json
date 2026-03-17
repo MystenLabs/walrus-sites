@@ -3,7 +3,8 @@
     "description": "The service-worker based implementation of the Walrus Sites portal.",
     "version": "2.7.0",
     "dependencies": {
-        "@mysten/sui": "^1.12.0",
+        "@mysten/sui": "^2.8.0",
+        "buffer": "^6.0.3",
         "common": "workspace:common",
         "ts-loader": "^9.5.1",
         "tsc": "^2.0.4",

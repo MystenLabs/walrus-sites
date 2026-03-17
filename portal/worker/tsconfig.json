@@ -2,13 +2,14 @@
 	"compilerOptions": {
 		"target": "esnext",
 		"module": "esnext",
-		"moduleResolution": "node",
+		"moduleResolution": "bundler",
 		"allowSyntheticDefaultImports": true,
 		"lib": [
 			"esnext",
 			"webworker",
 			"dom"
 		],
+		"types": [],
 		"baseUrl": "./",
 		"paths": {
 			"@lib/*": [

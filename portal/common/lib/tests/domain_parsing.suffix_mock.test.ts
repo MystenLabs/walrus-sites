@@ -34,7 +34,7 @@ describe('splitUrl: mocking parse-domain output for "flatland.wal.app" in getDom
         const expected_subdomain = "flatland";
         const res = splitUrl(new URL(input) as URL);
         expect(res.domain).toEqual(expected_portal_domain);
-        expect(res.details.subdomain).toEqual(expected_subdomain);
+        expect(res.details!.subdomain).toEqual(expected_subdomain);
     });
 
     test('wal.app is not included in the topLevelDomains - but only "app" is included instead', () => {
@@ -56,6 +56,6 @@ describe('splitUrl: mocking parse-domain output for "flatland.wal.app" in getDom
         const expected_subdomain = "flatland";
         const res = splitUrl(new URL(input) as URL);
         expect(res.domain).toEqual(expected_portal_domain);
-        expect(res.details.subdomain).toEqual(expected_subdomain);
+        expect(res.details!.subdomain).toEqual(expected_subdomain);
     });
 });

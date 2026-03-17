@@ -149,7 +149,7 @@ describe("routing tests", () => {
 
     test("should return portal fallback when site's 404.html blob is expired", async () => {
         const urlFetcher = new UrlFetcher(
-            new ResourceFetcher(rpcSelector, sitePackage),
+            new ResourceFetcher(rpcSelector, sitePackage!),
             new SuiNSResolver(rpcSelector),
             wsRouter,
             new PriorityExecutor([{ url: "http://unused", retries: 0, metric: 100 }]),
