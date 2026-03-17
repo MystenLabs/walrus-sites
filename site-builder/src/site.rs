@@ -15,8 +15,8 @@ use std::{collections::HashMap, time::Duration};
 use anyhow::{Context, Result};
 use futures::future::try_join_all;
 use resource::{ResourceSet, SiteOps};
-use sui_sdk::rpc_types::DynamicFieldInfo;
-use sui_types::{base_types::ObjectID, TypeTag};
+use sui_sdk::rpc_types::{DynamicFieldInfo, SuiObjectDataOptions};
+use sui_types::{base_types::ObjectID, dynamic_field::derive_dynamic_field_id, TypeTag};
 use walrus_sui::contracts::TypeOriginMap;
 
 use crate::{
@@ -39,6 +39,11 @@ use crate::{
 };
 
 pub const SITE_MODULE: &str = "site";
+
+/// The dynamic field key for routes (matches `ROUTES_FIELD` in site.move).
+const ROUTES_DF_KEY: &[u8] = b"routes";
+/// The dynamic field key for redirects (matches `redirects_field!()` in redirects.move).
+const REDIRECTS_DF_KEY: &[u8] = b"redirects";
 
 /// The maximum number of dynamic fields to request at once.
 const DF_REQ_BATCH_SIZE: usize = 10;
@@ -249,35 +254,7 @@ impl RemoteSiteFactory<'_> {
         }
 
         tracing::debug!("fetching the routes and redirects from the dynamic fields");
-        let vec_u8_fields: Vec<_> = dynamic_fields
-            .iter()
-            .filter(|field| field.name.type_ == TypeTag::Vector(Box::new(TypeTag::U8)))
-            .collect();
-
-        let mut routes: Option<Routes> = None;
-        let mut redirects: Option<Redirects> = None;
-
-        for field in &vec_u8_fields {
-            if routes.is_none() {
-                if let Ok(r) = self
-                    .sui_client
-                    .get_sui_object::<SuiDynamicField<Vec<u8>, Routes>>(field.object_id)
-                    .await
-                {
-                    routes = Some(r.value);
-                    continue;
-                }
-            }
-            if redirects.is_none() {
-                if let Ok(r) = self
-                    .sui_client
-                    .get_sui_object::<SuiDynamicField<Vec<u8>, Redirects>>(field.object_id)
-                    .await
-                {
-                    redirects = Some(r.value);
-                }
-            }
-        }
+        let (routes, redirects) = self.get_routes_and_redirects(site_id).await?;
 
         Ok(SiteData {
             resources,
@@ -286,6 +263,60 @@ impl RemoteSiteFactory<'_> {
             metadata,
             site_name: site_fields.name.into(),
         })
+    }
+
+    /// Fetches routes and redirects by deriving their DF object IDs from the known keys,
+    /// then looking them up in the already-fetched dynamic fields list.
+    async fn get_routes_and_redirects(
+        &self,
+        site_id: ObjectID,
+    ) -> Result<(Option<Routes>, Option<Redirects>)> {
+        let vec_u8_tag = TypeTag::Vector(Box::new(TypeTag::U8));
+
+        let routes_df_id = derive_dynamic_field_id(
+            site_id,
+            &vec_u8_tag,
+            &bcs::to_bytes(&ROUTES_DF_KEY.to_vec())?,
+        )?;
+        let redirects_df_id = derive_dynamic_field_id(
+            site_id,
+            &vec_u8_tag,
+            &bcs::to_bytes(&REDIRECTS_DF_KEY.to_vec())?,
+        )?;
+
+        // Batch-fetch both in a single RPC call.
+        let responses = self
+            .sui_client
+            .multi_get_object_with_options(
+                &[routes_df_id, redirects_df_id],
+                SuiObjectDataOptions::new().with_bcs().with_type(),
+            )
+            .await?;
+
+        let routes = responses[0]
+            .data
+            .as_ref()
+            .map(|_| {
+                contracts::get_sui_object_from_object_response::<SuiDynamicField<Vec<u8>, Routes>>(
+                    &responses[0],
+                )
+            })
+            .transpose()?
+            .map(|df| df.value);
+
+        let redirects =
+            responses[1]
+                .data
+                .as_ref()
+                .map(|_| {
+                    contracts::get_sui_object_from_object_response::<
+                        SuiDynamicField<Vec<u8>, Redirects>,
+                    >(&responses[1])
+                })
+                .transpose()?
+                .map(|df| df.value);
+
+        Ok((routes, redirects))
     }
 
     /// Gets all the resources and their object ids from chain.
