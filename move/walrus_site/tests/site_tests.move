@@ -272,6 +272,41 @@ fun test_site_fill_routes() {
 // === redirect tests on Site ===
 
 #[test]
+fun test_site_create_redirects() {
+    let owner = @0xCAFE;
+    let mut scenario = test_scenario::begin(owner);
+    {
+        let metadata = walrus_site::metadata::new_metadata(
+            option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
+            option::none(),
+        );
+        let mut site = walrus_site::site::new_site(
+            b"Test".to_string(),
+            metadata,
+            scenario.ctx(),
+        );
+
+        // create_redirects adds an empty redirects DF (mirrors create_routes).
+        site.create_redirects();
+
+        // Insert into the (now existing) redirects DF.
+        site.insert_redirect(b"/old".to_string(), b"/new".to_string(), 301);
+
+        let taken = site.take_redirects();
+        assert!(taken.length() == 1);
+        let (location, status_code) = taken.get(&b"/old".to_string());
+        assert!(*location == b"/new".to_string());
+        assert!(status_code == 301);
+
+        walrus_site::site::burn(site);
+    };
+    scenario.end();
+}
+
+#[test]
 fun test_site_set_and_take_redirects() {
     let owner = @0xCAFE;
     let mut scenario = test_scenario::begin(owner);

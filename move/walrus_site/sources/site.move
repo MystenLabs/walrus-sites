@@ -268,6 +268,13 @@ public fun redirects(self: &Site): &Redirects {
     self.id.df(redirects_field!())
 }
 
+/// Add an empty redirects dynamic field to the site.
+///
+/// Aborts if the redirects dynamic field already exists.
+public fun create_redirects(self: &mut Site) {
+    self.id.df_add(redirects_field!(), walrus_site::redirects::empty());
+}
+
 /// Adds the redirects dynamic field to the site.
 ///
 /// Aborts if the redirects dynamic field already exists.
