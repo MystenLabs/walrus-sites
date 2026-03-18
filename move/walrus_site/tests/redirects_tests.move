@@ -77,8 +77,7 @@ fun test_fill_on_existing() {
     assert!(status_code == 308);
 }
 
-#[test]
-#[expected_failure(abort_code = ELocationsLength)]
+#[test, expected_failure(abort_code = ELocationsLength)]
 fun test_fill_mismatched_locations_length() {
     redirects::filled(
         vector[b"/a".to_string(), b"/b".to_string()],
@@ -87,8 +86,7 @@ fun test_fill_mismatched_locations_length() {
     );
 }
 
-#[test]
-#[expected_failure(abort_code = EStatusCodesLengths)]
+#[test, expected_failure(abort_code = EStatusCodesLengths)]
 fun test_fill_mismatched_status_codes_length() {
     redirects::filled(
         vector[b"/a".to_string(), b"/b".to_string()],
@@ -159,8 +157,7 @@ fun test_all_valid_status_codes_via_fill() {
     );
 }
 
-#[test]
-#[expected_failure(abort_code = EInvalidRedirectStatusCode)]
+#[test, expected_failure(abort_code = EInvalidRedirectStatusCode)]
 fun test_invalid_status_code_200() {
     redirects::filled(
         vector[b"/a".to_string()],
@@ -169,8 +166,7 @@ fun test_invalid_status_code_200() {
     );
 }
 
-#[test]
-#[expected_failure(abort_code = EInvalidRedirectStatusCode)]
+#[test, expected_failure(abort_code = EInvalidRedirectStatusCode)]
 fun test_invalid_status_code_300() {
     redirects::filled(
         vector[b"/a".to_string()],
@@ -179,8 +175,7 @@ fun test_invalid_status_code_300() {
     );
 }
 
-#[test]
-#[expected_failure(abort_code = EInvalidRedirectStatusCode)]
+#[test, expected_failure(abort_code = EInvalidRedirectStatusCode)]
 fun test_invalid_status_code_304() {
     redirects::filled(
         vector[b"/a".to_string()],
@@ -189,8 +184,7 @@ fun test_invalid_status_code_304() {
     );
 }
 
-#[test]
-#[expected_failure(abort_code = EInvalidRedirectStatusCode)]
+#[test, expected_failure(abort_code = EInvalidRedirectStatusCode)]
 fun test_invalid_status_code_404() {
     redirects::filled(
         vector[b"/a".to_string()],
@@ -199,8 +193,7 @@ fun test_invalid_status_code_404() {
     );
 }
 
-#[test]
-#[expected_failure(abort_code = EInvalidRedirectStatusCode)]
+#[test, expected_failure(abort_code = EInvalidRedirectStatusCode)]
 fun test_insert_invalid_status_code() {
     let mut redirects = redirects::empty();
     redirects.insert(b"/a".to_string(), b"/b".to_string(), 999);
