@@ -102,7 +102,7 @@ fun test_site_flow_with_resources_and_routes() {
     {
         let mut site = scenario.take_from_sender<Site>();
         // Update the site name.
-        walrus_site::site::update_name(&mut site, b"Fancy Example".to_string());
+        site.update_name(b"Fancy Example".to_string());
         // Create a resource.
         let mut resource = walrus_site::site::new_resource(
             b"index.html".to_string(),
@@ -111,24 +111,19 @@ fun test_site_flow_with_resources_and_routes() {
             option::none<Range>(),
         );
         // Add a header to the resource.
-        walrus_site::site::add_header(
-            &mut resource,
+        resource.add_header(
             b"Content-Type".to_string(),
             b"text/html; charset=utf-8".to_string(),
         );
         // Add the resource to the site.
-        walrus_site::site::add_resource(&mut site, resource);
+        site.add_resource(resource);
         // Move the resource to a different path.
-        walrus_site::site::move_resource(
-            &mut site,
+        site.move_resource(
             b"index.html".to_string(),
             b"styles.css".to_string(),
         );
         // Delete the resource.
-        walrus_site::site::remove_resource(
-            &mut site,
-            b"styles.css".to_string(),
-        );
+        site.remove_resource(b"styles.css".to_string());
         scenario.return_to_sender<Site>(site);
     };
 
@@ -137,7 +132,7 @@ fun test_site_flow_with_resources_and_routes() {
     {
         let mut site = scenario.take_from_sender<Site>();
         // Create the routes DF.
-        walrus_site::site::create_routes(&mut site);
+        site.create_routes();
 
         // Create a resource and add it to the site.
         // This is needed for the insert_route to work,
@@ -148,27 +143,24 @@ fun test_site_flow_with_resources_and_routes() {
             124794210,
             option::none<Range>(),
         );
-        walrus_site::site::add_resource(&mut site, resource);
+        site.add_resource(resource);
 
         // Add some rerouting pairs.
-        walrus_site::site::insert_route(
-            &mut site,
+        site.insert_route(
             b"/path1".to_string(),
             b"index.html".to_string(),
         );
-        walrus_site::site::insert_route(
-            &mut site,
+        site.insert_route(
             b"/path2".to_string(),
             b"index.html".to_string(),
         );
         // Delete the last route.
-        walrus_site::site::remove_route(
-            &mut site,
+        site.remove_route(
             &b"/path2".to_string(),
         );
 
         // Remove all routes.
-        walrus_site::site::remove_all_routes_if_exist(&mut site);
+        site.remove_all_routes_if_exist();
         scenario.return_to_sender<Site>(site);
     };
 
@@ -176,7 +168,7 @@ fun test_site_flow_with_resources_and_routes() {
     scenario.next_tx(owner);
     {
         let site = scenario.take_from_sender<Site>();
-        walrus_site::site::burn(site);
+        site.burn();
     };
     scenario.end();
 }
@@ -246,18 +238,18 @@ fun test_site_fill_routes() {
         &mut tx_context::dummy(),
     );
 
-    walrus_site::site::create_routes(&mut site);
+    site.create_routes();
     site.fill_routes(
         vector[b"/path1".to_string(), b"/path2".to_string()],
         vector[b"index.html".to_string(), b"about.html".to_string()],
     );
 
     // Verify by removing the routes and checking they exist.
-    walrus_site::site::remove_route(&mut site, &b"/path1".to_string());
-    walrus_site::site::remove_route(&mut site, &b"/path2".to_string());
+    site.remove_route(&b"/path1".to_string());
+    site.remove_route(&b"/path2".to_string());
 
-    walrus_site::site::remove_all_routes_if_exist(&mut site);
-    walrus_site::site::burn(site);
+    site.remove_all_routes_if_exist();
+    site.burn();
 }
 
 // === redirect tests on Site ===
@@ -289,7 +281,7 @@ fun test_site_create_redirects() {
     assert!(*location == b"/new".to_string());
     assert!(status_code == 301);
 
-    walrus_site::site::burn(site);
+    site.burn();
 }
 
 #[test]
@@ -320,7 +312,7 @@ fun test_site_set_and_take_redirects() {
     assert!(*location == b"/new".to_string());
     assert!(status_code == 301);
 
-    walrus_site::site::burn(site);
+    site.burn();
 }
 
 #[test]
@@ -351,85 +343,75 @@ fun test_site_insert_and_remove_redirect() {
 
     // Clean up the DF before burning.
     site.take_redirects();
-    walrus_site::site::burn(site);
+    site.burn();
 }
 
 #[test]
 fun test_site_fill_redirects() {
-    let owner = @0xCAFE;
-    let mut scenario = test_scenario::begin(owner);
-    {
-        let metadata = walrus_site::metadata::new_metadata(
-            option::none(),
-            option::none(),
-            option::none(),
-            option::none(),
-            option::none(),
-        );
-        let mut site = walrus_site::site::new_site(
-            b"Test".to_string(),
-            metadata,
-            scenario.ctx(),
-        );
+    let metadata = walrus_site::metadata::new_metadata(
+        option::none(),
+        option::none(),
+        option::none(),
+        option::none(),
+        option::none(),
+    );
+    let mut site = walrus_site::site::new_site(
+        b"Test".to_string(),
+        metadata,
+        &mut tx_context::dummy(),
+    );
 
-        let redirects = walrus_site::redirects::empty();
-        site.set_redirects(redirects);
+    let redirects = walrus_site::redirects::empty();
+    site.set_redirects(redirects);
 
-        site.fill_redirects(
-            vector[b"/a".to_string(), b"/b".to_string()],
-            vector[b"/x".to_string(), b"/y".to_string()],
-            vector[301, 307],
-        );
+    site.fill_redirects(
+        vector[b"/a".to_string(), b"/b".to_string()],
+        vector[b"/x".to_string(), b"/y".to_string()],
+        vector[301, 307],
+    );
 
-        let taken = site.take_redirects();
-        assert!(taken.length() == 2);
-        let (location, status_code) = taken.get(&b"/a".to_string());
-        assert!(*location == b"/x".to_string());
-        assert!(status_code == 301);
-        let (location, status_code) = taken.get(&b"/b".to_string());
-        assert!(*location == b"/y".to_string());
-        assert!(status_code == 307);
+    let taken = site.take_redirects();
+    assert!(taken.length() == 2);
+    let (location, status_code) = taken.get(&b"/a".to_string());
+    assert!(*location == b"/x".to_string());
+    assert!(status_code == 301);
+    let (location, status_code) = taken.get(&b"/b".to_string());
+    assert!(*location == b"/y".to_string());
+    assert!(status_code == 307);
 
-        walrus_site::site::burn(site);
-    };
-    scenario.end();
+    site.burn();
 }
 
 #[test]
 fun test_site_take_redirects_if_exist() {
-    let owner = @0xCAFE;
-    let mut scenario = test_scenario::begin(owner);
-    {
-        let metadata = walrus_site::metadata::new_metadata(
-            option::none(),
-            option::none(),
-            option::none(),
-            option::none(),
-            option::none(),
-        );
-        let mut site = walrus_site::site::new_site(
-            b"Test".to_string(),
-            metadata,
-            scenario.ctx(),
-        );
+    let metadata = walrus_site::metadata::new_metadata(
+        option::none(),
+        option::none(),
+        option::none(),
+        option::none(),
+        option::none(),
+    );
+    let mut site = walrus_site::site::new_site(
+        b"Test".to_string(),
+        metadata,
+        &mut tx_context::dummy(),
+    );
 
-        // No redirects set yet — should return none.
-        let result = site.take_redirects_if_exist();
-        assert!(result.is_none());
+    // No redirects set yet — should return none.
+    let result = site.take_redirects_if_exist();
+    assert!(result.is_none());
 
-        // Set redirects, then take — should return some.
-        let redirects = walrus_site::redirects::filled(
-            vector[b"/old".to_string()],
-            vector[b"/new".to_string()],
-            vector[301],
-        );
-        site.set_redirects(redirects);
-        let result = site.take_redirects_if_exist();
-        assert!(result.is_some());
+    // Set redirects, then take — should return some.
+    let redirects = walrus_site::redirects::filled(
+        vector[b"/old".to_string()],
+        vector[b"/new".to_string()],
+        vector[301],
+    );
+    site.set_redirects(redirects);
+    let result = site.take_redirects_if_exist();
+    assert!(result.is_some());
 
-        walrus_site::site::burn(site);
-    };
-    scenario.end();
+    site.burn();
 }
 
 #[test, expected_failure(abort_code = walrus_site::redirects::EInvalidRedirectStatusCode)]
@@ -563,8 +545,8 @@ fun test_burn_fails_with_routes() {
         &mut tx_context::dummy(),
     );
 
-    walrus_site::site::create_routes(&mut site);
-    walrus_site::site::burn(site);
+    site.create_routes();
+    site.burn();
 
     abort EShouldHaveAborted
 }
@@ -585,36 +567,31 @@ fun test_burn_fails_with_redirects() {
     );
 
     site.set_redirects(walrus_site::redirects::empty());
-    walrus_site::site::burn(site);
+    site.burn();
 
     abort EShouldHaveAborted
 }
 
 #[test]
 fun test_burn_succeeds_after_removing_routes_and_redirects() {
-    let owner = @0xCAFE;
-    let mut scenario = test_scenario::begin(owner);
-    {
-        let metadata = walrus_site::metadata::new_metadata(
-            option::none(),
-            option::none(),
-            option::none(),
-            option::none(),
-            option::none(),
-        );
-        let mut site = walrus_site::site::new_site(
-            b"Test".to_string(),
-            metadata,
-            scenario.ctx(),
-        );
+    let metadata = walrus_site::metadata::new_metadata(
+        option::none(),
+        option::none(),
+        option::none(),
+        option::none(),
+        option::none(),
+    );
+    let mut site = walrus_site::site::new_site(
+        b"Test".to_string(),
+        metadata,
+        &mut tx_context::dummy(),
+    );
 
-        walrus_site::site::create_routes(&mut site);
-        let redirects = walrus_site::redirects::empty();
-        site.set_redirects(redirects);
+    site.create_routes();
+    let redirects = walrus_site::redirects::empty();
+    site.set_redirects(redirects);
 
-        walrus_site::site::remove_all_routes_if_exist(&mut site);
-        site.take_redirects();
-        walrus_site::site::burn(site);
-    };
-    scenario.end();
+    site.remove_all_routes_if_exist();
+    site.take_redirects();
+    site.burn();
 }
