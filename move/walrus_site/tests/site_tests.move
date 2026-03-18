@@ -18,8 +18,10 @@ use walrus_site::site::{
     get_site_creator
 };
 
-#[test]
-#[expected_failure(abort_code = EStartAndEndRangeAreNone)]
+/// Sentinel: if we reach this abort, the test should have already aborted earlier.
+const EShouldHaveAborted: u64 = 0xDEAD;
+
+#[test, expected_failure(abort_code = EStartAndEndRangeAreNone)]
 fun test_new_range_no_bounds_defined() {
     walrus_site::site::new_range(
         option::none(),
@@ -54,8 +56,7 @@ fun test_new_range_lower_bound_can_be_zero() {
         option::none(),
     );
 }
-#[test]
-#[expected_failure(abort_code = ERangeStartGreaterThanRangeEnd)]
+#[test, expected_failure(abort_code = ERangeStartGreaterThanRangeEnd)]
 fun test_new_range_upper_cannot_be_less_than_lower_bound() {
     walrus_site::site::new_range(
         option::some(2),
@@ -456,8 +457,7 @@ fun test_site_take_redirects_if_exist() {
     scenario.end();
 }
 
-#[test]
-#[expected_failure(abort_code = walrus_site::redirects::EInvalidRedirectStatusCode)]
+#[test, expected_failure(abort_code = walrus_site::redirects::EInvalidRedirectStatusCode)]
 fun test_site_fill_redirects_invalid_status_code() {
     let owner = @0xCAFE;
     let mut scenario = test_scenario::begin(owner);
@@ -490,8 +490,7 @@ fun test_site_fill_redirects_invalid_status_code() {
     scenario.end();
 }
 
-#[test]
-#[expected_failure(abort_code = walrus_site::redirects::EInvalidRedirectStatusCode)]
+#[test, expected_failure(abort_code = walrus_site::redirects::EInvalidRedirectStatusCode)]
 fun test_site_insert_redirect_invalid_status_code() {
     let owner = @0xCAFE;
     let mut scenario = test_scenario::begin(owner);
@@ -520,10 +519,83 @@ fun test_site_insert_redirect_invalid_status_code() {
     scenario.end();
 }
 
+#[test, expected_failure(abort_code = sui::dynamic_field::EFieldAlreadyExists)]
+fun set_redirect_twice_aborts() {
+    let owner = @0xCAFE;
+    let mut scenario = test_scenario::begin(owner);
+    let metadata = walrus_site::metadata::new_metadata(
+        option::none(),
+        option::none(),
+        option::none(),
+        option::none(),
+        option::none(),
+    );
+    let mut site = walrus_site::site::new_site(
+        b"Test".to_string(),
+        metadata,
+        scenario.ctx(),
+    );
+
+    site.set_redirects(walrus_site::redirects::empty());
+    site.set_redirects(walrus_site::redirects::empty());
+
+    abort EShouldHaveAborted
+}
+
+#[test, expected_failure(abort_code = sui::vec_map::EKeyAlreadyExists)]
+fun insert_redirect_dup_path_aborts() {
+    let owner = @0xCAFE;
+    let mut scenario = test_scenario::begin(owner);
+    let metadata = walrus_site::metadata::new_metadata(
+        option::none(),
+        option::none(),
+        option::none(),
+        option::none(),
+        option::none(),
+    );
+    let mut site = walrus_site::site::new_site(
+        b"Test".to_string(),
+        metadata,
+        scenario.ctx(),
+    );
+
+    site.set_redirects(walrus_site::redirects::empty());
+    site.insert_redirect(b"/a".to_string(), b"/b".to_string(), 301);
+    site.insert_redirect(b"/a".to_string(), b"/c".to_string(), 302);
+
+    abort EShouldHaveAborted
+}
+
+#[test, expected_failure(abort_code = sui::vec_map::EKeyAlreadyExists)]
+fun fill_redirects_dup_path_aborts() {
+    let owner = @0xCAFE;
+    let mut scenario = test_scenario::begin(owner);
+    let metadata = walrus_site::metadata::new_metadata(
+        option::none(),
+        option::none(),
+        option::none(),
+        option::none(),
+        option::none(),
+    );
+    let mut site = walrus_site::site::new_site(
+        b"Test".to_string(),
+        metadata,
+        scenario.ctx(),
+    );
+
+    site.set_redirects(walrus_site::redirects::empty());
+    site.fill_redirects(
+        vector[b"/a".to_string(), b"/a".to_string()],
+        vector[b"/b".to_string(), b"/c".to_string()],
+        vector[301, 302],
+    );
+
+    abort EShouldHaveAborted
+}
+
 // === burn assertions ===
 
-#[test]
-#[expected_failure(abort_code = ERemoveRoutesFirst)]
+#[test, expected_failure(abort_code = ERemoveRoutesFirst)]
 fun test_burn_fails_with_routes() {
     let owner = @0xCAFE;
     let mut scenario = test_scenario::begin(owner);
@@ -547,8 +619,7 @@ fun test_burn_fails_with_routes() {
     scenario.end();
 }
 
-#[test]
-#[expected_failure(abort_code = ERemoveRedirectsFirst)]
+#[test, expected_failure(abort_code = ERemoveRedirectsFirst)]
 fun test_burn_fails_with_redirects() {
     let owner = @0xCAFE;
     let mut scenario = test_scenario::begin(owner);
