@@ -4,6 +4,7 @@
 #[test_only]
 module walrus_site::site_tests;
 
+use std::unit_test::assert_eq;
 use sui::test_scenario;
 use walrus_site::site::{
     ERangeStartGreaterThanRangeEnd,
@@ -88,12 +89,12 @@ fun test_site_flow_with_resources_and_routes() {
             scenario.ctx(),
         );
 
-        assert!(get_site_name(&site) == b"Example".to_string());
-        assert!(get_site_link(&site).borrow() == b"https://<b36>.wal.app".to_string());
+        assert_eq!(get_site_name(&site), b"Example".to_string());
+        assert_eq!(get_site_link(&site).extract(), b"https://<b36>.wal.app".to_string());
         assert!(
-            get_site_image_url(&site).borrow() == b"https://<b36>.wal.app/image.png".to_string(),
+            get_site_image_url(&site).extract() == b"https://<b36>.wal.app/image.png".to_string(),
         );
-        assert!(get_site_description(&site).borrow() == b"This is a test site.".to_string());
+        assert_eq!(get_site_description(&site).extract(), b"This is a test site.".to_string());
         assert!(get_site_project_url(&site).is_none());
         assert!(get_site_creator(&site).is_none());
 
@@ -195,8 +196,8 @@ fun test_update_metadata() {
             scenario.ctx(),
         );
 
-        assert!(get_site_name(&site) == b"Example".to_string());
-        assert!(get_site_link(&site).borrow() == b"https://<b36>.wal.app".to_string());
+        assert_eq!(get_site_name(&site), b"Example".to_string());
+        assert_eq!(get_site_link(&site).extract(), b"https://<b36>.wal.app".to_string());
 
         transfer::public_transfer(site, owner)
     };
@@ -279,10 +280,10 @@ fun test_site_create_redirects() {
     site.insert_redirect(b"/old".to_string(), b"/new".to_string(), 301);
 
     let taken = site.take_redirects();
-    assert!(taken.length() == 1);
+    assert_eq!(taken.length(), 1);
     let (location, status_code) = taken.get(&b"/old".to_string());
-    assert!(*location == b"/new".to_string());
-    assert!(status_code == 301);
+    assert_eq!(*location, b"/new".to_string());
+    assert_eq!(status_code, 301);
 
     site.burn();
 }
@@ -310,10 +311,10 @@ fun test_site_set_and_take_redirects() {
     site.set_redirects(redirects);
 
     let taken = site.take_redirects();
-    assert!(taken.length() == 1);
+    assert_eq!(taken.length(), 1);
     let (location, status_code) = taken.get(&b"/old".to_string());
-    assert!(*location == b"/new".to_string());
-    assert!(status_code == 301);
+    assert_eq!(*location, b"/new".to_string());
+    assert_eq!(status_code, 301);
 
     site.burn();
 }
@@ -340,9 +341,9 @@ fun test_site_insert_and_remove_redirect() {
     site.insert_redirect(b"/c".to_string(), b"https://example.com".to_string(), 308);
 
     let (path, location, status_code) = site.remove_redirect(&b"/a".to_string());
-    assert!(path == b"/a".to_string());
-    assert!(location == b"/b".to_string());
-    assert!(status_code == 302);
+    assert_eq!(path, b"/a".to_string());
+    assert_eq!(location, b"/b".to_string());
+    assert_eq!(status_code, 302);
 
     // Clean up the DF before burning.
     site.take_redirects();
@@ -374,13 +375,13 @@ fun test_site_fill_redirects() {
     );
 
     let taken = site.take_redirects();
-    assert!(taken.length() == 2);
+    assert_eq!(taken.length(), 2);
     let (location, status_code) = taken.get(&b"/a".to_string());
-    assert!(*location == b"/x".to_string());
-    assert!(status_code == 301);
+    assert_eq!(*location, b"/x".to_string());
+    assert_eq!(status_code, 301);
     let (location, status_code) = taken.get(&b"/b".to_string());
-    assert!(*location == b"/y".to_string());
-    assert!(status_code == 307);
+    assert_eq!(*location, b"/y".to_string());
+    assert_eq!(status_code, 307);
 
     site.burn();
 }

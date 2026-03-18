@@ -4,6 +4,7 @@
 #[test_only]
 module walrus_site::redirects_tests;
 
+use std::unit_test::assert_eq;
 use walrus_site::redirects::{
     Self,
     EInvalidRedirectStatusCode,
@@ -20,10 +21,10 @@ fun test_filled_single() {
         vector[b"/new".to_string()],
         vector[301],
     );
-    assert!(redirects.length() == 1);
+    assert_eq!(redirects.length(), 1);
     let (location, status_code) = redirects.get(&b"/old".to_string());
-    assert!(*location == b"/new".to_string());
-    assert!(status_code == 301);
+    assert_eq!(*location, b"/new".to_string());
+    assert_eq!(status_code, 301);
 }
 
 #[test]
@@ -33,19 +34,19 @@ fun test_filled_multiple() {
         vector[b"/x".to_string(), b"/y".to_string()],
         vector[301, 308],
     );
-    assert!(redirects.length() == 2);
+    assert_eq!(redirects.length(), 2);
     let (location, status_code) = redirects.get(&b"/a".to_string());
-    assert!(*location == b"/x".to_string());
-    assert!(status_code == 301);
+    assert_eq!(*location, b"/x".to_string());
+    assert_eq!(status_code, 301);
     let (location, status_code) = redirects.get(&b"/b".to_string());
-    assert!(*location == b"/y".to_string());
-    assert!(status_code == 308);
+    assert_eq!(*location, b"/y".to_string());
+    assert_eq!(status_code, 308);
 }
 
 #[test]
 fun test_filled_empty_vectors() {
     let redirects = redirects::filled(vector[], vector[], vector[]);
-    assert!(redirects.length() == 0);
+    assert_eq!(redirects.length(), 0);
 }
 
 #[test]
@@ -56,8 +57,8 @@ fun test_filled_external_url() {
         vector[302],
     );
     let (location, status_code) = redirects.get(&b"/docs".to_string());
-    assert!(*location == b"https://docs.example.com".to_string());
-    assert!(status_code == 302);
+    assert_eq!(*location, b"https://docs.example.com".to_string());
+    assert_eq!(status_code, 302);
 }
 
 // === fill ===
@@ -65,16 +66,16 @@ fun test_filled_external_url() {
 #[test]
 fun test_fill_on_existing() {
     let mut redirects = redirects::empty();
-    assert!(redirects.length() == 0);
+    assert_eq!(redirects.length(), 0);
     redirects.fill(
         vector[b"/old".to_string()],
         vector[b"/new".to_string()],
         vector[308],
     );
-    assert!(redirects.length() == 1);
+    assert_eq!(redirects.length(), 1);
     let (location, status_code) = redirects.get(&b"/old".to_string());
-    assert!(*location == b"/new".to_string());
-    assert!(status_code == 308);
+    assert_eq!(*location, b"/new".to_string());
+    assert_eq!(status_code, 308);
 }
 
 #[test, expected_failure(abort_code = ELocationsLength)]
@@ -101,13 +102,13 @@ fun test_fill_mismatched_status_codes_length() {
 fun test_insert_and_remove() {
     let mut redirects = redirects::empty();
     redirects.insert(b"/old".to_string(), b"/new".to_string(), 301);
-    assert!(redirects.length() == 1);
+    assert_eq!(redirects.length(), 1);
 
     let (path, location, status_code) = redirects.remove(&b"/old".to_string());
-    assert!(path == b"/old".to_string());
-    assert!(location == b"/new".to_string());
-    assert!(status_code == 301);
-    assert!(redirects.length() == 0);
+    assert_eq!(path, b"/old".to_string());
+    assert_eq!(location, b"/new".to_string());
+    assert_eq!(status_code, 301);
+    assert_eq!(redirects.length(), 0);
 }
 
 #[test]
@@ -116,11 +117,11 @@ fun test_insert_multiple() {
     redirects.insert(b"/a".to_string(), b"/1".to_string(), 301);
     redirects.insert(b"/b".to_string(), b"/2".to_string(), 302);
     redirects.insert(b"/c".to_string(), b"/3".to_string(), 307);
-    assert!(redirects.length() == 3);
+    assert_eq!(redirects.length(), 3);
 
     let (location, status_code) = redirects.get(&b"/b".to_string());
-    assert!(*location == b"/2".to_string());
-    assert!(status_code == 302);
+    assert_eq!(*location, b"/2".to_string());
+    assert_eq!(status_code, 302);
 }
 
 // === status code validation ===
@@ -133,7 +134,7 @@ fun test_all_valid_status_codes_via_insert() {
     redirects.insert(b"/c".to_string(), b"/3".to_string(), 303);
     redirects.insert(b"/d".to_string(), b"/4".to_string(), 307);
     redirects.insert(b"/e".to_string(), b"/5".to_string(), 308);
-    assert!(redirects.length() == 5);
+    assert_eq!(redirects.length(), 5);
 }
 
 #[test]
