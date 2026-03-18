@@ -181,7 +181,7 @@ public fun update_metadata(site: &mut Site, metadata: Metadata) {
 /// Adds a resource to an existing site.
 public fun add_resource(site: &mut Site, resource: Resource) {
     let path_obj = new_path(resource.path);
-    df::add(&mut site.id, path_obj, resource);
+    site.id.df_add(path_obj, resource);
 }
 
 /// Removes a resource from a site.
@@ -189,13 +189,13 @@ public fun add_resource(site: &mut Site, resource: Resource) {
 /// Aborts if the resource does not exist.
 public fun remove_resource(site: &mut Site, path: String): Resource {
     let path_obj = new_path(path);
-    df::remove(&mut site.id, path_obj)
+    site.id.df_remove(path_obj)
 }
 
 /// Removes a resource from a site if it exists.
 public fun remove_resource_if_exists(site: &mut Site, path: String): Option<Resource> {
     let path_obj = new_path(path);
-    df::remove_if_exists(&mut site.id, path_obj)
+    site.id.df_remove_if_exists(path_obj)
 }
 
 /// Changes the path of a resource on a site.
@@ -229,7 +229,7 @@ fun routes_remove(routes: &mut Routes, route: &String): (String, String) {
 /// Add the routes dynamic field to the site.
 public fun create_routes(site: &mut Site) {
     let routes = new_routes();
-    df::add(&mut site.id, ROUTES_FIELD, routes);
+    site.id.df_add(ROUTES_FIELD, routes);
 }
 
 /// Populates the routes dynamic field with the given entries.
@@ -245,20 +245,20 @@ public fun fill_routes(self: &mut Site, from: vector<String>, to: vector<String>
 
 /// Remove all routes from the site.
 public fun remove_all_routes_if_exist(site: &mut Site): Option<Routes> {
-    df::remove_if_exists(&mut site.id, ROUTES_FIELD)
+    site.id.df_remove_if_exists(ROUTES_FIELD)
 }
 
 /// Add a route to the site.
 ///
 /// The insertion operation fails if the route already exists.
 public fun insert_route(site: &mut Site, route: String, resource_path: String) {
-    let routes = df::borrow_mut(&mut site.id, ROUTES_FIELD);
+    let routes = site.id.df_mut(ROUTES_FIELD);
     routes_insert(routes, route, resource_path);
 }
 
 /// Remove a route from the site.
 public fun remove_route(site: &mut Site, route: &String): (String, String) {
-    let routes = df::borrow_mut(&mut site.id, ROUTES_FIELD);
+    let routes = site.id.df_mut(ROUTES_FIELD);
     routes_remove(routes, route)
 }
 
