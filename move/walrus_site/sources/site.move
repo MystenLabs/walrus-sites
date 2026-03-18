@@ -1,3 +1,6 @@
+// Copyright (c) Mysten Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 /// The module exposes the functionality to create and update Walrus sites.
 module walrus_site::site;
 
