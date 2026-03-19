@@ -41,7 +41,10 @@ fn make_redirects(entries: &[(&str, &str, u16)]) -> Redirects {
     }
 }
 
-fn write_ws_resources(dir: &std::path::Path, ws: &WSResources) -> anyhow::Result<std::path::PathBuf> {
+fn write_ws_resources(
+    dir: &std::path::Path,
+    ws: &WSResources,
+) -> anyhow::Result<std::path::PathBuf> {
     let path = dir.join("ws-resources.json");
     let file = File::create(&path)?;
     serde_json::to_writer_pretty(BufWriter::new(file), ws)?;
@@ -117,10 +120,7 @@ async fn deploy_update_redirects() -> anyhow::Result<()> {
     writeln!(f, "<html><body>Hello</body></html>")?;
 
     // Initial deploy with 2 redirects.
-    let initial_redirects = make_redirects(&[
-        ("/a", "/target-a", 301),
-        ("/b", "/target-b", 302),
-    ]);
+    let initial_redirects = make_redirects(&[("/a", "/target-a", 301), ("/b", "/target-b", 302)]);
     let ws_path = site_dir.path().join("ws-resources.json");
     serde_json::to_writer_pretty(
         BufWriter::new(File::create(&ws_path)?),
@@ -162,10 +162,8 @@ async fn deploy_update_redirects() -> anyhow::Result<()> {
     assert_eq!(r.redirect_list.0["/b"].status_code, 302);
 
     // Update: change /a destination, add /c, remove /b.
-    let updated_redirects = make_redirects(&[
-        ("/a", "/new-target-a", 301),
-        ("/c", "/target-c", 307),
-    ]);
+    let updated_redirects =
+        make_redirects(&[("/a", "/new-target-a", 301), ("/c", "/target-c", 307)]);
     serde_json::to_writer_pretty(
         BufWriter::new(File::create(&ws_path)?),
         &WSResources {
@@ -230,7 +228,11 @@ async fn deploy_remove_all_redirects() -> anyhow::Result<()> {
         site_builder::run(args).await
     };
 
-    deploy(site_dir.path().to_owned(), cluster.sites_config_path().to_owned()).await?;
+    deploy(
+        site_dir.path().to_owned(),
+        cluster.sites_config_path().to_owned(),
+    )
+    .await?;
 
     let site_id = *cluster.last_site_created().await?.id.object_id();
     assert!(cluster.site_redirects(site_id).await?.is_some());
@@ -246,7 +248,11 @@ async fn deploy_remove_all_redirects() -> anyhow::Result<()> {
         },
     )?;
 
-    deploy(site_dir.path().to_owned(), cluster.sites_config_path().to_owned()).await?;
+    deploy(
+        site_dir.path().to_owned(),
+        cluster.sites_config_path().to_owned(),
+    )
+    .await?;
 
     assert!(
         cluster.site_redirects(site_id).await?.is_none(),
@@ -290,7 +296,11 @@ async fn deploy_add_redirects_to_existing_site() -> anyhow::Result<()> {
         site_builder::run(args).await
     };
 
-    deploy(site_dir.path().to_owned(), cluster.sites_config_path().to_owned()).await?;
+    deploy(
+        site_dir.path().to_owned(),
+        cluster.sites_config_path().to_owned(),
+    )
+    .await?;
 
     let site_id = *cluster.last_site_created().await?.id.object_id();
     assert!(cluster.site_redirects(site_id).await?.is_none());
@@ -306,7 +316,11 @@ async fn deploy_add_redirects_to_existing_site() -> anyhow::Result<()> {
         },
     )?;
 
-    deploy(site_dir.path().to_owned(), cluster.sites_config_path().to_owned()).await?;
+    deploy(
+        site_dir.path().to_owned(),
+        cluster.sites_config_path().to_owned(),
+    )
+    .await?;
 
     let r = cluster.site_redirects(site_id).await?;
     let r = r.expect("redirects should now exist on chain");
