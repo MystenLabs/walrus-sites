@@ -94,12 +94,9 @@ export class UrlFetcher {
             return siteNotFound();
         }
 
-        // Rerouting based on the contents of the routes object,
-        // constructed using the ws-resource.json.
-
-        // Initiate a fetch request to get the Routes object in case the request
-        // to the initial unfiltered path fails.
-        const routesPromise = this.wsRouter.getRoutes(resolvedObjectId);
+        // Initiate a fetch request to get the Routes and Redirects objects
+        // in case the request to the initial unfiltered path fails.
+        const routingPromise = this.wsRouter.getRoutesAndRedirects(resolvedObjectId);
 
         // Fetch the URL using the initial path.
         const fetchResult = await this.fetchUrl(resolvedObjectId, parsedUrl.path);
@@ -111,17 +108,26 @@ export class UrlFetcher {
             return fetchResult.response;
         }
 
-        // The on-chain resource was not found — try route matching and fallbacks.
-        const routes = await routesPromise;
+        // The on-chain resource was not found — try redirects, route matching, and fallbacks.
+        const { routes, redirects } = await routingPromise;
 
-        if (!routes) {
-            logger.warn("No Routes object found for the object ID", {
-                resolvedObjectIdNoRoutes: resolvedObjectId,
-            });
-            // Fall through to 404.html check
+        // Check redirects first (takes priority over routes).
+        if (redirects) {
+            const redirect = this.wsRouter.matchPathToRedirect(parsedUrl.path, redirects);
+            if (redirect) {
+                logger.info("Redirect match found", {
+                    path: parsedUrl.path,
+                    location: redirect.location,
+                    statusCode: redirect.status_code,
+                });
+                return new Response(null, {
+                    status: redirect.status_code,
+                    headers: { Location: redirect.location },
+                });
+            }
         }
 
-        // Try matching route if routes exist
+        // Try matching route if routes exist.
         if (routes) {
             const matchingRoute = this.wsRouter.matchPathToRoute(parsedUrl.path, routes);
             if (matchingRoute) {

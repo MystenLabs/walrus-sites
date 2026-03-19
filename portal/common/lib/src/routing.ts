@@ -2,101 +2,78 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { SuiObjectResponse } from "@mysten/sui/jsonRpc";
-import { Routes } from "@lib/types";
-import { DynamicFieldStruct, RoutesStruct } from "@lib/bcs_data_parsing";
-import { bcs, fromBase64 } from "@mysten/bcs";
+import { Redirect, Redirects, Routes } from "@lib/types";
+import { DynamicFieldStruct, RedirectsStruct, RoutesStruct } from "@lib/bcs_data_parsing";
+import { bcs, BcsType, fromBase64 } from "@mysten/bcs";
 import logger from "@lib/logger";
 import { RPCSelector } from "@lib/rpc_selector";
 import { deriveDynamicFieldID } from "@mysten/sui/utils";
 import { instrumentationFacade } from "@lib/instrumentation";
+import picomatch from "picomatch";
 
 /**
- * The WalrusSiteRouter class is responsible for handling the routing logic for published
- * Walrus Sites, depending by the definition of the `routes` field inside the `ws-resources.json`.
+ * The WalrusSitesRouter class is responsible for handling the routing and redirect
+ * logic for published Walrus Sites, based on the `routes` and `redirects` fields
+ * inside the `ws-resources.json`.
  */
 export class WalrusSitesRouter {
     constructor(private rpcSelector: RPCSelector) {}
 
     /**
      * Gets the Routes dynamic field of the site object.
-     * Returns the extracted routes_list map to use for future requests,
-     * and redirects the paths matched accordingly.
      *
      * @param siteObjectId - The ID of the site object.
-     * @returns The routes list.
+     * @returns The routes list, or undefined if not present.
      */
     public async getRoutes(siteObjectId: string): Promise<Routes | undefined> {
         const reqStartTime = Date.now();
-
-        logger.info(
-            "Retrieving the Routes dynamic field object (if present) associated with the Site object",
-            { siteObjectId },
-        );
-        const routesObj = await this.fetchRoutesDynamicFieldObject(siteObjectId);
-        const objectData = routesObj.data;
-        if (objectData && objectData.bcs && objectData.bcs.dataType === "moveObject") {
-            const routingDuration = Date.now() - reqStartTime;
-            instrumentationFacade.recordRoutingTime(routingDuration, siteObjectId);
-            return this.parseRoutesData(objectData.bcs.bcsBytes);
-        }
-        if (!objectData) {
-            logger.warn("Routes dynamic field does not contain a `data` field.");
-            return;
-        } else if (!objectData.bcs) {
-            logger.warn("Routes dynamic field does not contain a `bcs` field.");
-        } else if (!objectData.bcs.dataType) {
-            logger.warn("Routes dynamic field does not contain a `dataType` field.");
-        }
-        throw new Error("Routes object data could not be fetched.");
-    }
-
-    /**
-     * Derives and fetches the Routes dynamic field object.
-     *
-     * @param siteObjectId - The site object ID.
-     * @returns The routes object.
-     */
-    private async fetchRoutesDynamicFieldObject(siteObjectId: string): Promise<SuiObjectResponse> {
-        const reqStartTime = Date.now();
-        const routesMoveType = "vector<u8>";
-        const dynamicFieldId = deriveDynamicFieldID(
-            siteObjectId,
-            routesMoveType,
-            bcs.vector(bcs.u8()).serialize(Buffer.from("routes")).toBytes(),
-        );
-        const dfObjectResponse = await this.rpcSelector.getObject({
-            id: dynamicFieldId,
+        const dfId = this.deriveSiteFieldId(siteObjectId, "routes");
+        const response = await this.rpcSelector.getObject({
+            id: dfId,
             options: { showBcs: true },
         });
-        const fetchRoutesDynamicFieldObjectDuration = Date.now() - reqStartTime;
-        instrumentationFacade.recordFetchRoutesDynamicFieldObjectTime(
-            fetchRoutesDynamicFieldObjectDuration,
-            siteObjectId,
-        );
-        return dfObjectResponse;
+        const routingDuration = Date.now() - reqStartTime;
+        instrumentationFacade.recordRoutingTime(routingDuration, siteObjectId);
+        return this.parseDynamicFieldValue(response, RoutesStruct, "Routes");
     }
 
     /**
-     * Parses the routes data from the BCS bytes.
+     * Gets both the Routes and Redirects dynamic fields in a single RPC call.
      *
-     * @param bcsBytes - The BCS bytes of the routes object.
-     * @returns The parsed routes data.
+     * @param siteObjectId - The ID of the site object.
+     * @returns The routes and redirects, each undefined if not present.
      */
-    private parseRoutesData(bcsBytes: string): Routes {
-        const df = DynamicFieldStruct(
-            // BCS declaration of the ROUTES_FIELD in site.move.
-            bcs.vector(bcs.u8()),
-            // The value of the df, i.e. the Routes Struct.
-            RoutesStruct,
-        ).parse(fromBase64(bcsBytes));
+    public async getRoutesAndRedirects(siteObjectId: string): Promise<{
+        routes: Routes | undefined;
+        redirects: Redirects | undefined;
+    }> {
+        const reqStartTime = Date.now();
+        const routesDfId = this.deriveSiteFieldId(siteObjectId, "routes");
+        const redirectsDfId = this.deriveSiteFieldId(siteObjectId, "redirects");
 
-        return df.value as any as Routes;
+        const responses = await this.rpcSelector.multiGetObjects({
+            ids: [routesDfId, redirectsDfId],
+            options: { showBcs: true },
+        });
+
+        const routingDuration = Date.now() - reqStartTime;
+        instrumentationFacade.recordRoutingTime(routingDuration, siteObjectId);
+
+        const routes = this.parseDynamicFieldValue(responses[0], RoutesStruct, "Routes");
+        const redirects = this.parseDynamicFieldValue(responses[1], RedirectsStruct, "Redirects");
+
+        if (redirects) {
+            this.warnOnRedirectLoops(redirects);
+        }
+
+        return { routes, redirects };
     }
 
     /**
      * Matches the path to the appropriate route.
-     * Path patterns in the routes list are sorted by length in descending order.
-     * Then the first match is returned.
+     * Uses the legacy regex pattern where `*` is converted to `.*` (matches
+     * any characters including `/`). When multiple patterns match, the longest
+     * pattern wins.
      *
      * @param path - The path to match.
      * @param routes - The routes to match against.
@@ -104,18 +81,25 @@ export class WalrusSitesRouter {
     public matchPathToRoute(path: string, routes: Routes): string | undefined {
         logger.info(
             "Attempting to match the provided `path` with the routes in the Routes object",
-            { path, routesDFList: routes.routes_list },
+            {
+                path,
+                routesDFList: routes.routes_list,
+            },
         );
-        if (routes.routes_list.size == 0) {
-            // If the map is empty there is no match.
-            return undefined;
-        }
+        if (routes.routes_list.size === 0) return undefined;
 
-        const filteredRoutes = Array.from(routes.routes_list.entries()).filter(([pattern, _]) =>
-            new RegExp(`^${pattern.replace(/\*/g, ".*")}$`).test(path),
-        );
+        const filtered = Array.from(routes.routes_list.entries()).filter(([pattern]) => {
+            const regexMatch = new RegExp(`^${pattern.replace(/\*/g, ".*")}$`).test(path);
+            if (regexMatch && !picomatch(pattern, { dot: true })(path)) {
+                logger.warn("Route pattern matches via regex but not via glob (picomatch)", {
+                    pattern,
+                    path,
+                });
+            }
+            return regexMatch;
+        });
 
-        if (filteredRoutes.length === 0) {
+        if (filtered.length === 0) {
             logger.warn("No matching routes found.", {
                 path,
                 routesDFList: routes.routes_list,
@@ -123,8 +107,82 @@ export class WalrusSitesRouter {
             return undefined;
         }
 
-        const res = filteredRoutes.reduce((a, b) => (a[0].length >= b[0].length ? a : b));
+        return filtered.reduce((a, b) => (a[0].length >= b[0].length ? a : b))[1];
+    }
 
-        return res[1];
+    /**
+     * Matches the path to a redirect entry using glob patterns (picomatch).
+     * When multiple patterns match, the longest pattern wins.
+     *
+     * @param path - The path to match.
+     * @param redirects - The redirects to match against.
+     */
+    public matchPathToRedirect(path: string, redirects: Redirects): Redirect | undefined {
+        logger.info("Attempting to match the provided `path` with the redirects", { path });
+        if (redirects.redirect_list.size === 0) return undefined;
+
+        const filtered = Array.from(redirects.redirect_list.entries()).filter(([pattern]) =>
+            picomatch(pattern, { dot: true })(path),
+        );
+
+        if (filtered.length === 0) {
+            logger.warn("No matching redirects found.", { path });
+            return undefined;
+        }
+
+        return filtered.reduce((a, b) => (a[0].length >= b[0].length ? a : b))[1];
+    }
+
+    /**
+     * Derives the dynamic field object ID for a site field.
+     */
+    private deriveSiteFieldId(siteObjectId: string, fieldName: string): string {
+        return deriveDynamicFieldID(
+            siteObjectId,
+            "vector<u8>",
+            bcs.vector(bcs.u8()).serialize(Buffer.from(fieldName)).toBytes(),
+        );
+    }
+
+    /**
+     * Parses a dynamic field value from a SuiObjectResponse.
+     * Returns undefined if the DF doesn't exist on-chain.
+     * Throws if the object exists but has unexpected format.
+     */
+    private parseDynamicFieldValue<T>(
+        response: SuiObjectResponse,
+        valueStruct: BcsType<T>,
+        fieldName: string,
+    ): T | undefined {
+        const objectData = response.data;
+        if (objectData?.bcs?.dataType === "moveObject") {
+            const df = DynamicFieldStruct(bcs.vector(bcs.u8()), valueStruct).parse(
+                fromBase64(objectData.bcs.bcsBytes),
+            );
+            return df.value as any as T;
+        }
+        if (!objectData) {
+            return undefined;
+        }
+        logger.warn(`${fieldName} dynamic field has unexpected format`, { objectData });
+        throw new Error(`${fieldName} object data could not be fetched.`);
+    }
+
+    /**
+     * Logs a warning if any redirect's location matches another redirect pattern,
+     * indicating a possible redirect loop.
+     */
+    private warnOnRedirectLoops(redirects: Redirects): void {
+        for (const [path, redirect] of redirects.redirect_list) {
+            const match = Array.from(redirects.redirect_list.entries()).find(([pattern]) =>
+                picomatch(pattern, { dot: true })(redirect.location),
+            );
+            if (match) {
+                logger.warn("Possible redirect loop detected", {
+                    from: path,
+                    to: redirect.location,
+                });
+            }
+        }
     }
 }

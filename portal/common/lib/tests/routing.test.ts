@@ -9,6 +9,7 @@ import type { FetchUrlResult } from "@lib/url_fetcher";
 import { ResourceFetcher } from "@lib/resource";
 import { SuiNSResolver } from "@lib/suins";
 import { parsePriorityUrlList, PriorityExecutor } from "@lib/priority_executor";
+import { Redirect, Redirects } from "@lib/types";
 
 const snakeSiteObjectId = "0x7a95e4be3948415b852fb287d455166a276d7a52f1a567b4a26b6b5e9c753158";
 const rpcPriorityUrls = parsePriorityUrlList(process.env.RPC_URL_LIST!);
@@ -59,23 +60,80 @@ testCases.forEach(([requestPath, _]) => {
     });
 });
 
-describe("routing tests", () => {
+// --- Redirect matching tests ---
+
+const redirectsExample: Redirects = {
+    redirect_list: new Map<string, Redirect>([
+        ["/old-page", { location: "/new-page", status_code: 301 }],
+        ["/temp", { location: "https://example.com/temp", status_code: 302 }],
+        ["/blog/old-*", { location: "/blog/archive", status_code: 308 }],
+        ["/docs/*", { location: "/documentation", status_code: 307 }],
+    ]),
+};
+
+describe("matchPathToRedirect", () => {
+    test("exact match returns redirect", () => {
+        const match = wsRouter.matchPathToRedirect("/old-page", redirectsExample);
+        expect(match).toEqual({ location: "/new-page", status_code: 301 });
+    });
+
+    test("glob match returns redirect", () => {
+        const match = wsRouter.matchPathToRedirect("/blog/old-post", redirectsExample);
+        expect(match).toEqual({ location: "/blog/archive", status_code: 308 });
+    });
+
+    test("longest glob match wins", () => {
+        // /blog/old-post matches /blog/old-* (length 11) but not /docs/* (doesn't match)
+        const match = wsRouter.matchPathToRedirect("/blog/old-post", redirectsExample);
+        expect(match).toEqual({ location: "/blog/archive", status_code: 308 });
+    });
+
+    test("no match returns undefined", () => {
+        const match = wsRouter.matchPathToRedirect("/nonexistent", redirectsExample);
+        expect(match).toBeUndefined();
+    });
+
+    test("empty redirects returns undefined", () => {
+        const emptyRedirects: Redirects = { redirect_list: new Map() };
+        const match = wsRouter.matchPathToRedirect("/old-page", emptyRedirects);
+        expect(match).toBeUndefined();
+    });
+
+    test("preserves different status codes", () => {
+        expect(wsRouter.matchPathToRedirect("/old-page", redirectsExample)?.status_code).toBe(301);
+        expect(wsRouter.matchPathToRedirect("/temp", redirectsExample)?.status_code).toBe(302);
+        expect(wsRouter.matchPathToRedirect("/docs/guide", redirectsExample)?.status_code).toBe(
+            307,
+        );
+        expect(wsRouter.matchPathToRedirect("/blog/old-x", redirectsExample)?.status_code).toBe(
+            308,
+        );
+    });
+});
+
+// --- Integration tests ---
+
+const siteObjectId = "0x0977d45a9adb8af8405c0698b0e049de05f8c89da75ca16ac6a6cba76031519f";
+
+function makeUrlFetcher(): UrlFetcher {
+    return new UrlFetcher(
+        new ResourceFetcher(rpcSelector, sitePackage!),
+        new SuiNSResolver(rpcSelector),
+        wsRouter,
+        new PriorityExecutor(aggregatorPriorityUrls),
+        true,
+    );
+}
+
+describe("routing integration tests", () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
     test("should check routes before 404.html", async () => {
-        const aggregatorExecutor = new PriorityExecutor(aggregatorPriorityUrls);
-        const urlFetcher = new UrlFetcher(
-            new ResourceFetcher(rpcSelector, sitePackage!),
-            new SuiNSResolver(rpcSelector),
-            wsRouter,
-            aggregatorExecutor,
-            true,
-        );
+        const urlFetcher = makeUrlFetcher();
 
         const fetchUrlSpy = vi.spyOn(urlFetcher, "fetchUrl");
-        // Mock the fetchUrl method to return FetchUrlResult
         fetchUrlSpy.mockImplementation(
             async (_objectId: string, path: string): Promise<FetchUrlResult> => {
                 switch (path) {
@@ -90,29 +148,20 @@ describe("routing tests", () => {
                             response: new Response("404 page content", { status: 200 }),
                         };
                     default:
-                        return {
-                            status: "ResourceNotFound",
-                        };
+                        return { status: "ResourceNotFound" };
                 }
             },
         );
 
-        const getRoutesSpy = vi.spyOn(wsRouter, "getRoutes");
-        // Mock the getRoutes method to return a test.html route
-        getRoutesSpy.mockImplementation(async () => {
-            return {
-                routes_list: new Map([["/test", "/test.html"]]),
-            };
-        });
+        const getRoutesAndRedirectsSpy = vi.spyOn(wsRouter, "getRoutesAndRedirects");
+        getRoutesAndRedirectsSpy.mockImplementation(async () => ({
+            routes: { routes_list: new Map([["/test", "/test.html"]]) },
+            redirects: undefined,
+        }));
 
-        const siteObjectId = "0x0977d45a9adb8af8405c0698b0e049de05f8c89da75ca16ac6a6cba76031519f";
-
-        // First get the actual content directly through resolveDomainAndFetchUrl
+        // First get the actual content directly
         const directResponse = await urlFetcher.resolveDomainAndFetchUrl(
-            {
-                subdomain: siteObjectId,
-                path: "/test.html",
-            },
+            { subdomain: siteObjectId, path: "/test.html" },
             siteObjectId,
         );
         expect(directResponse.status).toBe(200);
@@ -120,30 +169,20 @@ describe("routing tests", () => {
 
         // Now test the routing flow
         const routedResponse = await urlFetcher.resolveDomainAndFetchUrl(
-            {
-                subdomain: siteObjectId,
-                path: "/test",
-            },
+            { subdomain: siteObjectId, path: "/test" },
             siteObjectId,
         );
         expect(routedResponse.status).toBe(200);
         const actualContent = await routedResponse.text();
-
-        // Verify we got the same content as direct fetch
         expect(actualContent).toBe(expectedContent);
 
         // Also fetch 404.html to prove we got different content
         const notFoundResponse = await urlFetcher.resolveDomainAndFetchUrl(
-            {
-                subdomain: siteObjectId,
-                path: "/404.html",
-            },
+            { subdomain: siteObjectId, path: "/404.html" },
             siteObjectId,
         );
         expect(notFoundResponse.status).toBe(200);
         const notFoundContent = await notFoundResponse.text();
-
-        // Verify we didn't get 404.html content
         expect(actualContent).not.toBe(notFoundContent);
     });
 
@@ -157,7 +196,6 @@ describe("routing tests", () => {
         );
 
         const fetchUrlSpy = vi.spyOn(urlFetcher, "fetchUrl");
-        // The resource exists on-chain but the blob is expired on the aggregator.
         fetchUrlSpy.mockImplementation(
             async (_objectId: string, path: string): Promise<FetchUrlResult> => {
                 if (path === "/404.html") {
@@ -166,28 +204,116 @@ describe("routing tests", () => {
                         response: new Response("blob unavailable", { status: 404 }),
                     };
                 }
-                return {
-                    status: "ResourceNotFound",
-                };
+                return { status: "ResourceNotFound" };
             },
         );
 
-        const getRoutesSpy = vi.spyOn(wsRouter, "getRoutes");
-        getRoutesSpy.mockImplementation(async () => {
-            return { routes_list: new Map() };
-        });
-
-        const siteObjectId = "0x0977d45a9adb8af8405c0698b0e049de05f8c89da75ca16ac6a6cba76031519f";
+        const getRoutesAndRedirectsSpy = vi.spyOn(wsRouter, "getRoutesAndRedirects");
+        getRoutesAndRedirectsSpy.mockImplementation(async () => ({
+            routes: { routes_list: new Map() },
+            redirects: undefined,
+        }));
 
         const response = await urlFetcher.resolveDomainAndFetchUrl(
             { subdomain: siteObjectId, path: "/nonexistent" },
             siteObjectId,
         );
 
-        // Should get the portal's custom404NotFound, NOT the blobUnavailable page
         expect(response.status).toBe(404);
         const text = await response.text();
         expect(text).not.toContain("no longer available");
         expect(text).toContain("Page not found");
+    });
+
+    test("should return redirect response when redirect matches", async () => {
+        const urlFetcher = makeUrlFetcher();
+
+        const fetchUrlSpy = vi.spyOn(urlFetcher, "fetchUrl");
+        fetchUrlSpy.mockImplementation(async (): Promise<FetchUrlResult> => {
+            return { status: "ResourceNotFound" };
+        });
+
+        const getRoutesAndRedirectsSpy = vi.spyOn(wsRouter, "getRoutesAndRedirects");
+        getRoutesAndRedirectsSpy.mockImplementation(async () => ({
+            routes: { routes_list: new Map([["/*", "/index.html"]]) },
+            redirects: {
+                redirect_list: new Map<string, Redirect>([
+                    ["/old", { location: "/new", status_code: 301 }],
+                ]),
+            },
+        }));
+
+        const response = await urlFetcher.resolveDomainAndFetchUrl(
+            { subdomain: siteObjectId, path: "/old" },
+            siteObjectId,
+        );
+
+        // Should return a 301 redirect, NOT try to fetch /index.html via route matching
+        expect(response.status).toBe(301);
+        expect(response.headers.get("Location")).toBe("/new");
+    });
+
+    test("should fall through to routes when no redirect matches", async () => {
+        const urlFetcher = makeUrlFetcher();
+
+        const fetchUrlSpy = vi.spyOn(urlFetcher, "fetchUrl");
+        fetchUrlSpy.mockImplementation(
+            async (_objectId: string, path: string): Promise<FetchUrlResult> => {
+                if (path === "/index.html") {
+                    return {
+                        status: "Ok",
+                        response: new Response("index content", { status: 200 }),
+                    };
+                }
+                return { status: "ResourceNotFound" };
+            },
+        );
+
+        const getRoutesAndRedirectsSpy = vi.spyOn(wsRouter, "getRoutesAndRedirects");
+        getRoutesAndRedirectsSpy.mockImplementation(async () => ({
+            routes: { routes_list: new Map([["/*", "/index.html"]]) },
+            redirects: {
+                redirect_list: new Map<string, Redirect>([
+                    ["/old", { location: "/new", status_code: 301 }],
+                ]),
+            },
+        }));
+
+        // Request a path that doesn't match any redirect but matches the route
+        const response = await urlFetcher.resolveDomainAndFetchUrl(
+            { subdomain: siteObjectId, path: "/some-page" },
+            siteObjectId,
+        );
+
+        expect(response.status).toBe(200);
+        const text = await response.text();
+        expect(text).toBe("index content");
+    });
+
+    test("should handle redirect with external URL", async () => {
+        const urlFetcher = makeUrlFetcher();
+
+        const fetchUrlSpy = vi.spyOn(urlFetcher, "fetchUrl");
+        fetchUrlSpy.mockImplementation(async (): Promise<FetchUrlResult> => {
+            return { status: "ResourceNotFound" };
+        });
+
+        const getRoutesAndRedirectsSpy = vi.spyOn(wsRouter, "getRoutesAndRedirects");
+        getRoutesAndRedirectsSpy.mockImplementation(async () => ({
+            routes: undefined,
+            redirects: {
+                redirect_list: new Map<string, Redirect>([
+                    ["/external", { location: "https://example.com/page", status_code: 302 }],
+                ]),
+            },
+        }));
+
+        const response = await urlFetcher.resolveDomainAndFetchUrl(
+            { subdomain: siteObjectId, path: "/external" },
+            siteObjectId,
+        );
+
+        expect(response.status).toBe(302);
+        expect(response.headers.get("Location")).toBe("https://example.com/page");
     });
 });
