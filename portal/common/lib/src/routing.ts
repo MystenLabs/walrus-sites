@@ -63,10 +63,19 @@ export class WalrusSitesRouter {
      * any characters including `/`). When multiple patterns match, the longest
      * pattern wins.
      *
+     * Returns an object with:
+     * - `match`: the matched route target, or undefined if no match.
+     * - `regexOnlyPatterns`: patterns that matched via the legacy regex but
+     *   NOT via picomatch (glob). These patterns will break when we migrate
+     *   routes to glob matching. The caller should log these with site context.
+     *
      * @param path - The path to match.
      * @param routes - The routes to match against.
      */
-    public matchPathToRoute(path: string, routes: Routes): string | undefined {
+    public matchPathToRoute(
+        path: string,
+        routes: Routes,
+    ): { match: string | undefined; regexOnlyPatterns: string[] } {
         logger.info(
             "Attempting to match the provided `path` with the routes in the Routes object",
             {
@@ -74,15 +83,16 @@ export class WalrusSitesRouter {
                 routesDFList: routes.routes_list,
             },
         );
-        if (routes.routes_list.size === 0) return undefined;
+        if (routes.routes_list.size === 0) return { match: undefined, regexOnlyPatterns: [] };
+
+        const regexOnlyPatterns: string[] = [];
 
         const filtered = Array.from(routes.routes_list.entries()).filter(([pattern]) => {
             const regexMatch = new RegExp(`^${pattern.replace(/\*/g, ".*")}$`).test(path);
+            // Shadow-test picomatch to identify existing route patterns that won't
+            // survive the migration from regex to glob matching.
             if (regexMatch && !picomatch(pattern, { dot: true })(path)) {
-                logger.warn("Route pattern matches via regex but not via glob (picomatch)", {
-                    pattern,
-                    path,
-                });
+                regexOnlyPatterns.push(pattern);
             }
             return regexMatch;
         });
@@ -92,10 +102,11 @@ export class WalrusSitesRouter {
                 path,
                 routesDFList: routes.routes_list,
             });
-            return undefined;
+            return { match: undefined, regexOnlyPatterns };
         }
 
-        return filtered.reduce((a, b) => (a[0].length >= b[0].length ? a : b))[1];
+        const match = filtered.reduce((a, b) => (a[0].length >= b[0].length ? a : b))[1];
+        return { match, regexOnlyPatterns };
     }
 
     /**

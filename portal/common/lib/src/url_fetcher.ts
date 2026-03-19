@@ -129,7 +129,18 @@ export class UrlFetcher {
 
         // Try matching route if routes exist.
         if (routes) {
-            const matchingRoute = this.wsRouter.matchPathToRoute(parsedUrl.path, routes);
+            const { match: matchingRoute, regexOnlyPatterns } = this.wsRouter.matchPathToRoute(
+                parsedUrl.path,
+                routes,
+            );
+            if (regexOnlyPatterns.length > 0) {
+                logger.warn("Route patterns match via regex but not via glob (picomatch)", {
+                    subdomain: parsedUrl.subdomain,
+                    siteObjectId: resolvedObjectId,
+                    path: parsedUrl.path,
+                    regexOnlyPatterns,
+                });
+            }
             if (matchingRoute) {
                 const routeResult = await this.fetchUrl(resolvedObjectId, matchingRoute);
                 if (routeResult.status !== "ResourceNotFound") {

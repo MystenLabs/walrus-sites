@@ -37,7 +37,7 @@ const testCases = [
 
 testCases.forEach(([requestPath, expected]) => {
     test(`matchPathToRoute: "${requestPath}" -> "${expected}"`, () => {
-        const match = wsRouter.matchPathToRoute(requestPath, routesExample);
+        const { match } = wsRouter.matchPathToRoute(requestPath, routesExample);
         expect(match).toEqual(expected);
     });
 });
@@ -47,7 +47,7 @@ const emptyRoutes = { routes_list: new Map<string, string>() };
 
 testCases.forEach(([requestPath, _]) => {
     test(`matchPathToRoute: empty routes for "${requestPath}"`, () => {
-        const match = wsRouter.matchPathToRoute(requestPath, emptyRoutes);
+        const { match } = wsRouter.matchPathToRoute(requestPath, emptyRoutes);
         expect(match).toEqual(undefined);
     });
 });
