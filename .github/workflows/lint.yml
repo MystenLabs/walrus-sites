@@ -41,8 +41,10 @@ jobs:
     name: Check license headers
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      # TODO: Consider repointing this to the upstream version again when https://github.com/notken12/licensesnip/pull/10 is merged.
-      - run: cargo install --git https://github.com/wbbradley/licensesnip --rev a1037505417d06a3 licensesnip
+      - name: Install licensesnip
+        uses: taiki-e/install-action@970d55e3ce02a46d60ffae7b4fab3dedace6e769 # pin@v2.49.13
+        with:
+          tool: licensesnip@1.7.0
       - run: licensesnip check
 
   prettier-portal:
