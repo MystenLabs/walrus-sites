@@ -39,7 +39,10 @@ export class WalrusSitesRouter {
         });
 
         const rpcDuration = Date.now() - reqStartTime;
-        instrumentationFacade.recordFetchRoutesAndRedirectsFieldObjectsTime(rpcDuration, siteObjectId);
+        instrumentationFacade.recordFetchRoutesAndRedirectsFieldObjectsTime(
+            rpcDuration,
+            siteObjectId,
+        );
 
         const routes = this.parseDynamicFieldValue(responses[0], RoutesStruct, "Routes");
         const redirects = this.parseDynamicFieldValue(responses[1], RedirectsStruct, "Redirects");
