@@ -20,24 +20,6 @@ export class WalrusSitesRouter {
     constructor(private rpcSelector: RPCSelector) {}
 
     /**
-     * Gets the Routes dynamic field of the site object.
-     *
-     * @param siteObjectId - The ID of the site object.
-     * @returns The routes list, or undefined if not present.
-     */
-    public async getRoutes(siteObjectId: string): Promise<Routes | undefined> {
-        const reqStartTime = Date.now();
-        const dfId = this.deriveSiteFieldId(siteObjectId, "routes");
-        const response = await this.rpcSelector.getObject({
-            id: dfId,
-            options: { showBcs: true },
-        });
-        const routingDuration = Date.now() - reqStartTime;
-        instrumentationFacade.recordRoutingTime(routingDuration, siteObjectId);
-        return this.parseDynamicFieldValue(response, RoutesStruct, "Routes");
-    }
-
-    /**
      * Gets both the Routes and Redirects dynamic fields in a single RPC call.
      *
      * @param siteObjectId - The ID of the site object.
@@ -56,11 +38,14 @@ export class WalrusSitesRouter {
             options: { showBcs: true },
         });
 
-        const routingDuration = Date.now() - reqStartTime;
-        instrumentationFacade.recordRoutingTime(routingDuration, siteObjectId);
+        const rpcDuration = Date.now() - reqStartTime;
+        instrumentationFacade.recordFetchRoutesAndRedirectsFieldObjectsTime(rpcDuration, siteObjectId);
 
         const routes = this.parseDynamicFieldValue(responses[0], RoutesStruct, "Routes");
         const redirects = this.parseDynamicFieldValue(responses[1], RedirectsStruct, "Redirects");
+
+        const totalDuration = Date.now() - reqStartTime;
+        instrumentationFacade.recordRoutesAndRedirectsResolutionTime(totalDuration, siteObjectId);
 
         if (redirects) {
             this.warnOnRedirectLoops(redirects);

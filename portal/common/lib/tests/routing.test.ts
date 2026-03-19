@@ -11,19 +11,11 @@ import { SuiNSResolver } from "@lib/suins";
 import { parsePriorityUrlList, PriorityExecutor } from "@lib/priority_executor";
 import { Redirect, Redirects } from "@lib/types";
 
-const snakeSiteObjectId = "0x7a95e4be3948415b852fb287d455166a276d7a52f1a567b4a26b6b5e9c753158";
 const rpcPriorityUrls = parsePriorityUrlList(process.env.RPC_URL_LIST!);
 const rpcSelector = new RPCSelector(rpcPriorityUrls, "testnet");
 const wsRouter = new WalrusSitesRouter(rpcSelector);
 const aggregatorPriorityUrls = parsePriorityUrlList(process.env.AGGREGATOR_URL_LIST!);
 const sitePackage = process.env.SITE_PACKAGE;
-
-test.skip("getRoutes", async () => {
-    // TODO: when you make sure get_routes fetches
-    // the Routes dynamic field, mock the request.
-    const routes = await wsRouter.getRoutes(snakeSiteObjectId);
-    console.log(routes);
-});
 
 const routesExample = {
     routes_list: new Map<string, string>([
