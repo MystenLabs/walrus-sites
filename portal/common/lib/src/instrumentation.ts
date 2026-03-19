@@ -51,20 +51,21 @@ export class InstrumentationFacade {
         );
 
         // TODO(SEW-936): rename metric names to match the new function names.
-        this.fetchRoutesAndRedirectsFieldObjectsHistogram = this.meter.createHistogram(
-            "ws_fetch_routes_dynamic_field_object_time",
-            {
-                description:
-                    "Time spent on the RPC call to fetch Routes and Redirects dynamic field objects",
-                unit: "ms",
-            },
-        );
-
         this.routesAndRedirectsResolutionHistogram = this.meter.createHistogram(
             "ws_routing_time",
             {
                 description:
                     "Total time spent resolving Routes and Redirects (RPC + BCS parsing)",
+                unit: "ms",
+            },
+        );
+
+        // TODO(SEW-936): rename metric names to match the new function names.
+        this.fetchRoutesAndRedirectsFieldObjectsHistogram = this.meter.createHistogram(
+            "ws_fetch_routes_dynamic_field_object_time",
+            {
+                description:
+                    "Time spent on the RPC call to fetch Routes and Redirects dynamic field objects",
                 unit: "ms",
             },
         );
