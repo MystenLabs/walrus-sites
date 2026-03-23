@@ -123,6 +123,21 @@ export function isRoutes(obj: any): obj is Routes {
 }
 
 /**
+ * A single redirect entry: destination URL and HTTP status code.
+ */
+export type Redirect = {
+    location: string;
+    status_code: number;
+};
+
+/**
+ * Redirects is an optional dynamic field object belonging to each site.
+ */
+export type Redirects = {
+    redirect_list: Map<string, Redirect>;
+};
+
+/**
  * A NameRecord entry of SuiNS Names.
  */
 export type NameRecord = {
