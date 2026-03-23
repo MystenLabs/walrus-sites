@@ -105,7 +105,10 @@ export class WalrusSitesRouter {
             return { match: undefined, regexOnlyPatterns };
         }
 
-        const match = filtered.reduce((a, b) => (a[0].length >= b[0].length ? a : b))[1];
+        const match = filtered.reduce(
+            (a, b) => (a[0].length >= b[0].length ? a : b),
+            filtered[0],
+        )[1];
         return { match, regexOnlyPatterns };
     }
 
@@ -129,7 +132,7 @@ export class WalrusSitesRouter {
             return undefined;
         }
 
-        return filtered.reduce((a, b) => (a[0].length >= b[0].length ? a : b))[1];
+        return filtered.reduce((a, b) => (a[0].length >= b[0].length ? a : b), filtered[0])[1];
     }
 
     /**
