@@ -116,6 +116,7 @@ export class UrlFetcher {
             const redirect = this.wsRouter.matchPathToRedirect(parsedUrl.path, redirects);
             if (redirect) {
                 logger.info("Redirect match found", {
+                    subdomain: parsedUrl.subdomain,
                     path: parsedUrl.path,
                     location: redirect.location,
                     statusCode: redirect.status_code,
