@@ -17,6 +17,7 @@ import {
     custom404NotFound,
     aggregatorFail,
     blobUnavailable,
+    redirectLoopDetected,
 } from "@lib/http/http_error_responses";
 import { blobAggregatorEndpoint, quiltAggregatorEndpoint } from "@lib/aggregator";
 import { toBase64 } from "@mysten/bcs";
@@ -115,6 +116,13 @@ export class UrlFetcher {
         if (redirects) {
             const redirect = this.wsRouter.matchPathToRedirect(parsedUrl.path, redirects);
             if (redirect) {
+                if (redirect.location === parsedUrl.path) {
+                    logger.warn("Redirect self-loop detected", {
+                        subdomain: parsedUrl.subdomain,
+                        path: parsedUrl.path,
+                    });
+                    return redirectLoopDetected();
+                }
                 logger.info("Redirect match found", {
                     subdomain: parsedUrl.subdomain,
                     path: parsedUrl.path,

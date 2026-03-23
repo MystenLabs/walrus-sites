@@ -103,32 +103,6 @@ describe("getRoutesAndRedirects", () => {
         });
     });
 
-    test("warns on redirect loops", async () => {
-        const redirectsBcs = encodeDynamicField("redirects", RedirectsStruct, {
-            redirect_list: new Map([
-                ["/a", { location: "/b", status_code: 301 }],
-                ["/b", { location: "/c", status_code: 301 }],
-            ]),
-        });
-
-        const spy = vi.spyOn(rpcSelector, "multiGetObjects");
-        spy.mockResolvedValue([
-            { error: { code: "notExists" as const, object_id: "0xroutes" } },
-            makeBcsObjectResponse(redirectsBcs),
-        ]);
-
-        // Import logger to spy on warn
-        const logger = await import("@lib/logger");
-        const warnSpy = vi.spyOn(logger.default, "warn");
-
-        await wsRouter.getRoutesAndRedirects(snakeSiteObjectId);
-
-        expect(warnSpy).toHaveBeenCalledWith(
-            "Possible redirect loop detected",
-            expect.objectContaining({ from: "/a", to: "/b" }),
-        );
-    });
-
     test("throws on unexpected object format", async () => {
         const spy = vi.spyOn(rpcSelector, "multiGetObjects");
         spy.mockResolvedValue([
@@ -439,5 +413,33 @@ describe("routing integration tests", () => {
 
         expect(response.status).toBe(302);
         expect(response.headers.get("Location")).toBe("https://example.com/page");
+    });
+
+    test("should return 508 on redirect self-loop", async () => {
+        const urlFetcher = makeUrlFetcher();
+
+        const fetchUrlSpy = vi.spyOn(urlFetcher, "fetchUrl");
+        fetchUrlSpy.mockImplementation(async (): Promise<FetchUrlResult> => {
+            return { status: "ResourceNotFound" };
+        });
+
+        const getRoutesAndRedirectsSpy = vi.spyOn(wsRouter, "getRoutesAndRedirects");
+        getRoutesAndRedirectsSpy.mockImplementation(async () => ({
+            routes: undefined,
+            redirects: {
+                redirect_list: new Map<string, Redirect>([
+                    ["/loop", { location: "/loop", status_code: 301 }],
+                ]),
+            },
+        }));
+
+        const response = await urlFetcher.resolveDomainAndFetchUrl(
+            { subdomain: siteObjectId, path: "/loop" },
+            siteObjectId,
+        );
+
+        expect(response.status).toBe(508);
+        const text = await response.text();
+        expect(text).toContain("Redirect loop detected");
     });
 });

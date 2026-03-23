@@ -50,10 +50,6 @@ export class WalrusSitesRouter {
         const totalDuration = Date.now() - reqStartTime;
         instrumentationFacade.recordRoutesAndRedirectsResolutionTime(totalDuration, siteObjectId);
 
-        if (redirects) {
-            this.warnOnRedirectLoops(redirects);
-        }
-
         return { routes, redirects };
     }
 
@@ -168,23 +164,5 @@ export class WalrusSitesRouter {
         }
         logger.warn(`${fieldName} dynamic field has unexpected format`, { objectData });
         throw new Error(`${fieldName} object data could not be fetched.`);
-    }
-
-    /**
-     * Logs a warning if any redirect's location matches another redirect pattern,
-     * indicating a possible redirect loop.
-     */
-    private warnOnRedirectLoops(redirects: Redirects): void {
-        for (const [path, redirect] of redirects.redirect_list) {
-            const match = Array.from(redirects.redirect_list.entries()).find(([pattern]) =>
-                picomatch(pattern, { dot: true })(redirect.location),
-            );
-            if (match) {
-                logger.warn("Possible redirect loop detected", {
-                    from: path,
-                    to: redirect.location,
-                });
-            }
-        }
     }
 }
