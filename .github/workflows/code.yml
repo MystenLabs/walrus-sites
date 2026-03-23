@@ -64,10 +64,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: EmbarkStudios/cargo-deny-action@30f817c6f72275c6d54dc744fbca09ebc958599f # v2.0.12
+      - uses: taiki-e/install-action@970d55e3ce02a46d60ffae7b4fab3dedace6e769 # pin@v2.49.13
         with:
-          # do not check advisories on PRs to prevent sudden failure due to new announcement
-          command: check bans licenses sources
+          tool: cargo-deny@0.19.0
+      - name: Check dependencies
+        # do not check advisories on PRs to prevent sudden failure due to new announcement
+        run: cargo deny check bans licenses sources
 
   lint:
     name: Lint Rust code
