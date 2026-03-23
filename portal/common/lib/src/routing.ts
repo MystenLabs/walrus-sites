@@ -98,7 +98,7 @@ export class WalrusSitesRouter {
         });
 
         if (filtered.length === 0) {
-            logger.warn("No matching routes found.", {
+            logger.info("No matching routes found.", {
                 path,
                 routesDFList: routes.routes_list,
             });
@@ -125,7 +125,7 @@ export class WalrusSitesRouter {
         );
 
         if (filtered.length === 0) {
-            logger.warn("No matching redirects found.", { path });
+            logger.info("No matching redirects found.", { path });
             return undefined;
         }
 
