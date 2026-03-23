@@ -3165,7 +3165,7 @@ dependencies = [
  "num-bigint 0.4.6",
  "once_cell",
  "regex",
- "reqwest 0.12.28",
+ "reqwest",
  "schemars 0.8.22",
  "serde",
  "serde_json",
@@ -4491,7 +4491,7 @@ dependencies = [
  "pin-project",
  "rustls",
  "rustls-pki-types",
- "rustls-platform-verifier 0.5.3",
+ "rustls-platform-verifier",
  "soketto",
  "thiserror 1.0.69",
  "tokio",
@@ -4542,7 +4542,7 @@ dependencies = [
  "jsonrpsee-core",
  "jsonrpsee-types",
  "rustls",
- "rustls-platform-verifier 0.5.3",
+ "rustls-platform-verifier",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -6054,7 +6054,7 @@ dependencies = [
  "once_cell",
  "parking_lot 0.12.5",
  "rand 0.8.5",
- "reqwest 0.12.28",
+ "reqwest",
  "serde_json",
  "snap",
  "sui-macros",
@@ -6503,7 +6503,7 @@ dependencies = [
  "percent-encoding",
  "quick-xml 0.37.5",
  "rand 0.8.5",
- "reqwest 0.12.28",
+ "reqwest",
  "ring",
  "rustls-pemfile",
  "serde",
@@ -6538,7 +6538,7 @@ dependencies = [
  "percent-encoding",
  "quick-xml 0.38.4",
  "rand 0.9.2",
- "reqwest 0.12.28",
+ "reqwest",
  "ring",
  "rustls-pki-types",
  "serde",
@@ -6624,7 +6624,7 @@ dependencies = [
  "bytes",
  "http 1.4.0",
  "opentelemetry 0.31.0",
- "reqwest 0.12.28",
+ "reqwest",
 ]
 
 [[package]]
@@ -6658,7 +6658,7 @@ dependencies = [
  "opentelemetry-proto 0.31.0",
  "opentelemetry_sdk 0.31.0",
  "prost 0.14.3",
- "reqwest 0.12.28",
+ "reqwest",
  "thiserror 2.0.18",
  "tokio",
  "tonic 0.14.5",
@@ -8098,43 +8098,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "reqwest"
-version = "0.13.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab3f43e3283ab1488b624b44b0e988d0acea0b3214e694730a055cb6b2efa801"
-dependencies = [
- "base64 0.22.1",
- "bytes",
- "futures-core",
- "h2",
- "http 1.4.0",
- "http-body 1.0.1",
- "http-body-util",
- "hyper",
- "hyper-rustls",
- "hyper-util",
- "js-sys",
- "log",
- "percent-encoding",
- "pin-project-lite",
- "rustls",
- "rustls-pki-types",
- "rustls-platform-verifier 0.6.2",
- "serde",
- "serde_json",
- "sync_wrapper",
- "tokio",
- "tokio-rustls",
- "tower 0.5.3",
- "tower-http 0.6.8",
- "tower-service",
- "url",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
-]
-
-[[package]]
 name = "rfc6979"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8380,27 +8343,6 @@ dependencies = [
  "security-framework-sys",
  "webpki-root-certs 0.26.11",
  "windows-sys 0.59.0",
-]
-
-[[package]]
-name = "rustls-platform-verifier"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d99feebc72bae7ab76ba994bb5e121b8d83d910ca40b36e0921f53becc41784"
-dependencies = [
- "core-foundation",
- "core-foundation-sys",
- "jni",
- "log",
- "once_cell",
- "rustls",
- "rustls-native-certs",
- "rustls-platform-verifier-android",
- "rustls-webpki",
- "security-framework",
- "security-framework-sys",
- "webpki-root-certs 1.0.6",
- "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -9114,7 +9056,7 @@ dependencies = [
  "prettytable",
  "rand 0.8.5",
  "regex",
- "reqwest 0.13.2",
+ "reqwest",
  "serde",
  "serde_json",
  "serde_with",
@@ -9621,7 +9563,7 @@ dependencies = [
  "once_cell",
  "prometheus",
  "rand 0.8.5",
- "reqwest 0.12.28",
+ "reqwest",
  "serde",
  "serde_json",
  "serde_with",
@@ -9688,7 +9630,7 @@ dependencies = [
  "protox",
  "rand 0.8.5",
  "rayon",
- "reqwest 0.12.28",
+ "reqwest",
  "roaring 0.10.12",
  "scopeguard",
  "serde",
@@ -10119,7 +10061,7 @@ dependencies = [
  "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=db643fd05a1b1c4cd52de3939766b53e12ce137e)",
  "mysten-metrics",
  "prometheus",
- "reqwest 0.12.28",
+ "reqwest",
  "serde",
  "snap",
  "sui-tls",
@@ -10331,7 +10273,7 @@ dependencies = [
  "mysten-service",
  "parking_lot 0.12.5",
  "prometheus",
- "reqwest 0.12.28",
+ "reqwest",
  "serde",
  "sui-config",
  "sui-core",
@@ -10602,7 +10544,7 @@ dependencies = [
  "jsonrpsee",
  "move-core-types",
  "mysten-common",
- "reqwest 0.12.28",
+ "reqwest",
  "serde",
  "serde_json",
  "serde_with",
@@ -10752,7 +10694,7 @@ dependencies = [
  "parking_lot 0.12.5",
  "percent-encoding",
  "prometheus",
- "reqwest 0.12.28",
+ "reqwest",
  "serde",
  "serde_json",
  "sui-config",
@@ -10828,7 +10770,7 @@ name = "sui-telemetry"
 version = "0.1.0"
 source = "git+https://github.com/MystenLabs/sui?tag=testnet-v1.67.1#4e8aa9ee8b307b294cc85baf7d08af1f432e3d93"
 dependencies = [
- "reqwest 0.12.28",
+ "reqwest",
  "serde",
  "sui-core",
  "tracing",
@@ -10862,7 +10804,7 @@ dependencies = [
  "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=db643fd05a1b1c4cd52de3939766b53e12ce137e)",
  "pkcs8 0.10.2",
  "rcgen",
- "reqwest 0.12.28",
+ "reqwest",
  "rustls",
  "rustls-webpki",
  "tokio",
@@ -12588,7 +12530,7 @@ dependencies = [
  "prometheus",
  "rand 0.8.5",
  "rayon",
- "reqwest 0.12.28",
+ "reqwest",
  "rustls",
  "rustls-native-certs",
  "serde",
@@ -12668,7 +12610,7 @@ dependencies = [
  "rayon",
  "rcgen",
  "regex",
- "reqwest 0.12.28",
+ "reqwest",
  "rocksdb",
  "rustls",
  "rustls-native-certs",
@@ -12732,7 +12674,7 @@ dependencies = [
  "pin-project",
  "prometheus",
  "rand 0.8.5",
- "reqwest 0.12.28",
+ "reqwest",
  "rustls",
  "rustls-native-certs",
  "serde",
@@ -12777,7 +12719,7 @@ dependencies = [
  "prometheus",
  "rand 0.8.5",
  "regex",
- "reqwest 0.12.28",
+ "reqwest",
  "serde",
  "serde_json",
  "serde_with",
