@@ -15,8 +15,8 @@ use std::{collections::HashMap, time::Duration};
 use anyhow::{Context, Result};
 use futures::future::try_join_all;
 use resource::{ResourceSet, SiteOps};
-use sui_sdk::rpc_types::DynamicFieldInfo;
-use sui_types::{base_types::ObjectID, TypeTag};
+use sui_sdk::rpc_types::{DynamicFieldInfo, SuiObjectDataOptions};
+use sui_types::{base_types::ObjectID, dynamic_field::derive_dynamic_field_id, TypeTag};
 use walrus_sui::contracts::TypeOriginMap;
 
 use crate::{
@@ -26,6 +26,8 @@ use crate::{
         ExtendOps,
         Metadata,
         MetadataOp,
+        RedirectOps,
+        Redirects,
         ResourceDynamicField,
         RouteOps,
         Routes,
@@ -38,6 +40,11 @@ use crate::{
 
 pub const SITE_MODULE: &str = "site";
 
+/// The dynamic field key for routes (matches `ROUTES_FIELD` in site.move).
+const ROUTES_DF_KEY: &[u8] = b"routes";
+/// The dynamic field key for redirects (matches `redirects_field!()` in redirects.move).
+const REDIRECTS_DF_KEY: &[u8] = b"redirects";
+
 /// The maximum number of dynamic fields to request at once.
 const DF_REQ_BATCH_SIZE: usize = 10;
 /// The delay between requests for dynamic fields.
@@ -49,6 +56,7 @@ pub struct SiteDataDiff<'a> {
     /// The operations to perform on the resources.
     pub resource_ops: Vec<SiteOps<'a>>,
     pub route_ops: RouteOps,
+    pub redirect_ops: RedirectOps,
     pub metadata_op: MetadataOp,
     pub site_name_op: SiteNameOp,
     pub extend_ops: ExtendOps,
@@ -57,8 +65,9 @@ pub struct SiteDataDiff<'a> {
 impl SiteDataDiff<'_> {
     /// Returns `true` if there are updates to be made.
     pub fn has_updates(&self) -> bool {
-        self.resource_ops.iter().any(|op| op.is_change())
+        self.resource_ops.iter().any(|op| op.is_resource_change())
             || !self.route_ops.is_unchanged()
+            || !self.redirect_ops.is_unchanged()
             || !self.metadata_op.is_noop()
             || !self.site_name_op.is_noop()
             || !self.extend_ops.is_noop()
@@ -70,10 +79,11 @@ impl SiteDataDiff<'_> {
             resource_ops: self
                 .resource_ops
                 .iter()
-                .filter(|op| op.is_change())
+                .filter(|op| op.is_resource_change())
                 .map(|op| op.into())
                 .collect(),
             route_ops: self.route_ops.clone(),
+            redirect_ops: self.redirect_ops.clone(),
             metadata_updated: !self.metadata_op.is_noop(),
             site_name_updated: !self.site_name_op.is_noop(),
             extend_ops: self.extend_ops.clone(),
@@ -89,6 +99,7 @@ impl SiteDataDiff<'_> {
 pub struct SiteData {
     resources: ResourceSet,
     routes: Option<Routes>,
+    redirects: Option<Redirects>,
     metadata: Option<Metadata>,
     site_name: Option<String>,
 }
@@ -98,12 +109,14 @@ impl SiteData {
     pub fn new(
         resources: ResourceSet,
         routes: Option<Routes>,
+        redirects: Option<Redirects>,
         metadata: Option<Metadata>,
         site_name: Option<String>,
     ) -> Self {
         Self {
             resources,
             routes,
+            redirects,
             metadata,
             site_name,
         }
@@ -114,6 +127,7 @@ impl SiteData {
         Self {
             resources: ResourceSet::empty(),
             routes: None,
+            redirects: None,
             metadata: None,
             site_name: None,
         }
@@ -129,10 +143,20 @@ impl SiteData {
         Ok(SiteDataDiff {
             resource_ops: self.resources.diff(&start.resources),
             route_ops: self.routes_diff(start),
+            redirect_ops: self.redirects_diff(start),
             metadata_op: self.metadata_diff(start),
             site_name_op: self.site_name_diff(start),
             extend_ops,
         })
+    }
+
+    fn redirects_diff(&self, start: &Self) -> RedirectOps {
+        match (&self.redirects, &start.redirects) {
+            (Some(r), Some(s)) => r.diff(s),
+            (None, Some(_)) => RedirectOps::Replace(Redirects::empty()),
+            (Some(s), None) => RedirectOps::Replace(s.clone()),
+            _ => RedirectOps::Unchanged,
+        }
     }
 
     fn routes_diff(&self, start: &Self) -> RouteOps {
@@ -229,30 +253,70 @@ impl RemoteSiteFactory<'_> {
             tokio::time::sleep(delay).await;
         }
 
-        tracing::debug!("fetching the routes from the dynamic fields");
-        let routes = self.get_routes(&dynamic_fields).await?;
+        tracing::debug!("fetching the routes and redirects from the dynamic fields");
+        let (routes, redirects) = self.get_routes_and_redirects(site_id).await?;
+
         Ok(SiteData {
             resources,
             routes,
+            redirects,
             metadata,
             site_name: site_fields.name.into(),
         })
     }
 
-    async fn get_routes(&self, dynamic_fields: &[DynamicFieldInfo]) -> Result<Option<Routes>> {
-        if let Some(routes_field) = dynamic_fields
-            .iter()
-            .find(|field| field.name.type_ == TypeTag::Vector(Box::new(TypeTag::U8)))
-        {
-            let routes = self
-                .sui_client
-                .get_sui_object::<SuiDynamicField<Vec<u8>, Routes>>(routes_field.object_id)
-                .await?
-                .value;
-            Ok(Some(routes))
-        } else {
-            Ok(None)
-        }
+    /// Fetches routes and redirects by deriving their DF object IDs from the known keys
+    /// and batch-fetching them in a single RPC call.
+    async fn get_routes_and_redirects(
+        &self,
+        site_id: ObjectID,
+    ) -> Result<(Option<Routes>, Option<Redirects>)> {
+        let vec_u8_tag = TypeTag::Vector(Box::new(TypeTag::U8));
+
+        let routes_df_id = derive_dynamic_field_id(
+            site_id,
+            &vec_u8_tag,
+            &bcs::to_bytes(&ROUTES_DF_KEY.to_vec())?,
+        )?;
+        let redirects_df_id = derive_dynamic_field_id(
+            site_id,
+            &vec_u8_tag,
+            &bcs::to_bytes(&REDIRECTS_DF_KEY.to_vec())?,
+        )?;
+
+        // Batch-fetch both in a single RPC call.
+        let responses = self
+            .sui_client
+            .multi_get_object_with_options(
+                &[routes_df_id, redirects_df_id],
+                SuiObjectDataOptions::new().with_bcs().with_type(),
+            )
+            .await?;
+
+        let routes = responses[0]
+            .data
+            .as_ref()
+            .map(|_| {
+                contracts::get_sui_object_from_object_response::<SuiDynamicField<Vec<u8>, Routes>>(
+                    &responses[0],
+                )
+            })
+            .transpose()?
+            .map(|df| df.value);
+
+        let redirects =
+            responses[1]
+                .data
+                .as_ref()
+                .map(|_| {
+                    contracts::get_sui_object_from_object_response::<
+                        SuiDynamicField<Vec<u8>, Redirects>,
+                    >(&responses[1])
+                })
+                .transpose()?
+                .map(|df| df.value);
+
+        Ok((routes, redirects))
     }
 
     /// Gets all the resources and their object ids from chain.
@@ -347,8 +411,8 @@ mod tests {
         ];
 
         for (this_routes, other_routes, has_updates) in cases {
-            let this = SiteData::new(ResourceSet::empty(), this_routes, None, None);
-            let other = SiteData::new(ResourceSet::empty(), other_routes, None, None);
+            let this = SiteData::new(ResourceSet::empty(), this_routes, None, None, None);
+            let other = SiteData::new(ResourceSet::empty(), other_routes, None, None, None);
             let diff = this.diff(&other, ExtendOps::Noop).unwrap();
             assert_eq!(diff.has_updates(), has_updates);
         }
@@ -386,8 +450,8 @@ mod tests {
         ];
 
         for (this_metadata, other_metadata, has_updates) in cases {
-            let this = SiteData::new(ResourceSet::empty(), None, this_metadata, None);
-            let other = SiteData::new(ResourceSet::empty(), None, other_metadata, None);
+            let this = SiteData::new(ResourceSet::empty(), None, None, this_metadata, None);
+            let other = SiteData::new(ResourceSet::empty(), None, None, other_metadata, None);
             assert_eq!(
                 this.diff(&other, ExtendOps::Noop).unwrap().has_updates(),
                 has_updates
@@ -417,8 +481,8 @@ mod tests {
         ];
 
         for (this_site_name, other_site_name, has_updates) in cases {
-            let this = SiteData::new(ResourceSet::empty(), None, None, this_site_name);
-            let other = SiteData::new(ResourceSet::empty(), None, None, other_site_name);
+            let this = SiteData::new(ResourceSet::empty(), None, None, None, this_site_name);
+            let other = SiteData::new(ResourceSet::empty(), None, None, None, other_site_name);
             assert_eq!(
                 this.diff(&other, ExtendOps::Noop).unwrap().has_updates(),
                 has_updates

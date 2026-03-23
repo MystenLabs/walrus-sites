@@ -79,8 +79,18 @@ pub mod site {
     walrus_sui::contract_ident!(fn site::create_routes);
     walrus_sui::contract_ident!(fn site::insert_route);
     walrus_sui::contract_ident!(fn site::remove_all_routes_if_exist);
+    // Redirect functions
+    walrus_sui::contract_ident!(fn site::create_redirects);
+    walrus_sui::contract_ident!(fn site::set_redirects);
+    walrus_sui::contract_ident!(fn site::take_redirects_if_exist);
+    walrus_sui::contract_ident!(fn site::insert_redirect);
     // Range functions
     walrus_sui::contract_ident!(fn site::new_range_option);
+}
+
+pub mod redirects {
+    walrus_sui::contract_ident!(struct redirects::Redirects);
+    walrus_sui::contract_ident!(fn redirects::empty);
 }
 
 pub mod walrus {

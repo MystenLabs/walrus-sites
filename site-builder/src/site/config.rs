@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use sui_types::base_types::ObjectID;
 
 use super::Routes;
-use crate::types::{HttpHeaders, Metadata};
+use crate::types::{HttpHeaders, Metadata, Redirects};
 
 /// Deserialized object of the file's `ws-resource.json` contents.
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
@@ -20,6 +20,9 @@ pub struct WSResources {
     /// The HTTP headers to be set for the resources.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub routes: Option<Routes>,
+    /// The redirects to be set for the site.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub redirects: Option<Redirects>,
     /// The attributes used inside the Display object.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Metadata>,
