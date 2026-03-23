@@ -28,7 +28,7 @@ use crate::{args::GeneralArgs, config::Config, retry_client::new_retriable_sui_c
 fn create_test_config(wallet_path: PathBuf, package_id: ObjectID) -> Config {
     Config {
         portal: "".to_string(),
-        package: package_id,
+        package: Some(package_id),
         general: GeneralArgs {
             wallet: Some(wallet_path),
             gas_budget: Some(100_000_000),

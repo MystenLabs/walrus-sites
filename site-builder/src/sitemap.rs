@@ -96,7 +96,7 @@ async fn get_site_resources_and_blobs(
         .map(|(blob_id, (sui_blob, _obj_ref))| (blob_id, sui_blob))
         .collect();
 
-    let site = RemoteSiteFactory::new(sui_client, config.package)
+    let site = RemoteSiteFactory::new(sui_client, config.package())
         .await?
         .get_from_chain(site_object_id)
         .await?;

@@ -46,6 +46,7 @@ fn test_derive_http_headers_lowercases_keys() {
     let ws_resources = Some(WSResources {
         headers: Some(headers),
         routes: None,
+        redirects: None,
         metadata: None,
         site_name: None,
         object_id: None,
@@ -82,6 +83,7 @@ fn mock_ws_resources() -> Option<WSResources> {
     Some(WSResources {
         headers: Some(headers),
         routes: None,
+        redirects: None,
         metadata: None,
         site_name: None,
         object_id: None,
