@@ -65,7 +65,7 @@ pub struct SiteDataDiff<'a> {
 impl SiteDataDiff<'_> {
     /// Returns `true` if there are updates to be made.
     pub fn has_updates(&self) -> bool {
-        self.resource_ops.iter().any(|op| op.is_change())
+        self.resource_ops.iter().any(|op| op.is_resource_change())
             || !self.route_ops.is_unchanged()
             || !self.redirect_ops.is_unchanged()
             || !self.metadata_op.is_noop()
@@ -79,7 +79,7 @@ impl SiteDataDiff<'_> {
             resource_ops: self
                 .resource_ops
                 .iter()
-                .filter(|op| op.is_change())
+                .filter(|op| op.is_resource_change())
                 .map(|op| op.into())
                 .collect(),
             route_ops: self.route_ops.clone(),

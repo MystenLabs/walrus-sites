@@ -219,11 +219,8 @@ impl<'a> SiteOps<'a> {
     }
 
     /// Returns true if the operation modifies a resource.
-    pub fn is_change(&self) -> bool {
-        matches!(
-            self,
-            SiteOps::Created(_) | SiteOps::Deleted(_) | SiteOps::RemovedRedirects
-        )
+    pub fn is_resource_change(&self) -> bool {
+        matches!(self, SiteOps::Created(_) | SiteOps::Deleted(_))
     }
 }
 
