@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { WalrusSitesRouter } from "@lib/routing";
-import { test, expect, describe, vi, beforeEach } from "vitest";
+import { test, expect, describe, vi, beforeEach, afterEach } from "vitest";
 import { RPCSelector } from "@lib/rpc_selector";
 import { UrlFetcher } from "@lib/url_fetcher";
 import type { FetchUrlResult } from "@lib/url_fetcher";
@@ -10,6 +10,9 @@ import { ResourceFetcher } from "@lib/resource";
 import { SuiNSResolver } from "@lib/suins";
 import { parsePriorityUrlList, PriorityExecutor } from "@lib/priority_executor";
 import { Redirect, Redirects } from "@lib/types";
+import { DynamicFieldStruct, RoutesStruct, RedirectsStruct } from "@lib/bcs_data_parsing";
+import { bcs, type BcsType } from "@mysten/bcs";
+import { toBase64 } from "@mysten/sui/utils";
 
 const snakeSiteObjectId = "0x7a95e4be3948415b852fb287d455166a276d7a52f1a567b4a26b6b5e9c753158";
 const rpcPriorityUrls = parsePriorityUrlList(process.env.RPC_URL_LIST!);
@@ -18,11 +21,132 @@ const wsRouter = new WalrusSitesRouter(rpcSelector);
 const aggregatorPriorityUrls = parsePriorityUrlList(process.env.AGGREGATOR_URL_LIST!);
 const sitePackage = process.env.SITE_PACKAGE;
 
-test.skip("getRoutesAndRedirects", async () => {
-    // TODO: when you make sure getRoutesAndRedirects fetches
-    // the Routes and Redirects dynamic fields, mock the request.
-    const { routes, redirects } = await wsRouter.getRoutesAndRedirects(snakeSiteObjectId);
-    console.log(routes, redirects);
+/**
+ * Encodes a value as a BCS DynamicField and returns the base64 string,
+ * matching the format returned by `multiGetObjects({ options: { showBcs: true } })`.
+ */
+function encodeDynamicField<T>(fieldName: string, valueStruct: BcsType<T>, value: T): string {
+    const parentId = "0000000000000000000000000000000000000000000000000000000000000000";
+    const df = DynamicFieldStruct(bcs.vector(bcs.u8()), valueStruct);
+    return toBase64(
+        df
+            .serialize({
+                parentId,
+                name: Array.from(Buffer.from(fieldName)),
+                value,
+            })
+            .toBytes(),
+    );
+}
+
+function makeBcsObjectResponse(bcsBytes: string) {
+    return {
+        data: {
+            objectId: "0x1",
+            version: "1",
+            digest: "test",
+            bcs: {
+                dataType: "moveObject" as const,
+                bcsBytes,
+                type: "0x2::dynamic_field::Field",
+                hasPublicTransfer: false,
+                version: "1",
+            },
+        },
+    };
+}
+
+describe("getRoutesAndRedirects", () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    test("returns undefined when dynamic fields don't exist", async () => {
+        const spy = vi.spyOn(rpcSelector, "multiGetObjects");
+        spy.mockResolvedValue([
+            { error: { code: "notExists" as const, object_id: "0xroutes" } },
+            { error: { code: "notExists" as const, object_id: "0xredirects" } },
+        ]);
+
+        const result = await wsRouter.getRoutesAndRedirects(snakeSiteObjectId);
+        expect(result.routes).toBeUndefined();
+        expect(result.redirects).toBeUndefined();
+        expect(spy).toHaveBeenCalledOnce();
+        expect(spy).toHaveBeenCalledWith({
+            ids: [expect.any(String), expect.any(String)],
+            options: { showBcs: true },
+        });
+    });
+
+    test("parses routes and redirects from BCS data", async () => {
+        const routesBcs = encodeDynamicField("routes", RoutesStruct, {
+            routes_list: new Map([["/*", "/index.html"]]),
+        });
+        const redirectsBcs = encodeDynamicField("redirects", RedirectsStruct, {
+            redirect_list: new Map([["/old", { location: "/new", status_code: 301 }]]),
+        });
+
+        const spy = vi.spyOn(rpcSelector, "multiGetObjects");
+        spy.mockResolvedValue([
+            makeBcsObjectResponse(routesBcs),
+            makeBcsObjectResponse(redirectsBcs),
+        ]);
+
+        const result = await wsRouter.getRoutesAndRedirects(snakeSiteObjectId);
+
+        expect(result.routes).toBeDefined();
+        expect(result.routes!.routes_list.get("/*")).toBe("/index.html");
+        expect(result.redirects).toBeDefined();
+        expect(result.redirects!.redirect_list.get("/old")).toEqual({
+            location: "/new",
+            status_code: 301,
+        });
+    });
+
+    test("warns on redirect loops", async () => {
+        const redirectsBcs = encodeDynamicField("redirects", RedirectsStruct, {
+            redirect_list: new Map([
+                ["/a", { location: "/b", status_code: 301 }],
+                ["/b", { location: "/c", status_code: 301 }],
+            ]),
+        });
+
+        const spy = vi.spyOn(rpcSelector, "multiGetObjects");
+        spy.mockResolvedValue([
+            { error: { code: "notExists" as const, object_id: "0xroutes" } },
+            makeBcsObjectResponse(redirectsBcs),
+        ]);
+
+        // Import logger to spy on warn
+        const logger = await import("@lib/logger");
+        const warnSpy = vi.spyOn(logger.default, "warn");
+
+        await wsRouter.getRoutesAndRedirects(snakeSiteObjectId);
+
+        expect(warnSpy).toHaveBeenCalledWith(
+            "Possible redirect loop detected",
+            expect.objectContaining({ from: "/a", to: "/b" }),
+        );
+    });
+
+    test("throws on unexpected object format", async () => {
+        const spy = vi.spyOn(rpcSelector, "multiGetObjects");
+        spy.mockResolvedValue([
+            {
+                data: {
+                    objectId: "0x1",
+                    version: "1",
+                    digest: "test",
+                    // no bcs field — unexpected format
+                },
+            },
+            { error: { code: "notExists" as const, object_id: "0xredirects" } },
+        ]);
+
+        await expect(wsRouter.getRoutesAndRedirects(snakeSiteObjectId)).rejects.toThrow(
+            "Routes object data could not be fetched.",
+        );
+    });
 });
 
 const routesExample = {
