@@ -359,6 +359,8 @@ jobs:
         run: |
           sui-fork client new-env --alias fork --rpc ${{ env.FORK_RPC }} 2>/dev/null || true
           sui-fork client switch --env fork
+          echo "Active env: $(sui-fork client active-env)"
+          echo "Active address: $(sui-fork client active-address)"
 
       - name: "Phase B: Upgrade contract on fork"
         if: steps.contract-diff.outputs.has_changes == 'true'
@@ -394,6 +396,9 @@ jobs:
             exit 1
           fi
 
+          # Advance checkpoint so the upgrade is visible to subsequent steps
+          sui-forking advance-checkpoint
+
           echo "NEW_PACKAGE_ID=$NEW_PACKAGE_ID" >> "$GITHUB_ENV"
           echo "Upgraded! New package: $NEW_PACKAGE_ID"
 
@@ -402,6 +407,19 @@ jobs:
         run: |
           echo "No contract upgrade needed — using existing package"
           echo "NEW_PACKAGE_ID=${{ env.SITE_PACKAGE }}" >> "$GITHUB_ENV"
+
+      - name: "Phase B: Verify fork is healthy"
+        run: |
+          echo "Verifying fork status..."
+          sui-forking status
+          echo "Verifying package ${{ env.NEW_PACKAGE_ID }} exists on fork..."
+          sui-fork client object ${{ env.NEW_PACKAGE_ID }} --json | jq '.data.type' || {
+            echo "WARNING: Could not verify new package on fork"
+          }
+          echo "Verifying staking object is reachable on fork..."
+          sui-fork client object ${{ env.STAKING_OBJECT }} --json | jq '.data.type' || {
+            echo "WARNING: Staking object not reachable on fork"
+          }
 
       # ── Phase C: Main portal on fork ─────────────────────────
       - name: "Phase C: Publish snake on fork (test-branch site-builder)"
