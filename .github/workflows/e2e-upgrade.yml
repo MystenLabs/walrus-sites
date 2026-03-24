@@ -34,8 +34,10 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   TEST_BRANCH: ${{ inputs.test-branch || github.head_ref || github.ref_name }}
-  # Existing testnet deployment — used when no contract changes
-  SITE_PACKAGE: "0xf99aee9f21493e1590e7e5a9aea6f343a1f381031a04a732724871fc294be799"
+  # Existing testnet deployment — used when no contract changes.
+  # Named EXISTING_SITE_PACKAGE (not SITE_PACKAGE) to avoid colliding with
+  # the portal's env-based config override (configuration_loader.ts).
+  EXISTING_SITE_PACKAGE: "0xf99aee9f21493e1590e7e5a9aea6f343a1f381031a04a732724871fc294be799"
   STAKING_OBJECT: "0xbe46180321c30aab2f8b3501e24048377287fa708018a5b7c2792b35fe339ee3"
   AGGREGATOR: "https://aggregator.walrus-testnet.walrus.space"
   PORTAL_PORT: "3000"
@@ -197,7 +199,7 @@ jobs:
             echo "package_v1=${{ steps.publish-pkg.outputs.package_v1 }}" >> "$GITHUB_OUTPUT"
             echo "upgrade_cap=${{ steps.publish-pkg.outputs.upgrade_cap }}" >> "$GITHUB_OUTPUT"
           else
-            echo "package_v1=${{ env.SITE_PACKAGE }}" >> "$GITHUB_OUTPUT"
+            echo "package_v1=${{ env.EXISTING_SITE_PACKAGE }}" >> "$GITHUB_OUTPUT"
             echo "upgrade_cap=" >> "$GITHUB_OUTPUT"
           fi
 
@@ -300,7 +302,7 @@ jobs:
           if [[ "${{ steps.contract-diff.outputs.has_changes }}" == "true" ]]; then
             echo "package_v2=${{ steps.upgrade.outputs.package_v2 }}" >> "$GITHUB_OUTPUT"
           else
-            echo "package_v2=${{ env.SITE_PACKAGE }}" >> "$GITHUB_OUTPUT"
+            echo "package_v2=${{ env.EXISTING_SITE_PACKAGE }}" >> "$GITHUB_OUTPUT"
           fi
           echo "PACKAGE_V2=$(cat "$GITHUB_OUTPUT" | grep package_v2 | cut -d= -f2)" >> "$GITHUB_ENV"
 
