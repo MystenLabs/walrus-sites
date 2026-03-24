@@ -354,7 +354,7 @@ jobs:
             --gas-budget 5000000000 \
             --build-env testnet \
             --json \
-            worktrees/test-branch/move/walrus_site 2>&1) || {
+            worktrees/test-branch/move/walrus_site) || {
             echo "$UPGRADE_OUTPUT"
             exit 1
           }
