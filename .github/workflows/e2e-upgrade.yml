@@ -271,6 +271,20 @@ jobs:
         run: kill $(cat /tmp/portal-main.pid) 2>/dev/null || true
 
       # ── Phase C: Upgrade package (only when contract changed) ──
+      - name: "Phase C: Patch Published.toml for fresh package"
+        if: steps.contract-diff.outputs.has_changes == 'true'
+        run: |
+          # The test-branch's Published.toml references the original testnet
+          # package. Replace it with the fresh package from Phase A so the
+          # upgrade bytecode embeds the correct package address.
+          PACKAGE_V1="${{ steps.packages.outputs.package_v1 }}"
+          sed -i "/^\[published\.testnet\]/,/^\[/ {
+            s|published-at = \".*\"|published-at = \"$PACKAGE_V1\"|
+            s|original-id = \".*\"|original-id = \"$PACKAGE_V1\"|
+          }" move/walrus_site/Published.toml
+          echo "Patched Published.toml testnet entry to $PACKAGE_V1"
+          cat move/walrus_site/Published.toml
+
       - name: "Phase C: Upgrade contract (test-branch)"
         if: steps.contract-diff.outputs.has_changes == 'true'
         id: upgrade
