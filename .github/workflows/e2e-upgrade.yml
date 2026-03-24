@@ -349,7 +349,9 @@ jobs:
       - name: "Phase B: Start forked testnet"
         run: |
           echo "Starting sui-forking on network=testnet..."
-          sui-forking start --network testnet &
+          echo "Prefetching Phase A site object: ${{ needs.phase-a.outputs.site-a-oid }}"
+          sui-forking start --network testnet \
+            --objects ${{ needs.phase-a.outputs.site-a-oid }} &
           echo $! > /tmp/forking.pid
           sleep 10
           echo "Checking fork status..."
