@@ -7,6 +7,14 @@ name: "E2E: Upgrade Test"
 # Phase B: Fork testnet, upgrade contract from test-branch
 # Phase C: main portal on fork, verify old + new sites
 # Phase D: test-branch portal on fork, verify new site
+#
+# IMPORTANT: Phase A publishes the snake example on real testnet, which stores
+# its blobs on Walrus. Phase C publishes again on the forked network, where
+# Walrus storage nodes are unreachable. This works because the blobs from
+# Phase A are already stored and the walrus CLI returns AlreadyCertified.
+# This means the snake example's file resources (index.html, file.svg, etc.)
+# must NOT change between the main and test-branch. Only ws-resources.json
+# config (routes, redirects, headers, metadata) may differ.
 
 on:
   # Run Phase A on every merge to main.
@@ -31,7 +39,7 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  TEST_BRANCH: ${{ inputs.test-branch || github.ref_name }}
+  TEST_BRANCH: ${{ inputs.test-branch || github.head_ref }}
   UPGRADE_CAP: "0x719b3b518ed7a2060243fbb04bcb7b635a3817cfb361f81807d551c277bdb647"
   SITE_PACKAGE: "0xf99aee9f21493e1590e7e5a9aea6f343a1f381031a04a732724871fc294be799"
   STAKING_OBJECT: "0xbe46180321c30aab2f8b3501e24048377287fa708018a5b7c2792b35fe339ee3"
@@ -52,13 +60,14 @@ jobs:
     runs-on: ubuntu-ghcloud
     timeout-minutes: 30
     steps:
-      - name: Log inputs
+      - name: Validate inputs
         run: |
-          echo "::group::Workflow inputs"
+          if [[ -z "${{ env.TEST_BRANCH }}" ]]; then
+            echo "::error::TEST_BRANCH is empty. For workflow_dispatch, provide the test-branch input. For pull_request, this is set automatically."
+            exit 1
+          fi
           echo "TEST_BRANCH=${{ env.TEST_BRANCH }}"
           echo "Trigger: ${{ github.event_name }}"
-          echo "Ref: ${{ github.ref_name }}"
-          echo "::endgroup::"
 
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -144,7 +153,7 @@ jobs:
         id: publish
         run: |
           OUTPUT=$(site-builder --context testnet \
-            publish --directory examples/snake --epochs 2 2>&1) || {
+            publish examples/snake --epochs 2 2>&1) || {
             echo "$OUTPUT"
             exit 1
           }
@@ -383,9 +392,12 @@ jobs:
           staking_object: ${{ env.STAKING_OBJECT }}
           EOF
 
+          # Use 1 epoch (lower than Phase A's 2) so that AlreadyCertified blobs
+          # are accepted even in the rare case of a Walrus epoch transition
+          # between Phase A and Phase C.
           OUTPUT=$(/tmp/test-branch-bin/site-builder \
             --config /tmp/fork-sites-config.yaml \
-            publish --directory worktrees/test-branch/examples/snake --epochs max 2>&1) || {
+            publish worktrees/test-branch/examples/snake --epochs 1 2>&1) || {
             echo "$OUTPUT"
             exit 1
           }
