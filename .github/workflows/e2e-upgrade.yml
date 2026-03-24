@@ -1,0 +1,427 @@
+name: "E2E: Upgrade Test"
+
+# Tests that contract upgrades don't break existing sites and that old portals
+# work with upgraded contracts.
+#
+# Phase A: main portal + main site-builder on real testnet
+# Phase B: Fork testnet, upgrade contract from test-branch
+# Phase C: main portal on fork, verify old + new sites
+# Phase D: test-branch portal on fork, verify new site
+
+on:
+  workflow_dispatch:
+    inputs:
+      test-branch:
+        description: "Branch to test upgrade from (e.g. feat/redirects)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  UPGRADE_CAP: "0x719b3b518ed7a2060243fbb04bcb7b635a3817cfb361f81807d551c277bdb647"
+  SITE_PACKAGE: "0xf99aee9f21493e1590e7e5a9aea6f343a1f381031a04a732724871fc294be799"
+  STAKING_OBJECT: "0xbe46180321c30aab2f8b3501e24048377287fa708018a5b7c2792b35fe339ee3"
+  AGGREGATOR: "https://aggregator.walrus-testnet.walrus.space"
+  FORK_RPC: "http://127.0.0.1:9000"
+  PORTAL_PORT: "3000"
+
+concurrency:
+  group: e2e-upgrade-${{ github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # Build site-builder from test-branch (runs in parallel with phase-a)
+  # ─────────────────────────────────────────────────────────────
+  build-test-branch:
+    name: "Build site-builder (test-branch)"
+    runs-on: ubuntu-ghcloud
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.test-branch }}
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+        with:
+          shared-key: e2e-test-branch
+
+      - name: Build site-builder
+        run: cargo build -p site-builder --release
+
+      - name: Upload site-builder binary
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: site-builder-test-branch
+          path: target/release/site-builder
+          retention-days: 1
+
+  # ─────────────────────────────────────────────────────────────
+  # Phase A: Test main on real testnet
+  # ─────────────────────────────────────────────────────────────
+  phase-a:
+    name: "Phase A: main on testnet"
+    runs-on: ubuntu-ghcloud
+    timeout-minutes: 15
+    outputs:
+      site-a-oid: ${{ steps.publish.outputs.site_oid }}
+      site-a-b36: ${{ steps.publish.outputs.site_b36 }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: main
+
+      # Install tools
+      - name: Install suiup + tools
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/MystenLabs/suiup/main/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          export PATH="$HOME/.local/bin:$PATH"
+          suiup install sui -y
+          suiup install walrus -y
+          suiup install site-builder -y
+          suiup install mvr -y
+
+      - name: Setup Sui wallet
+        run: |
+          mkdir -p ~/.sui/sui_config
+          echo '${{ secrets.SUI_KEYSTORE_TESTNET }}' > ~/.sui/sui_config/sui.keystore
+          cat > ~/.sui/sui_config/client.yaml << EOF
+          keystore:
+            File: $HOME/.sui/sui_config/sui.keystore
+          envs:
+            - alias: testnet
+              rpc: "https://fullnode.testnet.sui.io:443"
+              ws: ~
+          active_env: testnet
+          active_address: "${{ vars.SUI_ADDRESS_TESTNET }}"
+          EOF
+
+      - name: Setup Walrus config
+        run: |
+          mkdir -p ~/.config/walrus
+          curl -sSL https://raw.githubusercontent.com/MystenLabs/walrus/main/setup/client_config.yaml \
+            -o ~/.config/walrus/client_config.yaml
+
+      - name: Verify wallet
+        run: |
+          sui client active-address
+          sui client balance
+
+      # Publish snake on testnet
+      - name: Publish snake example on testnet
+        id: publish
+        run: |
+          OUTPUT=$(site-builder --context testnet \
+            publish --directory examples/snake --epochs 2 2>&1) || {
+            echo "$OUTPUT"
+            exit 1
+          }
+          echo "$OUTPUT"
+
+          SITE_OID=$(echo "$OUTPUT" | grep -oE 'object ID: 0x[0-9a-f]+' | head -1 | sed 's/object ID: //')
+          SITE_B36=$(echo "$OUTPUT" | grep -oE 'http://[^.]+\.localhost' | head -1 | sed 's|http://||;s|\.localhost||')
+
+          echo "site_oid=$SITE_OID" >> "$GITHUB_OUTPUT"
+          echo "site_b36=$SITE_B36" >> "$GITHUB_OUTPUT"
+          echo "Published site: $SITE_OID (b36: $SITE_B36)"
+
+      # Start portal from main
+      - uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+
+      - name: Install portal dependencies
+        run: cd portal && bun install
+
+      - name: Generate portal config (testnet)
+        run: |
+          cat > /tmp/portal-config.yaml << EOF
+          network: testnet
+          site_package: "${{ env.SITE_PACKAGE }}"
+          landing_page_oid_b36: "${{ steps.publish.outputs.site_b36 }}"
+          b36_domain_resolution: true
+          enable_allowlist: false
+          enable_blocklist: false
+          rpc_urls:
+            - url: https://fullnode.testnet.sui.io:443
+              retries: 2
+              metric: 100
+          aggregator_urls:
+            - url: ${{ env.AGGREGATOR }}
+              retries: 3
+              metric: 100
+          EOF
+
+      - name: Start portal
+        run: |
+          cd portal
+          PORTAL_CONFIG=/tmp/portal-config.yaml bun run server &
+          echo $! > /tmp/portal.pid
+          for i in $(seq 1 60); do
+            curl -s http://localhost:${{ env.PORTAL_PORT }} > /dev/null 2>&1 && break
+            sleep 2
+          done
+
+      # Verify
+      - name: Verify snake site (main portal, testnet)
+        run: ./scripts/verify-snake-site.sh http://localhost:${{ env.PORTAL_PORT }}
+
+      - name: Stop portal
+        if: always()
+        run: kill $(cat /tmp/portal.pid) 2>/dev/null || true
+
+      # Cleanup: destroy the testnet site to avoid junk
+      - name: Destroy testnet site
+        if: always()
+        run: |
+          site-builder --context testnet \
+            destroy ${{ steps.publish.outputs.site_oid }} 2>&1 || true
+
+  # ─────────────────────────────────────────────────────────────
+  # Phases B-D: Fork, upgrade, test with both portals
+  # ─────────────────────────────────────────────────────────────
+  phases-b-d:
+    name: "Phases B-D: fork + upgrade + verify"
+    runs-on: ubuntu-ghcloud
+    timeout-minutes: 45
+    needs: [build-test-branch, phase-a]
+    steps:
+      # Checkout main
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: main
+
+      # Also checkout test-branch as a worktree
+      - name: Setup test-branch worktree
+        run: |
+          git fetch origin ${{ inputs.test-branch }}
+          git worktree add worktrees/test-branch origin/${{ inputs.test-branch }}
+
+      # Download test-branch site-builder
+      - name: Download test-branch site-builder
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: site-builder-test-branch
+          path: /tmp/test-branch-bin
+
+      - name: Make site-builder executable
+        run: chmod +x /tmp/test-branch-bin/site-builder
+
+      # Install tools
+      - name: Install suiup + tools
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/MystenLabs/suiup/main/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          export PATH="$HOME/.local/bin:$PATH"
+          suiup install sui -y
+          suiup install walrus -y
+          suiup install site-builder -y
+          suiup install mvr -y
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+        with:
+          shared-key: e2e-sui-forking
+
+      - name: Install sui-forking
+        run: |
+          cargo install --locked --git https://github.com/MystenLabs/sui.git \
+            --branch forking2 sui-forking --features tracing
+
+      - uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+
+      - name: Setup Sui wallet
+        run: |
+          mkdir -p ~/.sui/sui_config
+          echo '${{ secrets.SUI_KEYSTORE_TESTNET }}' > ~/.sui/sui_config/sui.keystore
+          cat > ~/.sui/sui_config/client.yaml << EOF
+          keystore:
+            File: $HOME/.sui/sui_config/sui.keystore
+          envs:
+            - alias: testnet
+              rpc: "https://fullnode.testnet.sui.io:443"
+              ws: ~
+          active_env: testnet
+          active_address: "${{ vars.SUI_ADDRESS_TESTNET }}"
+          EOF
+
+      - name: Setup Walrus config
+        run: |
+          mkdir -p ~/.config/walrus
+          curl -sSL https://raw.githubusercontent.com/MystenLabs/walrus/main/setup/client_config.yaml \
+            -o ~/.config/walrus/client_config.yaml
+
+      # ── Phase B: Fork + upgrade ─────────────────────────────
+      - name: "Phase B: Start forked testnet"
+        run: |
+          sui-forking start --network testnet &
+          echo $! > /tmp/forking.pid
+          sleep 10
+          sui-forking status || { echo "Fork failed to start"; exit 1; }
+
+      - name: "Phase B: Upgrade contract on fork"
+        run: |
+          # Look up UpgradeCap owner
+          CAP_OWNER=$(sui client object ${{ env.UPGRADE_CAP }} --json \
+            | jq -r '.owner.AddressOwner')
+          echo "UpgradeCap owner: $CAP_OWNER"
+
+          # Fund cap owner on fork
+          sui-forking faucet --address "$CAP_OWNER" --amount 10000000000
+          sui-forking advance-checkpoint
+
+          # Switch to fork env
+          sui client new-env --alias fork --rpc ${{ env.FORK_RPC }} 2>/dev/null || true
+          sui client switch --env fork
+
+          # Upgrade using test-branch Move code
+          UPGRADE_OUTPUT=$(MVR_FALLBACK_NETWORK=testnet sui client upgrade \
+            --forking-mode \
+            --sender "$CAP_OWNER" \
+            --upgrade-capability ${{ env.UPGRADE_CAP }} \
+            --gas-budget 5000000000 \
+            --build-env testnet \
+            --json \
+            worktrees/test-branch/move/walrus_site 2>&1) || {
+            echo "$UPGRADE_OUTPUT"
+            exit 1
+          }
+
+          NEW_PACKAGE_ID=$(echo "$UPGRADE_OUTPUT" \
+            | jq -r '.objectChanges[] | select(.type == "published") | .packageId')
+
+          if [[ -z "$NEW_PACKAGE_ID" || "$NEW_PACKAGE_ID" == "null" ]]; then
+            echo "Failed to extract new package ID"
+            echo "$UPGRADE_OUTPUT"
+            exit 1
+          fi
+
+          echo "NEW_PACKAGE_ID=$NEW_PACKAGE_ID" >> "$GITHUB_ENV"
+          echo "Upgraded! New package: $NEW_PACKAGE_ID"
+
+      # ── Phase C: Main portal on fork ─────────────────────────
+      - name: "Phase C: Publish snake on fork (test-branch site-builder)"
+        run: |
+          # Fund active address on fork
+          PUBLISHER=$(sui client active-address)
+          sui-forking faucet --address "$PUBLISHER" --amount 10000000000
+          sui-forking advance-checkpoint
+
+          # Generate sites-config for fork
+          cat > /tmp/fork-sites-config.yaml << EOF
+          package: ${{ env.NEW_PACKAGE_ID }}
+          portal: ""
+          general:
+            rpc_url: ${{ env.FORK_RPC }}
+            walrus_context: testnet
+            gas_budget: 500000000
+          staking_object: ${{ env.STAKING_OBJECT }}
+          EOF
+
+          OUTPUT=$(/tmp/test-branch-bin/site-builder \
+            --config /tmp/fork-sites-config.yaml \
+            publish --directory worktrees/test-branch/examples/snake --epochs max 2>&1) || {
+            echo "$OUTPUT"
+            exit 1
+          }
+          echo "$OUTPUT"
+
+          SITE_B_OID=$(echo "$OUTPUT" | grep -oE 'object ID: 0x[0-9a-f]+' | head -1 | sed 's/object ID: //')
+          SITE_B_B36=$(echo "$OUTPUT" | grep -oE 'http://[^.]+\.localhost' | head -1 | sed 's|http://||;s|\.localhost||')
+
+          echo "SITE_B_OID=$SITE_B_OID" >> "$GITHUB_ENV"
+          echo "SITE_B_B36=$SITE_B_B36" >> "$GITHUB_ENV"
+          echo "Published new site: $SITE_B_OID (b36: $SITE_B_B36)"
+
+      - name: "Phase C: Install portal deps (main)"
+        run: cd portal && bun install
+
+      - name: "Phase C: Start portal (main, fork)"
+        run: |
+          cat > /tmp/portal-config-fork.yaml << EOF
+          network: testnet
+          site_package: "${{ env.SITE_PACKAGE }}"
+          landing_page_oid_b36: "${{ needs.phase-a.outputs.site-a-b36 }}"
+          b36_domain_resolution: true
+          enable_allowlist: false
+          enable_blocklist: false
+          rpc_urls:
+            - url: ${{ env.FORK_RPC }}
+              retries: 2
+              metric: 100
+          aggregator_urls:
+            - url: ${{ env.AGGREGATOR }}
+              retries: 3
+              metric: 100
+          EOF
+
+          cd portal
+          PORTAL_CONFIG=/tmp/portal-config-fork.yaml bun run server &
+          echo $! > /tmp/portal.pid
+          for i in $(seq 1 60); do
+            curl -s http://localhost:${{ env.PORTAL_PORT }} > /dev/null 2>&1 && break
+            sleep 2
+          done
+
+      - name: "Phase C: Verify OLD site (main portal, fork)"
+        run: |
+          ./scripts/verify-snake-site.sh \
+            "http://${{ needs.phase-a.outputs.site-a-b36 }}.localhost:${{ env.PORTAL_PORT }}"
+
+      - name: "Phase C: Verify NEW site (main portal, fork)"
+        run: |
+          ./scripts/verify-snake-site.sh \
+            "http://${{ env.SITE_B_B36 }}.localhost:${{ env.PORTAL_PORT }}"
+
+      - name: "Phase C: Stop portal"
+        if: always()
+        run: kill $(cat /tmp/portal.pid) 2>/dev/null || true
+
+      # ── Phase D: Test-branch portal on fork ──────────────────
+      - name: "Phase D: Install portal deps (test-branch)"
+        run: cd worktrees/test-branch/portal && bun install
+
+      - name: "Phase D: Start portal (test-branch, fork)"
+        run: |
+          cat > /tmp/portal-config-test.yaml << EOF
+          network: testnet
+          site_package: "${{ env.NEW_PACKAGE_ID }}"
+          landing_page_oid_b36: "${{ env.SITE_B_B36 }}"
+          b36_domain_resolution: true
+          enable_allowlist: false
+          enable_blocklist: false
+          rpc_urls:
+            - url: ${{ env.FORK_RPC }}
+              retries: 2
+              metric: 100
+          aggregator_urls:
+            - url: ${{ env.AGGREGATOR }}
+              retries: 3
+              metric: 100
+          EOF
+
+          cd worktrees/test-branch/portal
+          PORTAL_CONFIG=/tmp/portal-config-test.yaml bun run server &
+          echo $! > /tmp/portal-test.pid
+          for i in $(seq 1 60); do
+            curl -s http://localhost:${{ env.PORTAL_PORT }} > /dev/null 2>&1 && break
+            sleep 2
+          done
+
+      - name: "Phase D: Verify NEW site (test-branch portal, fork)"
+        run: |
+          worktrees/test-branch/scripts/verify-snake-site.sh \
+            "http://${{ env.SITE_B_B36 }}.localhost:${{ env.PORTAL_PORT }}"
+
+      - name: "Phase D: Stop portal"
+        if: always()
+        run: kill $(cat /tmp/portal-test.pid) 2>/dev/null || true
+
+      - name: Cleanup
+        if: always()
+        run: |
+          kill $(cat /tmp/forking.pid) 2>/dev/null || true
+          git worktree remove worktrees/test-branch 2>/dev/null || true
