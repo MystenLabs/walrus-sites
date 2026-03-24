@@ -89,6 +89,34 @@ jobs:
           retention-days: 1
 
   # ─────────────────────────────────────────────────────────────
+  # Build sui-forking (runs in parallel with build-test-branch and phase-a)
+  # ─────────────────────────────────────────────────────────────
+  build-sui-forking:
+    name: "Build sui-forking"
+    runs-on: ubuntu-ghcloud
+    timeout-minutes: 30
+    steps:
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+        with:
+          shared-key: e2e-sui-forking
+
+      - name: Build sui + sui-forking
+        run: |
+          cargo install --locked --git https://github.com/MystenLabs/sui.git \
+            --branch forking2 sui sui-forking
+          mkdir -p /tmp/forking-bin
+          cp ~/.cargo/bin/sui /tmp/forking-bin/sui-fork
+          cp ~/.cargo/bin/sui-forking /tmp/forking-bin/sui-forking
+
+      - name: Upload forking binaries
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: sui-forking-bin
+          path: /tmp/forking-bin/
+          retention-days: 1
+
+  # ─────────────────────────────────────────────────────────────
   # Phase A: Test main on real testnet
   # ─────────────────────────────────────────────────────────────
   phase-a:
@@ -223,7 +251,7 @@ jobs:
     name: "Phases B-D: fork + upgrade + verify"
     runs-on: ubuntu-ghcloud
     timeout-minutes: 45
-    needs: [build-test-branch, phase-a]
+    needs: [build-test-branch, build-sui-forking, phase-a]
     steps:
       - name: Log inputs
         run: |
@@ -267,19 +295,17 @@ jobs:
           suiup install site-builder -y
           suiup install mvr -y
 
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+      - name: Download sui-forking binaries
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
         with:
-          shared-key: e2e-sui-forking
+          name: sui-forking-bin
+          path: /tmp/forking-bin
 
-      - name: Install sui-forking
+      - name: Install sui-forking binaries
         run: |
-          cargo install --locked --git https://github.com/MystenLabs/sui.git \
-            --branch forking2 sui sui-forking
-          # The forking branch's `sui` binary supports --forking-mode.
-          # Copy it to a distinct name so it doesn't conflict with the suiup `sui`.
-          cp ~/.cargo/bin/sui /usr/local/bin/sui-fork
-          cp ~/.cargo/bin/sui-forking /usr/local/bin/sui-forking
+          chmod +x /tmp/forking-bin/sui-fork /tmp/forking-bin/sui-forking
+          sudo mv /tmp/forking-bin/sui-fork /usr/local/bin/sui-fork
+          sudo mv /tmp/forking-bin/sui-forking /usr/local/bin/sui-forking
 
       - uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
 
