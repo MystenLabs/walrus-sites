@@ -9,11 +9,21 @@ name: "E2E: Upgrade Test"
 # Phase D: test-branch portal on fork, verify new site
 
 on:
+  # Run Phase A on every merge to main.
+  # Phases B-D (fork + upgrade) run only via workflow_dispatch with a test-branch.
+  pull_request:
+    paths:
+      - portal/**
+      - site-builder/**
+      - move/walrus_site/**
+      - scripts/verify-snake-site.sh
+      - examples/snake/**
+      - .github/workflows/e2e-upgrade.yml
   workflow_dispatch:
     inputs:
       test-branch:
-        description: "Branch to test upgrade from (e.g. feat/redirects)"
-        required: true
+        description: "Branch to test upgrade from (defaults to current ref)"
+        required: false
         type: string
 
 permissions:
@@ -21,6 +31,7 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  TEST_BRANCH: ${{ inputs.test-branch || github.ref_name }}
   UPGRADE_CAP: "0x719b3b518ed7a2060243fbb04bcb7b635a3817cfb361f81807d551c277bdb647"
   SITE_PACKAGE: "0xf99aee9f21493e1590e7e5a9aea6f343a1f381031a04a732724871fc294be799"
   STAKING_OBJECT: "0xbe46180321c30aab2f8b3501e24048377287fa708018a5b7c2792b35fe339ee3"
@@ -41,9 +52,17 @@ jobs:
     runs-on: ubuntu-ghcloud
     timeout-minutes: 30
     steps:
+      - name: Log inputs
+        run: |
+          echo "::group::Workflow inputs"
+          echo "TEST_BRANCH=${{ env.TEST_BRANCH }}"
+          echo "Trigger: ${{ github.event_name }}"
+          echo "Ref: ${{ github.ref_name }}"
+          echo "::endgroup::"
+
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          ref: ${{ inputs.test-branch }}
+          ref: ${{ env.TEST_BRANCH }}
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
@@ -71,6 +90,14 @@ jobs:
       site-a-oid: ${{ steps.publish.outputs.site_oid }}
       site-a-b36: ${{ steps.publish.outputs.site_b36 }}
     steps:
+      - name: Log inputs
+        run: |
+          echo "::group::Phase A inputs"
+          echo "Checking out: main"
+          echo "TEST_BRANCH=${{ env.TEST_BRANCH }}"
+          echo "SITE_PACKAGE=${{ env.SITE_PACKAGE }}"
+          echo "::endgroup::"
+
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: main
@@ -189,6 +216,16 @@ jobs:
     timeout-minutes: 45
     needs: [build-test-branch, phase-a]
     steps:
+      - name: Log inputs
+        run: |
+          echo "::group::Phases B-D inputs"
+          echo "TEST_BRANCH=${{ env.TEST_BRANCH }}"
+          echo "SITE_A_OID=${{ needs.phase-a.outputs.site-a-oid }}"
+          echo "SITE_A_B36=${{ needs.phase-a.outputs.site-a-b36 }}"
+          echo "UPGRADE_CAP=${{ env.UPGRADE_CAP }}"
+          echo "SITE_PACKAGE=${{ env.SITE_PACKAGE }}"
+          echo "::endgroup::"
+
       # Checkout main
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -197,8 +234,8 @@ jobs:
       # Also checkout test-branch as a worktree
       - name: Setup test-branch worktree
         run: |
-          git fetch origin ${{ inputs.test-branch }}
-          git worktree add worktrees/test-branch origin/${{ inputs.test-branch }}
+          git fetch origin ${{ env.TEST_BRANCH }}
+          git worktree add worktrees/test-branch origin/${{ env.TEST_BRANCH }}
 
       # Download test-branch site-builder
       - name: Download test-branch site-builder
@@ -254,15 +291,38 @@ jobs:
           curl -sSL https://raw.githubusercontent.com/MystenLabs/walrus/main/setup/client_config.yaml \
             -o ~/.config/walrus/client_config.yaml
 
+      # ── Check if contract upgrade is needed ──────────────────
+      - name: Check for contract changes
+        id: contract-diff
+        run: |
+          CHANGED=$(git diff --name-only origin/main..origin/${{ env.TEST_BRANCH }} -- move/walrus_site/)
+          if [[ -n "$CHANGED" ]]; then
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+            echo "Contract sources changed:"
+            echo "$CHANGED"
+          else
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo "No contract changes — will skip upgrade step"
+          fi
+
       # ── Phase B: Fork + upgrade ─────────────────────────────
       - name: "Phase B: Start forked testnet"
         run: |
+          echo "Starting sui-forking on network=testnet..."
           sui-forking start --network testnet &
           echo $! > /tmp/forking.pid
           sleep 10
+          echo "Checking fork status..."
           sui-forking status || { echo "Fork failed to start"; exit 1; }
+          echo "Fork running at ${{ env.FORK_RPC }}"
+
+      - name: "Phase B: Switch sui client to fork"
+        run: |
+          sui client new-env --alias fork --rpc ${{ env.FORK_RPC }} 2>/dev/null || true
+          sui client switch --env fork
 
       - name: "Phase B: Upgrade contract on fork"
+        if: steps.contract-diff.outputs.has_changes == 'true'
         run: |
           # Look up UpgradeCap owner
           CAP_OWNER=$(sui client object ${{ env.UPGRADE_CAP }} --json \
@@ -272,10 +332,6 @@ jobs:
           # Fund cap owner on fork
           sui-forking faucet --address "$CAP_OWNER" --amount 10000000000
           sui-forking advance-checkpoint
-
-          # Switch to fork env
-          sui client new-env --alias fork --rpc ${{ env.FORK_RPC }} 2>/dev/null || true
-          sui client switch --env fork
 
           # Upgrade using test-branch Move code
           UPGRADE_OUTPUT=$(MVR_FALLBACK_NETWORK=testnet sui client upgrade \
@@ -301,6 +357,12 @@ jobs:
 
           echo "NEW_PACKAGE_ID=$NEW_PACKAGE_ID" >> "$GITHUB_ENV"
           echo "Upgraded! New package: $NEW_PACKAGE_ID"
+
+      - name: "Phase B: Use existing package (no contract changes)"
+        if: steps.contract-diff.outputs.has_changes != 'true'
+        run: |
+          echo "No contract upgrade needed — using existing package"
+          echo "NEW_PACKAGE_ID=${{ env.SITE_PACKAGE }}" >> "$GITHUB_ENV"
 
       # ── Phase C: Main portal on fork ─────────────────────────
       - name: "Phase C: Publish snake on fork (test-branch site-builder)"
@@ -341,6 +403,8 @@ jobs:
 
       - name: "Phase C: Start portal (main, fork)"
         run: |
+          echo "Starting main portal on fork RPC=${{ env.FORK_RPC }}"
+          echo "Landing page (old site): ${{ needs.phase-a.outputs.site-a-b36 }}"
           cat > /tmp/portal-config-fork.yaml << EOF
           network: testnet
           site_package: "${{ env.SITE_PACKAGE }}"
@@ -368,11 +432,13 @@ jobs:
 
       - name: "Phase C: Verify OLD site (main portal, fork)"
         run: |
+          echo "Verifying old site (b36=${{ needs.phase-a.outputs.site-a-b36 }}) with main portal on fork"
           ./scripts/verify-snake-site.sh \
             "http://${{ needs.phase-a.outputs.site-a-b36 }}.localhost:${{ env.PORTAL_PORT }}"
 
       - name: "Phase C: Verify NEW site (main portal, fork)"
         run: |
+          echo "Verifying new site (b36=${{ env.SITE_B_B36 }}) with main portal on fork"
           ./scripts/verify-snake-site.sh \
             "http://${{ env.SITE_B_B36 }}.localhost:${{ env.PORTAL_PORT }}"
 
@@ -386,6 +452,9 @@ jobs:
 
       - name: "Phase D: Start portal (test-branch, fork)"
         run: |
+          echo "Starting test-branch portal on fork RPC=${{ env.FORK_RPC }}"
+          echo "Package: ${{ env.NEW_PACKAGE_ID }}"
+          echo "Landing page (new site): ${{ env.SITE_B_B36 }}"
           cat > /tmp/portal-config-test.yaml << EOF
           network: testnet
           site_package: "${{ env.NEW_PACKAGE_ID }}"
@@ -413,6 +482,7 @@ jobs:
 
       - name: "Phase D: Verify NEW site (test-branch portal, fork)"
         run: |
+          echo "Verifying new site (b36=${{ env.SITE_B_B36 }}) with test-branch portal on fork"
           worktrees/test-branch/scripts/verify-snake-site.sh \
             "http://${{ env.SITE_B_B36 }}.localhost:${{ env.PORTAL_PORT }}"
 
