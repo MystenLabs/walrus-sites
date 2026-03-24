@@ -498,6 +498,26 @@ jobs:
             sleep 2
           done
 
+      - name: "Phase C: Debug — check old site exists on fork"
+        run: |
+          SITE_HEX="${{ needs.phase-a.outputs.site-a-oid }}"
+          echo "Checking old site $SITE_HEX on fork..."
+
+          echo "--- sui-fork client (gRPC) ---"
+          sui-fork client object "$SITE_HEX" --json 2>&1 | head -5 || echo "sui-fork: FAILED"
+
+          echo "--- JSON-RPC sui_getObject ---"
+          curl -s -X POST http://127.0.0.1:9000 \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"sui_getObject\",\"params\":[\"$SITE_HEX\",{\"showBcs\":true}]}" \
+            | jq '.result.data.objectId // .result.error // .error' || echo "curl: FAILED"
+
+          echo "--- JSON-RPC sui_multiGetObjects ---"
+          curl -s -X POST http://127.0.0.1:9000 \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"sui_multiGetObjects\",\"params\":[[\"$SITE_HEX\"],{\"showBcs\":true}]}" \
+            | jq '.[0].data.objectId // .[0].error // .error // .result' | head -5 || echo "curl: FAILED"
+
       - name: "Phase C: Verify OLD site (main portal, fork)"
         run: |
           echo "Verifying old site (b36=${{ needs.phase-a.outputs.site-a-b36 }}) with main portal on fork"
