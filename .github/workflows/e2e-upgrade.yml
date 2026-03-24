@@ -255,7 +255,7 @@ jobs:
 
           cd worktrees/main/portal
           PORTAL_CONFIG=/tmp/portal-config-main.yaml bun run server &
-          echo $! > /tmp/portal-main.pid
+          echo $! > /tmp/portal.pid
           for i in $(seq 1 60); do
             curl -s http://localhost:${{ env.PORTAL_PORT }} > /dev/null 2>&1 && break
             sleep 2
@@ -268,7 +268,9 @@ jobs:
 
       - name: "Phase B: Stop portal"
         if: always()
-        run: kill $(cat /tmp/portal-main.pid) 2>/dev/null || true
+        run: kill $(cat /tmp/portal.pid) 2>/dev/null || true
+          sleep 1
+          fuser -k ${{ env.PORTAL_PORT }}/tcp 2>/dev/null || true
 
       # ── Phase C: Upgrade package (only when contract changed) ──
       - name: "Phase C: Patch Published.toml for fresh package"
@@ -352,7 +354,7 @@ jobs:
         run: |
           cd worktrees/main/portal
           PORTAL_CONFIG=/tmp/portal-config-main.yaml bun run server &
-          echo $! > /tmp/portal-main.pid
+          echo $! > /tmp/portal.pid
           for i in $(seq 1 60); do
             curl -s http://localhost:${{ env.PORTAL_PORT }} > /dev/null 2>&1 && break
             sleep 2
@@ -370,7 +372,9 @@ jobs:
 
       - name: "Phase D: Stop portal"
         if: always()
-        run: kill $(cat /tmp/portal-main.pid) 2>/dev/null || true
+        run: kill $(cat /tmp/portal.pid) 2>/dev/null || true
+          sleep 1
+          fuser -k ${{ env.PORTAL_PORT }}/tcp 2>/dev/null || true
 
       # ── Phase E: Test-branch portal ──────────────────────────
       - name: "Phase E: Install portal deps (test-branch)"
@@ -398,7 +402,7 @@ jobs:
 
           cd portal
           PORTAL_CONFIG=/tmp/portal-config-test.yaml bun run server &
-          echo $! > /tmp/portal-test.pid
+          echo $! > /tmp/portal.pid
           for i in $(seq 1 60); do
             curl -s http://localhost:${{ env.PORTAL_PORT }} > /dev/null 2>&1 && break
             sleep 2
@@ -411,7 +415,9 @@ jobs:
 
       - name: "Phase E: Stop portal"
         if: always()
-        run: kill $(cat /tmp/portal-test.pid) 2>/dev/null || true
+        run: kill $(cat /tmp/portal.pid) 2>/dev/null || true
+          sleep 1
+          fuser -k ${{ env.PORTAL_PORT }}/tcp 2>/dev/null || true
 
       # ── Cleanup ──────────────────────────────────────────────
       - name: Destroy testnet sites
