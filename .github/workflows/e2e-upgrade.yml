@@ -276,6 +276,10 @@ jobs:
         run: |
           cargo install --locked --git https://github.com/MystenLabs/sui.git \
             --branch forking2 sui sui-forking
+          # The forking branch's `sui` binary supports --forking-mode.
+          # Copy it to a distinct name so it doesn't conflict with the suiup `sui`.
+          cp ~/.cargo/bin/sui /usr/local/bin/sui-fork
+          cp ~/.cargo/bin/sui-forking /usr/local/bin/sui-forking
 
       - uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
 
@@ -327,14 +331,14 @@ jobs:
 
       - name: "Phase B: Switch sui client to fork"
         run: |
-          sui client new-env --alias fork --rpc ${{ env.FORK_RPC }} 2>/dev/null || true
-          sui client switch --env fork
+          sui-fork client new-env --alias fork --rpc ${{ env.FORK_RPC }} 2>/dev/null || true
+          sui-fork client switch --env fork
 
       - name: "Phase B: Upgrade contract on fork"
         if: steps.contract-diff.outputs.has_changes == 'true'
         run: |
           # Look up UpgradeCap owner
-          CAP_OWNER=$(sui client object ${{ env.UPGRADE_CAP }} --json \
+          CAP_OWNER=$(sui-fork client object ${{ env.UPGRADE_CAP }} --json \
             | jq -r '.owner.AddressOwner')
           echo "UpgradeCap owner: $CAP_OWNER"
 
@@ -343,7 +347,7 @@ jobs:
           sui-forking advance-checkpoint
 
           # Upgrade using test-branch Move code
-          UPGRADE_OUTPUT=$(MVR_FALLBACK_NETWORK=testnet sui client upgrade \
+          UPGRADE_OUTPUT=$(MVR_FALLBACK_NETWORK=testnet sui-fork client upgrade \
             --forking-mode \
             --sender "$CAP_OWNER" \
             --upgrade-capability ${{ env.UPGRADE_CAP }} \
@@ -377,7 +381,7 @@ jobs:
       - name: "Phase C: Publish snake on fork (test-branch site-builder)"
         run: |
           # Fund active address on fork
-          PUBLISHER=$(sui client active-address)
+          PUBLISHER=$(sui-fork client active-address)
           sui-forking faucet --address "$PUBLISHER" --amount 10000000000
           sui-forking advance-checkpoint
 
@@ -507,3 +511,11 @@ jobs:
         run: |
           kill $(cat /tmp/forking.pid) 2>/dev/null || true
           git worktree remove worktrees/test-branch 2>/dev/null || true
+
+      - name: Destroy testnet site (cleanup)
+        if: always()
+        run: |
+          # Switch back to testnet to destroy the site published in Phase A
+          sui client switch --env testnet 2>/dev/null || true
+          site-builder --context testnet \
+            destroy ${{ needs.phase-a.outputs.site-a-oid }} 2>&1 || true
