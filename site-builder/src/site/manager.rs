@@ -372,7 +372,7 @@ impl SiteManager {
             } else {
                 ptb.replace_redirects()
             }?;
-            redirects_iter = new_redirects.redirect_list.iter().peekable();
+            redirects_iter = new_redirects.0.iter().peekable();
         }
 
         let mut resources_iter = updates.resource_ops.iter().peekable();

@@ -234,24 +234,20 @@ pub struct Redirect {
 
 /// The redirects of a site.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Redirects {
-    pub redirect_list: VecMap<String, Redirect>,
-}
+pub struct Redirects(pub VecMap<String, Redirect>);
 
 impl Redirects {
     pub fn empty() -> Self {
-        Redirects {
-            redirect_list: VecMap::new(),
-        }
+        Redirects(VecMap::new())
     }
 
     pub fn is_empty(&self) -> bool {
-        self.redirect_list.is_empty()
+        self.0.is_empty()
     }
 
     /// Checks if the redirects are different.
     pub fn diff(&self, start: &Self) -> RedirectOps {
-        if self.redirect_list == start.redirect_list {
+        if self.0 == start.0 {
             RedirectOps::Unchanged
         } else {
             RedirectOps::Replace(self.clone())
