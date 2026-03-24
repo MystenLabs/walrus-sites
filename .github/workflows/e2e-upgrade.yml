@@ -411,12 +411,16 @@ jobs:
           sui-forking faucet --address "$PUBLISHER" --amount 10000000000
           sui-forking advance-checkpoint
 
-          # Generate sites-config for fork
+          # Generate sites-config for fork.
+          # NOTE: Do NOT set rpc_url here. The site-builder creates its Sui client
+          # from wallet.config.get_active_env().rpc (see site/manager.rs:87-91),
+          # which is already the fork. The rpc_url config field is only passed to
+          # the walrus CLI — omitting it lets walrus use its own testnet RPC for
+          # blob operations (info, store → AlreadyCertified).
           cat > /tmp/fork-sites-config.yaml << EOF
           package: ${{ env.NEW_PACKAGE_ID }}
           portal: ""
           general:
-            rpc_url: ${{ env.FORK_RPC }}
             walrus_context: testnet
             gas_budget: 500000000
           staking_object: ${{ env.STAKING_OBJECT }}
