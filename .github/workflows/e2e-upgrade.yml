@@ -96,12 +96,26 @@ jobs:
     runs-on: ubuntu-ghcloud
     timeout-minutes: 30
     steps:
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+      - name: Get branch SHA for cache key
+        id: sha
+        run: |
+          SHA=$(git ls-remote https://github.com/MystenLabs/sui.git \
+            refs/heads/forking-jsonrpc-compat | cut -f1)
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "sui forking-jsonrpc-compat SHA: $SHA"
+
+      - name: Cache sui-forking binaries
+        id: cache
+        uses: actions/cache@v4
         with:
-          shared-key: e2e-sui-forking
+          path: /tmp/forking-bin
+          key: sui-forking-${{ steps.sha.outputs.sha }}
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.cache.outputs.cache-hit != 'true'
 
       - name: Build sui + sui-forking
+        if: steps.cache.outputs.cache-hit != 'true'
         run: |
           cargo install --locked --git https://github.com/MystenLabs/sui.git \
             --branch forking-jsonrpc-compat sui sui-forking
