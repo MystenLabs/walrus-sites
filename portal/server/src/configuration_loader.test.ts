@@ -9,7 +9,7 @@ const VALID_SITE_PACKAGE = "0x26eb7ee8688da02c5f671679524e379f0b837a12f1d1d799f2
 
 const minimalYaml = `
 network: mainnet
-site_package: "${VALID_SITE_PACKAGE}"
+original_package_id: "${VALID_SITE_PACKAGE}"
 landing_page_oid_b36: "46f3881sp4r55fc6pcao9t93bieeejl4vr4k2uv8u4wwyx1a93"
 enable_blocklist: false
 enable_allowlist: false
@@ -30,7 +30,7 @@ describe("loadAndValidateConfig", () => {
     test("parses YAML and produces a valid Configuration", () => {
         const config = loadAndValidateConfig(parseYaml(minimalYaml), {});
         expect(config.suinsClientNetwork).toBe("mainnet");
-        expect(config.sitePackage).toBe(VALID_SITE_PACKAGE);
+        expect(config.originalPackageId).toBe(VALID_SITE_PACKAGE);
         expect(config.rpcUrlList).toHaveLength(1);
         expect(config.rpcUrlList[0].url).toBe("https://rpc.example.com");
         expect(config.aggregatorUrlList).toHaveLength(1);
@@ -49,13 +49,13 @@ describe("loadAndValidateConfig", () => {
         expect(config.suinsClientNetwork).toBe("testnet");
         expect(config.enableBlocklist).toBe(true);
         // YAML values still used for non-overridden fields
-        expect(config.sitePackage).toBe(VALID_SITE_PACKAGE);
+        expect(config.originalPackageId).toBe(VALID_SITE_PACKAGE);
     });
 
     test("works with null yaml (env-only mode)", () => {
         const config = loadAndValidateConfig(null, {
             SUINS_CLIENT_NETWORK: "mainnet",
-            SITE_PACKAGE: VALID_SITE_PACKAGE,
+            ORIGINAL_PACKAGE_ID: VALID_SITE_PACKAGE,
             LANDING_PAGE_OID_B36: "abc123",
             RPC_URL_LIST: "https://rpc.example.com|2|100",
             AGGREGATOR_URL_LIST: "https://agg.example.com|3|100",
@@ -72,7 +72,7 @@ describe("loadAndValidateConfig", () => {
     test("handles optional YAML fields", () => {
         const yaml = `
 network: mainnet
-site_package: "${VALID_SITE_PACKAGE}"
+original_package_id: "${VALID_SITE_PACKAGE}"
 landing_page_oid_b36: "46f3881sp4r55fc6pcao9t93bieeejl4vr4k2uv8u4wwyx1a93"
 enable_blocklist: false
 enable_allowlist: false
@@ -104,7 +104,7 @@ aggregator_urls:
 
     test("rejects invalid site_package", () => {
         const yaml = minimalYaml.replace(
-            `site_package: "${VALID_SITE_PACKAGE}"`,
+            `original_package_id: "${VALID_SITE_PACKAGE}"`,
             'site_package: "bad"',
         );
         expect(() => loadAndValidateConfig(parseYaml(yaml), {})).toThrow(
@@ -129,7 +129,7 @@ aggregator_urls:
     test("accepts enableAllowlist with storage backend and premium RPC", () => {
         const yaml = `
 network: mainnet
-site_package: "${VALID_SITE_PACKAGE}"
+original_package_id: "${VALID_SITE_PACKAGE}"
 landing_page_oid_b36: "46f3881sp4r55fc6pcao9t93bieeejl4vr4k2uv8u4wwyx1a93"
 enable_blocklist: false
 enable_allowlist: true
@@ -160,7 +160,7 @@ aggregator_urls:
     test("multiple RPC urls with priority ordering", () => {
         const yaml = `
 network: mainnet
-site_package: "${VALID_SITE_PACKAGE}"
+original_package_id: "${VALID_SITE_PACKAGE}"
 landing_page_oid_b36: "46f3881sp4r55fc6pcao9t93bieeejl4vr4k2uv8u4wwyx1a93"
 enable_blocklist: false
 enable_allowlist: false

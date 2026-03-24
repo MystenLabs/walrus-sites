@@ -386,7 +386,7 @@ jobs:
         run: |
           cat > /tmp/portal-config-test.yaml << EOF
           network: testnet
-          site_package: "${{ env.PACKAGE_V2 }}"
+          original_package_id: "${{ steps.packages.outputs.package_v1 }}"
           landing_page_oid_b36: "${{ steps.publish-site-b.outputs.site_b_b36 }}"
           domain_name_length: 21
           b36_domain_resolution: true

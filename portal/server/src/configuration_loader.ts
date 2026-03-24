@@ -50,7 +50,15 @@ function buildRawConfig(
     // Start with YAML values (already typed by the YAML parser)
     if (yaml) {
         config.suinsClientNetwork = yaml.network;
-        config.sitePackage = yaml.site_package;
+        if (yaml.original_package_id !== undefined) {
+            config.originalPackageId = yaml.original_package_id;
+        } else if (yaml.site_package !== undefined) {
+            logger.warn(
+                "Config key 'site_package' is deprecated — use 'original_package_id' instead. " +
+                    "This must be the original (V1) package ID, not an upgraded version.",
+            );
+            config.originalPackageId = yaml.site_package;
+        }
         config.landingPageOidB36 = yaml.landing_page_oid_b36;
         config.rpcUrlList = yaml.rpc_urls;
         config.aggregatorUrlList = yaml.aggregator_urls;
@@ -67,7 +75,15 @@ function buildRawConfig(
     // Override with parsed env vars (converted from strings to typed values)
     if (env.SUINS_CLIENT_NETWORK !== undefined)
         config.suinsClientNetwork = env.SUINS_CLIENT_NETWORK;
-    if (env.SITE_PACKAGE !== undefined) config.sitePackage = env.SITE_PACKAGE;
+    if (env.ORIGINAL_PACKAGE_ID !== undefined) {
+        config.originalPackageId = env.ORIGINAL_PACKAGE_ID;
+    } else if (env.SITE_PACKAGE !== undefined) {
+        logger.warn(
+            "Env var 'SITE_PACKAGE' is deprecated — use 'ORIGINAL_PACKAGE_ID' instead. " +
+                "This must be the original (V1) package ID, not an upgraded version.",
+        );
+        config.originalPackageId = env.SITE_PACKAGE;
+    }
     if (env.LANDING_PAGE_OID_B36 !== undefined) config.landingPageOidB36 = env.LANDING_PAGE_OID_B36;
     if (env.RPC_URL_LIST !== undefined) config.rpcUrlList = parsePriorityUrlList(env.RPC_URL_LIST);
     if (env.AGGREGATOR_URL_LIST !== undefined) {
@@ -134,7 +150,9 @@ const configurationSchema = z
                 message: "ALLOWLIST_REDIS_URL must end with '1' to use the allowlist database.",
             }),
         aggregatorUrlList: z.array(priorityUrlEntrySchema).nonempty(),
-        sitePackage: z.string().refine((val) => val.length === 66 && /^0x[0-9a-fA-F]+$/.test(val)),
+        originalPackageId: z
+            .string()
+            .refine((val) => val.length === 66 && /^0x[0-9a-fA-F]+$/.test(val)),
         b36DomainResolutionSupport: z.boolean(),
         bringYourOwnDomain: z.boolean().default(false),
     })

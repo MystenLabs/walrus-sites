@@ -41,7 +41,7 @@ const rpcSelector = new RPCSelector(rpcPriorityUrls, suinsClientNetwork as Netwo
 const aggregatorExecutor = new PriorityExecutor(aggregatorPriorityUrls);
 
 export const urlFetcher = new UrlFetcher(
-    new ResourceFetcher(rpcSelector, process.env.SITE_PACKAGE),
+    new ResourceFetcher(rpcSelector, process.env.ORIGINAL_PACKAGE_ID),
     new SuiNSResolver(rpcSelector),
     new WalrusSitesRouter(rpcSelector),
     aggregatorExecutor,

@@ -25,7 +25,8 @@ function loadYamlDefaults() {
 
     const defaults = {};
     if (yaml.network) defaults.SUINS_CLIENT_NETWORK = yaml.network;
-    if (yaml.site_package) defaults.SITE_PACKAGE = yaml.site_package;
+    if (yaml.original_package_id) defaults.ORIGINAL_PACKAGE_ID = yaml.original_package_id;
+    else if (yaml.site_package) defaults.ORIGINAL_PACKAGE_ID = yaml.site_package;
     if (yaml.domain_name_length !== undefined) {
         defaults.PORTAL_DOMAIN_NAME_LENGTH = String(yaml.domain_name_length);
     }
@@ -95,8 +96,8 @@ module.exports = {
             'process.env.AGGREGATOR_URL_LIST': JSON.stringify(
                 envOrYaml('AGGREGATOR_URL_LIST')
             ),
-            'process.env.SITE_PACKAGE': JSON.stringify(
-                envOrYaml('SITE_PACKAGE')
+            'process.env.ORIGINAL_PACKAGE_ID': JSON.stringify(
+                envOrYaml('ORIGINAL_PACKAGE_ID') || envOrYaml('SITE_PACKAGE')
             ),
         }),
         new CopyPlugin({
