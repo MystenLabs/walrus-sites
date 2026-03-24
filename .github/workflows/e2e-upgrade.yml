@@ -275,7 +275,7 @@ jobs:
       - name: Install sui-forking
         run: |
           cargo install --locked --git https://github.com/MystenLabs/sui.git \
-            --branch forking2 sui-forking --features tracing
+            --branch forking2 sui sui-forking
 
       - uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
 
