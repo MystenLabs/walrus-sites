@@ -238,12 +238,9 @@ jobs:
         if: always()
         run: kill $(cat /tmp/portal.pid) 2>/dev/null || true
 
-      # Cleanup: destroy the testnet site to avoid junk
-      - name: Destroy testnet site
-        if: always()
-        run: |
-          site-builder --context testnet \
-            destroy ${{ steps.publish.outputs.site_oid }} 2>&1 || true
+      # NOTE: Do NOT destroy the testnet site here. Phase A runs in parallel
+      # with the builds. The site must still exist when Phases B-D fork testnet.
+      # Cleanup happens in the test job after the fork is done.
 
   # ─────────────────────────────────────────────────────────────
   # Phases B-D: Fork, upgrade, test with both portals
@@ -349,9 +346,8 @@ jobs:
       - name: "Phase B: Start forked testnet"
         run: |
           echo "Starting sui-forking on network=testnet..."
-          echo "Prefetching Phase A site object: ${{ needs.phase-a.outputs.site-a-oid }}"
-          sui-forking start --network testnet \
-            --objects ${{ needs.phase-a.outputs.site-a-oid }} &
+          echo "Phase A site: ${{ needs.phase-a.outputs.site-a-oid }}"
+          sui-forking start --network testnet &
           echo $! > /tmp/forking.pid
           sleep 10
           echo "Checking fork status..."
