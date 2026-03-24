@@ -206,6 +206,7 @@ jobs:
           network: testnet
           site_package: "${{ env.SITE_PACKAGE }}"
           landing_page_oid_b36: "${{ steps.publish.outputs.site_b36 }}"
+          domain_name_length: 21
           b36_domain_resolution: true
           enable_allowlist: false
           enable_blocklist: false
@@ -475,6 +476,7 @@ jobs:
           network: testnet
           site_package: "${{ env.SITE_PACKAGE }}"
           landing_page_oid_b36: "${{ needs.phase-a.outputs.site-a-b36 }}"
+          domain_name_length: 21
           b36_domain_resolution: true
           enable_allowlist: false
           enable_blocklist: false
@@ -525,6 +527,7 @@ jobs:
           network: testnet
           site_package: "${{ env.NEW_PACKAGE_ID }}"
           landing_page_oid_b36: "${{ env.SITE_B_B36 }}"
+          domain_name_length: 21
           b36_domain_resolution: true
           enable_allowlist: false
           enable_blocklist: false
