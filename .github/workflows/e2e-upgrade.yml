@@ -423,6 +423,8 @@ jobs:
 
       # ── Phase C: Main portal on fork ─────────────────────────
       - name: "Phase C: Publish snake on fork (test-branch site-builder)"
+        env:
+          WALRUS_GRPC_MIGRATION_LEVEL: "4"
         run: |
           # Fund active address on fork
           PUBLISHER=$(sui-fork client active-address)
