@@ -104,7 +104,7 @@ jobs:
       - name: Build sui + sui-forking
         run: |
           cargo install --locked --git https://github.com/MystenLabs/sui.git \
-            --branch forking2 sui sui-forking
+            --branch forking-jsonrpc-compat sui sui-forking
           mkdir -p /tmp/forking-bin
           cp ~/.cargo/bin/sui /tmp/forking-bin/sui-fork
           cp ~/.cargo/bin/sui-forking /tmp/forking-bin/sui-forking
