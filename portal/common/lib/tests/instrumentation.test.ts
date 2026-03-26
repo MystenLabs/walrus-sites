@@ -44,14 +44,10 @@ describe("Instrumentation metrics endpoint", () => {
         expect(metricsText).toContain("# TYPE ws_aggregator_fetching_time histogram");
 
         // Validate labels and count (1 measurement recorded)
-        expect(metricsText).toContain(
-            'ws_aggregator_fetching_time_count{siteId="0xtest123"} 1',
-        );
+        expect(metricsText).toContain('ws_aggregator_fetching_time_count{siteId="0xtest123"} 1');
 
         // Validate labels and sum (150ms recorded)
-        expect(metricsText).toContain(
-            'ws_aggregator_fetching_time_sum{siteId="0xtest123"} 150',
-        );
+        expect(metricsText).toContain('ws_aggregator_fetching_time_sum{siteId="0xtest123"} 150');
 
         // Validate correct bucket distribution for 150ms measurement
         // Buckets below 150ms should be 0
