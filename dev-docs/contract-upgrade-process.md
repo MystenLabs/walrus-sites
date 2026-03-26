@@ -79,3 +79,27 @@ the upgraded contract.
 
 The workflow can also be triggered manually via `workflow_dispatch` with a `test-branch` input.
 
+## Publishing the Upgrade
+
+After the integration branch merges to `main`, generate the unsigned upgrade transaction for
+signing:
+
+```bash
+sui client switch --env <NETWORK>
+sui client upgrade \
+  --sender <UPGRADE_CAP_OWNER> \
+  --upgrade-capability <UPGRADE_CAP> \
+  --build-env <NETWORK> \
+  --serialize-unsigned-transaction \
+  move/walrus_site
+```
+
+Replace `<NETWORK>` with `testnet` or `mainnet`, `<UPGRADE_CAP_OWNER>` with the address that
+owns the UpgradeCap, and `<UPGRADE_CAP>` with the UpgradeCap object ID.
+
+| Network | UpgradeCap |
+|---------|------------|
+| testnet | `0x719b3b518ed7a2060243fbb04bcb7b635a3817cfb361f81807d551c277bdb647` |
+| mainnet | `0x1cab3c76c48c023b60db0a56696d197569f006e406fb9627a8a8d1a119b1c23c` |
+
+This produces a base64-encoded transaction that can be signed offline by the UpgradeCap owner.
