@@ -17,12 +17,10 @@ describe("Instrumentation metrics endpoint", () => {
         expect(metricsText).toContain("# TYPE");
     });
 
-    it("should record and serve aggregator time metric with complete data", async () => {
+    it("should record and serve aggregator time metric with siteId label", async () => {
         // Record a test metric (only siteId label — blobOrPatchId and path were
         // dropped to avoid cardinality explosion in Prometheus/Mimir).
-        instrumentationFacade.recordAggregatorTime(150, {
-            siteId: "0xtest123",
-        });
+        instrumentationFacade.recordAggregatorTime(150, "0xtest123");
 
         // Fetch metrics
         const port = parseInt(process.env.PROMETHEUS_EXPORTER_PORT!) || 9184;
