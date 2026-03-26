@@ -34,9 +34,7 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   TEST_BRANCH: ${{ inputs.test-branch || github.head_ref || github.ref_name }}
-  # Existing testnet deployment — used when no contract changes.
-  # Named EXISTING_SITE_PACKAGE (not SITE_PACKAGE) to avoid colliding with
-  # the portal's env-based config override (configuration_loader.ts).
+  # Existing testnet deployment — used when no contract changes
   EXISTING_SITE_PACKAGE: "0xf99aee9f21493e1590e7e5a9aea6f343a1f381031a04a732724871fc294be799"
   STAKING_OBJECT: "0xbe46180321c30aab2f8b3501e24048377287fa708018a5b7c2792b35fe339ee3"
   AGGREGATOR: "https://aggregator.walrus-testnet.walrus.space"
@@ -142,18 +140,13 @@ jobs:
           curl -sSL https://raw.githubusercontent.com/MystenLabs/walrus/main/setup/client_config.yaml \
             -o ~/.config/walrus/client_config.yaml
 
-      - name: Verify wallet
-        run: |
-          sui client active-address
-          sui client balance
-
       - uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
 
       # ── Check for contract changes ───────────────────────────
       - name: Check for contract changes
         id: contract-diff
         run: |
-          CHANGED=$(git diff --name-only origin/main..origin/${{ env.TEST_BRANCH }} -- move/walrus_site/)
+          CHANGED=$(git diff --name-only origin/main..origin/${{ env.TEST_BRANCH }} -- move/walrus_site/sources/)
           if [[ -n "$CHANGED" ]]; then
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
             echo "Contract sources changed:"
@@ -286,7 +279,6 @@ jobs:
             s|original-id = \".*\"|original-id = \"$PACKAGE_V1\"|
           }" move/walrus_site/Published.toml
           echo "Patched Published.toml testnet entry to $PACKAGE_V1"
-          cat move/walrus_site/Published.toml
 
       - name: "Phase C: Upgrade contract (test-branch)"
         if: steps.contract-diff.outputs.has_changes == 'true'
@@ -321,14 +313,13 @@ jobs:
           else
             echo "package_v2=${{ env.EXISTING_SITE_PACKAGE }}" >> "$GITHUB_OUTPUT"
           fi
-          echo "PACKAGE_V2=$(cat "$GITHUB_OUTPUT" | grep package_v2 | cut -d= -f2)" >> "$GITHUB_ENV"
 
       # ── Phase D: Publish with test-branch, verify with main portal ──
       - name: "Phase D: Publish snake (test-branch site-builder)"
         id: publish-site-b
         run: |
           cat > /tmp/sites-config-v2.yaml << EOF
-          package: ${{ env.PACKAGE_V2 }}
+          package: ${{ steps.pkg-v2.outputs.package_v2 }}
           portal: ""
           general:
             walrus_context: testnet
