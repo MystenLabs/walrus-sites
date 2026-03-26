@@ -18,11 +18,10 @@ describe("Instrumentation metrics endpoint", () => {
     });
 
     it("should record and serve aggregator time metric with complete data", async () => {
-        // Record a test metric
+        // Record a test metric (only siteId label — blobOrPatchId and path were
+        // dropped to avoid cardinality explosion in Prometheus/Mimir).
         instrumentationFacade.recordAggregatorTime(150, {
             siteId: "0xtest123",
-            path: "/test.html",
-            blobOrPatchId: "blob456",
         });
 
         // Fetch metrics
@@ -46,28 +45,28 @@ describe("Instrumentation metrics endpoint", () => {
 
         // Validate labels and count (1 measurement recorded)
         expect(metricsText).toContain(
-            'ws_aggregator_fetching_time_count{siteId="0xtest123",path="/test.html",blobOrPatchId="blob456"} 1',
+            'ws_aggregator_fetching_time_count{siteId="0xtest123"} 1',
         );
 
         // Validate labels and sum (150ms recorded)
         expect(metricsText).toContain(
-            'ws_aggregator_fetching_time_sum{siteId="0xtest123",path="/test.html",blobOrPatchId="blob456"} 150',
+            'ws_aggregator_fetching_time_sum{siteId="0xtest123"} 150',
         );
 
         // Validate correct bucket distribution for 150ms measurement
         // Buckets below 150ms should be 0
         expect(metricsText).toContain(
-            'ws_aggregator_fetching_time_bucket{siteId="0xtest123",path="/test.html",blobOrPatchId="blob456",le="100"} 0',
+            'ws_aggregator_fetching_time_bucket{siteId="0xtest123",le="100"} 0',
         );
 
         // First bucket that includes 150ms (le="250") should be 1
         expect(metricsText).toContain(
-            'ws_aggregator_fetching_time_bucket{siteId="0xtest123",path="/test.html",blobOrPatchId="blob456",le="250"} 1',
+            'ws_aggregator_fetching_time_bucket{siteId="0xtest123",le="250"} 1',
         );
 
         // All higher buckets should also be 1 (cumulative)
         expect(metricsText).toContain(
-            'ws_aggregator_fetching_time_bucket{siteId="0xtest123",path="/test.html",blobOrPatchId="blob456",le="500"} 1',
+            'ws_aggregator_fetching_time_bucket{siteId="0xtest123",le="500"} 1',
         );
     });
 });

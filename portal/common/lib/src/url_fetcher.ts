@@ -272,8 +272,6 @@ export class UrlFetcher {
 
         instrumentationFacade.recordAggregatorTime(aggregatorResult.elapsedMs, {
             siteId: objectId,
-            path,
-            blobOrPatchId,
         });
 
         const body = aggregatorResult.body;

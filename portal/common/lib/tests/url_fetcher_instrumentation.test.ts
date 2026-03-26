@@ -83,10 +83,11 @@ describe("UrlFetcher records aggregator timing with mock servers", () => {
         expect(duration).toBeTypeOf("number");
         expect(duration).toBeGreaterThanOrEqual(0);
 
-        // Metadata should have correct structure
+        // Metadata should only contain siteId (blobOrPatchId and path
+        // were removed to reduce cardinality).
         expect(metadata.siteId).toBe(siteObjectId);
-        expect(metadata.path).toBe(path);
-        expect(metadata.blobOrPatchId).toBeTypeOf("string");
+        expect(metadata).not.toHaveProperty("path");
+        expect(metadata).not.toHaveProperty("blobOrPatchId");
     });
 });
 

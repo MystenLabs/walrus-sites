@@ -182,10 +182,7 @@ export class InstrumentationFacade {
         this.resolveDomainAndFetchUrlHistogram.record(time, { resolvedObjectId });
     }
 
-    public recordAggregatorTime(
-        time: number,
-        data: { siteId: string; blobOrPatchId: string; path: string },
-    ) {
+    public recordAggregatorTime(time: number, data: { siteId: string }) {
         this.aggregatorTime.record(time, data);
     }
 
