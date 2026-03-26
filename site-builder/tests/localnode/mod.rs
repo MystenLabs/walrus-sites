@@ -9,7 +9,7 @@ use std::{
 };
 
 use anyhow::{anyhow, bail};
-use move_core_types::language_storage::StructTag;
+use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
 use move_package_alt::schema::Environment;
 use serde::Deserialize;
 use site_builder::{
@@ -17,7 +17,7 @@ use site_builder::{
     config::Config as SitesConfig,
     contracts,
     contracts::AssociatedContractStruct,
-    types::{ResourceDynamicField, SiteFields, SuiResource},
+    types::{Redirects, ResourceDynamicField, Routes, SiteFields, SuiDynamicField, SuiResource},
 };
 use sui_move_build::BuildConfig;
 use sui_sdk::{
@@ -37,10 +37,12 @@ use sui_sdk::{
 };
 use sui_types::{
     base_types::{ObjectID, SuiAddress},
+    dynamic_field::derive_dynamic_field_id,
     programmable_transaction_builder::ProgrammableTransactionBuilder,
     transaction::TransactionData,
     transaction_driver_types::ExecuteTransactionRequestType,
     Identifier,
+    TypeTag,
 };
 use tempfile::TempDir;
 use tokio::sync::Mutex as TokioMutex;
@@ -332,6 +334,39 @@ impl TestSetup {
         Ok(resources)
     }
 
+    /// Fetch a `Vec<u8>`-keyed dynamic field from a site object by its key bytes.
+    async fn site_dynamic_field<T: serde::de::DeserializeOwned>(
+        &self,
+        site_id: ObjectID,
+        key: &[u8],
+    ) -> anyhow::Result<Option<T>> {
+        let vec_u8_tag = TypeTag::Vector(Box::new(TypeTag::U8));
+        let df_id = derive_dynamic_field_id(site_id, &vec_u8_tag, &bcs::to_bytes(&key.to_vec())?)?;
+
+        let resp = self
+            .client
+            .read_api()
+            .get_object_with_options(df_id, SuiObjectDataOptions::new().with_bcs())
+            .await?;
+
+        let Some(data) = resp.data else {
+            return Ok(None);
+        };
+        let obj_bcs = data.bcs.unwrap().try_into_move().unwrap();
+        let df: SuiDynamicField<Vec<u8>, T> = bcs::from_bytes(&obj_bcs.bcs_bytes)?;
+        Ok(Some(df.value))
+    }
+
+    /// Fetch the routes dynamic field from a site.
+    pub async fn site_routes(&self, site_id: ObjectID) -> anyhow::Result<Option<Routes>> {
+        self.site_dynamic_field(site_id, b"routes").await
+    }
+
+    /// Fetch the redirects dynamic field from a site.
+    pub async fn site_redirects(&self, site_id: ObjectID) -> anyhow::Result<Option<Redirects>> {
+        self.site_dynamic_field(site_id, b"redirects").await
+    }
+
     /// Get the current Walrus epoch from the Walrus staking object.
     pub async fn current_walrus_epoch(&self) -> anyhow::Result<u32> {
         let staking_object = self
@@ -565,6 +600,15 @@ impl TestSetup {
     }
 }
 
+/// Compile and publish the `walrus_site` Move package on a local test cluster.
+///
+/// Two issues prevent a straightforward build-and-publish:
+/// 1. Move.toml declares `suins = { r.mvr = "@suins/core" }`, but the custom "testing"
+///    environment doesn't match any MVR network. We set `MVR_FALLBACK_NETWORK=testnet`
+///    so MVR can resolve the dependency.
+/// 2. suins isn't published on the test cluster. We force its named address to `0x0` and
+///    use `get_package_bytes(true)` to inline its modules alongside walrus_site — equivalent
+///    to `sui client publish --with-unpublished-dependencies`.
 async fn publish_walrus_sites(
     sui_client: &SuiClient,
     publisher: &mut Wallet,
@@ -582,8 +626,20 @@ async fn publish_walrus_sites(
     // Use a non-matching environment name so the Move.lock [env.testnet] section
     // doesn't resolve walrus_site to a previously-published address.
     move_build_config.environment = Environment::new("testing".to_string(), "testing".to_string());
+    // Tell MVR to fall back to testnet for dependency resolution, since the custom
+    // "testing" environment name is not a recognized network.
+    unsafe { std::env::set_var("MVR_FALLBACK_NETWORK", "testnet") };
+    // Force suins named address to 0x0 so its modules compile at address zero
+    // and get included inline when publishing. Without this, the compiler assigns
+    // a dummy address to the unassigned dependency, making it unreachable on the
+    // test cluster. (Newer Sui versions have set_unpublished_deps_to_zero for this.)
+    move_build_config
+        .config
+        .additional_named_addresses
+        .insert("suins".to_string(), AccountAddress::ZERO);
     let compiled_modules = move_build_config.build(path)?;
-    let modules_bytes = compiled_modules.get_package_bytes(false);
+    // Include suins modules inline (address 0x0) since suins isn't on the test cluster.
+    let modules_bytes = compiled_modules.get_package_bytes(true);
 
     let wallet_active_address = publisher.active_address();
     let gas_data = sui_client
@@ -697,7 +753,7 @@ pub fn create_sites_config(
 
     let sites_config = SitesConfig {
         portal: "".to_string(),
-        package: walrus_sites_package_id,
+        package: Some(walrus_sites_package_id),
         general: GeneralArgs {
             wallet: Some(wallet_path),
             walrus_config: walrus_config_path,

@@ -160,7 +160,7 @@ impl Estimator {
         );
 
         // Build the initial PTB
-        let (initial_ptb, (mut resources_iter, mut routes_iter)) =
+        let (initial_ptb, (mut resources_iter, mut routes_iter, mut redirects_iter)) =
             site_manager.build_initial_ptb(updates, walrus_pkg).await?;
 
         let gas_ref = site_manager.gas_coin_ref().await?;
@@ -179,8 +179,9 @@ impl Estimator {
         ));
 
         // Check if we'll need additional PTBs by peeking at the iterators
-        let has_remaining_resources =
-            resources_iter.peek().is_some() || routes_iter.peek().is_some();
+        let has_remaining_resources = resources_iter.peek().is_some()
+            || routes_iter.peek().is_some()
+            || redirects_iter.peek().is_some();
 
         if !has_remaining_resources {
             // No additional PTBs needed - just return the initial PTB gas cost
@@ -197,7 +198,10 @@ impl Estimator {
         let fake_call_arg = fake_site_call_arg();
         let mut remaining_ptbs = Vec::new();
 
-        while resources_iter.peek().is_some() || routes_iter.peek().is_some() {
+        while resources_iter.peek().is_some()
+            || routes_iter.peek().is_some()
+            || redirects_iter.peek().is_some()
+        {
             let ptb = site_manager.create_site_ptb::<{ PTB_MAX_MOVE_CALLS }>(walrus_pkg);
             let mut ptb = ptb.with_call_arg(&fake_call_arg)?;
 
@@ -207,6 +211,12 @@ impl Estimator {
             // Add routes only if all resources have been added.
             if resources_iter.peek().is_none() {
                 ptb.add_route_operations(&mut routes_iter)
+                    .ok_if_limit_reached()?;
+            }
+
+            // Add redirects only if all resources and routes have been added.
+            if resources_iter.peek().is_none() && routes_iter.peek().is_none() {
+                ptb.add_redirect_operations(&mut redirects_iter)
                     .ok_if_limit_reached()?;
             }
 

@@ -40,7 +40,16 @@ use crate::{
     retry_client::{new_retriable_sui_client, RetriableSuiClient},
     site::{SiteData, SiteDataDiff, SITE_MODULE},
     summary::SiteDataDiffSummary,
-    types::{ExtendOps, Metadata, MetadataOp, ObjectCache, RouteOps, SiteNameOp},
+    types::{
+        ExtendOps,
+        Metadata,
+        MetadataOp,
+        ObjectCache,
+        Redirect,
+        RedirectOps,
+        RouteOps,
+        SiteNameOp,
+    },
     util::{get_epochs_ahead, get_owned_blobs, get_site_id_from_response, sign_and_send_ptb},
     walrus::{output::SuiBlob, types::BlobId, Walrus},
 };
@@ -268,6 +277,7 @@ impl SiteManager {
         (
             Peekable<std::slice::Iter<'a, SiteOps<'a>>>,
             Peekable<btree_map::Iter<'a, String, String>>,
+            Peekable<btree_map::Iter<'a, String, Redirect>>,
         ),
     )> {
         // 1st iteration
@@ -355,6 +365,16 @@ impl SiteManager {
             routes_iter = new_routes.0.iter().peekable();
         }
 
+        let mut redirects_iter = btree_map::Iter::default().peekable();
+        if let RedirectOps::Replace(new_redirects) = &updates.redirect_ops {
+            if new_redirects.is_empty() {
+                ptb.remove_redirects()
+            } else {
+                ptb.replace_redirects()
+            }?;
+            redirects_iter = new_redirects.0.iter().peekable();
+        }
+
         let mut resources_iter = updates.resource_ops.iter().peekable();
         ptb.add_resource_operations(&mut resources_iter)
             .ok_if_limit_reached()?;
@@ -365,12 +385,18 @@ impl SiteManager {
                 .ok_if_limit_reached()?;
         }
 
+        // Add redirects only if all resources and routes have been added.
+        if resources_iter.peek().is_none() && routes_iter.peek().is_none() {
+            ptb.add_redirect_operations(&mut redirects_iter)
+                .ok_if_limit_reached()?;
+        }
+
         let mut ptb = ptb.with_max_move_calls::<PTB_MAX_MOVE_CALLS>(); // Update to actual max.
         if self.needs_transfer() {
             ptb.transfer_site(self.active_address()?)?;
         }
 
-        Ok((ptb.finish(), (resources_iter, routes_iter)))
+        Ok((ptb.finish(), (resources_iter, routes_iter, redirects_iter)))
     }
 
     /// Fetches a fresh `CallArg` for the given site object from the chain.
@@ -386,7 +412,7 @@ impl SiteManager {
         walrus_pkg: ObjectID,
     ) -> SitePtb<(), MAX_MOVE_CALLS> {
         SitePtb::<(), MAX_MOVE_CALLS>::new(
-            self.config.package,
+            self.config.package(),
             Identifier::from_str(SITE_MODULE).expect("the str provided is valid"),
             walrus_pkg,
         )
@@ -456,7 +482,7 @@ impl SiteManager {
         // Build the initial PTB with retry on object version conflicts.
         // Version conflicts mean the PTB was rejected pre-execution (no on-chain effects),
         // so retrying is safe with no risk of double-spend.
-        let (result, (mut resources_iter, mut routes_iter)) = self
+        let (result, (mut resources_iter, mut routes_iter, mut redirects_iter)) = self
             .send_ptb_retry_on_version_conflict("initial PTB", async |s: &mut Self| {
                 let (initial_ptb, iters) = s.build_initial_ptb(updates, walrus_pkg).await?;
                 assert!(initial_ptb.commands.len() <= PTB_MAX_MOVE_CALLS as usize);
@@ -477,14 +503,18 @@ impl SiteManager {
         // Execute remaining PTBs with retry on object version conflicts.
         // Version conflicts mean the PTB was rejected pre-execution (no on-chain effects),
         // so retrying is safe with no risk of double-spend.
-        while resources_iter.peek().is_some() || routes_iter.peek().is_some() {
-            (_, (resources_iter, routes_iter)) = self
+        while resources_iter.peek().is_some()
+            || routes_iter.peek().is_some()
+            || redirects_iter.peek().is_some()
+        {
+            (_, (resources_iter, routes_iter, redirects_iter)) = self
                 .send_ptb_retry_on_version_conflict(
                     "continuation PTB",
                     async |site_manager: &mut Self| {
                         // Clone the iterators so retries restart from the same position.
                         let mut resources_iter = resources_iter.clone();
                         let mut routes_iter = routes_iter.clone();
+                        let mut redirects_iter = redirects_iter.clone();
                         let call_arg = site_manager.fetch_site_call_arg(site_object_id).await?;
                         let ptb = site_manager.create_site_ptb::<PTB_MAX_MOVE_CALLS>(walrus_pkg);
                         let mut ptb = ptb.with_call_arg(&call_arg)?;
@@ -495,7 +525,12 @@ impl SiteManager {
                             ptb.add_route_operations(&mut routes_iter)
                                 .ok_if_limit_reached()?;
                         }
-                        Ok((ptb.finish(), (resources_iter, routes_iter)))
+                        // Add redirects only if all resources and routes have been added.
+                        if resources_iter.peek().is_none() && routes_iter.peek().is_none() {
+                            ptb.add_redirect_operations(&mut redirects_iter)
+                                .ok_if_limit_reached()?;
+                        }
+                        Ok((ptb.finish(), (resources_iter, routes_iter, redirects_iter)))
                     },
                 )
                 .await?;

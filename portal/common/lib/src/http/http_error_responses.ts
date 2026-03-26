@@ -94,6 +94,27 @@ export function genericError(): Response {
     );
 }
 
+/**
+ * Returns 508 Loop Detected when a redirect's location points back to the same path.
+ */
+export function redirectLoopDetected(): Response {
+    const template = template_404 as unknown as string;
+    const interpolated = template.replace("${message}", "Redirect loop detected").replace(
+        "${secondaryMessage}",
+        `<details>
+                <summary>Are you the site owner?</summary>
+                <p>One of your redirect rules points back to the same path, causing a loop.</p>
+                <p>Check the <code>redirects</code> section in your <code>ws-resources.json</code>.</p>
+            </details>`,
+    );
+    return new Response(interpolated, {
+        status: HttpStatusCodes.LOOP_DETECTED,
+        headers: {
+            "Content-Type": "text/html",
+        },
+    });
+}
+
 function Response404(
     message: string,
     secondaryMessage?: string,

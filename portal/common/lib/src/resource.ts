@@ -26,9 +26,9 @@ export class ResourceFetcher {
     private readonly resourcePathMoveType: string;
     constructor(
         private rpcSelector: RPCSelector,
-        sitePackage: string,
+        originalPackageId: string,
     ) {
-        this.resourcePathMoveType = sitePackage + "::site::ResourcePath";
+        this.resourcePathMoveType = originalPackageId + "::site::ResourcePath";
     }
 
     /**

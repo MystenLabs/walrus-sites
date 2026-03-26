@@ -62,3 +62,12 @@ export function DynamicFieldStruct<K, V>(K: BcsType<K>, V: BcsType<V>) {
 export const RoutesStruct = bcs.struct("Routes", {
     routes_list: bcs.map(bcs.string(), bcs.string()),
 });
+
+export const RedirectStruct = bcs.struct("Redirect", {
+    location: bcs.string(),
+    status_code: bcs.u16(),
+});
+
+export const RedirectsStruct = bcs.struct("Redirects", {
+    redirect_list: bcs.map(bcs.string(), RedirectStruct),
+});

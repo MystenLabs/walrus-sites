@@ -79,7 +79,7 @@ impl SiteEditor {
         let mut site_manager =
             SiteManager::new(self.config.clone(), Some(site_id), None, None, None).await?;
 
-        let site = RemoteSiteFactory::new(site_manager.sui_client(), self.config.package)
+        let site = RemoteSiteFactory::new(site_manager.sui_client(), self.config.package())
             .await?
             .get_from_chain(site_id)
             .await?;
@@ -109,6 +109,7 @@ impl SiteEditor {
             .map(SiteOps::Deleted)
             .collect();
         operations.push(SiteOps::RemovedRoutes);
+        operations.push(SiteOps::RemovedRedirects);
         operations.push(SiteOps::BurnedSite);
         display::action("Deleting Sui object data");
         site_manager.execute_operations(operations).await?;
@@ -154,7 +155,7 @@ impl SiteEditor<EditOptions> {
         let retriable_client = site_manager.sui_client();
         let existing_site = match site_manager.site_id {
             Some(site_id) => {
-                RemoteSiteFactory::new(retriable_client, self.config.package)
+                RemoteSiteFactory::new(retriable_client, self.config.package())
                     .await?
                     .get_from_chain(site_id)
                     .await?
