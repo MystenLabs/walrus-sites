@@ -401,7 +401,12 @@ jobs:
             sleep 2
           done
 
-      - name: "Phase E: Verify SITE_B (test-branch portal)"
+      - name: "Phase E: Verify SITE_A (test-branch portal, old site)"
+        run: |
+          worktrees/main/scripts/verify-snake-site.sh \
+            "http://${{ steps.publish-site-a.outputs.site_a_b36 }}.localhost:${{ env.PORTAL_PORT }}"
+
+      - name: "Phase E: Verify SITE_B (test-branch portal, new site)"
         run: |
           ./scripts/verify-snake-site.sh \
             "http://${{ steps.publish-site-b.outputs.site_b_b36 }}.localhost:${{ env.PORTAL_PORT }}"
