@@ -253,6 +253,10 @@ jobs:
             curl -s http://localhost:${{ env.PORTAL_PORT }} > /dev/null 2>&1 && break
             sleep 2
           done
+          if ! curl -s http://localhost:${{ env.PORTAL_PORT }} > /dev/null 2>&1; then
+            echo "::error::Portal failed to start on port ${{ env.PORTAL_PORT }} after 120s"
+            exit 1
+          fi
 
       - name: "Phase B: Verify SITE_A (main portal)"
         run: |
@@ -351,6 +355,10 @@ jobs:
             curl -s http://localhost:${{ env.PORTAL_PORT }} > /dev/null 2>&1 && break
             sleep 2
           done
+          if ! curl -s http://localhost:${{ env.PORTAL_PORT }} > /dev/null 2>&1; then
+            echo "::error::Portal failed to start on port ${{ env.PORTAL_PORT }} after 120s"
+            exit 1
+          fi
 
       - name: "Phase D: Verify SITE_A still works (backward compat)"
         run: |
@@ -400,6 +408,10 @@ jobs:
             curl -s http://localhost:${{ env.PORTAL_PORT }} > /dev/null 2>&1 && break
             sleep 2
           done
+          if ! curl -s http://localhost:${{ env.PORTAL_PORT }} > /dev/null 2>&1; then
+            echo "::error::Portal failed to start on port ${{ env.PORTAL_PORT }} after 120s"
+            exit 1
+          fi
 
       - name: "Phase E: Verify SITE_A (test-branch portal, old site)"
         run: |
