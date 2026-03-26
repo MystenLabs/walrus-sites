@@ -19,7 +19,7 @@ const rpcPriorityUrls = parsePriorityUrlList(process.env.RPC_URL_LIST!);
 const rpcSelector = new RPCSelector(rpcPriorityUrls, "testnet");
 const wsRouter = new WalrusSitesRouter(rpcSelector);
 const aggregatorPriorityUrls = parsePriorityUrlList(process.env.AGGREGATOR_URL_LIST!);
-const sitePackage = process.env.SITE_PACKAGE;
+const sitePackage = process.env.ORIGINAL_PACKAGE_ID;
 
 /**
  * Encodes a value as a BCS DynamicField and returns the base64 string,

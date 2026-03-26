@@ -3,7 +3,7 @@
 # Env vars override any value set here (for backward compatibility).
 
 network: mainnet
-site_package: "0x26eb7ee8688da02c5f671679524e379f0b837a12f1d1d799f255b7eea260ad27"
+original_package_id: "0x26eb7ee8688da02c5f671679524e379f0b837a12f1d1d799f255b7eea260ad27"
 landing_page_oid_b36: "46f3881sp4r55fc6pcao9t93bieeejl4vr4k2uv8u4wwyx1a93"
 
 domain_name_length: 21

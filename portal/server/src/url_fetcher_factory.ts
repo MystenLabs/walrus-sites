@@ -29,7 +29,7 @@ class UrlFetcherFactory {
     public static premiumUrlFetcher(): UrlFetcher | undefined {
         if (!this.premiumRpcSelector) return undefined;
         return new UrlFetcher(
-            new ResourceFetcher(this.premiumRpcSelector, config.sitePackage),
+            new ResourceFetcher(this.premiumRpcSelector, config.originalPackageId),
             new SuiNSResolver(this.premiumRpcSelector),
             new WalrusSitesRouter(this.premiumRpcSelector),
             this.aggregatorExecutor,
@@ -39,7 +39,7 @@ class UrlFetcherFactory {
 
     public static standardUrlFetcher(): UrlFetcher {
         return new UrlFetcher(
-            new ResourceFetcher(this.standardRpcSelector, config.sitePackage),
+            new ResourceFetcher(this.standardRpcSelector, config.originalPackageId),
             new SuiNSResolver(this.standardRpcSelector),
             new WalrusSitesRouter(this.standardRpcSelector),
             this.aggregatorExecutor,

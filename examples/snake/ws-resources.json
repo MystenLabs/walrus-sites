@@ -12,6 +12,11 @@
   "routes": {
     "/path/*": "/file.svg"
   },
+  "redirects": {
+    "/old-game": { "location": "/index.html", "status_code": 308 },
+    "/walrus-docs": { "location": "https://docs.wal.app", "status_code": 301 },
+    "/redirects/**/*": { "location": "/walrus.svg", "status_code": 302 }
+  },
   "metadata": {
     "link": "https://docs.wal.app",
     "image_url": "https://www.walrus.xyz/walrus-site",

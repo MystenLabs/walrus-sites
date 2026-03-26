@@ -1,0 +1,444 @@
+name: "E2E: Upgrade Test"
+
+# Tests that contract upgrades don't break existing sites and that portals
+# (old and new) work with upgraded contracts.
+#
+# When Move sources changed between main and test-branch:
+#   Publishes a fresh walrus_site package on testnet from main, publishes a
+#   snake site, upgrades the package from test-branch, publishes another snake
+#   site, then verifies both sites with both main and test-branch portals.
+#
+# When no Move changes:
+#   Uses the existing testnet package, publishes sites with main and
+#   test-branch site-builders, verifies with both portals.
+
+on:
+  pull_request:
+    paths:
+      - portal/**
+      - site-builder/**
+      - move/walrus_site/**
+      - scripts/verify-snake-site.sh
+      - examples/snake/**
+      - .github/workflows/e2e-upgrade.yml
+  workflow_dispatch:
+    inputs:
+      test-branch:
+        description: "Branch to test upgrade from (defaults to current ref)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  TEST_BRANCH: ${{ inputs.test-branch || github.head_ref || github.ref_name }}
+  # Existing testnet deployment — used when no contract changes
+  EXISTING_SITE_PACKAGE: "0xf99aee9f21493e1590e7e5a9aea6f343a1f381031a04a732724871fc294be799"
+  STAKING_OBJECT: "0xbe46180321c30aab2f8b3501e24048377287fa708018a5b7c2792b35fe339ee3"
+  AGGREGATOR: "https://aggregator.walrus-testnet.walrus.space"
+  PORTAL_PORT: "3000"
+
+concurrency:
+  group: e2e-upgrade-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # Build site-builder from test-branch (runs in parallel)
+  # ─────────────────────────────────────────────────────────────
+  build-test-branch:
+    name: "Build site-builder (test-branch)"
+    runs-on: ubuntu-ghcloud
+    timeout-minutes: 30
+    steps:
+      - name: Validate inputs
+        run: |
+          if [[ -z "${{ env.TEST_BRANCH }}" ]]; then
+            echo "::error::TEST_BRANCH is empty. For workflow_dispatch, provide the test-branch input. For pull_request, this is set automatically."
+            exit 1
+          fi
+          echo "TEST_BRANCH=${{ env.TEST_BRANCH }}"
+          echo "Trigger: ${{ github.event_name }}"
+
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ env.TEST_BRANCH }}
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+        with:
+          shared-key: e2e-test-branch
+
+      - name: Build site-builder
+        run: cargo build -p site-builder --release
+
+      - name: Upload site-builder binary
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: site-builder-test-branch
+          path: target/release/site-builder
+          retention-days: 1
+
+  # ─────────────────────────────────────────────────────────────
+  # E2E upgrade test (sequential phases)
+  # ─────────────────────────────────────────────────────────────
+  e2e-test:
+    name: "E2E upgrade test"
+    runs-on: ubuntu-ghcloud
+    timeout-minutes: 30
+    needs: [build-test-branch]
+    steps:
+      # ── Setup ────────────────────────────────────────────────
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ env.TEST_BRANCH }}
+
+      - name: Setup main worktree
+        run: |
+          git fetch origin main
+          git worktree add worktrees/main origin/main
+
+      - name: Download test-branch site-builder
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: site-builder-test-branch
+          path: /tmp/test-branch-bin
+
+      - name: Make site-builder executable
+        run: chmod +x /tmp/test-branch-bin/site-builder
+
+      - name: Install suiup + tools
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/MystenLabs/suiup/main/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          export PATH="$HOME/.local/bin:$PATH"
+          suiup install sui -y
+          suiup install walrus -y
+          suiup install site-builder -y
+          suiup install mvr -y
+
+      - name: Setup Sui wallet
+        run: |
+          mkdir -p ~/.sui/sui_config
+          echo '${{ secrets.SUI_KEYSTORE_TESTNET }}' > ~/.sui/sui_config/sui.keystore
+          cat > ~/.sui/sui_config/client.yaml << EOF
+          keystore:
+            File: $HOME/.sui/sui_config/sui.keystore
+          envs:
+            - alias: testnet
+              rpc: "https://fullnode.testnet.sui.io:443"
+              ws: ~
+          active_env: testnet
+          active_address: "${{ vars.SUI_ADDRESS_TESTNET }}"
+          EOF
+
+      - name: Setup Walrus config
+        run: |
+          mkdir -p ~/.config/walrus
+          curl -sSL https://raw.githubusercontent.com/MystenLabs/walrus/main/setup/client_config.yaml \
+            -o ~/.config/walrus/client_config.yaml
+
+      - uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+
+      # ── Check for contract changes ───────────────────────────
+      - name: Check for contract changes
+        id: contract-diff
+        run: |
+          CHANGED=$(git diff --name-only origin/main..origin/${{ env.TEST_BRANCH }} -- move/walrus_site/sources/)
+          if [[ -n "$CHANGED" ]]; then
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+            echo "Contract sources changed:"
+            echo "$CHANGED"
+          else
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo "No contract changes — will use existing testnet package"
+          fi
+
+      # ── Phase A: Publish fresh package (only when contract changed) ──
+      - name: "Phase A: Publish Move package (main)"
+        if: steps.contract-diff.outputs.has_changes == 'true'
+        id: publish-pkg
+        run: |
+          echo "Publishing walrus_site package from main..."
+          PUBLISH_OUTPUT=$(MVR_FALLBACK_NETWORK=testnet sui client publish \
+            --gas-budget 500000000 --json \
+            worktrees/main/move/walrus_site) || {
+            echo "$PUBLISH_OUTPUT"
+            exit 1
+          }
+
+          PACKAGE_V1=$(echo "$PUBLISH_OUTPUT" \
+            | jq -r '.objectChanges[] | select(.type == "published") | .packageId')
+          UPGRADE_CAP=$(echo "$PUBLISH_OUTPUT" \
+            | jq -r '.objectChanges[] | select(.type == "created" and (.objectType | contains("UpgradeCap"))) | .objectId')
+
+          if [[ -z "$PACKAGE_V1" || "$PACKAGE_V1" == "null" ]]; then
+            echo "::error::Failed to extract package ID"
+            echo "$PUBLISH_OUTPUT"
+            exit 1
+          fi
+
+          echo "package_v1=$PACKAGE_V1" >> "$GITHUB_OUTPUT"
+          echo "upgrade_cap=$UPGRADE_CAP" >> "$GITHUB_OUTPUT"
+          echo "Published package V1: $PACKAGE_V1"
+          echo "UpgradeCap: $UPGRADE_CAP"
+
+      - name: "Phase A: Set package IDs"
+        id: packages
+        run: |
+          if [[ "${{ steps.contract-diff.outputs.has_changes }}" == "true" ]]; then
+            echo "package_v1=${{ steps.publish-pkg.outputs.package_v1 }}" >> "$GITHUB_OUTPUT"
+            echo "upgrade_cap=${{ steps.publish-pkg.outputs.upgrade_cap }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "package_v1=${{ env.EXISTING_SITE_PACKAGE }}" >> "$GITHUB_OUTPUT"
+            echo "upgrade_cap=" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── Phase B: Publish site from main + verify ─────────────
+      - name: "Phase B: Publish snake (main site-builder)"
+        id: publish-site-a
+        run: |
+          cat > /tmp/sites-config-v1.yaml << EOF
+          package: ${{ steps.packages.outputs.package_v1 }}
+          portal: ""
+          general:
+            walrus_context: testnet
+            gas_budget: 500000000
+          staking_object: ${{ env.STAKING_OBJECT }}
+          EOF
+
+          OUTPUT=$(site-builder --config /tmp/sites-config-v1.yaml \
+            publish worktrees/main/examples/snake --epochs 2 2>&1) || {
+            echo "$OUTPUT"
+            exit 1
+          }
+          echo "$OUTPUT"
+
+          SITE_A_OID=$(echo "$OUTPUT" | grep -oE 'object ID: 0x[0-9a-f]+' | head -1 | sed 's/object ID: //')
+          SITE_A_B36=$(echo "$OUTPUT" | grep -oE 'http://[^.]+\.localhost' | head -1 | sed 's|http://||;s|\.localhost||')
+
+          echo "site_a_oid=$SITE_A_OID" >> "$GITHUB_OUTPUT"
+          echo "site_a_b36=$SITE_A_B36" >> "$GITHUB_OUTPUT"
+          echo "Published SITE_A: $SITE_A_OID (b36: $SITE_A_B36)"
+
+      - name: "Phase B: Install portal deps (main)"
+        run: cd worktrees/main/portal && bun install
+
+      - name: "Phase B: Start portal (main)"
+        run: |
+          cat > /tmp/portal-config-main.yaml << EOF
+          network: testnet
+          site_package: "${{ steps.packages.outputs.package_v1 }}"
+          landing_page_oid_b36: "${{ steps.publish-site-a.outputs.site_a_b36 }}"
+          domain_name_length: 21
+          b36_domain_resolution: true
+          enable_allowlist: false
+          enable_blocklist: false
+          rpc_urls:
+            - url: https://fullnode.testnet.sui.io:443
+              retries: 2
+              metric: 100
+          aggregator_urls:
+            - url: ${{ env.AGGREGATOR }}
+              retries: 3
+              metric: 100
+          EOF
+
+          cd worktrees/main/portal
+          PORTAL_CONFIG=/tmp/portal-config-main.yaml bun run server &
+          echo $! > /tmp/portal.pid
+          for i in $(seq 1 60); do
+            curl -s http://localhost:${{ env.PORTAL_PORT }} > /dev/null 2>&1 && break
+            sleep 2
+          done
+          if ! curl -s http://localhost:${{ env.PORTAL_PORT }} > /dev/null 2>&1; then
+            echo "::error::Portal failed to start on port ${{ env.PORTAL_PORT }} after 120s"
+            exit 1
+          fi
+
+      - name: "Phase B: Verify SITE_A (main portal)"
+        run: |
+          worktrees/main/scripts/verify-snake-site.sh \
+            "http://${{ steps.publish-site-a.outputs.site_a_b36 }}.localhost:${{ env.PORTAL_PORT }}"
+
+      - name: "Phase B: Stop portal"
+        if: always()
+        run: |
+          kill $(cat /tmp/portal.pid) 2>/dev/null || true
+          sleep 1
+          fuser -k ${{ env.PORTAL_PORT }}/tcp 2>/dev/null || true
+
+      # ── Phase C: Upgrade package (only when contract changed) ──
+      - name: "Phase C: Patch Published.toml for fresh package"
+        if: steps.contract-diff.outputs.has_changes == 'true'
+        run: |
+          # The test-branch's Published.toml references the original testnet
+          # package. Replace it with the fresh package from Phase A so the
+          # upgrade bytecode embeds the correct package address.
+          PACKAGE_V1="${{ steps.packages.outputs.package_v1 }}"
+          sed -i "/^\[published\.testnet\]/,/^\[/ {
+            s|published-at = \".*\"|published-at = \"$PACKAGE_V1\"|
+            s|original-id = \".*\"|original-id = \"$PACKAGE_V1\"|
+          }" move/walrus_site/Published.toml
+          echo "Patched Published.toml testnet entry to $PACKAGE_V1"
+
+      - name: "Phase C: Upgrade contract (test-branch)"
+        if: steps.contract-diff.outputs.has_changes == 'true'
+        id: upgrade
+        run: |
+          UPGRADE_OUTPUT=$(MVR_FALLBACK_NETWORK=testnet sui client upgrade \
+            --upgrade-capability ${{ steps.packages.outputs.upgrade_cap }} \
+            --gas-budget 500000000 \
+            --json \
+            move/walrus_site) || {
+            echo "$UPGRADE_OUTPUT"
+            exit 1
+          }
+
+          PACKAGE_V2=$(echo "$UPGRADE_OUTPUT" \
+            | jq -r '.objectChanges[] | select(.type == "published") | .packageId')
+
+          if [[ -z "$PACKAGE_V2" || "$PACKAGE_V2" == "null" ]]; then
+            echo "::error::Failed to extract upgraded package ID"
+            echo "$UPGRADE_OUTPUT"
+            exit 1
+          fi
+
+          echo "package_v2=$PACKAGE_V2" >> "$GITHUB_OUTPUT"
+          echo "Upgraded! New package: $PACKAGE_V2"
+
+      - name: "Phase C: Set V2 package"
+        id: pkg-v2
+        run: |
+          if [[ "${{ steps.contract-diff.outputs.has_changes }}" == "true" ]]; then
+            echo "package_v2=${{ steps.upgrade.outputs.package_v2 }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "package_v2=${{ env.EXISTING_SITE_PACKAGE }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── Phase D: Publish with test-branch, verify with main portal ──
+      - name: "Phase D: Publish snake (test-branch site-builder)"
+        id: publish-site-b
+        run: |
+          cat > /tmp/sites-config-v2.yaml << EOF
+          package: ${{ steps.pkg-v2.outputs.package_v2 }}
+          portal: ""
+          general:
+            walrus_context: testnet
+            gas_budget: 500000000
+          staking_object: ${{ env.STAKING_OBJECT }}
+          EOF
+
+          OUTPUT=$(/tmp/test-branch-bin/site-builder \
+            --config /tmp/sites-config-v2.yaml \
+            publish examples/snake --epochs 2 2>&1) || {
+            echo "$OUTPUT"
+            exit 1
+          }
+          echo "$OUTPUT"
+
+          SITE_B_OID=$(echo "$OUTPUT" | grep -oE 'object ID: 0x[0-9a-f]+' | head -1 | sed 's/object ID: //')
+          SITE_B_B36=$(echo "$OUTPUT" | grep -oE 'http://[^.]+\.localhost' | head -1 | sed 's|http://||;s|\.localhost||')
+
+          echo "site_b_oid=$SITE_B_OID" >> "$GITHUB_OUTPUT"
+          echo "site_b_b36=$SITE_B_B36" >> "$GITHUB_OUTPUT"
+          echo "Published SITE_B: $SITE_B_OID (b36: $SITE_B_B36)"
+
+      - name: "Phase D: Start portal (main, V1 package)"
+        run: |
+          cd worktrees/main/portal
+          PORTAL_CONFIG=/tmp/portal-config-main.yaml bun run server &
+          echo $! > /tmp/portal.pid
+          for i in $(seq 1 60); do
+            curl -s http://localhost:${{ env.PORTAL_PORT }} > /dev/null 2>&1 && break
+            sleep 2
+          done
+          if ! curl -s http://localhost:${{ env.PORTAL_PORT }} > /dev/null 2>&1; then
+            echo "::error::Portal failed to start on port ${{ env.PORTAL_PORT }} after 120s"
+            exit 1
+          fi
+
+      - name: "Phase D: Verify SITE_A still works (backward compat)"
+        run: |
+          worktrees/main/scripts/verify-snake-site.sh \
+            "http://${{ steps.publish-site-a.outputs.site_a_b36 }}.localhost:${{ env.PORTAL_PORT }}"
+
+      - name: "Phase D: Verify SITE_B (main portal, new site)"
+        run: |
+          worktrees/main/scripts/verify-snake-site.sh \
+            "http://${{ steps.publish-site-b.outputs.site_b_b36 }}.localhost:${{ env.PORTAL_PORT }}"
+
+      - name: "Phase D: Stop portal"
+        if: always()
+        run: |
+          kill $(cat /tmp/portal.pid) 2>/dev/null || true
+          sleep 1
+          fuser -k ${{ env.PORTAL_PORT }}/tcp 2>/dev/null || true
+
+      # ── Phase E: Test-branch portal ──────────────────────────
+      - name: "Phase E: Install portal deps (test-branch)"
+        run: cd portal && bun install
+
+      - name: "Phase E: Start portal (test-branch)"
+        run: |
+          cat > /tmp/portal-config-test.yaml << EOF
+          network: testnet
+          original_package_id: "${{ steps.packages.outputs.package_v1 }}"
+          landing_page_oid_b36: "${{ steps.publish-site-b.outputs.site_b_b36 }}"
+          domain_name_length: 21
+          b36_domain_resolution: true
+          enable_allowlist: false
+          enable_blocklist: false
+          rpc_urls:
+            - url: https://fullnode.testnet.sui.io:443
+              retries: 2
+              metric: 100
+          aggregator_urls:
+            - url: ${{ env.AGGREGATOR }}
+              retries: 3
+              metric: 100
+          EOF
+
+          cd portal
+          PORTAL_CONFIG=/tmp/portal-config-test.yaml bun run server &
+          echo $! > /tmp/portal.pid
+          for i in $(seq 1 60); do
+            curl -s http://localhost:${{ env.PORTAL_PORT }} > /dev/null 2>&1 && break
+            sleep 2
+          done
+          if ! curl -s http://localhost:${{ env.PORTAL_PORT }} > /dev/null 2>&1; then
+            echo "::error::Portal failed to start on port ${{ env.PORTAL_PORT }} after 120s"
+            exit 1
+          fi
+
+      - name: "Phase E: Verify SITE_A (test-branch portal, old site)"
+        run: |
+          worktrees/main/scripts/verify-snake-site.sh \
+            "http://${{ steps.publish-site-a.outputs.site_a_b36 }}.localhost:${{ env.PORTAL_PORT }}"
+
+      - name: "Phase E: Verify SITE_B (test-branch portal, new site)"
+        run: |
+          ./scripts/verify-snake-site.sh \
+            "http://${{ steps.publish-site-b.outputs.site_b_b36 }}.localhost:${{ env.PORTAL_PORT }}"
+
+      - name: "Phase E: Stop portal"
+        if: always()
+        run: |
+          kill $(cat /tmp/portal.pid) 2>/dev/null || true
+          sleep 1
+          fuser -k ${{ env.PORTAL_PORT }}/tcp 2>/dev/null || true
+
+      # ── Cleanup ──────────────────────────────────────────────
+      - name: Destroy testnet sites
+        if: always()
+        run: |
+          site-builder --config /tmp/sites-config-v1.yaml \
+            destroy ${{ steps.publish-site-a.outputs.site_a_oid }} 2>&1 || true
+          /tmp/test-branch-bin/site-builder --config /tmp/sites-config-v2.yaml \
+            destroy ${{ steps.publish-site-b.outputs.site_b_oid }} 2>&1 || true
+
+      - name: Cleanup worktree
+        if: always()
+        run: git worktree remove worktrees/main 2>/dev/null || true

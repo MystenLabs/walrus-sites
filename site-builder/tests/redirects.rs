@@ -23,22 +23,20 @@ use localnode::{
 };
 
 fn make_redirects(entries: &[(&str, &str, u16)]) -> Redirects {
-    Redirects {
-        redirect_list: VecMap(
-            entries
-                .iter()
-                .map(|(path, location, status_code)| {
-                    (
-                        path.to_string(),
-                        Redirect {
-                            location: location.to_string(),
-                            status_code: *status_code,
-                        },
-                    )
-                })
-                .collect(),
-        ),
-    }
+    Redirects(VecMap(
+        entries
+            .iter()
+            .map(|(path, location, status_code)| {
+                (
+                    path.to_string(),
+                    Redirect {
+                        location: location.to_string(),
+                        status_code: *status_code,
+                    },
+                )
+            })
+            .collect(),
+    ))
 }
 
 fn write_ws_resources(
@@ -96,9 +94,9 @@ async fn publish_with_redirects() -> anyhow::Result<()> {
 
     let on_chain_redirects = cluster.site_redirects(site_id).await?;
     let on_chain_redirects = on_chain_redirects.expect("redirects should exist on chain");
-    assert_eq!(on_chain_redirects.redirect_list.len(), 2);
+    assert_eq!(on_chain_redirects.0.len(), 2);
 
-    let map: &BTreeMap<_, _> = &on_chain_redirects.redirect_list.0;
+    let map: &BTreeMap<_, _> = &on_chain_redirects.0 .0;
     let old_redirect = &map["/old"];
     assert_eq!(old_redirect.location, "https://example.com/new");
     assert_eq!(old_redirect.status_code, 301);
@@ -157,9 +155,9 @@ async fn deploy_update_redirects() -> anyhow::Result<()> {
 
     // Verify initial redirects.
     let r = cluster.site_redirects(site_id).await?.unwrap();
-    assert_eq!(r.redirect_list.len(), 2);
-    assert_eq!(r.redirect_list.0["/a"].status_code, 301);
-    assert_eq!(r.redirect_list.0["/b"].status_code, 302);
+    assert_eq!(r.0.len(), 2);
+    assert_eq!(r.0 .0["/a"].status_code, 301);
+    assert_eq!(r.0 .0["/b"].status_code, 302);
 
     // Update: change /a destination, add /c, remove /b.
     let updated_redirects =
@@ -180,10 +178,10 @@ async fn deploy_update_redirects() -> anyhow::Result<()> {
     assert_eq!(site_id, *updated_site.id.object_id());
 
     let r = cluster.site_redirects(site_id).await?.unwrap();
-    assert_eq!(r.redirect_list.len(), 2);
-    assert_eq!(r.redirect_list.0["/a"].location, "/new-target-a");
-    assert_eq!(r.redirect_list.0["/c"].status_code, 307);
-    assert!(!r.redirect_list.0.contains_key("/b"));
+    assert_eq!(r.0.len(), 2);
+    assert_eq!(r.0 .0["/a"].location, "/new-target-a");
+    assert_eq!(r.0 .0["/c"].status_code, 307);
+    assert!(!r.0 .0.contains_key("/b"));
 
     Ok(())
 }
@@ -324,9 +322,9 @@ async fn deploy_add_redirects_to_existing_site() -> anyhow::Result<()> {
 
     let r = cluster.site_redirects(site_id).await?;
     let r = r.expect("redirects should now exist on chain");
-    assert_eq!(r.redirect_list.len(), 1);
-    assert_eq!(r.redirect_list.0["/go"].location, "https://example.com");
-    assert_eq!(r.redirect_list.0["/go"].status_code, 303);
+    assert_eq!(r.0.len(), 1);
+    assert_eq!(r.0 .0["/go"].location, "https://example.com");
+    assert_eq!(r.0 .0["/go"].status_code, 303);
 
     Ok(())
 }
@@ -385,7 +383,7 @@ async fn publish_with_redirects_and_routes() -> anyhow::Result<()> {
 
     let on_chain_redirects = cluster.site_redirects(site_id).await?;
     let on_chain_redirects = on_chain_redirects.expect("redirects should exist on chain");
-    assert_eq!(on_chain_redirects.redirect_list.len(), 2);
+    assert_eq!(on_chain_redirects.0.len(), 2);
 
     Ok(())
 }
@@ -411,22 +409,20 @@ async fn publish_with_many_redirects() -> anyhow::Result<()> {
             if i % 2 == 0 { 301 } else { 302 },
         ));
     }
-    let redirects = Redirects {
-        redirect_list: VecMap(
-            owned_entries
-                .iter()
-                .map(|(path, location, code)| {
-                    (
-                        path.clone(),
-                        Redirect {
-                            location: location.clone(),
-                            status_code: *code,
-                        },
-                    )
-                })
-                .collect(),
-        ),
-    };
+    let redirects = Redirects(VecMap(
+        owned_entries
+            .iter()
+            .map(|(path, location, code)| {
+                (
+                    path.clone(),
+                    Redirect {
+                        location: location.clone(),
+                        status_code: *code,
+                    },
+                )
+            })
+            .collect(),
+    ));
 
     let ws_dir = tempfile::tempdir()?;
     let ws_path = write_ws_resources(
@@ -455,7 +451,7 @@ async fn publish_with_many_redirects() -> anyhow::Result<()> {
 
     let on_chain_redirects = cluster.site_redirects(site_id).await?;
     let on_chain_redirects = on_chain_redirects.expect("redirects should exist on chain");
-    assert_eq!(on_chain_redirects.redirect_list.len(), N_REDIRECTS);
+    assert_eq!(on_chain_redirects.0.len(), N_REDIRECTS);
 
     Ok(())
 }

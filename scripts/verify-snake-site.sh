@@ -4,7 +4,8 @@
 #
 # Verify a published snake example site is working correctly.
 #
-# Checks: index loads, custom headers, ignored files are 404, routes work.
+# Checks: index loads, custom headers, ignored files are 404, routes work,
+# redirects return correct status and Location header.
 #
 # Usage: verify-snake-site.sh <base-url>
 # Example: verify-snake-site.sh http://localhost:3000
@@ -42,6 +43,19 @@ assert_header() {
         pass "$label"
     else
         fail "$label (got '$value', expected to contain '$expected')"
+    fi
+}
+
+assert_redirect() {
+    local path="$1" expected_status="$2" expected_location="$3" label="$4"
+    local headers status location
+    headers=$(curl -s -D- -o /dev/null --max-time 10 "${BASE_URL}${path}" 2>/dev/null) || headers=""
+    status=$(echo "$headers" | head -1 | grep -oE '[0-9]{3}') || status="000"
+    location=$(echo "$headers" | grep -i "^location:" | sed 's/^[^:]*: //' | tr -d '\r') || location=""
+    if [[ "$status" == "$expected_status" && "$location" == "$expected_location" ]]; then
+        pass "$label"
+    else
+        fail "$label (got $status -> '$location', expected $expected_status -> '$expected_location')"
     fi
 }
 
@@ -84,6 +98,15 @@ assert_status "/private/data.txt" 404 "GET /private/data.txt returns 404 (ignore
 log "Routes"
 assert_status "/path/anything" 200 "GET /path/anything returns 200 (route match)"
 assert_body_contains "/path/anything" "<svg" "Route /path/* serves SVG content"
+
+# 6. Redirects
+log "Redirects"
+assert_redirect "/old-game" 308 "/index.html" \
+    "GET /old-game returns 308 -> /index.html"
+assert_redirect "/walrus-docs" 301 "https://docs.wal.app" \
+    "GET /walrus-docs returns 301 -> https://docs.wal.app"
+assert_redirect "/redirects/any/path" 302 "/walrus.svg" \
+    "GET /redirects/any/path returns 302 -> /walrus.svg (glob **/*)"
 
 # Summary
 echo ""
