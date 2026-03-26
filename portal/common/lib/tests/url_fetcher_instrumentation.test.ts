@@ -77,16 +77,14 @@ describe("UrlFetcher records aggregator timing with mock servers", () => {
         expect(recordTimeSpy).toHaveBeenCalledTimes(1);
 
         // Verify call parameters
-        const [duration, metadata] = recordTimeSpy.mock.calls[0];
+        const [duration, siteId] = recordTimeSpy.mock.calls[0];
 
         // Duration should be a non-negative number
         expect(duration).toBeTypeOf("number");
         expect(duration).toBeGreaterThanOrEqual(0);
 
-        // Metadata should have correct structure
-        expect(metadata.siteId).toBe(siteObjectId);
-        expect(metadata.path).toBe(path);
-        expect(metadata.blobOrPatchId).toBeTypeOf("string");
+        // Should pass siteId directly (not wrapped in an object).
+        expect(siteId).toBe(siteObjectId);
     });
 });
 

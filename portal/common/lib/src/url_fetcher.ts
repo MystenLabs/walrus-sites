@@ -270,11 +270,7 @@ export class UrlFetcher {
             };
         }
 
-        instrumentationFacade.recordAggregatorTime(aggregatorResult.elapsedMs, {
-            siteId: objectId,
-            path,
-            blobOrPatchId,
-        });
+        instrumentationFacade.recordAggregatorTime(aggregatorResult.elapsedMs, objectId);
 
         const body = aggregatorResult.body;
         // Verify the integrity of the aggregator response by hashing
