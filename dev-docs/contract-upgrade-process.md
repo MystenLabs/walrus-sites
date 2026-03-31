@@ -73,8 +73,8 @@ testnet package directly.
 1. Main's site-builder can publish a site and main's portal can serve it (baseline).
 2. The contract upgrade from the PR branch succeeds.
 3. The PR branch's site-builder can publish a site against the upgraded contract.
-4. Main's portal still serves both old and new sites after the upgrade (backward compatibility).
-5. The PR branch's portal serves both old and new sites (forward compatibility).
+4. Main's portal still serves both old and new sites after the upgrade (forward compatibility).
+5. The PR branch's portal serves both old and new sites (backward compatibility).
 
 When the integration branch has all components ready, this workflow should pass. A failure
 indicates that the upgrade breaks an existing site, or that a component isn't compatible with
