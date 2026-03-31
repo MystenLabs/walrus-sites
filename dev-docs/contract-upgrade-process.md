@@ -61,20 +61,8 @@ main
 ## E2E Upgrade Workflow
 
 The `e2e-upgrade.yml` workflow runs automatically on PRs that touch the contract, site-builder,
-portal, or snake example. It verifies the upgrade path end-to-end on testnet.
-
-When Move sources changed between the PR branch and `main`, the workflow publishes a fresh
-package from `main`, upgrades it from the PR branch, and tests both old and new sites with both
-portals. When there are no contract changes, it skips the publish/upgrade and uses the existing
-testnet package directly.
-
-**What it tests:**
-
-1. Main's site-builder can publish a site and main's portal can serve it (baseline).
-2. The contract upgrade from the PR branch succeeds.
-3. The PR branch's site-builder can publish a site against the upgraded contract.
-4. Main's portal still serves both old and new sites after the upgrade (forward compatibility).
-5. The PR branch's portal serves both old and new sites (backward compatibility).
+portal, or snake example. It verifies the upgrade path end-to-end on testnet — see the workflow
+file header for details on what it tests.
 
 When the integration branch has all components ready, this workflow should pass. A failure
 indicates that the upgrade breaks an existing site, or that a component isn't compatible with
