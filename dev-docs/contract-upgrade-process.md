@@ -16,9 +16,9 @@ once all components are ready.
 ```
 main
  └── feat/<feature>                    ← integration branch (merges to main only when everything is ready)
-      ├── feat/<feature>-contract      ← contract changes, reviewed & squash-merged into integration
-      ├── feat/<feature>-site-builder  ← site-builder changes, branched from integration
-      └── feat/<feature>-portal        ← portal changes, branched from site-builder
+      ├── feat/<feature>-contract      ← contract changes
+      ├── feat/<feature>-site-builder  ← site-builder changes
+      └── feat/<feature>-portal        ← portal changes
 ```
 
 ### Example: Redirects Feature
@@ -27,7 +27,6 @@ main
 main
  └── feat/redirects                    ← integration branch
       ├── feat/redirects-contract      ← contract: new Redirects type, site.move functions
-      │                                   (reviewed, squash-merged into feat/redirects via PR #682)
       ├── feat/redirects-site-builder  ← site-builder: redirect config, PTB building, diffing
       └── feat/redirects-portal        ← portal: serve redirects to end users
 ```
@@ -43,6 +42,10 @@ main
    branch, rebase onto the integration branch.
 4. **Portal changes** — branch `feat/<feature>-portal` from the site-builder branch, implement
    serving logic.
+> 💡 When implementing site-builder and portal changes, consider how the new code behaves against
+> the old contract version. For more, see [Decoupling Release from Contract
+> Upgrade](#decoupling-release-from-contract-upgrade).
+
 5. **Merge upward** — once each layer is complete and reviewed, merge into the parent branch.
 6. **Merge to `main`** — only when the full stack (contract + site-builder + portal) is complete
    and integration-tested together.
@@ -108,6 +111,10 @@ This produces a base64-encoded transaction that can be signed offline by the Upg
 
 ## Creating the Release
 
+> 💡 If the new site-builder and portal don't handle the old contract version gracefully, the
+> contract must be upgraded on-chain before releasing them. For more, see [Decoupling Release from
+> Contract Upgrade](#decoupling-release-from-contract-upgrade).
+
 After the upgrade transaction has been executed on both testnet and mainnet, follow the standard
 release process. The release tag is needed for the next step (updating PackageInfo).
 
@@ -146,3 +153,16 @@ Replace:
 | mainnet | `0x78969731e1f29f996e24261a13dd78c6a0932bc099aa02e27965bbfb1a643d86` |
 
 This produces a base64-encoded transaction that can be signed offline by the PackageInfo owner.
+
+## Lessons Learned
+
+### Decoupling Release from Contract Upgrade
+
+Currently, the release of the new site-builder and portal is blocked by the contract upgrade.
+The new site-builder accepts new configuration (e.g., `redirects` in `ws-resources.json`) but
+fails when calling contract functions that don't exist in the old on-chain version. This means
+the contract must be upgraded on both networks before the release.
+
+Ideally, the new site-builder and portal should be able to run against the old contract version
+without failing. Possible approaches include detecting the on-chain package version at runtime
+or using feature flags.
