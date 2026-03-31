@@ -109,6 +109,18 @@ Replace:
 
 This produces a base64-encoded transaction that can be signed offline by the UpgradeCap owner.
 
+## Updating Configuration Files
+
+After the upgrade transaction has been executed, update the configuration files with the new
+package ID. The files that need updating depend on what changed in the contract:
+
+- `sites-config.yaml` — site-builder config with `package` ID per network
+- `sites-config.testnet-singleton.yaml` / `sites-config.mainnet-singleton.yaml` — singleton
+  variants
+- `portal/server/portal-config.*.example.yaml` — portal config examples, if affected
+
+Commit these changes to `main` before cutting the release.
+
 ## Creating the Release
 
 > 💡 If the new site-builder and portal don't handle the old contract version gracefully, the
