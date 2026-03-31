@@ -94,8 +94,10 @@ sui client upgrade \
   move/walrus_site
 ```
 
-Replace `<NETWORK>` with `testnet` or `mainnet`, `<UPGRADE_CAP_OWNER>` with the address that
-owns the UpgradeCap, and `<UPGRADE_CAP>` with the UpgradeCap object ID.
+Replace:
+- `<NETWORK>` — `testnet` or `mainnet`
+- `<UPGRADE_CAP_OWNER>` — the address that owns the UpgradeCap
+- `<UPGRADE_CAP>` — the UpgradeCap object ID (see table below)
 
 | Network | UpgradeCap |
 |---------|------------|
@@ -103,3 +105,44 @@ owns the UpgradeCap, and `<UPGRADE_CAP>` with the UpgradeCap object ID.
 | mainnet | `0x1cab3c76c48c023b60db0a56696d197569f006e406fb9627a8a8d1a119b1c23c` |
 
 This produces a base64-encoded transaction that can be signed offline by the UpgradeCap owner.
+
+## Creating the Release
+
+After the upgrade transaction has been executed on both testnet and mainnet, follow the standard
+release process. The release tag is needed for the next step (updating PackageInfo).
+
+## Updating the PackageInfo with the new contract version
+
+After the release is published, update the MVR `PackageInfo` objects so that the on-chain
+package version points to the correct Git source. This allows MVR to resolve the source code
+for the published package.
+
+Generate the unsigned transaction:
+
+```bash
+sui client switch --env <NETWORK>
+sui client ptb \
+  --move-call @mvr/metadata::git::new \
+    "https://github.com/MystenLabs/walrus-sites" \
+    "move/walrus_site" \
+    "<RELEASE_TAG>" \
+  --assign git \
+  --move-call @mvr/metadata::package_info::set_git_versioning \
+    <PACKAGE_INFO> \
+    <ON_CHAIN_VERSION> \
+    git \
+  --serialize-unsigned-transaction
+```
+
+Replace:
+- `<NETWORK>` — `testnet` or `mainnet`
+- `<RELEASE_TAG>` — the Git release tag (e.g., `mainnet-v2.8.0`)
+- `<PACKAGE_INFO>` — the PackageInfo object ID (see table below)
+- `<ON_CHAIN_VERSION>` — the on-chain package version number (increments with each upgrade)
+
+| Network | PackageInfo |
+|---------|-------------|
+| testnet | `0x97be021af63c8b6c5e668f4d398b3a7457ff4c87cf9c347a1da3618e6a0223e4` |
+| mainnet | `0x78969731e1f29f996e24261a13dd78c6a0932bc099aa02e27965bbfb1a643d86` |
+
+This produces a base64-encoded transaction that can be signed offline by the PackageInfo owner.
