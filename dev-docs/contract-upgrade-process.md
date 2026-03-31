@@ -114,6 +114,7 @@ This produces a base64-encoded transaction that can be signed offline by the Upg
 After the upgrade transaction has been executed, update the configuration files with the new
 package ID. The files that need updating depend on what changed in the contract:
 
+- `move/walrus_site/Published.toml` — `published-at` and `version` per network
 - `sites-config.yaml` — site-builder config with `package` ID per network
 - `sites-config.testnet-singleton.yaml` / `sites-config.mainnet-singleton.yaml` — singleton
   variants
