@@ -42,9 +42,9 @@ main
    branch, rebase onto the integration branch.
 4. **Portal changes** — branch `feat/<feature>-portal` from the site-builder branch, implement
    serving logic.
-> 💡 When implementing site-builder and portal changes, consider how the new code behaves against
-> the old contract version. For more, see [Decoupling Release from Contract
-> Upgrade](#decoupling-release-from-contract-upgrade).
+> [!TIP]
+> Code that calls new contract functions should be behind a feature flag so that the
+> site-builder and portal can be released before the contract is upgraded.
 
 5. **Merge upward** — once each layer is complete and reviewed, merge into the parent branch.
 6. **Merge to `main`** — only when the full stack (contract + site-builder + portal) is complete
@@ -108,22 +108,14 @@ package ID. The files that need updating depend on what changed in the contract:
   variants
 - `portal/server/portal-config.*.example.yaml` — portal config examples, if affected
 
-Commit these changes to `main` before cutting the release.
-
-## Creating the Release
-
-> 💡 If the new site-builder and portal don't handle the old contract version gracefully, the
-> contract must be upgraded on-chain before releasing them. For more, see [Decoupling Release from
-> Contract Upgrade](#decoupling-release-from-contract-upgrade).
-
-After the upgrade transaction has been executed on both testnet and mainnet, follow the standard
-release process. The release tag is needed for the next step (updating PackageInfo).
+> [!IMPORTANT]
+> Remove feature flags for the new contract functions at this point.
 
 ## Updating the PackageInfo with the new contract version
 
-After the release is published, update the MVR `PackageInfo` objects so that the on-chain
-package version points to the correct Git source. This allows MVR to resolve the source code
-for the published package.
+After the next release that includes the configuration changes above, update the MVR `PackageInfo`
+objects so that the on-chain package version points to the correct Git source. This allows MVR to
+resolve the source code for the published package.
 
 Generate the unsigned transaction:
 
@@ -155,15 +147,3 @@ Replace:
 
 This produces a base64-encoded transaction that can be signed offline by the PackageInfo owner.
 
-## Lessons Learned
-
-### Decoupling Release from Contract Upgrade
-
-Currently, the release of the new site-builder and portal is blocked by the contract upgrade.
-The new site-builder accepts new configuration (e.g., `redirects` in `ws-resources.json`) but
-fails when calling contract functions that don't exist in the old on-chain version. This means
-the contract must be upgraded on both networks before the release.
-
-Ideally, the new site-builder and portal should be able to run against the old contract version
-without failing. Possible approaches include detecting the on-chain package version at runtime
-or using feature flags.
