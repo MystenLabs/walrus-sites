@@ -2,7 +2,7 @@ contexts:
   testnet:
     # module: site
     # portal: wal.app
-    package: 0xf99aee9f21493e1590e7e5a9aea6f343a1f381031a04a732724871fc294be799
+    package: 0x22b8c1496650eb45fbcca0f8f37fae77ed33b7d4eaab4da5f0bb9b62a8708dcb
     staking_object: 0xbe46180321c30aab2f8b3501e24048377287fa708018a5b7c2792b35fe339ee3
     general:
        wallet_env: testnet

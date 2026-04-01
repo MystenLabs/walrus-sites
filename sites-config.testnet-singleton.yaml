@@ -2,7 +2,7 @@
 
 # module: site
 # portal: wal.app
-package: 0xf99aee9f21493e1590e7e5a9aea6f343a1f381031a04a732724871fc294be799
+package: 0x22b8c1496650eb45fbcca0f8f37fae77ed33b7d4eaab4da5f0bb9b62a8708dcb
 general:
    wallet_env: testnet
    walrus_context: testnet # Assumes a Walrus CLI setup with a multi-config containing the "testnet" context.
