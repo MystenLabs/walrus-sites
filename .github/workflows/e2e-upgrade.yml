@@ -3,14 +3,10 @@ name: "E2E: Upgrade Test"
 # Tests that contract upgrades don't break existing sites and that portals
 # (old and new) work with upgraded contracts.
 #
-# When Move sources changed between main and test-branch:
-#   Publishes a fresh walrus_site package on testnet from main, publishes a
-#   snake site, upgrades the package from test-branch, publishes another snake
-#   site, then verifies both sites with both main and test-branch portals.
-#
-# When no Move changes:
-#   Uses the existing testnet package, publishes sites with main and
-#   test-branch site-builders, verifies with both portals.
+# Always publishes a fresh walrus_site package on testnet from main, publishes
+# a snake site, then verifies it. When Move sources differ between main and
+# the test branch, also upgrades the package and verifies both old and new
+# sites with both portals.
 
 on:
   pull_request:
@@ -34,8 +30,6 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   TEST_BRANCH: ${{ inputs.test-branch || github.head_ref || github.ref_name }}
-  # Existing testnet deployment — used when no contract changes
-  EXISTING_SITE_PACKAGE: "0xf99aee9f21493e1590e7e5a9aea6f343a1f381031a04a732724871fc294be799"
   STAKING_OBJECT: "0xbe46180321c30aab2f8b3501e24048377287fa708018a5b7c2792b35fe339ee3"
   AGGREGATOR: "https://aggregator.walrus-testnet.walrus.space"
   PORTAL_PORT: "3000"
@@ -183,12 +177,11 @@ jobs:
             echo "$CHANGED"
           else
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
-            echo "No contract changes — will use existing testnet package"
+            echo "No contract changes — will skip upgrade"
           fi
 
-      # ── Phase A: Publish fresh package (only when contract changed) ──
+      # ── Phase A: Publish fresh package from main ────────────
       - name: "Phase A: Publish Move package (main)"
-        if: steps.contract-diff.outputs.has_changes == 'true'
         id: publish-pkg
         run: |
           echo "Publishing walrus_site package from main..."
@@ -215,23 +208,12 @@ jobs:
           echo "Published package V1: $PACKAGE_V1"
           echo "UpgradeCap: $UPGRADE_CAP"
 
-      - name: "Phase A: Set package IDs"
-        id: packages
-        run: |
-          if [[ "${{ steps.contract-diff.outputs.has_changes }}" == "true" ]]; then
-            echo "package_v1=${{ steps.publish-pkg.outputs.package_v1 }}" >> "$GITHUB_OUTPUT"
-            echo "upgrade_cap=${{ steps.publish-pkg.outputs.upgrade_cap }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "package_v1=${{ env.EXISTING_SITE_PACKAGE }}" >> "$GITHUB_OUTPUT"
-            echo "upgrade_cap=" >> "$GITHUB_OUTPUT"
-          fi
-
       # ── Phase B: Publish site from main + verify ─────────────
       - name: "Phase B: Publish snake (main site-builder)"
         id: publish-site-a
         run: |
           cat > /tmp/sites-config-v1.yaml << EOF
-          package: ${{ steps.packages.outputs.package_v1 }}
+          package: ${{ steps.publish-pkg.outputs.package_v1 }}
           portal: ""
           general:
             walrus_context: testnet
@@ -260,7 +242,7 @@ jobs:
         run: |
           cat > /tmp/portal-config-main.yaml << EOF
           network: testnet
-          site_package: "${{ steps.packages.outputs.package_v1 }}"
+          site_package: "${{ steps.publish-pkg.outputs.package_v1 }}"
           landing_page_oid_b36: "${{ steps.publish-site-a.outputs.site_a_b36 }}"
           domain_name_length: 21
           b36_domain_resolution: true
@@ -307,7 +289,7 @@ jobs:
           # The test-branch's Published.toml references the original testnet
           # package. Replace it with the fresh package from Phase A so the
           # upgrade bytecode embeds the correct package address.
-          PACKAGE_V1="${{ steps.packages.outputs.package_v1 }}"
+          PACKAGE_V1="${{ steps.publish-pkg.outputs.package_v1 }}"
           sed -i "/^\[published\.testnet\]/,/^\[/ {
             s|published-at = \".*\"|published-at = \"$PACKAGE_V1\"|
             s|original-id = \".*\"|original-id = \"$PACKAGE_V1\"|
@@ -319,7 +301,7 @@ jobs:
         id: upgrade
         run: |
           UPGRADE_OUTPUT=$(MVR_FALLBACK_NETWORK=testnet sui client upgrade \
-            --upgrade-capability ${{ steps.packages.outputs.upgrade_cap }} \
+            --upgrade-capability ${{ steps.publish-pkg.outputs.upgrade_cap }} \
             --gas-budget 500000000 \
             --json \
             move/walrus_site) || {
@@ -345,7 +327,7 @@ jobs:
           if [[ "${{ steps.contract-diff.outputs.has_changes }}" == "true" ]]; then
             echo "package_v2=${{ steps.upgrade.outputs.package_v2 }}" >> "$GITHUB_OUTPUT"
           else
-            echo "package_v2=${{ env.EXISTING_SITE_PACKAGE }}" >> "$GITHUB_OUTPUT"
+            echo "package_v2=${{ steps.publish-pkg.outputs.package_v1 }}" >> "$GITHUB_OUTPUT"
           fi
 
       # ── Phase D: Publish with test-branch, verify with main portal ──
@@ -415,7 +397,7 @@ jobs:
         run: |
           cat > /tmp/portal-config-test.yaml << EOF
           network: testnet
-          original_package_id: "${{ steps.packages.outputs.package_v1 }}"
+          original_package_id: "${{ steps.publish-pkg.outputs.package_v1 }}"
           landing_page_oid_b36: "${{ steps.publish-site-b.outputs.site_b_b36 }}"
           domain_name_length: 21
           b36_domain_resolution: true
