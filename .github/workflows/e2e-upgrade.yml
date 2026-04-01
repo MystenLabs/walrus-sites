@@ -187,6 +187,7 @@ jobs:
           echo "Publishing walrus_site package from main..."
           PUBLISH_OUTPUT=$(MVR_FALLBACK_NETWORK=testnet sui client test-publish \
             --gas-budget 500000000 --json \
+            --build-env testnet \
             --pubfile-path /tmp/e2e-published.toml \
             worktrees/main/move/walrus_site) || {
             echo "$PUBLISH_OUTPUT"
@@ -292,6 +293,7 @@ jobs:
             --upgrade-capability ${{ steps.publish-pkg.outputs.upgrade_cap }} \
             --gas-budget 500000000 \
             --json \
+            --build-env testnet \
             --pubfile-path /tmp/e2e-published.toml \
             move/walrus_site) || {
             echo "$UPGRADE_OUTPUT"
