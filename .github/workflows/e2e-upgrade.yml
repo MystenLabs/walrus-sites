@@ -184,11 +184,12 @@ jobs:
       - name: "Phase A: Publish Move package (main)"
         id: publish-pkg
         run: |
+          # Remove existing testnet entry so publish doesn't refuse
+          sed -i '/^\[published\.testnet\]/,/^\[/{ /^\[published\.testnet\]/d; /^\[/!d; }' \
+            worktrees/main/move/walrus_site/Published.toml
           echo "Publishing walrus_site package from main..."
-          PUBLISH_OUTPUT=$(MVR_FALLBACK_NETWORK=testnet sui client test-publish \
+          PUBLISH_OUTPUT=$(MVR_FALLBACK_NETWORK=testnet sui client publish \
             --gas-budget 500000000 --json \
-            --build-env testnet \
-            --pubfile-path /tmp/e2e-published.toml \
             worktrees/main/move/walrus_site) || {
             echo "$PUBLISH_OUTPUT"
             exit 1
@@ -285,16 +286,20 @@ jobs:
           fuser -k ${{ env.PORTAL_PORT }}/tcp 2>/dev/null || true
 
       # ── Phase C: Upgrade package (only when contract changed) ──
+      - name: "Phase C: Copy Published.toml from main"
+        if: steps.contract-diff.outputs.has_changes == 'true'
+        run: |
+          # Main's Published.toml was updated by Phase A's publish with V1's address
+          cp worktrees/main/move/walrus_site/Published.toml move/walrus_site/Published.toml
+
       - name: "Phase C: Upgrade contract (test-branch)"
         if: steps.contract-diff.outputs.has_changes == 'true'
         id: upgrade
         run: |
-          UPGRADE_OUTPUT=$(MVR_FALLBACK_NETWORK=testnet sui client test-upgrade \
+          UPGRADE_OUTPUT=$(MVR_FALLBACK_NETWORK=testnet sui client upgrade \
             --upgrade-capability ${{ steps.publish-pkg.outputs.upgrade_cap }} \
             --gas-budget 500000000 \
             --json \
-            --build-env testnet \
-            --pubfile-path /tmp/e2e-published.toml \
             move/walrus_site) || {
             echo "$UPGRADE_OUTPUT"
             exit 1
