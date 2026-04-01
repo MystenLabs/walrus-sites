@@ -6,10 +6,10 @@
 chain-id = "4c78adac"
 published-at = "0x22b8c1496650eb45fbcca0f8f37fae77ed33b7d4eaab4da5f0bb9b62a8708dcb"
 original-id = "0xf99aee9f21493e1590e7e5a9aea6f343a1f381031a04a732724871fc294be799"
-version = 1
+version = 2
 
 [published.mainnet]
 chain-id = "35834a8a"
-published-at = "0x26eb7ee8688da02c5f671679524e379f0b837a12f1d1d799f255b7eea260ad27"
+published-at = "0x5a0c509a659ba982f91ff1189872b8d528f8c02b5f6285a3931fc4c2869ccc9c"
 original-id = "0x26eb7ee8688da02c5f671679524e379f0b837a12f1d1d799f255b7eea260ad27"
-version = 1
+version = 2

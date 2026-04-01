@@ -17,7 +17,7 @@ contexts:
   mainnet:
     # module: site
     # portal: wal.app
-    package: 0x26eb7ee8688da02c5f671679524e379f0b837a12f1d1d799f255b7eea260ad27
+    package: 0x5a0c509a659ba982f91ff1189872b8d528f8c02b5f6285a3931fc4c2869ccc9c
     staking_object: 0x10b9d30c28448939ce6c4d6c6e0ffce4a7f8a4ada8248bdad09ef8b70e4a3904
     general:
        wallet_env: mainnet
