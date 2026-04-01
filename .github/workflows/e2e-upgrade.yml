@@ -187,6 +187,7 @@ jobs:
           echo "Publishing walrus_site package from main..."
           PUBLISH_OUTPUT=$(MVR_FALLBACK_NETWORK=testnet sui client publish \
             --gas-budget 500000000 --json \
+            --pubfile-path /tmp/e2e-published.toml \
             worktrees/main/move/walrus_site) || {
             echo "$PUBLISH_OUTPUT"
             exit 1
@@ -283,19 +284,6 @@ jobs:
           fuser -k ${{ env.PORTAL_PORT }}/tcp 2>/dev/null || true
 
       # ── Phase C: Upgrade package (only when contract changed) ──
-      - name: "Phase C: Patch Published.toml for fresh package"
-        if: steps.contract-diff.outputs.has_changes == 'true'
-        run: |
-          # The test-branch's Published.toml references the original testnet
-          # package. Replace it with the fresh package from Phase A so the
-          # upgrade bytecode embeds the correct package address.
-          PACKAGE_V1="${{ steps.publish-pkg.outputs.package_v1 }}"
-          sed -i "/^\[published\.testnet\]/,/^\[/ {
-            s|published-at = \".*\"|published-at = \"$PACKAGE_V1\"|
-            s|original-id = \".*\"|original-id = \"$PACKAGE_V1\"|
-          }" move/walrus_site/Published.toml
-          echo "Patched Published.toml testnet entry to $PACKAGE_V1"
-
       - name: "Phase C: Upgrade contract (test-branch)"
         if: steps.contract-diff.outputs.has_changes == 'true'
         id: upgrade
@@ -304,6 +292,7 @@ jobs:
             --upgrade-capability ${{ steps.publish-pkg.outputs.upgrade_cap }} \
             --gas-budget 500000000 \
             --json \
+            --pubfile-path /tmp/e2e-published.toml \
             move/walrus_site) || {
             echo "$UPGRADE_OUTPUT"
             exit 1
