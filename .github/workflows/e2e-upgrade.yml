@@ -185,7 +185,7 @@ jobs:
         id: publish-pkg
         run: |
           echo "Publishing walrus_site package from main..."
-          PUBLISH_OUTPUT=$(MVR_FALLBACK_NETWORK=testnet sui client publish \
+          PUBLISH_OUTPUT=$(MVR_FALLBACK_NETWORK=testnet sui client test-publish \
             --gas-budget 500000000 --json \
             --pubfile-path /tmp/e2e-published.toml \
             worktrees/main/move/walrus_site) || {
@@ -288,7 +288,7 @@ jobs:
         if: steps.contract-diff.outputs.has_changes == 'true'
         id: upgrade
         run: |
-          UPGRADE_OUTPUT=$(MVR_FALLBACK_NETWORK=testnet sui client upgrade \
+          UPGRADE_OUTPUT=$(MVR_FALLBACK_NETWORK=testnet sui client test-upgrade \
             --upgrade-capability ${{ steps.publish-pkg.outputs.upgrade_cap }} \
             --gas-budget 500000000 \
             --json \
