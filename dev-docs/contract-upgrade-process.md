@@ -76,19 +76,19 @@ After the integration branch merges to `main`, generate the unsigned upgrade tra
 signing:
 
 ```bash
-sui client switch --env <NETWORK>
+sui client switch --env $NETWORK
 sui client upgrade \
-  --sender <UPGRADE_CAP_OWNER> \
-  --upgrade-capability <UPGRADE_CAP> \
-  --build-env <NETWORK> \
+  --sender $UPGRADE_CAP_OWNER \
+  --upgrade-capability $UPGRADE_CAP \
+  --build-env $NETWORK \
   --serialize-unsigned-transaction \
   move/walrus_site
 ```
 
 Replace:
-- `<NETWORK>` — `testnet` or `mainnet`
-- `<UPGRADE_CAP_OWNER>` — the address that owns the UpgradeCap
-- `<UPGRADE_CAP>` — the UpgradeCap object ID (see table below)
+- `NETWORK` — `testnet` or `mainnet`
+- `UPGRADE_CAP_OWNER` — the address that owns the UpgradeCap
+- `UPGRADE_CAP` — the UpgradeCap object ID (see table below)
 
 | Network | UpgradeCap |
 |---------|------------|
@@ -120,25 +120,27 @@ resolve the source code for the published package.
 Generate the unsigned transaction:
 
 ```bash
-sui client switch --env <NETWORK>
+sui client switch --env $NETWORK
 sui client ptb \
   --move-call @mvr/metadata::git::new \
-    "https://github.com/MystenLabs/walrus-sites" \
-    "move/walrus_site" \
-    "<RELEASE_TAG>" \
+    \"https://github.com/MystenLabs/walrus-sites\" \
+    \"move/walrus_site\" \
+    \"$RELEASE_TAG\" \
   --assign git \
   --move-call @mvr/metadata::package_info::set_git_versioning \
-    <PACKAGE_INFO> \
-    <ON_CHAIN_VERSION> \
+    @$PACKAGE_INFO \
+    $ON_CHAIN_VERSION \
     git \
+  --sender @$SENDER \
   --serialize-unsigned-transaction
 ```
 
 Replace:
-- `<NETWORK>` — `testnet` or `mainnet`
-- `<RELEASE_TAG>` — the Git release tag (e.g., `mainnet-v2.8.0`)
-- `<PACKAGE_INFO>` — the PackageInfo object ID (see table below)
-- `<ON_CHAIN_VERSION>` — the on-chain package version number (increments with each upgrade)
+- `NETWORK` — `testnet` or `mainnet`
+- `RELEASE_TAG` — the Git release tag (e.g., `mainnet-v2.8.0`)
+- `PACKAGE_INFO` — the PackageInfo object ID (see table below)
+- `ON_CHAIN_VERSION` — the on-chain package version number (increments with each upgrade)
+- `SENDER` - the owner of the PackageInfo object
 
 | Network | PackageInfo |
 |---------|-------------|
