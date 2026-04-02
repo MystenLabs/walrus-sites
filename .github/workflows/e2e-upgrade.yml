@@ -3,14 +3,10 @@ name: "E2E: Upgrade Test"
 # Tests that contract upgrades don't break existing sites and that portals
 # (old and new) work with upgraded contracts.
 #
-# When Move sources changed between main and test-branch:
-#   Publishes a fresh walrus_site package on testnet from main, publishes a
-#   snake site, upgrades the package from test-branch, publishes another snake
-#   site, then verifies both sites with both main and test-branch portals.
-#
-# When no Move changes:
-#   Uses the existing testnet package, publishes sites with main and
-#   test-branch site-builders, verifies with both portals.
+# Always publishes a fresh walrus_site package on testnet from main, publishes
+# a snake site, then verifies it. When Move sources differ between main and
+# the test branch, also upgrades the package and verifies both old and new
+# sites with both portals.
 
 on:
   pull_request:
@@ -34,8 +30,6 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   TEST_BRANCH: ${{ inputs.test-branch || github.head_ref || github.ref_name }}
-  # Existing testnet deployment — used when no contract changes
-  EXISTING_SITE_PACKAGE: "0xf99aee9f21493e1590e7e5a9aea6f343a1f381031a04a732724871fc294be799"
   STAKING_OBJECT: "0xbe46180321c30aab2f8b3501e24048377287fa708018a5b7c2792b35fe339ee3"
   AGGREGATOR: "https://aggregator.walrus-testnet.walrus.space"
   PORTAL_PORT: "3000"
@@ -46,7 +40,7 @@ concurrency:
 
 jobs:
   # ─────────────────────────────────────────────────────────────
-  # Build site-builder from test-branch (runs in parallel)
+  # Build site-builders from both branches (runs in parallel)
   # ─────────────────────────────────────────────────────────────
   build-test-branch:
     name: "Build site-builder (test-branch)"
@@ -81,6 +75,30 @@ jobs:
           path: target/release/site-builder
           retention-days: 1
 
+  build-main:
+    name: "Build site-builder (main)"
+    runs-on: ubuntu-ghcloud
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: main
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+        with:
+          shared-key: e2e-main
+
+      - name: Build site-builder
+        run: cargo build -p site-builder --release
+
+      - name: Upload site-builder binary
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: site-builder-main
+          path: target/release/site-builder
+          retention-days: 1
+
   # ─────────────────────────────────────────────────────────────
   # E2E upgrade test (sequential phases)
   # ─────────────────────────────────────────────────────────────
@@ -88,7 +106,7 @@ jobs:
     name: "E2E upgrade test"
     runs-on: ubuntu-ghcloud
     timeout-minutes: 30
-    needs: [build-test-branch]
+    needs: [build-test-branch, build-main]
     steps:
       # ── Setup ────────────────────────────────────────────────
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -100,14 +118,21 @@ jobs:
           git fetch origin main
           git worktree add worktrees/main origin/main
 
-      - name: Download test-branch site-builder
+      - name: Download site-builder binaries
         uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
         with:
           name: site-builder-test-branch
           path: /tmp/test-branch-bin
 
-      - name: Make site-builder executable
-        run: chmod +x /tmp/test-branch-bin/site-builder
+      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: site-builder-main
+          path: /tmp/main-bin
+
+      - name: Make site-builders executable
+        run: |
+          chmod +x /tmp/test-branch-bin/site-builder
+          chmod +x /tmp/main-bin/site-builder
 
       - name: Install suiup + tools
         run: |
@@ -116,7 +141,6 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH"
           suiup install sui -y
           suiup install walrus -y
-          suiup install site-builder -y
           suiup install mvr -y
 
       - name: Setup Sui wallet
@@ -153,14 +177,16 @@ jobs:
             echo "$CHANGED"
           else
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
-            echo "No contract changes — will use existing testnet package"
+            echo "No contract changes — will skip upgrade"
           fi
 
-      # ── Phase A: Publish fresh package (only when contract changed) ──
+      # ── Phase A: Publish fresh package from main ────────────
       - name: "Phase A: Publish Move package (main)"
-        if: steps.contract-diff.outputs.has_changes == 'true'
         id: publish-pkg
         run: |
+          # Remove existing testnet entry so publish doesn't refuse
+          sed -i '/^\[published\.testnet\]/,/^\[/{ /^\[published\.testnet\]/d; /^\[/!d; }' \
+            worktrees/main/move/walrus_site/Published.toml
           echo "Publishing walrus_site package from main..."
           PUBLISH_OUTPUT=$(MVR_FALLBACK_NETWORK=testnet sui client publish \
             --gas-budget 500000000 --json \
@@ -185,23 +211,12 @@ jobs:
           echo "Published package V1: $PACKAGE_V1"
           echo "UpgradeCap: $UPGRADE_CAP"
 
-      - name: "Phase A: Set package IDs"
-        id: packages
-        run: |
-          if [[ "${{ steps.contract-diff.outputs.has_changes }}" == "true" ]]; then
-            echo "package_v1=${{ steps.publish-pkg.outputs.package_v1 }}" >> "$GITHUB_OUTPUT"
-            echo "upgrade_cap=${{ steps.publish-pkg.outputs.upgrade_cap }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "package_v1=${{ env.EXISTING_SITE_PACKAGE }}" >> "$GITHUB_OUTPUT"
-            echo "upgrade_cap=" >> "$GITHUB_OUTPUT"
-          fi
-
       # ── Phase B: Publish site from main + verify ─────────────
       - name: "Phase B: Publish snake (main site-builder)"
         id: publish-site-a
         run: |
           cat > /tmp/sites-config-v1.yaml << EOF
-          package: ${{ steps.packages.outputs.package_v1 }}
+          package: ${{ steps.publish-pkg.outputs.package_v1 }}
           portal: ""
           general:
             walrus_context: testnet
@@ -209,7 +224,7 @@ jobs:
           staking_object: ${{ env.STAKING_OBJECT }}
           EOF
 
-          OUTPUT=$(site-builder --config /tmp/sites-config-v1.yaml \
+          OUTPUT=$(/tmp/main-bin/site-builder --config /tmp/sites-config-v1.yaml \
             publish worktrees/main/examples/snake --epochs 2 2>&1) || {
             echo "$OUTPUT"
             exit 1
@@ -230,7 +245,7 @@ jobs:
         run: |
           cat > /tmp/portal-config-main.yaml << EOF
           network: testnet
-          site_package: "${{ steps.packages.outputs.package_v1 }}"
+          site_package: "${{ steps.publish-pkg.outputs.package_v1 }}"
           landing_page_oid_b36: "${{ steps.publish-site-a.outputs.site_a_b36 }}"
           domain_name_length: 21
           b36_domain_resolution: true
@@ -271,25 +286,18 @@ jobs:
           fuser -k ${{ env.PORTAL_PORT }}/tcp 2>/dev/null || true
 
       # ── Phase C: Upgrade package (only when contract changed) ──
-      - name: "Phase C: Patch Published.toml for fresh package"
+      - name: "Phase C: Copy Published.toml from main"
         if: steps.contract-diff.outputs.has_changes == 'true'
         run: |
-          # The test-branch's Published.toml references the original testnet
-          # package. Replace it with the fresh package from Phase A so the
-          # upgrade bytecode embeds the correct package address.
-          PACKAGE_V1="${{ steps.packages.outputs.package_v1 }}"
-          sed -i "/^\[published\.testnet\]/,/^\[/ {
-            s|published-at = \".*\"|published-at = \"$PACKAGE_V1\"|
-            s|original-id = \".*\"|original-id = \"$PACKAGE_V1\"|
-          }" move/walrus_site/Published.toml
-          echo "Patched Published.toml testnet entry to $PACKAGE_V1"
+          # Main's Published.toml was updated by Phase A's publish with V1's address
+          cp worktrees/main/move/walrus_site/Published.toml move/walrus_site/Published.toml
 
       - name: "Phase C: Upgrade contract (test-branch)"
         if: steps.contract-diff.outputs.has_changes == 'true'
         id: upgrade
         run: |
           UPGRADE_OUTPUT=$(MVR_FALLBACK_NETWORK=testnet sui client upgrade \
-            --upgrade-capability ${{ steps.packages.outputs.upgrade_cap }} \
+            --upgrade-capability ${{ steps.publish-pkg.outputs.upgrade_cap }} \
             --gas-budget 500000000 \
             --json \
             move/walrus_site) || {
@@ -315,7 +323,7 @@ jobs:
           if [[ "${{ steps.contract-diff.outputs.has_changes }}" == "true" ]]; then
             echo "package_v2=${{ steps.upgrade.outputs.package_v2 }}" >> "$GITHUB_OUTPUT"
           else
-            echo "package_v2=${{ env.EXISTING_SITE_PACKAGE }}" >> "$GITHUB_OUTPUT"
+            echo "package_v2=${{ steps.publish-pkg.outputs.package_v1 }}" >> "$GITHUB_OUTPUT"
           fi
 
       # ── Phase D: Publish with test-branch, verify with main portal ──
@@ -385,7 +393,7 @@ jobs:
         run: |
           cat > /tmp/portal-config-test.yaml << EOF
           network: testnet
-          original_package_id: "${{ steps.packages.outputs.package_v1 }}"
+          original_package_id: "${{ steps.publish-pkg.outputs.package_v1 }}"
           landing_page_oid_b36: "${{ steps.publish-site-b.outputs.site_b_b36 }}"
           domain_name_length: 21
           b36_domain_resolution: true
@@ -434,7 +442,7 @@ jobs:
       - name: Destroy testnet sites
         if: always()
         run: |
-          site-builder --config /tmp/sites-config-v1.yaml \
+          /tmp/main-bin/site-builder --config /tmp/sites-config-v1.yaml \
             destroy ${{ steps.publish-site-a.outputs.site_a_oid }} 2>&1 || true
           /tmp/test-branch-bin/site-builder --config /tmp/sites-config-v2.yaml \
             destroy ${{ steps.publish-site-b.outputs.site_b_oid }} 2>&1 || true
