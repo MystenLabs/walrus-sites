@@ -50,9 +50,8 @@ get-site-package() {
 log "running the walrus-sites portal Docker image for network: $network and version: $version"
 log "landing page oid (b36): $landing_page_oid_b36"
 
-# The v2.4.0 Docker image predates the YAML config migration and only reads env vars.
-# Pass configuration as SCREAMING_SNAKE_CASE environment variables.
-# URL list format: URL|RETRIES|METRIC (comma-separated for multiple entries).
+# Configure the portal via environment variables.
+# See portal/server/src/configuration_loader.ts for the full set of supported variables.
 
 docker run \
   --rm \
