@@ -17,7 +17,10 @@ export async function setupTapelog() {
                 formatter: getJsonLinesFormatter(),
             }),
         },
-        loggers: [{ category: "server-portal", lowestLevel: "debug", sinks: ["console"] }],
+        loggers: [
+            { category: ["logtape", "meta"], lowestLevel: "warning", sinks: ["console"] },
+            { category: "server-portal", lowestLevel: "debug", sinks: ["console"] },
+        ],
     });
     const tapeLogger = getLogger(["server-portal"]);
 
