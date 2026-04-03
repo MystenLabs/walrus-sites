@@ -2,12 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, it, expect } from "vitest";
-import { instrumentationFacade } from "@lib/instrumentation";
+import { InstrumentationFacade } from "@lib/instrumentation";
+
+// Use a dedicated port to avoid collisions with other test files that also
+// import the instrumentationFacade singleton (which binds to port 9184).
+const TEST_PORT = 9185;
+const facade = new InstrumentationFacade(TEST_PORT);
 
 describe("Instrumentation metrics endpoint", () => {
     it("should serve metrics on the Prometheus endpoint", async () => {
-        const port = parseInt(process.env.PROMETHEUS_EXPORTER_PORT!) || 9184;
-        const response = await fetch(`http://localhost:${port}/metrics`);
+        const response = await fetch(`http://localhost:${TEST_PORT}/metrics`);
 
         expect(response.ok).toBe(true);
         expect(response.status).toBe(200);
@@ -20,11 +24,10 @@ describe("Instrumentation metrics endpoint", () => {
     it("should record and serve aggregator time metric with siteId label", async () => {
         // Record a test metric (only siteId label — blobOrPatchId and path were
         // dropped to avoid cardinality explosion in Prometheus/Mimir).
-        instrumentationFacade.recordAggregatorTime(150, "0xtest123");
+        facade.recordAggregatorTime(150, "0xtest123");
 
         // Fetch metrics
-        const port = parseInt(process.env.PROMETHEUS_EXPORTER_PORT!) || 9184;
-        const response = await fetch(`http://localhost:${port}/metrics`);
+        const response = await fetch(`http://localhost:${TEST_PORT}/metrics`);
         const metricsText = await response.text();
 
         // Validate metric name exists
