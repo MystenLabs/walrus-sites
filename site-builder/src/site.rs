@@ -10,10 +10,9 @@ pub mod manager;
 pub mod quilts;
 pub mod resource;
 
-use std::{collections::HashMap, time::Duration};
+use std::collections::HashMap;
 
 use anyhow::{Context, Result};
-use futures::future::try_join_all;
 use resource::{ResourceSet, SiteOps};
 use sui_sdk::rpc_types::{DynamicFieldInfo, SuiObjectDataOptions};
 use sui_types::{base_types::ObjectID, dynamic_field::derive_dynamic_field_id, TypeTag};
@@ -44,11 +43,6 @@ pub const SITE_MODULE: &str = "site";
 const ROUTES_DF_KEY: &[u8] = b"routes";
 /// The dynamic field key for redirects (matches `redirects_field!()` in redirects.move).
 const REDIRECTS_DF_KEY: &[u8] = b"redirects";
-
-/// The maximum number of dynamic fields to request at once.
-const DF_REQ_BATCH_SIZE: usize = 10;
-/// The delay between requests for dynamic fields.
-const DF_REQ_DELAY_MS: u64 = 100;
 
 /// The diff between two site data.
 #[derive(Debug, Clone)]
@@ -221,37 +215,35 @@ impl RemoteSiteFactory<'_> {
         let dynamic_fields = self.get_all_dynamic_fields(site_id).await?;
         let resource_path_tag = self.resource_path_tag()?;
 
-        // Chunking ensures that we do not make too many requests at once.
-        // TODO(sew-737): multi_get_objects?
-        let futures = dynamic_fields.chunks(DF_REQ_BATCH_SIZE).map(|chunk| {
-            try_join_all(
-                chunk
-                    .iter()
-                    .filter(|field| field.name.type_ == resource_path_tag)
-                    .map(|field| async {
-                        self.sui_client
-                            .get_sui_object::<ResourceDynamicField>(field.object_id)
-                            .await
-                            .map(|field| field.value)
-                    }),
-            )
-        });
+        let resource_df_ids: Vec<ObjectID> = dynamic_fields
+            .iter()
+            .filter(|field| field.name.type_ == resource_path_tag)
+            .map(|field| field.object_id)
+            .collect();
 
-        let mut resources = ResourceSet::empty();
-        let delay = Duration::from_millis(DF_REQ_DELAY_MS);
-        let req_s = DF_REQ_BATCH_SIZE as f64 * 1.0 / delay.as_secs_f64();
         tracing::info!(
-            batch_size = DF_REQ_BATCH_SIZE,
-            ?delay,
-            req_s,
-            "fetching the resources from the dynamic fields"
+            count = resource_df_ids.len(),
+            "fetching resource dynamic fields via multi_get"
         );
 
-        for fut in futures {
-            tracing::debug!("fetching a batch of dynamic fields");
-            resources.extend(fut.await?);
-            tokio::time::sleep(delay).await;
-        }
+        let responses = self
+            .sui_client
+            .multi_get_object_with_options_batched(
+                &resource_df_ids,
+                SuiObjectDataOptions::new().with_bcs().with_type(),
+            )
+            .await?;
+
+        let mut resources = ResourceSet::empty();
+        resources.extend(
+            responses
+                .iter()
+                .map(|resp| {
+                    contracts::get_sui_object_from_object_response::<ResourceDynamicField>(resp)
+                        .map(|df| df.value)
+                })
+                .collect::<Result<Vec<_>>>()?,
+        );
 
         tracing::debug!("fetching the routes and redirects from the dynamic fields");
         let (routes, redirects) = self.get_routes_and_redirects(site_id).await?;
