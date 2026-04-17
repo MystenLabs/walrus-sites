@@ -47,8 +47,8 @@ pub(crate) async fn display_sitemap(
     let sui_client = new_retriable_sui_client(
         &wallet
             .config
-            .get_env(&None)
-            .context("no default network env specified in wallet config")?
+            .get_active_env()
+            .context("no active env specified in wallet config")?
             .rpc,
         ExponentialBackoffConfig::default(),
     )?;
