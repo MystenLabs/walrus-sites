@@ -3,7 +3,7 @@
 
 //! Utilities to resolve SuiNS addresses.
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use sui_types::{base_types::ObjectID, TypeTag};
 
 use crate::{
@@ -74,7 +74,16 @@ impl SuiNsClient {
         suins_object_id: ObjectID,
         package_id: ObjectID,
     ) -> Result<Self> {
-        let type_map = client.type_origin_map_for_package(package_id).await?;
+        let type_map = client
+            .type_origin_map_for_package(package_id)
+            .await
+            .with_context(|| {
+                format!(
+                    "failed to fetch SuiNS package {package_id}; \
+                     ensure --context (or the wallet's active env) points at the \
+                     Sui network where this SuiNS name is registered"
+                )
+            })?;
         Ok(Self {
             client,
             suins_object_id,
