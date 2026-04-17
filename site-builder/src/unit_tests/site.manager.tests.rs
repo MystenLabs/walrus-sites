@@ -247,7 +247,7 @@ async fn test_site_manager_cache_protects_against_stale_fullnode() {
     // Create a RetriableSuiClient pointing to main (non-stale) fullnode for execution
     // using the original manager's wallet which still points to main fullnode
     let main_retry_client = new_retriable_sui_client(
-        &manager.wallet.config.get_env(&None).unwrap().rpc,
+        &manager.wallet.config.get_active_env().unwrap().rpc,
         ExponentialBackoffConfig::default(),
     )
     .unwrap();
