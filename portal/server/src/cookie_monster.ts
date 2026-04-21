@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import * as cookie from "cookie";
-import psl from "psl";
+import * as psl from "psl";
 import logger from "@lib/logger";
 
 export class CookieMonster {

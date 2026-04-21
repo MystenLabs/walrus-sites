@@ -4,7 +4,8 @@
     "version": "2.9.0",
     "private": true,
     "scripts": {
-        "start": "bun --hot run index.ts"
+        "start": "bun --hot run index.ts",
+        "typecheck": "tsc --noEmit"
     },
     "dependencies": {
         "@logtape/logtape": "^0.11.0",
