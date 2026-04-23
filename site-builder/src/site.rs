@@ -10,13 +10,12 @@ pub mod manager;
 pub mod quilts;
 pub mod resource;
 
-use std::collections::HashMap;
-
 use anyhow::{Context, Result};
 use resource::{ResourceSet, SiteOps};
-use sui_sdk::rpc_types::{DynamicFieldInfo, SuiObjectDataOptions};
+use sui_sdk::rpc_types::SuiObjectDataOptions;
 use sui_types::{base_types::ObjectID, dynamic_field::derive_dynamic_field_id, TypeTag};
-use walrus_sui::contracts::TypeOriginMap;
+use walrus_sui::{contracts::TypeOriginMap, dynamic_field_info::DynamicFieldInfo};
+use walrus_utils::http::bytes::Bytes;
 
 use crate::{
     retry_client::RetriableSuiClient,
@@ -34,7 +33,6 @@ use crate::{
         SiteNameOp,
         SuiDynamicField,
     },
-    util::handle_pagination,
 };
 
 pub const SITE_MODULE: &str = "site";
@@ -217,8 +215,8 @@ impl RemoteSiteFactory<'_> {
 
         let resource_df_ids: Vec<ObjectID> = dynamic_fields
             .iter()
-            .filter(|field| field.name.type_ == resource_path_tag)
-            .map(|field| field.object_id)
+            .filter(|field| field.name_type == resource_path_tag)
+            .map(|field| field.field_id)
             .collect();
 
         tracing::info!(
@@ -311,57 +309,25 @@ impl RemoteSiteFactory<'_> {
         Ok((routes, redirects))
     }
 
-    /// Gets all the resources and their object ids from chain.
-    #[allow(unused)]
-    pub async fn get_existing_resources(
-        &self,
-        object_id: ObjectID,
-    ) -> Result<HashMap<String, ObjectID>> {
-        let dynamic_fields = self.get_all_dynamic_fields(object_id).await?;
-        self.resources_from_dynamic_fields(&dynamic_fields)
-    }
-
     async fn get_all_dynamic_fields(&self, object_id: ObjectID) -> Result<Vec<DynamicFieldInfo>> {
-        let iter =
-            handle_pagination(|cursor| self.sui_client.get_dynamic_fields(object_id, cursor, None))
-                .await?
-                .collect();
-        Ok(iter)
+        let mut all = Vec::new();
+        let mut cursor: Option<Bytes> = None;
+        loop {
+            let page = self
+                .sui_client
+                .get_dynamic_fields(object_id, cursor, None)
+                .await?;
+            all.extend(page.fields);
+            if !page.has_next_page {
+                break;
+            }
+            cursor = page.next_cursor;
+        }
+        Ok(all)
     }
 
     async fn get_site_fields(&self, site_id: ObjectID) -> anyhow::Result<SiteFields> {
         Ok(self.sui_client.get_sui_object(site_id).await?)
-    }
-
-    /// Filters the dynamic fields to get the resource object IDs.
-    #[allow(unused)]
-    fn resources_from_dynamic_fields(
-        &self,
-        dynamic_fields: &[DynamicFieldInfo],
-    ) -> Result<HashMap<String, ObjectID>> {
-        let type_tag = self.resource_path_tag()?;
-        Ok(dynamic_fields
-            .iter()
-            .filter_map(|field| {
-                self.get_path_from_info(field, &type_tag)
-                    .map(|path| (path, field.object_id))
-            })
-            .collect::<HashMap<String, ObjectID>>())
-    }
-
-    /// Gets the path of the resource from the dynamic field.
-    #[allow(unused)]
-    fn get_path_from_info(&self, field: &DynamicFieldInfo, name_tag: &TypeTag) -> Option<String> {
-        if field.name.type_ != *name_tag {
-            return None;
-        }
-        field
-            .name
-            .value
-            .as_object()
-            .and_then(|obj| obj.get("path"))
-            .and_then(|p| p.as_str())
-            .map(|s| s.to_owned())
     }
 
     /// Gets the type tag for the ResourcePath move struct
