@@ -196,7 +196,7 @@ dependencies = [
  "pkcs8 0.10.2",
  "quinn",
  "quinn-proto",
- "rand 0.8.5",
+ "rand 0.8.6",
  "rcgen 0.13.2",
  "ring",
  "rustls",
@@ -311,7 +311,7 @@ dependencies = [
  "libloading",
  "linkme",
  "once_cell",
- "rand 0.8.5",
+ "rand 0.8.6",
  "rustc_version_runtime",
  "serde",
  "serde_json",
@@ -540,7 +540,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94893f1e0c6eeab764ade8dc4c0db24caf4fe7cbbaafc0eba0a9030f447b5185"
 dependencies = [
  "num-traits",
- "rand 0.8.5",
+ "rand 0.8.6",
 ]
 
 [[package]]
@@ -890,7 +890,7 @@ dependencies = [
  "getrandom 0.2.17",
  "instant",
  "pin-project-lite",
- "rand 0.8.5",
+ "rand 0.8.6",
  "tokio",
 ]
 
@@ -1335,7 +1335,7 @@ dependencies = [
  "digest 0.10.7",
  "group 0.13.0",
  "merlin",
- "rand 0.8.5",
+ "rand 0.8.6",
  "rand_core 0.6.4",
  "serde",
  "serde_derive",
@@ -1536,7 +1536,7 @@ dependencies = [
  "axum 0.8.8",
  "mysten-metrics",
  "prometheus",
- "rand 0.8.5",
+ "rand 0.8.6",
  "serde",
  "serde_with",
  "sui-macros",
@@ -1785,7 +1785,7 @@ source = "git+https://github.com/MystenLabs/sui?tag=testnet-v1.69.1#6c3a7475b6fd
 dependencies = [
  "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=7ba456d008a3a657e01589de64cb0eeb8aca532b)",
  "mysten-network",
- "rand 0.8.5",
+ "rand 0.8.6",
  "serde",
  "shared-crypto",
 ]
@@ -1820,7 +1820,7 @@ dependencies = [
  "prometheus",
  "prost 0.14.3",
  "quinn-proto",
- "rand 0.8.5",
+ "rand 0.8.6",
  "rustls",
  "serde",
  "shared-crypto",
@@ -2017,7 +2017,7 @@ version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3fef0a447ef2e9e6bd57e379f88702c58c4a4253ba82fb175bd7db012192311a"
 dependencies = [
- "rand 0.8.5",
+ "rand 0.8.6",
  "siphasher",
 ]
 
@@ -2366,7 +2366,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ab67060fc6b8ef687992d439ca0fa36e7ed17e9a0b16b25b601e8757df720de"
 dependencies = [
  "data-encoding",
- "syn 2.0.117",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -2973,7 +2973,7 @@ dependencies = [
  "num-bigint 0.4.6",
  "once_cell",
  "p256",
- "rand 0.8.5",
+ "rand 0.8.6",
  "readonly",
  "rfc6979 0.4.0",
  "rsa 0.8.2",
@@ -3032,7 +3032,7 @@ dependencies = [
  "num-bigint 0.4.6",
  "once_cell",
  "p256",
- "rand 0.8.5",
+ "rand 0.8.6",
  "readonly",
  "rfc6979 0.4.0",
  "rsa 0.9.10",
@@ -3088,7 +3088,7 @@ dependencies = [
  "num-bigint 0.4.6",
  "once_cell",
  "p256",
- "rand 0.8.5",
+ "rand 0.8.6",
  "readonly",
  "rfc6979 0.4.0",
  "rsa 0.9.10",
@@ -3145,7 +3145,7 @@ dependencies = [
  "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=7ba456d008a3a657e01589de64cb0eeb8aca532b)",
  "hex",
  "itertools 0.10.5",
- "rand 0.8.5",
+ "rand 0.8.6",
  "serde",
  "serde-big-array",
  "sha3 0.10.8",
@@ -3167,7 +3167,7 @@ dependencies = [
  "num-integer",
  "num-prime",
  "num-traits",
- "rand 0.8.5",
+ "rand 0.8.6",
  "rand_chacha 0.3.1",
  "serde",
 ]
@@ -3318,7 +3318,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cfcf0ed7fe52a17a03854ec54a9f76d6d84508d1c0e66bc1793301c73fc8493c"
 dependencies = [
  "byteorder",
- "rand 0.8.5",
+ "rand 0.8.6",
  "rustc-hex",
  "static_assertions",
 ]
@@ -3665,7 +3665,7 @@ dependencies = [
  "parking_lot 0.12.5",
  "portable-atomic",
  "quanta",
- "rand 0.8.5",
+ "rand 0.8.6",
  "smallvec",
  "spinning_top",
 ]
@@ -3688,7 +3688,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f0f9ef7462f7c099f518d754361858f86d8a07af53ba9af0fe635bbccb151a63"
 dependencies = [
  "ff 0.13.1",
- "rand 0.8.5",
+ "rand 0.8.6",
  "rand_core 0.6.4",
  "rand_xorshift 0.3.0",
  "subtle",
@@ -4586,7 +4586,7 @@ dependencies = [
  "jsonrpsee-types",
  "parking_lot 0.12.5",
  "pin-project",
- "rand 0.8.5",
+ "rand 0.8.6",
  "rustc-hash 2.1.2",
  "serde",
  "serde_json",
@@ -4700,7 +4700,7 @@ dependencies = [
  "p256",
  "p384",
  "pem",
- "rand 0.8.5",
+ "rand 0.8.6",
  "rsa 0.9.10",
  "serde",
  "serde_json",
@@ -5521,7 +5521,7 @@ dependencies = [
  "move-proc-macros",
  "num",
  "primitive-types",
- "rand 0.8.5",
+ "rand 0.8.6",
  "ref-cast",
  "serde",
  "serde_bytes",
@@ -6069,7 +6069,7 @@ dependencies = [
  "msim-macros",
  "naive-timer",
  "pin-project-lite",
- "rand 0.8.5",
+ "rand 0.8.6",
  "real_tokio",
  "serde",
  "socket2 0.4.10",
@@ -6183,7 +6183,7 @@ dependencies = [
  "mysten-metrics",
  "once_cell",
  "parking_lot 0.12.5",
- "rand 0.8.5",
+ "rand 0.8.6",
  "reqwest",
  "serde_json",
  "snap",
@@ -6239,7 +6239,7 @@ dependencies = [
  "pin-project-lite",
  "prometheus",
  "quinn-proto",
- "rand 0.8.5",
+ "rand 0.8.6",
  "rustls",
  "serde",
  "snap",
@@ -6453,7 +6453,7 @@ checksum = "a5e44f723f1133c9deac646763579fdb3ac745e418f2a7af9cd0c431da1f20b9"
 dependencies = [
  "num-integer",
  "num-traits",
- "rand 0.8.5",
+ "rand 0.8.6",
  "serde",
 ]
 
@@ -6468,7 +6468,7 @@ dependencies = [
  "num-integer",
  "num-iter",
  "num-traits",
- "rand 0.8.5",
+ "rand 0.8.6",
  "smallvec",
  "zeroize",
 ]
@@ -6532,7 +6532,7 @@ dependencies = [
  "num-integer",
  "num-modular",
  "num-traits",
- "rand 0.8.5",
+ "rand 0.8.6",
 ]
 
 [[package]]
@@ -6632,7 +6632,7 @@ dependencies = [
  "parking_lot 0.12.5",
  "percent-encoding",
  "quick-xml 0.37.5",
- "rand 0.8.5",
+ "rand 0.8.6",
  "reqwest",
  "ring",
  "rustls-pemfile",
@@ -6847,7 +6847,7 @@ dependencies = [
  "glob",
  "opentelemetry 0.27.1",
  "percent-encoding",
- "rand 0.8.5",
+ "rand 0.8.6",
  "serde_json",
  "thiserror 1.0.69",
  "tokio",
@@ -7059,7 +7059,7 @@ dependencies = [
  "getrandom 0.2.17",
  "hmac",
  "indexmap 2.13.1",
- "rand 0.8.5",
+ "rand 0.8.6",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -7079,7 +7079,7 @@ dependencies = [
  "group 0.13.0",
  "hex",
  "lazy_static",
- "rand 0.8.5",
+ "rand 0.8.6",
  "serde",
  "static_assertions",
  "subtle",
@@ -7179,7 +7179,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c80231409c20246a13fddb31776fb942c38553c51e871f8cbd687a4cfb5843d"
 dependencies = [
  "phf_shared",
- "rand 0.8.5",
+ "rand 0.8.6",
 ]
 
 [[package]]
@@ -7876,9 +7876,9 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.8.5"
+version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34af8d1a0e25924bc5b7c43c079c942339d8f0a8b57c39049bef581b46327404"
+checksum = "5ca0ecfa931c29007047d1bc58e623ab12e5590e8c7cc53200d5202b69266d8a"
 dependencies = [
  "libc",
  "rand_chacha 0.3.1",
@@ -8709,7 +8709,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "25996b82292a7a57ed3508f052cfff8640d38d32018784acd714758b43da9c8f"
 dependencies = [
  "bitcoin_hashes",
- "rand 0.8.5",
+ "rand 0.8.6",
  "secp256k1-sys",
 ]
 
@@ -9206,7 +9206,7 @@ dependencies = [
  "move-package-alt",
  "notify",
  "prettytable",
- "rand 0.8.5",
+ "rand 0.10.0",
  "regex",
  "reqwest",
  "serde",
@@ -9333,7 +9333,7 @@ dependencies = [
  "http 1.4.0",
  "httparse",
  "log",
- "rand 0.8.5",
+ "rand 0.8.6",
  "sha1",
 ]
 
@@ -9749,7 +9749,7 @@ dependencies = [
  "object_store 0.13.2",
  "once_cell",
  "prometheus",
- "rand 0.8.5",
+ "rand 0.8.6",
  "reqwest",
  "serde",
  "serde_json",
@@ -9815,7 +9815,7 @@ dependencies = [
  "prost 0.14.3",
  "prost-build",
  "protox",
- "rand 0.8.5",
+ "rand 0.8.6",
  "rayon",
  "reqwest",
  "roaring 0.10.12",
@@ -10012,7 +10012,7 @@ dependencies = [
  "move-binary-format",
  "move-core-types",
  "prometheus",
- "rand 0.8.5",
+ "rand 0.8.6",
  "serde",
  "serde_with",
  "serde_yaml 0.8.26",
@@ -10191,7 +10191,7 @@ dependencies = [
  "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=7ba456d008a3a657e01589de64cb0eeb8aca532b)",
  "jsonrpc",
  "mockall",
- "rand 0.8.5",
+ "rand 0.8.6",
  "regex",
  "serde",
  "serde_json",
@@ -10275,7 +10275,7 @@ dependencies = [
  "move-binary-format",
  "move-core-types",
  "move-vm-runtime",
- "rand 0.8.5",
+ "rand 0.8.6",
  "smallvec",
  "sui-protocol-config",
  "sui-types",
@@ -10361,7 +10361,7 @@ dependencies = [
  "move-stdlib-natives-v3",
  "move-vm-runtime-v3",
  "move-vm-types-v3",
- "rand 0.8.5",
+ "rand 0.8.6",
  "smallvec",
  "sui-protocol-config",
  "sui-types",
@@ -10407,7 +10407,7 @@ dependencies = [
  "once_cell",
  "prometheus",
  "prost 0.14.3",
- "rand 0.8.5",
+ "rand 0.8.6",
  "serde",
  "serde_yaml 0.8.26",
  "shared-crypto",
@@ -10601,7 +10601,7 @@ dependencies = [
  "move-core-types",
  "move-vm-config",
  "mysten-common",
- "rand 0.8.5",
+ "rand 0.8.6",
  "schemars 0.8.22",
  "serde",
  "serde-env",
@@ -10686,7 +10686,7 @@ dependencies = [
  "prost 0.14.3",
  "prost-types 0.14.3",
  "protox",
- "rand 0.8.5",
+ "rand 0.8.6",
  "roaring 0.10.12",
  "serde",
  "serde_json",
@@ -10812,7 +10812,7 @@ dependencies = [
  "move-package-alt-compilation",
  "msim",
  "mysten-network",
- "rand 0.8.5",
+ "rand 0.8.6",
  "serde",
  "sui-framework",
  "sui-move-build",
@@ -10912,7 +10912,7 @@ dependencies = [
  "mysten-metrics",
  "mysten-network",
  "prometheus",
- "rand 0.8.5",
+ "rand 0.8.6",
  "sui-config",
  "sui-macros",
  "sui-node",
@@ -10941,7 +10941,7 @@ dependencies = [
  "move-bytecode-utils",
  "mysten-common",
  "prometheus",
- "rand 0.8.5",
+ "rand 0.8.6",
  "serde",
  "serde_with",
  "serde_yaml 0.8.26",
@@ -11085,7 +11085,7 @@ dependencies = [
  "proptest-derive",
  "prost 0.14.3",
  "prost-types 0.14.3",
- "rand 0.8.5",
+ "rand 0.8.6",
  "roaring 0.10.12",
  "rustls-pki-types",
  "schemars 0.8.22",
@@ -11386,7 +11386,7 @@ dependencies = [
  "move-core-types",
  "mysten-common",
  "prometheus",
- "rand 0.8.5",
+ "rand 0.8.6",
  "sui-config",
  "sui-core",
  "sui-framework",
@@ -11538,7 +11538,7 @@ dependencies = [
  "hmac",
  "once_cell",
  "pbkdf2",
- "rand 0.8.5",
+ "rand 0.8.6",
  "rustc-hash 1.1.0",
  "sha2 0.10.9",
  "thiserror 1.0.69",
@@ -12008,7 +12008,7 @@ dependencies = [
  "indexmap 1.9.3",
  "pin-project",
  "pin-project-lite",
- "rand 0.8.5",
+ "rand 0.8.6",
  "slab",
  "tokio",
  "tokio-util 0.7.18",
@@ -12277,7 +12277,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
 dependencies = [
  "cfg-if",
- "rand 0.8.5",
+ "rand 0.7.3",
  "static_assertions",
 ]
 
@@ -12311,7 +12311,7 @@ dependencies = [
  "mysten-metrics",
  "once_cell",
  "prometheus",
- "rand 0.8.5",
+ "rand 0.8.6",
  "rocksdb",
  "serde",
  "sui-macros",
@@ -12339,7 +12339,7 @@ dependencies = [
  "itertools 0.14.0",
  "once_cell",
  "prometheus",
- "rand 0.8.5",
+ "rand 0.8.6",
  "rocksdb",
  "serde",
  "sui-macros",
@@ -12693,7 +12693,7 @@ dependencies = [
  "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=4db0e90c732bbf7420ca20de808b698883148d9c)",
  "hex",
  "p256",
- "rand 0.8.5",
+ "rand 0.8.6",
  "reed-solomon-simd",
  "serde",
  "serde_with",
@@ -12737,7 +12737,7 @@ dependencies = [
  "jsonwebtoken",
  "pin-project",
  "prometheus",
- "rand 0.8.5",
+ "rand 0.8.6",
  "rayon",
  "reqwest",
  "rustls",
@@ -12815,7 +12815,7 @@ dependencies = [
  "prettytable",
  "prometheus",
  "prost 0.14.3",
- "rand 0.8.5",
+ "rand 0.8.6",
  "rayon",
  "rcgen 0.14.7",
  "regex",
@@ -12882,7 +12882,7 @@ dependencies = [
  "p256",
  "pin-project",
  "prometheus",
- "rand 0.8.5",
+ "rand 0.8.6",
  "reqwest",
  "rustls",
  "rustls-native-certs",
@@ -12926,7 +12926,7 @@ dependencies = [
  "move-package-alt-compilation",
  "mysten-metrics",
  "prometheus",
- "rand 0.8.5",
+ "rand 0.8.6",
  "regex",
  "reqwest",
  "serde",
@@ -12969,7 +12969,7 @@ source = "git+https://github.com/MystenLabs/walrus?tag=testnet-v1.46.1#c2c57ae34
 dependencies = [
  "anyhow",
  "once_cell",
- "rand 0.8.5",
+ "rand 0.8.6",
  "tempfile",
  "tokio",
  "tracing",
@@ -12991,7 +12991,7 @@ dependencies = [
  "once_cell",
  "pin-project",
  "prometheus",
- "rand 0.8.5",
+ "rand 0.8.6",
  "serde",
  "serde_with",
  "serde_yaml 0.9.34+deprecated",
