@@ -81,6 +81,7 @@ export class UrlFetcher {
             subdomain: parsedUrl.subdomain,
             path: parsedUrl.path,
         });
+        instrumentationFacade.increaseRequestsMade(1);
         if (!resolvedObjectId) {
             const resolveObjectResult = await this.resolveObjectId(parsedUrl);
             const isObjectId = typeof resolveObjectResult == "string";
@@ -89,7 +90,6 @@ export class UrlFetcher {
             }
             resolvedObjectId = resolveObjectResult;
         }
-        instrumentationFacade.increaseRequestsMade(1, resolvedObjectId);
 
         if (blocklistChecker && (await blocklistChecker.isBlocked(resolvedObjectId))) {
             return siteNotFound();

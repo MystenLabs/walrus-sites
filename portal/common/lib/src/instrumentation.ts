@@ -141,7 +141,7 @@ export class InstrumentationFacade {
         );
     }
 
-    public increaseRequestsMade(total: number, _requestId: string) {
+    public increaseRequestsMade(total: number) {
         this.num_requests_made_counter.add(total);
     }
 
