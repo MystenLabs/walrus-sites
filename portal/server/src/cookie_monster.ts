@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import * as cookie from "cookie";
-import psl from "psl";
+import * as psl from "psl";
 import logger from "@lib/logger";
 
 export class CookieMonster {
@@ -79,7 +79,7 @@ export class CookieMonster {
     }
 
     private static getCookieParentDomains(host: string): string[] {
-        const parentDomains = [];
+        const parentDomains: string[] = [];
         let currentParentDomain = this.getParentDomain(host);
         while (currentParentDomain) {
             const parsedPsl = psl.parse(currentParentDomain);

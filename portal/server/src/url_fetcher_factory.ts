@@ -49,4 +49,9 @@ class UrlFetcherFactory {
 }
 
 export const standardUrlFetcher = UrlFetcherFactory.standardUrlFetcher();
-export const premiumUrlFetcher = UrlFetcherFactory.premiumUrlFetcher();
+const premium = UrlFetcherFactory.premiumUrlFetcher();
+// Zod config validation (configuration_loader.ts) guarantees `premium` is
+// defined when `enableAllowlist` is true. When allowlist is disabled,
+// premiumUrlFetcher is never actually invoked — aliasing to standard keeps
+// the export type non-nullable and avoids touching consumers.
+export const premiumUrlFetcher: UrlFetcher = premium ?? standardUrlFetcher;

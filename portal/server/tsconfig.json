@@ -20,7 +20,8 @@
         ],
         "baseUrl": "./",
         "paths": {
-            "@lib/*": ["../common/lib/src/*"]
+            "@lib/*": ["../common/lib/src/*"],
+            "psl": ["../node_modules/psl/types"]
         },
         "types": ["../common/lib/src/custom.d.ts", "@types/bun"]
     },
