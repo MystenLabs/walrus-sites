@@ -79,7 +79,7 @@ export class CookieMonster {
     }
 
     private static getCookieParentDomains(host: string): string[] {
-        const parentDomains = [];
+        const parentDomains: string[] = [];
         let currentParentDomain = this.getParentDomain(host);
         while (currentParentDomain) {
             const parsedPsl = psl.parse(currentParentDomain);
