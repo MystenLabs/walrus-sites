@@ -35,25 +35,14 @@ import { instrumentationFacade } from "@lib/instrumentation";
 import { HttpStatusCodes } from "@lib/http/http_status_codes";
 
 /**
- * The portal's `resolveObjectId` is supposed to bump
- * `ws_num_full_node_fail_counter` only when the Sui full node is genuinely
- * unreachable. In production we observe that the same counter is also being
- * bumped when a SuiNS subdomain is simply not registered: the FN responds
- * healthily with `error.code: "notExists"` for the dynamic field lookup, but
- * the @mysten/sui SDK turns that response into a thrown `ObjectError("Object
- * <id> does not exist")`. The portal's catch-all then treats this exception
- * the same as a real connectivity failure.
+ * Tests that `resolveObjectId` only bumps `ws_num_full_node_fail_counter`
+ * for genuine FN connectivity failures.
  *
- * These tests capture the desired behaviour:
- *   - A real connectivity failure (network error, timeout) → 503 + counter
- *     bumped.
- *   - A "name not registered" exception (`notExists` from the FN) → 404 (the
- *     same response we already return when `getNameRecord` resolves to null)
- *     and the counter is NOT bumped.
- *
- * The second test starts as RED on `main` and turns GREEN after the fix.
+ * Unregistered SuiNS names are now handled at the RPCSelector level
+ * (getNameRecord returns null), so they never reach the catch block here.
+ * See rpc_selector_get_name_record.test.ts for the notExists tests.
  */
-describe("UrlFetcher.resolveObjectId — counter discrimination", () => {
+describe("UrlFetcher.resolveObjectId — FN-fail counter", () => {
     let suinsResolver: SuiNSResolver;
     let urlFetcher: UrlFetcher;
 
@@ -75,43 +64,9 @@ describe("UrlFetcher.resolveObjectId — counter discrimination", () => {
         );
     });
 
-    /**
-     * Builds the kind of `AggregateError` that bubbles up to `resolveObjectId`
-     * after `RPCSelector.invokeWithFailover` exhausts retries. Each entry in
-     * `errors[]` wraps the original underlying error as `cause` (see
-     * priority_executor.ts).
-     */
-    function buildAggregateAfterFailover(causes: unknown[]): AggregateError {
-        const wrapped = causes.map(
-            (cause, i) =>
-                new Error(`retry-same from http://localhost:1 (attempt ${i + 1})`, { cause }),
-        );
-        return new AggregateError(wrapped, "All URLs exhausted");
-    }
-
-    /** Mirrors @mysten/sui ObjectError shape (we don't import it because the
-     * package doesn't re-export it from the public entry point). */
-    class ObjectErrorLike extends Error {
-        public code: string;
-        constructor(code: string, message: string) {
-            super(message);
-            this.code = code;
-            this.name = "ObjectError";
-        }
-    }
-
     it("returns 503 and bumps FN-fail counter on a real network failure", async () => {
-        const networkErr = new TypeError("fetch failed");
-        // simulate an undici-style cause chain
-        (networkErr as Error & { cause?: unknown }).cause = Object.assign(
-            new Error("ECONNREFUSED"),
-            {
-                code: "ECONNREFUSED",
-            },
-        );
-
         (suinsResolver.resolveSuiNsAddress as ReturnType<typeof vi.fn>).mockRejectedValue(
-            buildAggregateAfterFailover([networkErr]),
+            new TypeError("fetch failed"),
         );
 
         const result = await urlFetcher.resolveObjectId({ subdomain: "anything", path: "/" });
@@ -122,10 +77,8 @@ describe("UrlFetcher.resolveObjectId — counter discrimination", () => {
     });
 
     it("returns 503 and bumps FN-fail counter on a request timeout", async () => {
-        const timeoutErr = new Error("Request timed out");
-
         (suinsResolver.resolveSuiNsAddress as ReturnType<typeof vi.fn>).mockRejectedValue(
-            buildAggregateAfterFailover([timeoutErr]),
+            new Error("Request timed out"),
         );
 
         const result = await urlFetcher.resolveObjectId({ subdomain: "anything", path: "/" });
@@ -134,54 +87,15 @@ describe("UrlFetcher.resolveObjectId — counter discrimination", () => {
         expect(instrumentationFacade.bumpFullNodeFailRequests).toHaveBeenCalledTimes(1);
     });
 
-    it("returns 404 and does NOT bump FN-fail counter when the SuiNS name is not registered", async () => {
-        // This is what @mysten/sui's getDynamicField → getObjects throws when
-        // the FN cleanly answers "this object does not exist" (which is what
-        // happens for any unregistered <name>.sui — the dynamic field's
-        // address is queried directly).
-        const objectErr = new ObjectErrorLike(
-            "notExists",
-            "Object 0x5f181e7e58e6f8f9c3a1c6e5d4b9e2a8d3f7c1b2a3e4d5c6b7a8f9e0d1c2b3a4 does not exist",
-        );
-
-        (suinsResolver.resolveSuiNsAddress as ReturnType<typeof vi.fn>).mockRejectedValue(
-            buildAggregateAfterFailover([objectErr]),
-        );
+    it("returns 404 and does NOT bump FN-fail counter when SuiNS name is not registered", async () => {
+        // After the fix, getNameRecord returns null for unregistered names,
+        // so resolveSuiNsAddress returns null — no throw, no catch block.
+        (suinsResolver.resolveSuiNsAddress as ReturnType<typeof vi.fn>).mockResolvedValue(null);
 
         const result = await urlFetcher.resolveObjectId({
             subdomain: "definitely-not-registered-xyz",
             path: "/",
         });
-
-        expect((result as Response).status).toBe(HttpStatusCodes.NOT_FOUND);
-        // The crux: this counter must NOT increment, otherwise our alert fires
-        // for unregistered-name lookups even though the FN is healthy.
-        expect(instrumentationFacade.bumpFullNodeFailRequests).not.toHaveBeenCalled();
-    });
-
-    it("returns 404 when the AggregateError mixes notExists with secondary-FN errors", async () => {
-        // Real-world shape observed against testnet: the primary FN cleanly
-        // returns notExists (the authoritative answer — name registration is
-        // determinate on-chain state) but failover keeps going and the
-        // secondary FNs (blastapi, suiet, etc.) often return 403/502 because
-        // they're rate-limited or unauthenticated. We must not let those
-        // unrelated failures inflate the FN-fail counter when we have proof
-        // the name doesn't exist.
-        const objectErr = new ObjectErrorLike("notExists", "Object 0xdeadbeef does not exist");
-        const httpErr = Object.assign(new Error("Unexpected status code: 403"), {
-            status: 403,
-            statusText: "Forbidden",
-        });
-        const httpErr2 = Object.assign(new Error("Unexpected status code: 502"), {
-            status: 502,
-            statusText: "Bad Gateway",
-        });
-
-        (suinsResolver.resolveSuiNsAddress as ReturnType<typeof vi.fn>).mockRejectedValue(
-            buildAggregateAfterFailover([objectErr, httpErr, httpErr2]),
-        );
-
-        const result = await urlFetcher.resolveObjectId({ subdomain: "mixed", path: "/" });
 
         expect((result as Response).status).toBe(HttpStatusCodes.NOT_FOUND);
         expect(instrumentationFacade.bumpFullNodeFailRequests).not.toHaveBeenCalled();

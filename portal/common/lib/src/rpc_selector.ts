@@ -43,6 +43,21 @@ class WrappedSuiClient extends SuiJsonRpcClient {
     }
 }
 
+/**
+ * Returns true if the error is an ObjectError with code "notExists" from the
+ * @mysten/sui SDK. This is thrown when the FN cleanly responds that an object
+ * doesn't exist (e.g. an unregistered SuiNS name's dynamic field).
+ *
+ * We use duck-typing because ObjectError is not exported from @mysten/sui.
+ */
+function isNotExistsError(error: unknown): boolean {
+    return (
+        typeof error === "object" &&
+        error !== null &&
+        (error as { code?: unknown }).code === "notExists"
+    );
+}
+
 export class RPCSelector implements RPCSelectorInterface {
     private executor: PriorityExecutor;
     private clients: Map<string, WrappedSuiClient>;
@@ -92,11 +107,15 @@ export class RPCSelector implements RPCSelectorInterface {
                     clearTimeout(timer!);
                 }
             } catch (error) {
+                const wrappedError = error instanceof Error ? error : new Error(String(error));
+                // ObjectError(notExists) means the FN authoritatively answered
+                // "this object does not exist" — retrying won't change the
+                // answer.
+                if (isNotExistsError(error)) {
+                    return { status: "stop", error: wrappedError };
+                }
                 logger.warn("RPC call failed", { url, error: formatError(error) });
-                return {
-                    status: "retry-same",
-                    error: error instanceof Error ? error : new Error(String(error)),
-                };
+                return { status: "retry-same", error: wrappedError };
             }
         });
     }
@@ -157,6 +176,22 @@ export class RPCSelector implements RPCSelectorInterface {
 
     public async getNameRecord(name: string): Promise<NameRecord | null> {
         logger.info("RPCSelector: getNameRecord", { name });
-        return this.invokeWithFailover((client) => client.getNameRecord(name));
+        try {
+            return await this.invokeWithFailover((client) => client.getNameRecord(name));
+        } catch (error) {
+            // The executor wraps the ObjectError in: AggregateError → Error
+            // ("stop from <url>", { cause: ObjectError }). Check the cause
+            // chain for the notExists code.
+            if (
+                error instanceof AggregateError &&
+                error.errors.some((e) =>
+                    isNotExistsError((e as Error & { cause?: unknown }).cause),
+                )
+            ) {
+                logger.info("SuiNS name not registered (FN responded notExists)", { name });
+                return null;
+            }
+            throw error;
+        }
     }
 }
