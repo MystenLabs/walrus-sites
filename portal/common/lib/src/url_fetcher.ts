@@ -36,6 +36,39 @@ type AggregatorResult =
 export const QUILT_PATCH_ID_INTERNAL_HEADER = "x-wal-quilt-patch-internal-id";
 
 /**
+ * Returns true if the error chain contains evidence that the FN cleanly
+ * answered "object does not exist" — i.e. the SuiNS name is not registered.
+ *
+ * Rationale: SuiNS lookup uses `getDynamicField`, which derives the field's
+ * object id and fetches it. For an unregistered name, the FN responds with
+ * `error.code: "notExists"` (a healthy response). The @mysten/sui SDK turns
+ * that into `ObjectError(code: "notExists", "Object 0x... does not exist")`
+ * and throws. After the RPCSelector's failover machinery exhausts retries,
+ * that error ends up wrapped in an `AggregateError`, with each entry's
+ * `cause` carrying the original.
+ *
+ * Name registration is determinate on-chain state, so a single FN saying
+ * "notExists" is authoritative. We don't require *every* cause to be
+ * notExists, because secondary FNs in the priority list (public providers
+ * like blastapi/suiet) frequently return 403/502 due to rate limiting or
+ * auth, and those failures are unrelated to the answer to the lookup.
+ */
+function isUnregisteredSuiNsName(error: unknown): boolean {
+    const causes: unknown[] = [];
+    if (error instanceof AggregateError) {
+        for (const e of error.errors) {
+            causes.push((e as Error & { cause?: unknown }).cause ?? e);
+        }
+    } else {
+        causes.push(error);
+    }
+    return causes.some(
+        (c) =>
+            typeof c === "object" && c !== null && (c as { code?: unknown }).code === "notExists",
+    );
+}
+
+/**
  * Discriminated union returned by `fetchUrl`.
  *
  * Uses a `status` field as the discriminator, similar to Rust enums.
@@ -215,9 +248,22 @@ export class UrlFetcher {
                 subdomain: parsedUrl.subdomain,
             });
             return noObjectIdFound();
-        } catch {
+        } catch (error) {
+            // The @mysten/sui SDK's getDynamicField throws ObjectError(code:
+            // "notExists") when the FN cleanly answers "object does not exist"
+            // — which is exactly what happens for any unregistered <name>.sui
+            // (the dynamic field address is queried directly). That's a
+            // healthy FN response, not a connectivity failure, so it must not
+            // bump the FN-fail counter (which feeds our pager alert).
+            if (isUnregisteredSuiNsName(error)) {
+                logger.warn("SuiNS name is not registered (FN responded notExists)", {
+                    subdomain: parsedUrl.subdomain,
+                });
+                return noObjectIdFound();
+            }
             logger.error("Unable to reach the full node during suins domain resolution", {
                 subdomain: parsedUrl.subdomain,
+                error: formatError(error),
             });
             return fullNodeFail();
         }
