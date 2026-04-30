@@ -11,6 +11,9 @@
 		],
 		"types": [],
 		"baseUrl": "./",
+		"rootDir": "../",
+		"outDir": "dist",
+		"skipLibCheck": true,
 		"paths": {
 			"@lib/*": [
 				"../common/lib/src/*"
@@ -20,10 +23,6 @@
 			]
 		}
 	},
-	"baseUrl": "./",
-	"rootDir": "src",
-	"outDir": "dist",
-	"skipLibCheck": true,
 	"include": [
 		"src/**/*",
 		"../common/lib/src/**/*",
@@ -32,10 +31,5 @@
 	"exclude": [
 		"node_modules",
 		"dist",
-	],
-	"references": [
-		{
-			"path": "../common/tsconfig.json"
-		}
 	]
 }
