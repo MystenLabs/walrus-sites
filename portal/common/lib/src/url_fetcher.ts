@@ -215,9 +215,10 @@ export class UrlFetcher {
                 subdomain: parsedUrl.subdomain,
             });
             return noObjectIdFound();
-        } catch {
+        } catch (error) {
             logger.error("Unable to reach the full node during suins domain resolution", {
                 subdomain: parsedUrl.subdomain,
+                error: formatError(error),
             });
             return fullNodeFail();
         }
