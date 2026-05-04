@@ -819,7 +819,7 @@ fn is_object_version_conflict(err: &anyhow::Error) -> bool {
     let message = error_obj.message();
     static RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
         regex::Regex::new(
-            r"Error checking transaction input objects: Object ID 0x[0-9a-f]+ Version 0x[0-9a-f]+ Digest [0-9a-zA-Z]+ is not available for consumption, current version: 0x[0-9a-f]+"
+            r"Error checking transaction input objects:.*0x[0-9a-f]+.*(?:is not available|is unavailable) for consumption, current version: 0x[0-9a-f]+"
         ).unwrap()
     });
     if !RE.is_match(message) {
