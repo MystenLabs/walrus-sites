@@ -132,7 +132,11 @@ if [[ "$DRY_RUN" == true ]]; then
     echo "Dry run: skipping Move.lock regeneration (sui move build)"
 else
     echo "Regenerating Cargo.lock ..."
-    (cd "$REPO_ROOT" && cargo update && cargo check)
+    # Use `cargo check` alone (no `cargo update`) so only the changed git deps
+    # are re-resolved. A full `cargo update` would re-pick every transitive and
+    # trip over yanked-but-already-locked crates (e.g. core2 0.4.0, pulled in
+    # via mysten-network → multiaddr → multihash in the Sui dep tree).
+    (cd "$REPO_ROOT" && cargo check)
 
     # Regenerate Move.lock files.
     while IFS= read -r move_toml; do

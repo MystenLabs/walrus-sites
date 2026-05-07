@@ -9,13 +9,11 @@ use std::{
 
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::{DateTime, Utc};
-use futures::Future;
 use glob::Pattern;
 use serde::{Deserialize, Deserializer};
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{
     rpc_types::{
-        Page,
         SuiExecutionStatus,
         SuiTransactionBlockEffects,
         SuiTransactionBlockEffectsAPI,
@@ -29,7 +27,6 @@ use sui_types::{
     transaction::{ProgrammableTransaction, TransactionData},
 };
 use walrus_sdk::core::{BlobId as BlobIdOriginal, QuiltPatchId};
-use walrus_sui::client::SuiClientResult;
 
 use crate::{
     display,
@@ -91,37 +88,6 @@ fn update_cache_from_effects(object_cache: &mut ObjectCache, effects: &SuiTransa
             _ => {}
         }
     }
-}
-
-pub(crate) async fn handle_pagination<F, T, C, Fut>(
-    closure: F,
-) -> SuiClientResult<impl Iterator<Item = T>>
-where
-    F: FnMut(Option<C>) -> Fut,
-    T: 'static,
-    Fut: Future<Output = SuiClientResult<Page<T, C>>>,
-{
-    handle_pagination_with_cursor(closure, None).await
-}
-
-pub(crate) async fn handle_pagination_with_cursor<F, T, C, Fut>(
-    mut closure: F,
-    mut cursor: Option<C>,
-) -> SuiClientResult<impl Iterator<Item = T>>
-where
-    F: FnMut(Option<C>) -> Fut,
-    T: 'static,
-    Fut: Future<Output = SuiClientResult<Page<T, C>>>,
-{
-    let mut cont = true;
-    let mut iterators = vec![];
-    while cont {
-        let page = closure(cursor).await?;
-        cont = page.has_next_page;
-        cursor = page.next_cursor;
-        iterators.push(page.data.into_iter());
-    }
-    Ok(iterators.into_iter().flatten())
 }
 
 pub fn bytes_to_base36(source: &[u8]) -> Result<String> {
