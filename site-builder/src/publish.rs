@@ -441,7 +441,7 @@ fn print_summary(
             *id
         }
         None => {
-            let resp = response.ok_or_else(|| anyhow!("response did not contain effects"))?;
+            let resp = response.ok_or(anyhow!("response did not contain effects"))?;
             let id = get_site_id_from_response(*address, resp)?;
             println!("Created new site! \nNew site object ID: {id}");
             id
@@ -515,7 +515,7 @@ fn persist_site_identifier(
         None => {
             let active_address = site_manager.active_address()?;
 
-            let resp = response.ok_or_else(|| anyhow!("Transaction response not found"))?;
+            let resp = response.ok_or(anyhow!("Transaction response not found"))?;
 
             let new_site_object_id = get_site_id_from_response(active_address, resp)?;
 

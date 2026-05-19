@@ -61,15 +61,15 @@ pub(crate) async fn sign_and_send_ptb(
     let resp = retry_client
         .execute_transaction(transaction, "sign_and_send_ptb", Duration::ZERO)
         .await?;
-    update_cache_from_effects(object_cache, resp.object_changes.as_deref());
+    update_cache_from_obj_changes(object_cache, resp.object_changes.as_deref());
     Ok(resp)
 }
 
-/// Updates the object cache with the changed objects from transaction effects.
+/// Updates the object cache with the changed objects from a transaction's object changes.
 ///
 /// Only objects with `AddressOwner` or `ObjectOwner` ownership are cached,
 /// as shared and immutable objects don't have version conflicts in the same way.
-pub(crate) fn update_cache_from_effects(
+pub(crate) fn update_cache_from_obj_changes(
     object_cache: &mut ObjectCache,
     object_changes: Option<&[ObjectChangeEntry]>,
 ) {

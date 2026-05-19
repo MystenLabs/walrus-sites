@@ -16,7 +16,7 @@ use crate::{
     retry_client::new_retriable_sui_client,
     site::config::WSResources,
     types::ObjectCache,
-    util::{is_ignored, is_pattern_match, update_cache_from_effects},
+    util::{is_ignored, is_pattern_match, update_cache_from_obj_changes},
 };
 
 struct PatternMatchTestCase {
@@ -100,13 +100,13 @@ fn test_is_pattern_match_invalid_pattern() {
     );
 }
 
-// ============ update_cache_from_effects tests ============
+// ============ update_cache_from_obj_changes tests ============
 
-/// Tests that `update_cache_from_effects` correctly caches objects from real transaction
+/// Tests that `update_cache_from_obj_changes` correctly caches objects from real transaction
 /// object changes. This test splits a coin to observe created objects, and passes an
 /// unused coin to see if it appears in mutated.
 #[tokio::test]
-async fn test_update_cache_from_effects_with_real_tx() {
+async fn test_update_cache_from_obj_changes_with_real_tx() {
     let cluster = TestClusterBuilder::new().build().await;
     let address = cluster.get_address_0();
 
@@ -169,7 +169,7 @@ async fn test_update_cache_from_effects_with_real_tx() {
     let response = retry_client
         .execute_transaction(
             tx,
-            "test_update_cache_from_effects_with_real_tx",
+            "test_update_cache_from_obj_changes_with_real_tx",
             Duration::ZERO,
         )
         .await
@@ -190,9 +190,9 @@ async fn test_update_cache_from_effects_with_real_tx() {
         "Unused coin should still appear in mutated (Sui bumps version of all inputs)"
     );
 
-    // Test update_cache_from_effects with real object changes
+    // Test update_cache_from_obj_changes with real object changes
     let mut cache = ObjectCache::new();
-    update_cache_from_effects(&mut cache, Some(&object_changes));
+    update_cache_from_obj_changes(&mut cache, Some(&object_changes));
 
     // Gas object should be cached (it's in mutated list as AddressOwner)
     assert!(
