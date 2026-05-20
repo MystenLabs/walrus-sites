@@ -410,4 +410,51 @@ describe("PriorityExecutor", () => {
             expect(attemptCounts.get("https://c.com")).toBe(1); // Succeeded
         });
     });
+
+    describe("worstCaseDurationMs", () => {
+        const DEFAULT_DELAY = 500;
+
+        it("single URL, no retries: one perAttemptMs", () => {
+            const exec = new PriorityExecutor([{ url: "https://a.com", retries: 0, metric: 100 }]);
+            // attempts=1, delays=0 → 1*1000 = 1000
+            expect(exec.worstCaseDurationMs(1000)).toBe(1000);
+        });
+
+        it("single URL, with retries: counts every attempt plus inter-retry delays", () => {
+            const exec = new PriorityExecutor([{ url: "https://a.com", retries: 2, metric: 100 }]);
+            // attempts=3, delays=2 → 3*1000 + 2*500 = 4000
+            expect(exec.worstCaseDurationMs(1000)).toBe(3 * 1000 + 2 * DEFAULT_DELAY);
+        });
+
+        it("multiple URLs: sums independent per-URL chains", () => {
+            const exec = new PriorityExecutor([
+                { url: "https://a.com", retries: 2, metric: 100 }, // 3*1000 + 2*500 = 4000
+                { url: "https://b.com", retries: 0, metric: 200 }, //   1*1000 +   0   = 1000
+                { url: "https://c.com", retries: 1, metric: 300 }, //   2*1000 + 1*500 = 2500
+            ]);
+            expect(exec.worstCaseDurationMs(1000)).toBe(4000 + 1000 + 2500);
+        });
+
+        it("honors a custom delayBetweenRetriesMs", () => {
+            const exec = new PriorityExecutor(
+                [{ url: "https://a.com", retries: 2, metric: 100 }],
+                250,
+            );
+            // attempts=3, delays=2 → 3*1000 + 2*250 = 3500
+            expect(exec.worstCaseDurationMs(1000)).toBe(3500);
+        });
+
+        it("scales linearly with perAttemptMs", () => {
+            const exec = new PriorityExecutor([{ url: "https://a.com", retries: 2, metric: 100 }]);
+            const small = exec.worstCaseDurationMs(100);
+            const big = exec.worstCaseDurationMs(1000);
+            // (big - small) should equal attempts * (1000 - 100) = 3 * 900 = 2700
+            expect(big - small).toBe(3 * 900);
+        });
+
+        it("empty URL list yields zero", () => {
+            const exec = new PriorityExecutor([]);
+            expect(exec.worstCaseDurationMs(10_000)).toBe(0);
+        });
+    });
 });

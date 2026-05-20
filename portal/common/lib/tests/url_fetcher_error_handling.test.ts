@@ -258,3 +258,35 @@ describe("aggregator error handling with priority executor", () => {
         });
     });
 });
+
+describe("UrlFetcher.worstCaseAggregatorChainMs", () => {
+    const mockResourceFetcher = {} as ResourceFetcher;
+    const mockSuiNSResolver = {} as SuiNSResolver;
+    const mockWsRouter = {} as WalrusSitesRouter;
+
+    function makeFetcher(items: PriorityUrl[]): UrlFetcher {
+        return new UrlFetcher(
+            mockResourceFetcher,
+            mockSuiNSResolver,
+            mockWsRouter,
+            new PriorityExecutor(items),
+            true,
+        );
+    }
+
+    it("returns the executor's worst-case chain at the configured per-attempt timeout", () => {
+        const items: PriorityUrl[] = [
+            { url: "https://a.com", retries: 2, metric: 100 },
+            { url: "https://b.com", retries: 0, metric: 200 },
+        ];
+        const fetcher = makeFetcher(items);
+
+        // Library applies a 10s default per-attempt timeout (DEFAULT_AGGREGATOR_TIMEOUT_MS).
+        // A.com: 3*10000 + 2*500 = 31000; B.com: 1*10000 + 0 = 10000; total = 41000.
+        expect(fetcher.worstCaseAggregatorChainMs()).toBe(41_000);
+    });
+
+    it("returns 0 when the aggregator list is empty", () => {
+        expect(makeFetcher([]).worstCaseAggregatorChainMs()).toBe(0);
+    });
+});
