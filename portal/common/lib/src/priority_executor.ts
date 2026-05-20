@@ -157,11 +157,7 @@ export class PriorityExecutor {
     worstCaseDurationMs(perAttemptMs: number): number {
         return this.sortedItems.reduce((sum, item) => {
             const attempts = item.retries + 1;
-            return (
-                sum +
-                attempts * perAttemptMs +
-                (attempts - 1) * this.delayBetweenRetriesMs
-            );
+            return sum + attempts * perAttemptMs + (attempts - 1) * this.delayBetweenRetriesMs;
         }, 0);
     }
 

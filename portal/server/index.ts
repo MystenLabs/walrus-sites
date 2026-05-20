@@ -25,8 +25,7 @@ const IDLE_TIMEOUT_HEADROOM_S = 10;
  * Cloudflare's default free-tier proxy timeout is 100s).
  */
 const DEFAULT_IDLE_TIMEOUT_MAX_S = 100;
-const idleTimeoutMaxS =
-    Number(process.env.PORTAL_IDLE_TIMEOUT_MAX_S) || DEFAULT_IDLE_TIMEOUT_MAX_S;
+const idleTimeoutMaxS = Number(process.env.PORTAL_IDLE_TIMEOUT_MAX_S) || DEFAULT_IDLE_TIMEOUT_MAX_S;
 
 // Bun.serve closes the inbound socket after `idleTimeout` seconds. If that
 // fires before the portal has returned a response, an upstream proxy may

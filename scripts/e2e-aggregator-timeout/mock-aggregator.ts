@@ -46,11 +46,15 @@ Bun.serve({
         const start = Date.now();
 
         if (MODE === "fail503") {
-            console.log(`[mock-aggregator] ${req.method} ${pathname} (will 503 in ${FAIL_DELAY_MS}ms)`);
+            console.log(
+                `[mock-aggregator] ${req.method} ${pathname} (will 503 in ${FAIL_DELAY_MS}ms)`,
+            );
             try {
                 await sleep(FAIL_DELAY_MS, req.signal);
             } catch {
-                console.log(`[mock-aggregator] ${pathname} — client gave up after ${Date.now() - start}ms`);
+                console.log(
+                    `[mock-aggregator] ${pathname} — client gave up after ${Date.now() - start}ms`,
+                );
                 return new Response("aborted", { status: 499 });
             }
             console.log(`[mock-aggregator] ${pathname} → 503 (after ${Date.now() - start}ms)`);
