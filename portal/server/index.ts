@@ -10,17 +10,23 @@ import { setupTapelog } from "custom_logger";
 import logger, { formatErrorWithStack } from "@lib/logger";
 import { QUILT_PATCH_ID_INTERNAL_HEADER } from "@lib/url_fetcher";
 import { worstCaseAggregatorChainMs } from "src/url_fetcher_factory";
+import { config } from "src/config";
 
 const PORT = 3000;
 
 // Headroom above the worst-case aggregator chain — accounts for RPC calls,
 // hashing, and small per-attempt variance.
 const IDLE_TIMEOUT_HEADROOM_S = 10;
-// Upper bound on the computed idleTimeout so a misconfigured aggregator list
-// (many URLs / high retries) can't grow the per-request budget unboundedly.
-// Tune to fit under any upstream proxy or CDN request timeout sitting in front
-// of the portal.
-const IDLE_TIMEOUT_MAX_S = 100;
+/**
+ * Default upper bound (seconds) on the computed idleTimeout. Overridable via
+ * the `PORTAL_IDLE_TIMEOUT_MAX_S` env var. Set this below any upstream proxy
+ * or CDN request timeout sitting in front of the portal — depending on the
+ * dependent service's timeout, it may need to be lower than 100s (e.g.
+ * Cloudflare's default free-tier proxy timeout is 100s).
+ */
+const DEFAULT_IDLE_TIMEOUT_MAX_S = 100;
+const idleTimeoutMaxS =
+    Number(process.env.PORTAL_IDLE_TIMEOUT_MAX_S) || DEFAULT_IDLE_TIMEOUT_MAX_S;
 
 // Bun.serve closes the inbound socket after `idleTimeout` seconds. If that
 // fires before the portal has returned a response, an upstream proxy may
@@ -29,10 +35,24 @@ const IDLE_TIMEOUT_MAX_S = 100;
 // aggregatorFail() response.
 const idleTimeoutS = Math.min(
     Math.ceil(worstCaseAggregatorChainMs() / 1000) + IDLE_TIMEOUT_HEADROOM_S,
-    IDLE_TIMEOUT_MAX_S,
+    idleTimeoutMaxS,
 );
 
-console.log("Running Bun server at port", PORT, `(idleTimeout=${idleTimeoutS}s) ...`);
+logger.info(`Starting Bun server on port ${PORT}`);
+
+// Secret fields are reported as set/unset only — values must never reach logs.
+const SECRET_FIELDS = [
+    "blocklistRedisUrl",
+    "allowlistRedisUrl",
+    "edgeConfig",
+    "edgeConfigAllowlist",
+] as const;
+const sanitizedConfig: Record<string, unknown> = { ...config, idleTimeoutS };
+for (const field of SECRET_FIELDS) {
+    sanitizedConfig[field] = config[field] ? "[set]" : "[unset]";
+}
+logger.info("Portal config", sanitizedConfig);
+
 await setupTapelog();
 serve({
     port: PORT,

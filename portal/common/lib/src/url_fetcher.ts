@@ -35,8 +35,16 @@ type AggregatorResult =
 
 export const QUILT_PATCH_ID_INTERNAL_HEADER = "x-wal-quilt-patch-internal-id";
 
-/** Per-attempt timeout for a single aggregator HTTP fetch. */
-const AGGREGATOR_TIMEOUT_MS = 10_000;
+/**
+ * Default per-attempt timeout (ms) for a single aggregator HTTP fetch.
+ * Overridable via the `AGGREGATOR_REQUEST_TIMEOUT_MS` env var. Set this below
+ * any upstream proxy / CDN request timeout in front of the portal — a slow
+ * aggregator response longer than this is aborted and the request fails over
+ * to the next aggregator URL.
+ */
+const DEFAULT_AGGREGATOR_TIMEOUT_MS = 10_000;
+const aggregatorTimeoutMs =
+    Number(process.env.AGGREGATOR_REQUEST_TIMEOUT_MS) || DEFAULT_AGGREGATOR_TIMEOUT_MS;
 
 /**
  * Discriminated union returned by `fetchUrl`.
@@ -75,7 +83,7 @@ export class UrlFetcher {
      * timeout.
      */
     worstCaseAggregatorChainMs(): number {
-        return this.aggregatorExecutor.worstCaseDurationMs(AGGREGATOR_TIMEOUT_MS);
+        return this.aggregatorExecutor.worstCaseDurationMs(aggregatorTimeoutMs);
     }
 
     /**
@@ -352,9 +360,14 @@ export class UrlFetcher {
         const start = Date.now();
 
         try {
+            // NOTE: As of early 2026, Bun's AbortSignal rejects the fetch
+            // promise on timeout but the underlying request still completes in
+            // the background (same caveat as in rpc_selector.ts). Under load,
+            // repeated timeouts can hold sockets open until the upstream
+            // naturally responds. This may improve in future Bun versions.
             const response = await fetch(url, {
                 headers,
-                signal: AbortSignal.timeout(AGGREGATOR_TIMEOUT_MS),
+                signal: AbortSignal.timeout(aggregatorTimeoutMs),
             });
 
             if (response.ok) {
