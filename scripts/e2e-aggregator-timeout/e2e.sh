@@ -49,17 +49,26 @@ echo "starting portal..."
 echo "starting envoy..."
 envoy -c "$HERE/envoy.yaml" >"$LOG/envoy.log" 2>&1 &
 
-echo "waiting for portal to come up..."
-for _ in $(seq 1 60); do
-    if curl -sf -o /dev/null --max-time 1 http://localhost:3000/__wal__/healthz; then
-        break
-    fi
-    sleep 0.5
-done
-if ! curl -sf -o /dev/null --max-time 1 http://localhost:3000/__wal__/healthz; then
-    echo "::error::portal did not come up within 30s"
-    exit 1
-fi
+wait_for() {
+    local name="$1" probe="$2"
+    for _ in $(seq 1 60); do
+        if eval "$probe" >/dev/null 2>&1; then return 0; fi
+        sleep 0.5
+    done
+    echo "::error::$name did not come up within 30s"
+    return 1
+}
+
+# Probe each upstream before firing the test request — otherwise a failed
+# mock/envoy start surfaces as a buried connection error later. The mock
+# deliberately stalls HTTP responses (per MODE), so for it and envoy we
+# only verify the listening socket via TCP connect.
+wait_for "mock-aggregator" "bash -c '</dev/tcp/localhost/8080'" \
+    || { echo "see $LOG/mock.log"; exit 1; }
+wait_for "portal" "curl -sf -o /dev/null --max-time 1 http://localhost:3000/__wal__/healthz" \
+    || { echo "see $LOG/portal.log"; exit 1; }
+wait_for "envoy" "bash -c '</dev/tcp/localhost/4000'" \
+    || { echo "see $LOG/envoy.log"; exit 1; }
 
 echo "firing request at $TARGET"
 RESPONSE_FILE="$LOG/response.body"

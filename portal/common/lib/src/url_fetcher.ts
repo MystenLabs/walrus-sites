@@ -41,6 +41,11 @@ export const QUILT_PATCH_ID_INTERNAL_HEADER = "x-wal-quilt-patch-internal-id";
  * any upstream proxy / CDN request timeout in front of the portal — a slow
  * aggregator response longer than this is aborted and the request fails over
  * to the next aggregator URL.
+ *
+ * TODO: any new env-driven knob in common/lib must also be added to the
+ * worker's webpack DefinePlugin (`portal/worker/webpack.config.common.js`),
+ * or the worker bundle will read a bare `process.env.X` that is undefined
+ * at runtime. A central registry would prevent that drift.
  */
 const DEFAULT_AGGREGATOR_TIMEOUT_MS = 10_000;
 export const aggregatorTimeoutMs =

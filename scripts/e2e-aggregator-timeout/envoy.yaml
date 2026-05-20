@@ -1,10 +1,12 @@
 # Copyright (c) Mysten Labs, Inc.
 # SPDX-License-Identifier: Apache-2.0
 #
-# Real Envoy config that sits in front of the portal — mirrors GCLB's
-# behavior for SEW-893. The route timeout of 5s emulates
-# BackendConfig.timeoutSec from pulumi/gcp/sui-rpc2/resources/backendconfig-walrus-sites.yaml
-# (production uses 120s; we use 5s for fast iteration).
+# Real Envoy in front of the portal. All per-stream timers are disabled
+# (route timeout, stream_idle_timeout, request_timeout) on purpose so the
+# e2e isolates the portal's own behavior — we want to verify that the
+# portal returns its own aggregatorFail() body under its own idleTimeout,
+# without Envoy cutting the stream first. Production GCLB sets
+# BackendConfig.timeoutSec=120; we run with timers off here.
 
 admin:
   address:

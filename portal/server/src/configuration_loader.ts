@@ -230,14 +230,42 @@ const SECRET_FIELDS = [
     "edgeConfigAllowlist",
 ] as const satisfies readonly (keyof Configuration)[];
 
+// URL-list fields where individual entries may carry credentials in the path
+// or query (e.g. provider API keys like `/v2/<KEY>` or `?api_key=...`).
+// Path-embedded keys can't be soundly identified without false positives, so
+// we reduce each URL to its origin for logging.
+const URL_LIST_FIELDS = [
+    "rpcUrlList",
+    "premiumRpcUrlList",
+    "aggregatorUrlList",
+] as const satisfies readonly (keyof Configuration)[];
+
+function originOrInvalid(url: string): string {
+    try {
+        return new URL(url).origin;
+    } catch {
+        return "[invalid-url]";
+    }
+}
+
 /**
- * Returns a copy of `config` with secret-bearing fields replaced by
- * `"[set]"` / `"[unset]"`. Safe to pass to a logger.
+ * Returns a copy of `config` safe for logging:
+ *   - secret-bearing fields → `"[set]"` / `"[unset]"`
+ *   - URL list entries → reduced to their origin (drops path/query/userinfo)
  */
 export function sanitizeConfig(config: Configuration): Record<string, unknown> {
     const out: Record<string, unknown> = { ...config };
     for (const field of SECRET_FIELDS) {
         out[field] = config[field] ? "[set]" : "[unset]";
+    }
+    for (const field of URL_LIST_FIELDS) {
+        const list = config[field];
+        if (list) {
+            out[field] = list.map((entry) => ({
+                ...entry,
+                url: originOrInvalid(entry.url),
+            }));
+        }
     }
     return out;
 }

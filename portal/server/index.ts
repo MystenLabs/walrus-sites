@@ -25,6 +25,9 @@ const IDLE_TIMEOUT_HEADROOM_S = 10;
  * or CDN request timeout sitting in front of the portal — depending on the
  * dependent service's timeout, it may need to be lower than 100s (e.g.
  * Cloudflare's default free-tier proxy timeout is 100s).
+ *
+ * Bun's `idleTimeout` accepts at most 255s; values above that are rejected
+ * or clamped at serve() time.
  */
 const DEFAULT_IDLE_TIMEOUT_MAX_S = 100;
 const idleTimeoutMaxS = Number(process.env.PORTAL_IDLE_TIMEOUT_MAX_S) || DEFAULT_IDLE_TIMEOUT_MAX_S;

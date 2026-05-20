@@ -99,6 +99,14 @@ module.exports = {
             'process.env.ORIGINAL_PACKAGE_ID': JSON.stringify(
                 envOrYaml('ORIGINAL_PACKAGE_ID') || envOrYaml('SITE_PACKAGE')
             ),
+            // common/lib timeout knobs — must be listed here or the bundled
+            // worker reads a bare `process.env.X` that's undefined at runtime.
+            'process.env.RPC_REQUEST_TIMEOUT_MS': JSON.stringify(
+                envOrYaml('RPC_REQUEST_TIMEOUT_MS')
+            ),
+            'process.env.AGGREGATOR_REQUEST_TIMEOUT_MS': JSON.stringify(
+                envOrYaml('AGGREGATOR_REQUEST_TIMEOUT_MS')
+            ),
         }),
         new CopyPlugin({
             patterns: [

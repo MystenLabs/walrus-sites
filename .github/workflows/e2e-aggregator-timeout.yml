@@ -11,8 +11,10 @@ on:
     paths:
       - portal/common/lib/src/url_fetcher.ts
       - portal/common/lib/src/priority_executor.ts
+      - portal/common/lib/src/rpc_selector.ts
       - portal/server/index.ts
       - portal/server/src/url_fetcher_factory.ts
+      - portal/server/src/configuration_loader.ts
       - scripts/e2e-aggregator-timeout/**
       - .github/workflows/e2e-aggregator-timeout.yml
   workflow_dispatch:
@@ -25,7 +27,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  ENVOY_IMAGE: envoyproxy/envoy:v1.31-latest
+  ENVOY_IMAGE: envoyproxy/envoy:v1.31.7
 
 jobs:
   e2e:
