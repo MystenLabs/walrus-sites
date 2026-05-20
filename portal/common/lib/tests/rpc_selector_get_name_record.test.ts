@@ -55,6 +55,9 @@ describe("RPCSelector.getNameRecord — notExists handling", () => {
                 const wrapped = new Error(`stop from ${urls[0].url}`, { cause: result.error });
                 throw new AggregateError([wrapped], "Stopped");
             }
+            if (result.status !== "success") {
+                throw new AggregateError([result.error ?? new Error(result.status)], "Retried");
+            }
             return result.value;
         });
 
