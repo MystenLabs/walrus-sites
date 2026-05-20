@@ -8,9 +8,11 @@ import { genericError } from "@lib/http/http_error_responses";
 import main from "src/main";
 import { setupTapelog } from "custom_logger";
 import logger, { formatErrorWithStack } from "@lib/logger";
-import { QUILT_PATCH_ID_INTERNAL_HEADER } from "@lib/url_fetcher";
+import { aggregatorTimeoutMs, QUILT_PATCH_ID_INTERNAL_HEADER } from "@lib/url_fetcher";
+import { rpcRequestTimeoutMs } from "@lib/rpc_selector";
 import { worstCaseAggregatorChainMs } from "src/url_fetcher_factory";
 import { config } from "src/config";
+import { sanitizeConfig } from "src/configuration_loader";
 
 const PORT = 3000;
 
@@ -38,19 +40,13 @@ const idleTimeoutS = Math.min(
 );
 
 logger.info(`Starting Bun server on port ${PORT}`);
-
-// Secret fields are reported as set/unset only — values must never reach logs.
-const SECRET_FIELDS = [
-    "blocklistRedisUrl",
-    "allowlistRedisUrl",
-    "edgeConfig",
-    "edgeConfigAllowlist",
-] as const;
-const sanitizedConfig: Record<string, unknown> = { ...config, idleTimeoutS };
-for (const field of SECRET_FIELDS) {
-    sanitizedConfig[field] = config[field] ? "[set]" : "[unset]";
-}
-logger.info("Portal config", sanitizedConfig);
+logger.info("Portal config", {
+    ...sanitizeConfig(config),
+    idleTimeoutS,
+    idleTimeoutMaxS,
+    aggregatorTimeoutMs,
+    rpcRequestTimeoutMs,
+});
 
 await setupTapelog();
 serve({

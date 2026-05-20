@@ -218,3 +218,26 @@ export function loadAndValidateConfig(
     }
     return parsedConfig.data;
 }
+
+// --- Sanitization for logging ---
+
+// Fields whose values must never appear in logs. Reported as set/unset only.
+// Keep in sync with credential-bearing fields in `configurationSchema`.
+const SECRET_FIELDS = [
+    "blocklistRedisUrl",
+    "allowlistRedisUrl",
+    "edgeConfig",
+    "edgeConfigAllowlist",
+] as const satisfies readonly (keyof Configuration)[];
+
+/**
+ * Returns a copy of `config` with secret-bearing fields replaced by
+ * `"[set]"` / `"[unset]"`. Safe to pass to a logger.
+ */
+export function sanitizeConfig(config: Configuration): Record<string, unknown> {
+    const out: Record<string, unknown> = { ...config };
+    for (const field of SECRET_FIELDS) {
+        out[field] = config[field] ? "[set]" : "[unset]";
+    }
+    return out;
+}

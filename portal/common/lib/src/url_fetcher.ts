@@ -43,7 +43,7 @@ export const QUILT_PATCH_ID_INTERNAL_HEADER = "x-wal-quilt-patch-internal-id";
  * to the next aggregator URL.
  */
 const DEFAULT_AGGREGATOR_TIMEOUT_MS = 10_000;
-const aggregatorTimeoutMs =
+export const aggregatorTimeoutMs =
     Number(process.env.AGGREGATOR_REQUEST_TIMEOUT_MS) || DEFAULT_AGGREGATOR_TIMEOUT_MS;
 
 /**

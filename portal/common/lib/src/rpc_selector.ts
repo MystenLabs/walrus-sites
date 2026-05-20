@@ -13,6 +13,10 @@ import logger, { formatError } from "@lib/logger";
 import { NameRecord, Network } from "@lib/types";
 import { ExecuteResult, PriorityExecutor, PriorityUrl } from "@lib/priority_executor";
 
+const DEFAULT_RPC_REQUEST_TIMEOUT_MS = 7_000;
+export const rpcRequestTimeoutMs =
+    Number(process.env.RPC_REQUEST_TIMEOUT_MS) || DEFAULT_RPC_REQUEST_TIMEOUT_MS;
+
 interface RPCSelectorInterface {
     getObject(input: GetObjectParams): Promise<SuiObjectResponse>;
     multiGetObjects(input: MultiGetObjectsParams): Promise<SuiObjectResponse[]>;
@@ -61,14 +65,13 @@ function isNotExistsError(error: unknown): boolean {
 export class RPCSelector implements RPCSelectorInterface {
     private executor: PriorityExecutor;
     private clients: Map<string, WrappedSuiClient>;
-    private readonly timeoutMs: number;
+    private readonly timeoutMs: number = rpcRequestTimeoutMs;
 
     constructor(priorityUrls: PriorityUrl[], network: Network) {
         this.executor = new PriorityExecutor(priorityUrls);
         this.clients = new Map(
             priorityUrls.map((p) => [p.url, new WrappedSuiClient(p.url, network)]),
         );
-        this.timeoutMs = Number(process.env.RPC_REQUEST_TIMEOUT_MS) || 7000;
     }
 
     // General method to call clients in priority order with failover.
