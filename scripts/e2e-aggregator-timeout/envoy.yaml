@@ -1,0 +1,53 @@
+# Copyright (c) Mysten Labs, Inc.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Real Envoy config that sits in front of the portal — mirrors GCLB's
+# behavior for SEW-893. The route timeout of 5s emulates
+# BackendConfig.timeoutSec from pulumi/gcp/sui-rpc2/resources/backendconfig-walrus-sites.yaml
+# (production uses 120s; we use 5s for fast iteration).
+
+admin:
+  address:
+    socket_address: { address: 127.0.0.1, port_value: 9901 }
+
+static_resources:
+  listeners:
+    - name: ingress
+      address:
+        socket_address: { address: 0.0.0.0, port_value: 4000 }
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: ingress_http
+                http_filters:
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+                # Disable Envoy's own per-stream timer so we can isolate the
+                # behavior triggered by max_stream_duration on the upstream.
+                stream_idle_timeout: 0s
+                request_timeout: 0s
+                route_config:
+                  name: local_route
+                  virtual_hosts:
+                    - name: portal
+                      domains: ["*"]
+                      routes:
+                        - match: { prefix: "/" }
+                          route:
+                            cluster: portal
+                            timeout: 0s
+
+  clusters:
+    - name: portal
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: portal
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address: { address: 127.0.0.1, port_value: 3000 }
