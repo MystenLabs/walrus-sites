@@ -35,6 +35,9 @@ type AggregatorResult =
 
 export const QUILT_PATCH_ID_INTERNAL_HEADER = "x-wal-quilt-patch-internal-id";
 
+/** Per-attempt timeout for a single aggregator HTTP fetch. */
+export const AGGREGATOR_TIMEOUT_MS = 10_000;
+
 /**
  * Discriminated union returned by `fetchUrl`.
  *
@@ -340,7 +343,10 @@ export class UrlFetcher {
         const start = Date.now();
 
         try {
-            const response = await fetch(url, { headers });
+            const response = await fetch(url, {
+                headers,
+                signal: AbortSignal.timeout(AGGREGATOR_TIMEOUT_MS),
+            });
 
             if (response.ok) {
                 const body = await response.arrayBuffer();

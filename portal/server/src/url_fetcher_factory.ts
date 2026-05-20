@@ -24,7 +24,7 @@ class UrlFetcherFactory {
         config.suinsClientNetwork,
     );
 
-    private static readonly aggregatorExecutor = new PriorityExecutor(config.aggregatorUrlList);
+    public static readonly aggregatorExecutor = new PriorityExecutor(config.aggregatorUrlList);
 
     public static premiumUrlFetcher(): UrlFetcher | undefined {
         if (!this.premiumRpcSelector) return undefined;
@@ -48,6 +48,7 @@ class UrlFetcherFactory {
     }
 }
 
+export const aggregatorExecutor = UrlFetcherFactory.aggregatorExecutor;
 export const standardUrlFetcher = UrlFetcherFactory.standardUrlFetcher();
 const premium = UrlFetcherFactory.premiumUrlFetcher();
 // Zod config validation (configuration_loader.ts) guarantees `premium` is
