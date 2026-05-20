@@ -36,7 +36,7 @@ type AggregatorResult =
 export const QUILT_PATCH_ID_INTERNAL_HEADER = "x-wal-quilt-patch-internal-id";
 
 /** Per-attempt timeout for a single aggregator HTTP fetch. */
-export const AGGREGATOR_TIMEOUT_MS = 10_000;
+const AGGREGATOR_TIMEOUT_MS = 10_000;
 
 /**
  * Discriminated union returned by `fetchUrl`.
@@ -68,6 +68,15 @@ export class UrlFetcher {
         private aggregatorExecutor: PriorityExecutor,
         private b36DomainResolutionSupport: boolean,
     ) {}
+
+    /**
+     * Worst-case time the aggregator chain could spend on a single resource
+     * fetch, given the configured URL list, retries, delays, and per-attempt
+     * timeout.
+     */
+    worstCaseAggregatorChainMs(): number {
+        return this.aggregatorExecutor.worstCaseDurationMs(AGGREGATOR_TIMEOUT_MS);
+    }
 
     /**
      * Resolves the subdomain to an object ID, and gets the corresponding resources.

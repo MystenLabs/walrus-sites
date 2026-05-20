@@ -8,8 +8,8 @@ import { genericError } from "@lib/http/http_error_responses";
 import main from "src/main";
 import { setupTapelog } from "custom_logger";
 import logger, { formatErrorWithStack } from "@lib/logger";
-import { AGGREGATOR_TIMEOUT_MS, QUILT_PATCH_ID_INTERNAL_HEADER } from "@lib/url_fetcher";
-import { aggregatorExecutor } from "src/url_fetcher_factory";
+import { QUILT_PATCH_ID_INTERNAL_HEADER } from "@lib/url_fetcher";
+import { worstCaseAggregatorChainMs } from "src/url_fetcher_factory";
 
 const PORT = 3000;
 
@@ -28,8 +28,7 @@ const IDLE_TIMEOUT_MAX_S = 100;
 // retry budget so the chain always has room to complete and return our own
 // aggregatorFail() response.
 const idleTimeoutS = Math.min(
-    Math.ceil(aggregatorExecutor.worstCaseDurationMs(AGGREGATOR_TIMEOUT_MS) / 1000) +
-        IDLE_TIMEOUT_HEADROOM_S,
+    Math.ceil(worstCaseAggregatorChainMs() / 1000) + IDLE_TIMEOUT_HEADROOM_S,
     IDLE_TIMEOUT_MAX_S,
 );
 

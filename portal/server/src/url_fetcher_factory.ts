@@ -24,7 +24,7 @@ class UrlFetcherFactory {
         config.suinsClientNetwork,
     );
 
-    public static readonly aggregatorExecutor = new PriorityExecutor(config.aggregatorUrlList);
+    private static readonly aggregatorExecutor = new PriorityExecutor(config.aggregatorUrlList);
 
     public static premiumUrlFetcher(): UrlFetcher | undefined {
         if (!this.premiumRpcSelector) return undefined;
@@ -48,7 +48,6 @@ class UrlFetcherFactory {
     }
 }
 
-export const aggregatorExecutor = UrlFetcherFactory.aggregatorExecutor;
 export const standardUrlFetcher = UrlFetcherFactory.standardUrlFetcher();
 const premium = UrlFetcherFactory.premiumUrlFetcher();
 // Zod config validation (configuration_loader.ts) guarantees `premium` is
@@ -56,3 +55,8 @@ const premium = UrlFetcherFactory.premiumUrlFetcher();
 // premiumUrlFetcher is never actually invoked — aliasing to standard keeps
 // the export type non-nullable and avoids touching consumers.
 export const premiumUrlFetcher: UrlFetcher = premium ?? standardUrlFetcher;
+
+// Standard and premium fetchers share the same aggregator executor, so either
+// one returns the same answer. Exposed here so callers don't have to know that.
+export const worstCaseAggregatorChainMs = (): number =>
+    standardUrlFetcher.worstCaseAggregatorChainMs();
