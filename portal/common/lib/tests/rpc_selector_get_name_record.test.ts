@@ -39,10 +39,7 @@ describe("RPCSelector.getNameRecord — notExists handling", () => {
     ];
 
     it("returns null without retrying when FN responds notExists", async () => {
-        const notExistsError = new ObjectErrorLike(
-            "notExists",
-            "Object 0xdeadbeef does not exist",
-        );
+        const notExistsError = new ObjectErrorLike("notExists", "Object 0xdeadbeef does not exist");
 
         // Track how many times the executor's callback is invoked to verify
         // no retries happen.

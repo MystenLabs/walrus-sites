@@ -184,9 +184,7 @@ export class RPCSelector implements RPCSelectorInterface {
             // chain for the notExists code.
             if (
                 error instanceof AggregateError &&
-                error.errors.some((e) =>
-                    isNotExistsError((e as Error & { cause?: unknown }).cause),
-                )
+                error.errors.some((e) => isNotExistsError((e as Error & { cause?: unknown }).cause))
             ) {
                 logger.info("SuiNS name not registered (FN responded notExists)", { name });
                 return null;
