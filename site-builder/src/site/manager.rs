@@ -11,7 +11,6 @@ use anyhow::{anyhow, bail, Context, Result};
 use sui_keys::keystore::AccountKeystore;
 use sui_sdk::{
     json_rpc_error::TRANSACTION_EXECUTION_CLIENT_ERROR_CODE,
-    rpc_types::SuiTransactionBlockResponse,
     wallet_context::WalletContext,
 };
 use sui_types::{
@@ -27,7 +26,10 @@ use walrus_sdk::{
         utils::price_for_encoded_length,
     },
 };
-use walrus_sui::client::retry_client::retriable_sui_client::MAX_GAS_PAYMENT_OBJECTS;
+use walrus_sui::{
+    client::retry_client::retriable_sui_client::MAX_GAS_PAYMENT_OBJECTS,
+    types::transaction::{ExecuteTransactionResponse, TransactionEffectsStatus},
+};
 
 use super::{
     builder::{SitePtb, SitePtbBuilderResultExt, PTB_MAX_MOVE_CALLS},
@@ -116,7 +118,7 @@ impl SiteManager {
         existing_site: &SiteData,
         blob_extensions: BlobExtensions,
         walrus_pkg: ObjectID,
-    ) -> Result<(SuiTransactionBlockResponse, SiteDataDiffSummary)> {
+    ) -> Result<(Option<ExecuteTransactionResponse>, SiteDataDiffSummary)> {
         tracing::debug!(?self.site_id, "creating or updating site");
 
         tracing::debug!(?existing_site, "checked existing site");
@@ -128,11 +130,13 @@ impl SiteManager {
         let result = if site_updates.has_updates() {
             println!(); // Empty line before applying action for consistency
             display::action("Applying the Walrus Site object updates on Sui");
-            self.execute_sui_updates(&site_updates, walrus_pkg)
-                .await
-                .inspect(|_| display::done())?
+            Some(
+                self.execute_sui_updates(&site_updates, walrus_pkg)
+                    .await
+                    .inspect(|_| display::done())?,
+            )
         } else {
-            SuiTransactionBlockResponse::default()
+            None
         };
 
         // Extract the BlobIDs from deleted resources for Walrus cleanup
@@ -440,14 +444,17 @@ impl SiteManager {
             gas_price, // Use actual reference gas price
         );
 
-        // TODO(grpc-migration): Replace with gRPC-backed simulate/dev_inspect once the
-        // walrus-sui crate adds support. Currently goes through deprecated
-        // get_current_client() → sui_client() → read_api() → dev_inspect_transaction_block().
+        // TODO(grpc-migration): Migrate to gRPC-backed simulate/dev_inspect.
+        // Builds a standalone JSON-RPC client from the wallet's RPC URL.
+        let rpc_url = &self
+            .wallet
+            .config
+            .get_active_env()
+            .context("no default env specified in wallet config")?
+            .rpc;
+        let sui_client = sui_sdk::SuiClientBuilder::default().build(rpc_url).await?;
         #[allow(deprecated)]
-        let response = retry_client
-            .get_current_client()
-            .await
-            .sui_client()
+        let response = sui_client
             .read_api()
             .dev_inspect_transaction_block(
                 self.active_address()?,
@@ -472,7 +479,7 @@ impl SiteManager {
         &mut self,
         updates: &SiteDataDiff<'_>,
         walrus_pkg: ObjectID,
-    ) -> Result<SuiTransactionBlockResponse> {
+    ) -> Result<ExecuteTransactionResponse> {
         tracing::debug!(
             address=?self.active_address()?,
             ?updates,
@@ -492,13 +499,7 @@ impl SiteManager {
 
         let site_object_id = match &self.site_id {
             Some(site_id) => *site_id,
-            None => {
-                let resp = result
-                    .effects
-                    .as_ref()
-                    .ok_or(anyhow!("the result did not have effects"))?;
-                get_site_id_from_response(self.active_address()?, resp)?
-            }
+            None => get_site_id_from_response(self.active_address()?, &result)?,
         };
         // Execute remaining PTBs with retry on object version conflicts.
         // Version conflicts mean the PTB was rejected pre-execution (no on-chain effects),
@@ -549,7 +550,7 @@ impl SiteManager {
         &mut self,
         context: &str,
         mut build_ptb: impl AsyncFnMut(&mut Self) -> Result<(ProgrammableTransaction, T)>,
-    ) -> Result<(SuiTransactionBlockResponse, T)> {
+    ) -> Result<(ExecuteTransactionResponse, T)> {
         let mut backoff = self.backoff_config.get_strategy(rand::random());
         loop {
             let (ptb, extra) = build_ptb(self).await?;
@@ -561,7 +562,11 @@ impl SiteManager {
                 "sending PTB"
             );
             match self.sign_and_send_ptb(ptb, gas_ref).await {
-                Ok(result) if result.status_ok() == Some(true) => return Ok((result, extra)),
+                Ok(result)
+                    if matches!(result.effects_status, TransactionEffectsStatus::Success) =>
+                {
+                    return Ok((result, extra));
+                }
                 Ok(result) => {
                     bail!("{context} transaction failed [tx_digest={}]", result.digest);
                 }
@@ -635,7 +640,7 @@ impl SiteManager {
         &mut self,
         programmable_transaction: ProgrammableTransaction,
         gas_coin: ObjectRef,
-    ) -> Result<SuiTransactionBlockResponse> {
+    ) -> Result<ExecuteTransactionResponse> {
         sign_and_send_ptb(
             self.active_address()?,
             &self.wallet,

@@ -9,7 +9,6 @@ use move_core_types::language_storage::StructTag;
 use rand::rngs::OsRng;
 use sui_config::{node::RunWithRange, Config as _};
 use sui_sdk::{
-    rpc_types::SuiTransactionBlockEffectsAPI,
     sui_client_config::{SuiClientConfig, SuiEnv},
     SuiClientBuilder,
 };
@@ -20,6 +19,7 @@ use sui_types::{
 };
 use test_cluster::TestClusterBuilder;
 use walrus_sdk::core_utils::backoff::ExponentialBackoffConfig;
+use walrus_sui::types::transaction::ObjectChangeEntry;
 
 use super::SiteManager;
 use crate::{args::GeneralArgs, config::Config, retry_client::new_retriable_sui_client};
@@ -376,14 +376,21 @@ async fn test_send_ptb_retries_on_version_conflict() {
         .unwrap();
 
     // Find the newly created coin object.
-    let created = response
-        .effects
+    let created: Vec<ObjectRef> = response
+        .object_changes
         .as_ref()
         .unwrap()
-        .created()
         .iter()
-        .map(|o| o.reference.to_object_ref())
-        .collect::<Vec<_>>();
+        .filter_map(|c| match c {
+            ObjectChangeEntry::Created {
+                object_id,
+                version,
+                digest,
+                ..
+            } => Some((*object_id, *version, *digest)),
+            _ => None,
+        })
+        .collect();
     assert_eq!(created.len(), 1, "expected exactly one created object");
     let stale_coin_ref = created[0];
 
@@ -401,15 +408,20 @@ async fn test_send_ptb_retries_on_version_conflict() {
 
     // Get the fresh (advanced) version of the coin.
     let fresh_coin_ref: ObjectRef = response
-        .effects
+        .object_changes
         .as_ref()
         .unwrap()
-        .mutated()
         .iter()
-        .find(|o| o.reference.object_id == stale_coin_ref.0)
-        .expect("coin should be in mutated list")
-        .reference
-        .to_object_ref();
+        .find_map(|c| match c {
+            ObjectChangeEntry::Mutated {
+                object_id,
+                version,
+                digest,
+                ..
+            } if *object_id == stale_coin_ref.0 => Some((*object_id, *version, *digest)),
+            _ => None,
+        })
+        .expect("coin should be in mutated list");
     assert!(fresh_coin_ref.1 > stale_coin_ref.1);
 
     // Call send_ptb_retry_on_version_conflict. The closure builds a PTB that transfers the
@@ -432,7 +444,10 @@ async fn test_send_ptb_retries_on_version_conflict() {
         .await
         .unwrap();
 
-    assert_eq!(result.status_ok(), Some(true));
+    assert!(matches!(
+        result.effects_status,
+        walrus_sui::types::transaction::TransactionEffectsStatus::Success
+    ));
     assert!(
         attempt.get() >= 2,
         "expected at least 2 attempts, got {}",

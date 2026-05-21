@@ -6,12 +6,8 @@ use std::{
 };
 
 use anyhow::{anyhow, Result};
-use sui_sdk::rpc_types::{
-    SuiExecutionStatus,
-    SuiTransactionBlockEffects,
-    SuiTransactionBlockResponse,
-};
 use sui_types::base_types::{ObjectID, SuiAddress};
+use walrus_sui::types::transaction::{ExecuteTransactionResponse, TransactionEffectsStatus};
 
 use crate::{
     args::PublishOptions,
@@ -130,7 +126,7 @@ impl SiteEditor<EditOptions> {
             &self.config,
             &active_address,
             &self.edit_options.site_id,
-            &response,
+            response.as_ref(),
             &summary,
         )?;
         Ok(())
@@ -139,7 +135,11 @@ impl SiteEditor<EditOptions> {
     /// Load resources from directory and store quilts (with enhanced dry-run logic)
     async fn run_single_edit_quilts(
         &self,
-    ) -> Result<(SuiAddress, SuiTransactionBlockResponse, SiteDataDiffSummary)> {
+    ) -> Result<(
+        SuiAddress,
+        Option<ExecuteTransactionResponse>,
+        SiteDataDiffSummary,
+    )> {
         let (resource_manager, mut quilts_manager, mut site_manager) =
             self.create_managers().await?;
         if self.is_list_directory() {
@@ -322,7 +322,7 @@ impl SiteEditor<EditOptions> {
                 walrus_pkg,
             )
             .await?;
-        self.persist_site_identifier(resource_manager, &site_manager, &response)?;
+        self.persist_site_identifier(resource_manager, &site_manager, response.as_ref())?;
 
         Ok((site_manager.active_address()?, response, summary))
     }
@@ -380,7 +380,7 @@ impl SiteEditor<EditOptions> {
         &self,
         resource_manager: ResourceManager,
         site_manager: &SiteManager,
-        response: &SuiTransactionBlockResponse,
+        response: Option<&ExecuteTransactionResponse>,
     ) -> Result<()> {
         let path_for_saving = resource_manager
             .ws_resources_path
@@ -422,11 +422,11 @@ fn print_summary(
     config: &Config,
     address: &SuiAddress,
     site_id: &Option<ObjectID>,
-    response: &SuiTransactionBlockResponse,
+    response: Option<&ExecuteTransactionResponse>,
     summary: &impl Summarizable,
 ) -> Result<()> {
-    if let Some(SuiTransactionBlockEffects::V1(eff)) = response.effects.as_ref() {
-        if let SuiExecutionStatus::Failure { error } = &eff.status {
+    if let Some(resp) = response {
+        if let TransactionEffectsStatus::Failure { error } = &resp.effects_status {
             return Err(anyhow!(
                 "error while processing the Sui transaction: {error}"
             ));
@@ -441,13 +441,8 @@ fn print_summary(
             *id
         }
         None => {
-            let id = get_site_id_from_response(
-                *address,
-                response
-                    .effects
-                    .as_ref()
-                    .ok_or(anyhow::anyhow!("response did not contain effects"))?,
-            )?;
+            let resp = response.ok_or(anyhow!("response did not contain effects"))?;
+            let id = get_site_id_from_response(*address, resp)?;
             println!("Created new site! \nNew site object ID: {id}");
             id
         }
@@ -505,7 +500,7 @@ fn print_summary(
 fn persist_site_identifier(
     site_id: &Option<ObjectID>,
     site_manager: &SiteManager,
-    response: &SuiTransactionBlockResponse,
+    response: Option<&ExecuteTransactionResponse>,
     ws_resources: Option<WSResources>, // TODO: theoretically we should only need a ref.
     path: &Path,
 ) -> Result<()> {
@@ -520,12 +515,9 @@ fn persist_site_identifier(
         None => {
             let active_address = site_manager.active_address()?;
 
-            let tx_effects = response
-                .effects
-                .as_ref()
-                .ok_or_else(|| anyhow!("Transaction effects not found"))?;
+            let resp = response.ok_or(anyhow!("Transaction response not found"))?;
 
-            let new_site_object_id = get_site_id_from_response(active_address, tx_effects)?;
+            let new_site_object_id = get_site_id_from_response(active_address, resp)?;
 
             tracing::info!(
                 "New site published. New ObjectID ({}) will be persisted in ws-resources.json.",

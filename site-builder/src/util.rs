@@ -4,7 +4,7 @@ use std::{
     collections::{hash_map::Entry, HashMap},
     path::{Path, PathBuf},
     str,
-    time::SystemTime,
+    time::{Duration, SystemTime},
 };
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -12,21 +12,18 @@ use chrono::{DateTime, Utc};
 use glob::Pattern;
 use serde::{Deserialize, Deserializer};
 use sui_keys::keystore::AccountKeystore;
-use sui_sdk::{
-    rpc_types::{
-        SuiExecutionStatus,
-        SuiTransactionBlockEffects,
-        SuiTransactionBlockEffectsAPI,
-        SuiTransactionBlockResponse,
-    },
-    wallet_context::WalletContext,
-};
+use sui_sdk::wallet_context::WalletContext;
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
     object::Owner,
     transaction::{ProgrammableTransaction, TransactionData},
 };
 use walrus_sdk::core::{BlobId as BlobIdOriginal, QuiltPatchId};
+use walrus_sui::types::transaction::{
+    ExecuteTransactionResponse,
+    ObjectChangeEntry,
+    TransactionEffectsStatus,
+};
 
 use crate::{
     display,
@@ -51,7 +48,7 @@ pub(crate) async fn sign_and_send_ptb(
     gas_coin: ObjectRef,
     gas_budget: u64,
     object_cache: &mut ObjectCache,
-) -> Result<SuiTransactionBlockResponse> {
+) -> Result<ExecuteTransactionResponse> {
     let gas_price = wallet.get_reference_gas_price().await?;
     let transaction = TransactionData::new_programmable(
         active_address,
@@ -62,30 +59,43 @@ pub(crate) async fn sign_and_send_ptb(
     );
     let transaction = wallet.sign_transaction(&transaction).await;
     let resp = retry_client
-        .execute_transaction(transaction, "sign_and_send_ptb")
+        .execute_transaction(transaction, "sign_and_send_ptb", Duration::ZERO)
         .await?;
-    let digest = resp.digest;
-    let effects = resp
-        .effects
-        .as_ref()
-        .ok_or(anyhow!("Expected effects for transaction {}", digest))?;
-    update_cache_from_effects(object_cache, effects);
+    update_cache_from_obj_changes(object_cache, resp.object_changes.as_deref());
     Ok(resp)
 }
 
-/// Updates the object cache with the changed objects from transaction effects.
+/// Updates the object cache with the changed objects from a transaction's object changes.
 ///
 /// Only objects with `AddressOwner` or `ObjectOwner` ownership are cached,
 /// as shared and immutable objects don't have version conflicts in the same way.
-// TODO(grpc-migration): Change to accept gRPC `TransactionEffects` instead of
-// `SuiTransactionBlockEffects` once walrus-sites uses gRPC for transaction execution.
-fn update_cache_from_effects(object_cache: &mut ObjectCache, effects: &SuiTransactionBlockEffects) {
-    for obj in effects.all_changed_objects() {
-        match obj.0.owner {
-            Owner::ObjectOwner(_) | Owner::AddressOwner(_) => {
-                object_cache.insert(obj.0.object_id(), obj.0.reference.to_object_ref());
+pub(crate) fn update_cache_from_obj_changes(
+    object_cache: &mut ObjectCache,
+    object_changes: Option<&[ObjectChangeEntry]>,
+) {
+    let Some(changes) = object_changes else {
+        return;
+    };
+    for change in changes {
+        let (owner, object_id, version, digest) = match change {
+            ObjectChangeEntry::Created {
+                owner,
+                object_id,
+                version,
+                digest,
+                ..
             }
-            _ => {}
+            | ObjectChangeEntry::Mutated {
+                owner,
+                object_id,
+                version,
+                digest,
+                ..
+            } => (owner, *object_id, *version, *digest),
+            _ => continue,
+        };
+        if matches!(owner, Owner::AddressOwner(_) | Owner::ObjectOwner(_)) {
+            object_cache.insert(object_id, (object_id, version, digest));
         }
     }
 }
@@ -130,35 +140,35 @@ pub fn id_to_base36(id: &ObjectID) -> Result<String> {
 
 /// Get the object id of the site that was published in the transaction.
 ///
-/// Fails if the created site object ID cannot be found in the transaction effects.
+/// Fails if the created site object ID cannot be found in the transaction object changes.
 /// This can happen if, for example, no object owned by the provided `address` was created
 /// in the transaction, or if the transaction did not result in the expected object creation
 /// structure that this function relies on. Can also fail if the transaction itself failed (not
 /// enough gas, etc.)
 pub(crate) fn get_site_id_from_response(
     address: SuiAddress,
-    effects: &SuiTransactionBlockEffects,
+    resp: &ExecuteTransactionResponse,
 ) -> Result<ObjectID> {
-    // Return type changed to ObjectID
     tracing::debug!(
-        ?effects,
+        digest = ?resp.digest,
         "getting the object ID of the created Walrus site."
     );
-    if let SuiExecutionStatus::Failure { error } = &effects.status() {
+    if let TransactionEffectsStatus::Failure { error } = &resp.effects_status {
         anyhow::bail!("site ptb failed with error: {error}");
     }
-    Ok(effects
-        .created()
+    let object_changes = resp
+        .object_changes
+        .as_ref()
+        .ok_or(anyhow!("response did not contain object changes"))?;
+    object_changes
         .iter()
-        .find(|c| {
-            c.owner
-                .get_owner_address()
-                .map(|owner_address| owner_address == address)
-                .unwrap_or(false)
+        .find_map(|change| match change {
+            ObjectChangeEntry::Created {
+                owner, object_id, ..
+            } if owner.get_owner_address().ok() == Some(address) => Some(*object_id),
+            _ => None,
         })
-        .ok_or(anyhow::anyhow!("failed to get site_id from response"))?
-        .reference
-        .object_id)
+        .ok_or(anyhow!("failed to get site_id from response"))
 }
 
 /// Returns the path if it is `Some` or any of the default paths if they exist (attempt in order).

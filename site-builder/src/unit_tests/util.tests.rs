@@ -1,18 +1,22 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::time::Duration;
+
 use move_core_types::language_storage::StructTag;
-use sui_sdk::rpc_types::{SuiTransactionBlockEffectsAPI, SuiTransactionBlockResponseOptions};
 use sui_types::{
     programmable_transaction_builder::ProgrammableTransactionBuilder,
     transaction::{Argument, Command, TransactionData},
 };
 use test_cluster::TestClusterBuilder;
+use walrus_sdk::core_utils::backoff::ExponentialBackoffConfig;
+use walrus_sui::types::transaction::ObjectChangeEntry;
 
 use crate::{
+    retry_client::new_retriable_sui_client,
     site::config::WSResources,
     types::ObjectCache,
-    util::{is_ignored, is_pattern_match, update_cache_from_effects},
+    util::{is_ignored, is_pattern_match, update_cache_from_obj_changes},
 };
 
 struct PatternMatchTestCase {
@@ -96,13 +100,13 @@ fn test_is_pattern_match_invalid_pattern() {
     );
 }
 
-// ============ update_cache_from_effects tests ============
+// ============ update_cache_from_obj_changes tests ============
 
-/// Tests that `update_cache_from_effects` correctly caches objects from real transaction effects.
-/// This test splits a coin to observe created objects, and passes an unused coin to see if it
-/// appears in mutated.
+/// Tests that `update_cache_from_obj_changes` correctly caches objects from real transaction
+/// object changes. This test splits a coin to observe created objects, and passes an
+/// unused coin to see if it appears in mutated.
 #[tokio::test]
-async fn test_update_cache_from_effects_with_real_tx() {
+async fn test_update_cache_from_obj_changes_with_real_tx() {
     let cluster = TestClusterBuilder::new().build().await;
     let address = cluster.get_address_0();
 
@@ -155,40 +159,40 @@ async fn test_update_cache_from_effects_with_real_tx() {
         TransactionData::new_programmable(address, vec![gas_ref], pt, 10_000_000, gas_price);
 
     let tx = cluster.wallet.sign_transaction(&tx_data).await;
-    // Cannot migrate to grpc: update_cache_from_effects requires SuiTransactionBlockEffects
-    // (JSON-RPC type), not the gRPC TransactionEffects type.
-    #[allow(deprecated)]
-    let response = cluster
-        .sui_client()
-        .quorum_driver_api()
-        .execute_transaction_block(
+    // Execute via walrus-sui's RetriableSuiClient so we get back the protocol-agnostic
+    // ExecuteTransactionResponse (with `object_changes` already converted to ObjectChangeEntry).
+    let retry_client = new_retriable_sui_client(
+        &cluster.fullnode_handle.rpc_url,
+        ExponentialBackoffConfig::default(),
+    )
+    .unwrap();
+    let response = retry_client
+        .execute_transaction(
             tx,
-            SuiTransactionBlockResponseOptions::new().with_effects(),
-            None,
+            "test_update_cache_from_obj_changes_with_real_tx",
+            Duration::ZERO,
         )
         .await
         .unwrap();
 
-    let effects = response.effects.unwrap();
-
-    // Print effects for debugging
-    println!("Effects created: {:?}", effects.created());
-    println!("Effects mutated: {:?}", effects.mutated());
+    let object_changes = response.object_changes.unwrap();
 
     // Even unused coin inputs appear in mutated (Sui bumps version of all owned object inputs)
-    let mutated_ids: Vec<_> = effects
-        .mutated()
+    let mutated_ids: Vec<_> = object_changes
         .iter()
-        .map(|o| o.reference.object_id)
+        .filter_map(|c| match c {
+            ObjectChangeEntry::Mutated { object_id, .. } => Some(*object_id),
+            _ => None,
+        })
         .collect();
     assert!(
         mutated_ids.contains(&unused_coin_id),
         "Unused coin should still appear in mutated (Sui bumps version of all inputs)"
     );
 
-    // Test update_cache_from_effects with real effects
+    // Test update_cache_from_obj_changes with real object changes
     let mut cache = ObjectCache::new();
-    update_cache_from_effects(&mut cache, &effects);
+    update_cache_from_obj_changes(&mut cache, Some(&object_changes));
 
     // Gas object should be cached (it's in mutated list as AddressOwner)
     assert!(
@@ -209,9 +213,15 @@ async fn test_update_cache_from_effects_with_real_tx() {
     );
 
     // The newly created coin should be in created and cached
-    let created = effects.created();
-    assert!(!created.is_empty(), "Should have created a new coin");
-    let new_coin_id = created[0].reference.object_id;
+    let created_ids: Vec<_> = object_changes
+        .iter()
+        .filter_map(|c| match c {
+            ObjectChangeEntry::Created { object_id, .. } => Some(*object_id),
+            _ => None,
+        })
+        .collect();
+    assert!(!created_ids.is_empty(), "Should have created a new coin");
+    let new_coin_id = created_ids[0];
     assert!(
         cache.contains_key(&new_coin_id),
         "Newly created coin should be cached"
