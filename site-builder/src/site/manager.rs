@@ -444,9 +444,8 @@ impl SiteManager {
             gas_price, // Use actual reference gas price
         );
 
-        // TODO(grpc-migration): Replace with gRPC-backed simulate/dev_inspect once the
-        // walrus-sui crate adds support. RetriableSuiClient no longer exposes the inner
-        // SuiClient, so we build a standalone JSON-RPC client from the wallet's RPC URL.
+        // TODO(grpc-migration): Migrate to gRPC-backed simulate/dev_inspect.
+        // Builds a standalone JSON-RPC client from the wallet's RPC URL.
         let rpc_url = &self
             .wallet
             .config
