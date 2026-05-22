@@ -1,0 +1,36 @@
+# Copyright (c) Mysten Labs, Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+# Local repro config for SEW-893. Points the portal at the slow mock aggregator
+# on :8080 instead of the real Walrus aggregator.
+
+network: mainnet
+original_package_id: "0x26eb7ee8688da02c5f671679524e379f0b837a12f1d1d799f255b7eea260ad27"
+landing_page_oid_b36: "46f3881sp4r55fc6pcao9t93bieeejl4vr4k2uv8u4wwyx1a93"
+
+# "localhost" = 9 chars. The portal uses this to figure out where the subdomain
+# ends. So curl http://<b36>.localhost:3000/ resolves <b36> as the subdomain.
+domain_name_length: 9
+b36_domain_resolution: true
+bring_your_own_domain: false
+enable_blocklist: false
+enable_allowlist: false
+
+rpc_urls:
+  - url: https://fullnode.mainnet.sui.io
+    retries: 2
+    metric: 100
+
+# Primary: our slow mock. Fallback: the real aggregator (so on the
+# `retry-next` branch we can observe whether the portal still attempts it
+# after the inbound request was aborted).
+# Mirror production: 3 attempts on primary (retries:2), 1 attempt on fallback.
+# Both pointed at the mock so we deterministically exercise the full
+# "All aggregators failed" → aggregatorFail() return path.
+aggregator_urls:
+  - url: http://127.0.0.1:8080
+    retries: 2
+    metric: 100
+  - url: http://127.0.0.1:8080
+    retries: 0
+    metric: 200

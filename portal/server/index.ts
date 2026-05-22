@@ -8,13 +8,68 @@ import { genericError } from "@lib/http/http_error_responses";
 import main from "src/main";
 import { setupTapelog } from "custom_logger";
 import logger, { formatErrorWithStack } from "@lib/logger";
-import { QUILT_PATCH_ID_INTERNAL_HEADER } from "@lib/url_fetcher";
+import { aggregatorTimeoutMs, QUILT_PATCH_ID_INTERNAL_HEADER } from "@lib/url_fetcher";
+import { rpcRequestTimeoutMs } from "@lib/rpc_selector";
+import { worstCaseAggregatorChainMs } from "src/url_fetcher_factory";
+import { config } from "src/config";
+import { sanitizeConfig } from "src/configuration_loader";
 
 const PORT = 3000;
-console.log("Running Bun server at port", PORT, "...");
+
+// Headroom above the worst-case aggregator chain — accounts for RPC calls,
+// hashing, and small per-attempt variance.
+const IDLE_TIMEOUT_HEADROOM_S = 10;
+/**
+ * Default upper bound (seconds) on the computed idleTimeout. Overridable via
+ * the `PORTAL_IDLE_TIMEOUT_MAX_S` env var. Set this below any upstream proxy
+ * or CDN request timeout sitting in front of the portal — depending on the
+ * dependent service's timeout, it may need to be lower than 100s (e.g.
+ * Cloudflare's default free-tier proxy timeout is 100s).
+ */
+const DEFAULT_IDLE_TIMEOUT_MAX_S = 100;
+/** Bun.serve's hard ceiling — values above this are rejected at serve() time. */
+const BUN_IDLE_TIMEOUT_CEILING_S = 255;
+
+const requestedIdleTimeoutMaxS =
+    Number(process.env.PORTAL_IDLE_TIMEOUT_MAX_S) || DEFAULT_IDLE_TIMEOUT_MAX_S;
+const idleTimeoutMaxS = Math.min(requestedIdleTimeoutMaxS, BUN_IDLE_TIMEOUT_CEILING_S);
+if (requestedIdleTimeoutMaxS > BUN_IDLE_TIMEOUT_CEILING_S) {
+    logger.warn(
+        `PORTAL_IDLE_TIMEOUT_MAX_S (${requestedIdleTimeoutMaxS}s) exceeds Bun.serve's ` +
+            `${BUN_IDLE_TIMEOUT_CEILING_S}s ceiling — clamping to ${BUN_IDLE_TIMEOUT_CEILING_S}s.`,
+    );
+}
+
+// Bun.serve closes the inbound socket after `idleTimeout` seconds. If that
+// fires before the portal has returned a response, an upstream proxy may
+// substitute its own (less helpful) error body. Size it from the aggregator
+// retry budget so the chain always has room to complete and return our own
+// aggregatorFail() response.
+//
+// RPC failover chains are intentionally excluded — empirically they
+// resolve in ~100ms, so including their worst case would unnecessarily
+// push idleTimeout past IDLE_TIMEOUT_MAX_S and any reasonable upstream
+// proxy budget.
+const idleTimeoutS = Math.min(
+    Math.ceil(worstCaseAggregatorChainMs() / 1000) + IDLE_TIMEOUT_HEADROOM_S,
+    idleTimeoutMaxS,
+);
+
+logger.info(`Starting Bun server on port ${PORT}`);
+logger.info("Portal config", {
+    ...sanitizeConfig(config),
+    idleTimeoutS,
+    idleTimeoutMaxS,
+    aggregatorTimeoutMs,
+    rpcRequestTimeoutMs,
+});
+
 await setupTapelog();
 serve({
     port: PORT,
+    // Sized to the worst-case aggregator retry chain plus headroom so the
+    // portal can return its own response instead of being cut mid-flight.
+    idleTimeout: idleTimeoutS,
     // Special Walrus Sites routes.
     routes: {
         "/__wal__/*": async (req: Request) => {

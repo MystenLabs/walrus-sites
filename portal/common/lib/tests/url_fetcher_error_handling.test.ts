@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from "vitest";
-import { UrlFetcher } from "@lib/url_fetcher";
+import { aggregatorTimeoutMs, UrlFetcher } from "@lib/url_fetcher";
 import { ResourceFetcher } from "@lib/resource";
 import { SuiNSResolver } from "@lib/suins";
 import { WalrusSitesRouter } from "@lib/routing";
@@ -256,5 +256,41 @@ describe("aggregator error handling with priority executor", () => {
             expect(requestCount).toBe(1); // First server tried once
             expect(server2RequestCount).toBe(1); // Second server succeeded
         });
+    });
+});
+
+describe("UrlFetcher.worstCaseAggregatorChainMs", () => {
+    const mockResourceFetcher = {} as ResourceFetcher;
+    const mockSuiNSResolver = {} as SuiNSResolver;
+    const mockWsRouter = {} as WalrusSitesRouter;
+
+    function makeFetcher(items: PriorityUrl[]): UrlFetcher {
+        return new UrlFetcher(
+            mockResourceFetcher,
+            mockSuiNSResolver,
+            mockWsRouter,
+            new PriorityExecutor(items),
+            true,
+        );
+    }
+
+    it("returns the executor's worst-case chain at the configured per-attempt timeout", () => {
+        const items: PriorityUrl[] = [
+            { url: "https://a.com", retries: 2, metric: 100 },
+            { url: "https://b.com", retries: 0, metric: 200 },
+        ];
+        const fetcher = makeFetcher(items);
+
+        // Derive the expected value from the configured per-attempt timeout so
+        // the test doesn't break when AGGREGATOR_REQUEST_TIMEOUT_MS is set in
+        // the environment.
+        // A: 3 attempts × T + 2 × 500ms inter-retry delay; B: 1 × T.
+        const t = aggregatorTimeoutMs;
+        const expected = 3 * t + 2 * 500 + 1 * t;
+        expect(fetcher.worstCaseAggregatorChainMs()).toBe(expected);
+    });
+
+    it("returns 0 when the aggregator list is empty", () => {
+        expect(makeFetcher([]).worstCaseAggregatorChainMs()).toBe(0);
     });
 });

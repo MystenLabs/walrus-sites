@@ -148,6 +148,19 @@ export class PriorityExecutor {
         return this.sortedItems[0]?.url;
     }
 
+    /**
+     * Worst-case time the executor could spend, assuming each attempt takes
+     * at most `perAttemptMs`. Sum over every URL of:
+     *   attempts × perAttemptMs + (attempts - 1) × delayBetweenRetriesMs
+     * where attempts = retries + 1.
+     */
+    worstCaseDurationMs(perAttemptMs: number): number {
+        return this.sortedItems.reduce((sum, item) => {
+            const attempts = item.retries + 1;
+            return sum + attempts * perAttemptMs + (attempts - 1) * this.delayBetweenRetriesMs;
+        }, 0);
+    }
+
     private createAggregateError(errors: Error[], message: string): AggregateError {
         const summary = errors
             .map((e) => {

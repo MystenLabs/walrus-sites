@@ -55,3 +55,8 @@ const premium = UrlFetcherFactory.premiumUrlFetcher();
 // premiumUrlFetcher is never actually invoked — aliasing to standard keeps
 // the export type non-nullable and avoids touching consumers.
 export const premiumUrlFetcher: UrlFetcher = premium ?? standardUrlFetcher;
+
+// Standard and premium fetchers share the same aggregator executor, so either
+// one returns the same answer. Exposed here so callers don't have to know that.
+export const worstCaseAggregatorChainMs = (): number =>
+    standardUrlFetcher.worstCaseAggregatorChainMs();
