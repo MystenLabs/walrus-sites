@@ -53,9 +53,7 @@ function resolveAggregatorTimeoutMs(): number {
     if (raw === undefined || raw === "") return DEFAULT_AGGREGATOR_TIMEOUT_MS;
     const parsed = Number(raw);
     if (!Number.isFinite(parsed) || parsed <= 0) {
-        throw new Error(
-            `AGGREGATOR_REQUEST_TIMEOUT_MS must be a positive number (got "${raw}")`,
-        );
+        throw new Error(`AGGREGATOR_REQUEST_TIMEOUT_MS must be a positive number (got "${raw}")`);
     }
     return parsed;
 }
