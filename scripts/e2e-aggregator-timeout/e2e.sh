@@ -9,3 +9,4 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 "$HERE/fail503.sh"
+"$HERE/timeout.sh"
