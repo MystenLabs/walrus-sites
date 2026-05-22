@@ -45,6 +45,11 @@ if (requestedIdleTimeoutMaxS > BUN_IDLE_TIMEOUT_CEILING_S) {
 // substitute its own (less helpful) error body. Size it from the aggregator
 // retry budget so the chain always has room to complete and return our own
 // aggregatorFail() response.
+//
+// RPC failover chains are intentionally excluded — empirically they
+// resolve in ~100ms, so including their worst case would unnecessarily
+// push idleTimeout past IDLE_TIMEOUT_MAX_S and any reasonable upstream
+// proxy budget.
 const idleTimeoutS = Math.min(
     Math.ceil(worstCaseAggregatorChainMs() / 1000) + IDLE_TIMEOUT_HEADROOM_S,
     idleTimeoutMaxS,
