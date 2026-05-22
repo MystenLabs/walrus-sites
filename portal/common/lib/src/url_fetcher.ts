@@ -48,8 +48,18 @@ export const QUILT_PATCH_ID_INTERNAL_HEADER = "x-wal-quilt-patch-internal-id";
  * at runtime. A central registry would prevent that drift.
  */
 const DEFAULT_AGGREGATOR_TIMEOUT_MS = 10_000;
-export const aggregatorTimeoutMs =
-    Number(process.env.AGGREGATOR_REQUEST_TIMEOUT_MS) || DEFAULT_AGGREGATOR_TIMEOUT_MS;
+function resolveAggregatorTimeoutMs(): number {
+    const raw = process.env.AGGREGATOR_REQUEST_TIMEOUT_MS;
+    if (raw === undefined || raw === "") return DEFAULT_AGGREGATOR_TIMEOUT_MS;
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+        throw new Error(
+            `AGGREGATOR_REQUEST_TIMEOUT_MS must be a positive number (got "${raw}")`,
+        );
+    }
+    return parsed;
+}
+export const aggregatorTimeoutMs = resolveAggregatorTimeoutMs();
 
 /**
  * Discriminated union returned by `fetchUrl`.
