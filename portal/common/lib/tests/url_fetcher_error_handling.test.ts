@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from "vitest";
-import { UrlFetcher } from "@lib/url_fetcher";
+import { aggregatorTimeoutMs, UrlFetcher } from "@lib/url_fetcher";
 import { ResourceFetcher } from "@lib/resource";
 import { SuiNSResolver } from "@lib/suins";
 import { WalrusSitesRouter } from "@lib/routing";
@@ -281,9 +281,13 @@ describe("UrlFetcher.worstCaseAggregatorChainMs", () => {
         ];
         const fetcher = makeFetcher(items);
 
-        // Library applies a 10s default per-attempt timeout (DEFAULT_AGGREGATOR_TIMEOUT_MS).
-        // A.com: 3*10000 + 2*500 = 31000; B.com: 1*10000 + 0 = 10000; total = 41000.
-        expect(fetcher.worstCaseAggregatorChainMs()).toBe(41_000);
+        // Derive the expected value from the configured per-attempt timeout so
+        // the test doesn't break when AGGREGATOR_REQUEST_TIMEOUT_MS is set in
+        // the environment.
+        // A: 3 attempts × T + 2 × 500ms inter-retry delay; B: 1 × T.
+        const t = aggregatorTimeoutMs;
+        const expected = 3 * t + 2 * 500 + 1 * t;
+        expect(fetcher.worstCaseAggregatorChainMs()).toBe(expected);
     });
 
     it("returns 0 when the aggregator list is empty", () => {
