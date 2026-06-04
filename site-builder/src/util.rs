@@ -4,7 +4,7 @@ use std::{
     collections::{hash_map::Entry, HashMap},
     path::{Path, PathBuf},
     str,
-    time::{Duration, SystemTime},
+    time::SystemTime,
 };
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -19,10 +19,9 @@ use sui_types::{
     transaction::{ProgrammableTransaction, TransactionData},
 };
 use walrus_sdk::core::{BlobId as BlobIdOriginal, QuiltPatchId};
-use walrus_sui::types::transaction::{
-    ExecuteTransactionResponse,
-    ObjectChangeEntry,
-    TransactionEffectsStatus,
+use walrus_sui::{
+    client::dual_client::DEFAULT_CHECKPOINT_WAIT_TIMEOUT,
+    types::transaction::{ExecuteTransactionResponse, ObjectChangeEntry, TransactionEffectsStatus},
 };
 
 use crate::{
@@ -59,7 +58,11 @@ pub(crate) async fn sign_and_send_ptb(
     );
     let transaction = wallet.sign_transaction(&transaction).await;
     let resp = retry_client
-        .execute_transaction(transaction, "sign_and_send_ptb", Duration::ZERO)
+        .execute_transaction(
+            transaction,
+            "sign_and_send_ptb",
+            DEFAULT_CHECKPOINT_WAIT_TIMEOUT,
+        )
         .await?;
     update_cache_from_obj_changes(object_cache, resp.object_changes.as_deref());
     Ok(resp)
