@@ -9,10 +9,7 @@ use std::{
 
 use anyhow::{anyhow, bail, Context, Result};
 use sui_keys::keystore::AccountKeystore;
-use sui_sdk::{
-    json_rpc_error::TRANSACTION_EXECUTION_CLIENT_ERROR_CODE,
-    wallet_context::WalletContext,
-};
+use sui_sdk::wallet_context::WalletContext;
 use sui_types::{
     base_types::{ObjectID, ObjectRef, SuiAddress},
     transaction::{CallArg, ProgrammableTransaction, TransactionData, TransactionDataAPI},
@@ -801,34 +798,36 @@ impl From<BlobExtensions> for ExtendOps {
     }
 }
 
-/// Returns `true` if the error is a Sui object version conflict (ServerError
-/// TRANSACTION_EXECUTION_CLIENT_ERROR_CODE -32002).
+/// Returns `true` if the error is a Sui object version conflict (gRPC status
+/// `INVALID_ARGUMENT`).
 ///
 /// This error occurs when a transaction references an object at a stale version,
 /// typically due to concurrent transactions consuming the same gas coin.
 fn is_object_version_conflict(err: &anyhow::Error) -> bool {
-    use jsonrpsee::core::ClientError;
-    use sui_sdk::error::Error as SuiSdkError;
     use walrus_sui::client::SuiClientError;
 
-    let Some(SuiClientError::SuiSdkError(SuiSdkError::RpcError(ClientError::Call(error_obj)))) =
-        err.downcast_ref::<SuiClientError>()
-    else {
+    let Some(SuiClientError::GrpcError(status)) = err.downcast_ref::<SuiClientError>() else {
         return false;
     };
 
-    if error_obj.code() != TRANSACTION_EXECUTION_CLIENT_ERROR_CODE {
+    if status.code() != tonic::Code::InvalidArgument {
         return false;
     }
 
-    let message = error_obj.message();
+    let message = status.message();
+    // Match the sui-types base string for a stale object version (sui-types `error.rs`). The same
+    // base string reaches us inside two different wrappers depending on where the conflict is
+    // caught on the current fullnode — the input-object pre-check ("Error checking transaction
+    // input objects: ...") or a validator-stake rejection ("Transaction is rejected ...
+    // Non-retriable errors: [...]") — so we anchor on the base string, not the wrapper.
     static RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+        // object 0x<id> version 0x<ver> (<digest>) is unavailable for consumption, current version: 0x<cur>
         regex::Regex::new(
-            r"Error checking transaction input objects:.*0x[0-9a-f]+.*(?:is not available|is unavailable) for consumption, current version: 0x[0-9a-f]+"
+            r"object 0x[0-9a-f]+ version 0x[0-9a-f]+ .* is unavailable for consumption, current version: 0x[0-9a-f]+"
         ).unwrap()
     });
     if !RE.is_match(message) {
-        warn!("Unexpected error message format for ServerError({TRANSACTION_EXECUTION_CLIENT_ERROR_CODE}): {message}");
+        warn!("Unexpected error message format for gRPC INVALID_ARGUMENT status: {message}");
         return false;
     }
     true
