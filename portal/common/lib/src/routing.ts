@@ -17,7 +17,10 @@ import { matchGlob, validateGlobPattern, validateRegexPattern } from "@lib/route
  * inside the `ws-resources.json`.
  */
 export class WalrusSitesRouter {
-    constructor(private rpcSelector: RPCSelector) {}
+    constructor(
+        private rpcSelector: RPCSelector,
+        private enableGlobRouting = false,
+    ) {}
 
     /**
      * Gets both the Routes and Redirects dynamic fields in a single RPC call.

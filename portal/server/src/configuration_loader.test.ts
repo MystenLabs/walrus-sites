@@ -38,6 +38,7 @@ describe("loadAndValidateConfig", () => {
         expect(config.enableAllowlist).toBe(false);
         expect(config.b36DomainResolutionSupport).toBe(true);
         expect(config.bringYourOwnDomain).toBe(false);
+        expect(config.enableGlobRouting).toBe(false);
     });
 
     test("env vars override YAML values", () => {
@@ -45,9 +46,11 @@ describe("loadAndValidateConfig", () => {
             SUINS_CLIENT_NETWORK: "testnet",
             ENABLE_BLOCKLIST: "true",
             BLOCKLIST_REDIS_URL: "redis://localhost:6379/0",
+            ENABLE_GLOB_ROUTING: "true",
         });
         expect(config.suinsClientNetwork).toBe("testnet");
         expect(config.enableBlocklist).toBe(true);
+        expect(config.enableGlobRouting).toBe(true);
         // YAML values still used for non-overridden fields
         expect(config.originalPackageId).toBe(VALID_SITE_PACKAGE);
     });
@@ -93,6 +96,14 @@ aggregator_urls:
         const config = loadAndValidateConfig(parseYaml(yaml), {});
         expect(config.bringYourOwnDomain).toBe(true);
         expect(config.portalDomainNameLength).toBe(21);
+    });
+
+    test("enableGlobRouting can be enabled via YAML", () => {
+        const yaml = minimalYaml.replace(
+            "enable_allowlist: false",
+            "enable_allowlist: false\nenable_glob_routing: true",
+        );
+        expect(loadAndValidateConfig(parseYaml(yaml), {}).enableGlobRouting).toBe(true);
     });
 
     test("rejects invalid network", () => {

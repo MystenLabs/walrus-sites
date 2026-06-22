@@ -11,6 +11,7 @@ b36_domain_resolution: true
 bring_your_own_domain: false
 enable_blocklist: false
 enable_allowlist: false
+enable_glob_routing: false
 
 # Format: url, retries (>= 0), metric (lower = higher priority)
 rpc_urls:

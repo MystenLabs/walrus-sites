@@ -43,7 +43,7 @@ const aggregatorExecutor = new PriorityExecutor(aggregatorPriorityUrls);
 export const urlFetcher = new UrlFetcher(
     new ResourceFetcher(rpcSelector, process.env.ORIGINAL_PACKAGE_ID),
     new SuiNSResolver(rpcSelector),
-    new WalrusSitesRouter(rpcSelector),
+    new WalrusSitesRouter(rpcSelector, process.env.ENABLE_GLOB_ROUTING === "true"),
     aggregatorExecutor,
     true, // b36 domain support should always be enabled for service workers.
 );

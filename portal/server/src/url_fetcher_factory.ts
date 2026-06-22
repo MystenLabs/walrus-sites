@@ -31,7 +31,7 @@ class UrlFetcherFactory {
         return new UrlFetcher(
             new ResourceFetcher(this.premiumRpcSelector, config.originalPackageId),
             new SuiNSResolver(this.premiumRpcSelector),
-            new WalrusSitesRouter(this.premiumRpcSelector),
+            new WalrusSitesRouter(this.premiumRpcSelector, config.enableGlobRouting),
             this.aggregatorExecutor,
             config.b36DomainResolutionSupport,
         );
@@ -41,7 +41,7 @@ class UrlFetcherFactory {
         return new UrlFetcher(
             new ResourceFetcher(this.standardRpcSelector, config.originalPackageId),
             new SuiNSResolver(this.standardRpcSelector),
-            new WalrusSitesRouter(this.standardRpcSelector),
+            new WalrusSitesRouter(this.standardRpcSelector, config.enableGlobRouting),
             this.aggregatorExecutor,
             config.b36DomainResolutionSupport,
         );

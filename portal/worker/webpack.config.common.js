@@ -99,6 +99,9 @@ module.exports = {
             'process.env.ORIGINAL_PACKAGE_ID': JSON.stringify(
                 envOrYaml('ORIGINAL_PACKAGE_ID') || envOrYaml('SITE_PACKAGE')
             ),
+            'process.env.ENABLE_GLOB_ROUTING': JSON.stringify(
+                envOrYaml('ENABLE_GLOB_ROUTING')
+            ),
             // common/lib timeout knobs — must be listed here or the bundled
             // worker reads a bare `process.env.X` that's undefined at runtime.
             'process.env.RPC_REQUEST_TIMEOUT_MS': JSON.stringify(

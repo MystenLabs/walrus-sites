@@ -70,6 +70,8 @@ function buildRawConfig(
             config.portalDomainNameLength = yaml.domain_name_length;
         if (yaml.bring_your_own_domain !== undefined)
             config.bringYourOwnDomain = yaml.bring_your_own_domain;
+        if (yaml.enable_glob_routing !== undefined)
+            config.enableGlobRouting = yaml.enable_glob_routing;
     }
 
     // Override with parsed env vars (converted from strings to typed values)
@@ -103,6 +105,8 @@ function buildRawConfig(
     }
     if (env.BRING_YOUR_OWN_DOMAIN !== undefined)
         config.bringYourOwnDomain = env.BRING_YOUR_OWN_DOMAIN === "true";
+    if (env.ENABLE_GLOB_ROUTING !== undefined)
+        config.enableGlobRouting = env.ENABLE_GLOB_ROUTING === "true";
     if (env.PORTAL_DOMAIN_NAME_LENGTH !== undefined)
         config.portalDomainNameLength = Number(env.PORTAL_DOMAIN_NAME_LENGTH);
 
@@ -155,6 +159,7 @@ const configurationSchema = z
             .refine((val) => val.length === 66 && /^0x[0-9a-fA-F]+$/.test(val)),
         b36DomainResolutionSupport: z.boolean(),
         bringYourOwnDomain: z.boolean().default(false),
+        enableGlobRouting: z.boolean().default(false),
     })
     /// Extra refinements - Relations between configuration fields:
     // TODO: tighten to XOR — reject if both blocklistRedisUrl and edgeConfig are set
