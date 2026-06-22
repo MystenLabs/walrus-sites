@@ -136,7 +136,7 @@ const testCases = [
 
 testCases.forEach(([requestPath, expected]) => {
     test(`matchPathToRoute: "${requestPath}" -> "${expected}"`, () => {
-        const { match } = wsRouter.matchPathToRoute(requestPath, routesExample);
+        const match = wsRouter.matchPathToRoute(requestPath, routesExample);
         expect(match).toEqual(expected);
     });
 });
@@ -146,7 +146,7 @@ const emptyRoutes = { routes_list: new Map<string, string>() };
 
 testCases.forEach(([requestPath, _]) => {
     test(`matchPathToRoute: empty routes for "${requestPath}"`, () => {
-        const { match } = wsRouter.matchPathToRoute(requestPath, emptyRoutes);
+        const match = wsRouter.matchPathToRoute(requestPath, emptyRoutes);
         expect(match).toEqual(undefined);
     });
 });
@@ -161,8 +161,76 @@ describe("matchPathToRoute skips unsafe patterns", () => {
         };
         // The unsafe pattern is longer, so if it were matched it would win.
         // Getting the catch-all proves it was skipped.
-        const { match } = wsRouter.matchPathToRoute("/aXbYcZ", routes);
+        const match = wsRouter.matchPathToRoute("/aXbYcZ", routes);
         expect(match).toBe("/ok.html");
+    });
+});
+
+// --- Glob route matching (ENABLE_GLOB_ROUTING) ---
+
+const globRouter = new WalrusSitesRouter(rpcSelector, true);
+
+// A catch-all widens to require the extra slash, so every legacy regex case
+// above resolves identically under the glob matcher (no behaviour drift).
+testCases.forEach(([requestPath, expected]) => {
+    test(`matchPathToRoute (glob): "${requestPath}" -> "${expected}"`, () => {
+        expect(globRouter.matchPathToRoute(requestPath, routesExample)).toEqual(expected);
+    });
+});
+
+describe("matchPathToRoute with glob routing enabled", () => {
+    test("a catch-all `/*` matches any path below root", () => {
+        const routes = { routes_list: new Map<string, string>([["/*", "/index.html"]]) };
+        expect(globRouter.matchPathToRoute("/a/b/c/d", routes)).toBe("/index.html");
+        expect(globRouter.matchPathToRoute("/x", routes)).toBe("/index.html");
+    });
+
+    test("a mid-pattern `*` stays within a single segment", () => {
+        const routes = {
+            routes_list: new Map<string, string>([["/forms/*/admin", "/admin.html"]]),
+        };
+        expect(globRouter.matchPathToRoute("/forms/contact/admin", routes)).toBe("/admin.html");
+        // The legacy regex would cross `/` here; glob does not.
+        expect(globRouter.matchPathToRoute("/forms/a/b/admin", routes)).toBeUndefined();
+    });
+
+    test("a within-segment `*` matches a prefix in one segment only", () => {
+        const routes = { routes_list: new Map<string, string>([["/blog/old-*", "/archive.html"]]) };
+        expect(globRouter.matchPathToRoute("/blog/old-post", routes)).toBe("/archive.html");
+        expect(globRouter.matchPathToRoute("/blog/old/post", routes)).toBeUndefined();
+    });
+
+    test("a more specific prefix route beats the catch-all", () => {
+        const routes = {
+            routes_list: new Map<string, string>([
+                ["/*", "/catch-all.html"],
+                ["/docs/*", "/docs.html"],
+            ]),
+        };
+        expect(globRouter.matchPathToRoute("/docs/intro", routes)).toBe("/docs.html");
+    });
+
+    test("an exact route is not shadowed by a sibling `/*` route", () => {
+        // `/section/*` widens to require a deeper segment, so the bare `/section`
+        // resolves to its own exact route — not the sibling catch-all.
+        const routes = {
+            routes_list: new Map<string, string>([
+                ["/section", "/exact.html"],
+                ["/section/*", "/child.html"],
+            ]),
+        };
+        expect(globRouter.matchPathToRoute("/section", routes)).toBe("/exact.html");
+        expect(globRouter.matchPathToRoute("/section/sub", routes)).toBe("/child.html");
+    });
+
+    test("an unsafe pattern is skipped under glob too", () => {
+        const routes = {
+            routes_list: new Map<string, string>([
+                ["/x/a*a*a*/y", "/bad.html"], // more than one star in a segment -> skipped
+                ["/*", "/ok.html"],
+            ]),
+        };
+        expect(globRouter.matchPathToRoute("/x/aaa/y", routes)).toBe("/ok.html");
     });
 });
 

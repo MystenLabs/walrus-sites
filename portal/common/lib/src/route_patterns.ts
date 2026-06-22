@@ -137,3 +137,29 @@ export function matchGlob(pattern: string, path: string): boolean {
         after.every((segment, i) => matchSegment(segment, pathSegments[tailOffset + i]))
     );
 }
+
+/**
+ * Rewrites a legacy regex route pattern as the equivalent glob, so a site
+ * authored for the old regex matcher keeps the same reach once glob routing is
+ * on. Under the regex a `*` became `.*` and crossed `/`, so:
+ *  - a bare `*` matched everything, and becomes a root globstar `/**`;
+ *  - a trailing `/` then `*` matched paths one or more levels below the prefix;
+ *    the regex needed that slash, so it never matched the bare prefix. It
+ *    becomes a globstar plus a required segment, keeping that reach without
+ *    shadowing an exact route for the prefix itself.
+ * A `*` in the middle of a pattern stays within its segment, and a pattern that
+ * already uses `**` is returned unchanged.
+ */
+export function regexToGlobPattern(pattern: string): string {
+    if (pattern.includes("**")) {
+        return pattern; // already a glob pattern
+    } else if (pattern === "*") {
+        return "/**"; // bare catch-all matches everything
+    } else if (pattern.endsWith("/*")) {
+        // Require the slash plus a segment, so the catch-all matches strictly
+        // below the prefix and never the bare prefix (as the regex did).
+        return pattern.slice(0, -2) + "/**/*";
+    } else {
+        return pattern;
+    }
+}

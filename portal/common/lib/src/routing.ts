@@ -9,7 +9,12 @@ import { RPCSelector } from "@lib/rpc_selector";
 import { SuiClientTypes } from "@mysten/sui/client";
 import { deriveDynamicFieldID } from "@mysten/sui/utils";
 import { instrumentationFacade } from "@lib/instrumentation";
-import { matchGlob, validateGlobPattern, validateRegexPattern } from "@lib/route_patterns";
+import {
+    matchGlob,
+    regexToGlobPattern,
+    validateGlobPattern,
+    validateRegexPattern,
+} from "@lib/route_patterns";
 
 /**
  * The WalrusSitesRouter class is responsible for handling the routing and redirect
@@ -65,24 +70,16 @@ export class WalrusSitesRouter {
     }
 
     /**
-     * Matches the path to the appropriate route.
-     * Uses the legacy regex pattern where `*` is converted to `.*` (matches
-     * any characters including `/`). When multiple patterns match, the longest
-     * pattern wins. Patterns that fail validation are skipped (and logged).
-     *
-     * Returns an object with:
-     * - `match`: the matched route target, or undefined if no match.
-     * - `regexOnlyPatterns`: patterns that matched via the legacy regex but NOT
-     *   via the glob matcher. These will behave differently once routes migrate
-     *   to glob matching; the caller logs them with site context as a canary.
+     * Matches the path to the appropriate route. With the glob flag off,
+     * patterns match via the legacy regex (`*` becomes `.*` and crosses `/`);
+     * with it on, each pattern is rewritten to its glob equivalent and matched
+     * via the glob matcher. Either way, patterns that fail validation are skipped
+     * (and logged), and when several patterns match the longest one wins.
      *
      * @param path - The path to match.
      * @param routes - The routes to match against.
      */
-    public matchPathToRoute(
-        path: string,
-        routes: Routes,
-    ): { match: string | undefined; regexOnlyPatterns: string[] } {
+    public matchPathToRoute(path: string, routes: Routes): string | undefined {
         logger.info(
             "Attempting to match the provided `path` with the routes in the Routes object",
             {
@@ -90,42 +87,60 @@ export class WalrusSitesRouter {
                 routesDFList: routes.routes_list,
             },
         );
-        if (routes.routes_list.size === 0) return { match: undefined, regexOnlyPatterns: [] };
+        if (routes.routes_list.size === 0) return undefined;
 
-        const regexOnlyPatterns: string[] = [];
-
-        const filtered = Array.from(routes.routes_list.entries()).filter(([pattern]) => {
-            const validation = validateRegexPattern(pattern);
-            if (!validation.ok) {
-                logger.warn("Skipping unsafe route pattern", {
-                    path,
-                    pattern,
-                    reason: validation.reason,
-                });
-                return false;
-            }
-            const regexMatch = new RegExp(`^${pattern.replace(/\*/g, ".*")}$`).test(path);
-            // Shadow-test glob matching to surface route patterns that won't
-            // survive the migration from regex to glob matching.
-            if (regexMatch && !matchGlob(pattern, path)) {
-                regexOnlyPatterns.push(pattern);
-            }
-            return regexMatch;
-        });
+        const filtered = Array.from(routes.routes_list.entries()).filter(([pattern]) =>
+            this.enableGlobRouting
+                ? this.routeMatchesGlob(pattern, path)
+                : this.routeMatchesRegex(pattern, path),
+        );
 
         if (filtered.length === 0) {
             logger.info("No matching routes found.", {
                 path,
                 routesDFList: routes.routes_list,
             });
-            return { match: undefined, regexOnlyPatterns };
+            return undefined;
         }
 
-        const match = filtered.reduce(
-            (a, b) => (a[0].length >= b[0].length ? a : b),
-            filtered[0],
-        )[1];
-        return { match, regexOnlyPatterns };
+        // When several patterns match, the longest pattern wins.
+        return filtered.reduce((a, b) => (a[0].length >= b[0].length ? a : b), filtered[0])[1];
+    }
+
+    /**
+     * Legacy route match: `*` becomes `.*` and crosses `/`. The pattern is
+     * validated first, so a ReDoS-prone pattern is skipped (and logged) instead
+     * of being handed to `RegExp`.
+     */
+    private routeMatchesRegex(pattern: string, path: string): boolean {
+        const validation = validateRegexPattern(pattern);
+        if (!validation.ok) {
+            logger.warn("Skipping unsafe route pattern", {
+                path,
+                pattern,
+                reason: validation.reason,
+            });
+            return false;
+        }
+        return new RegExp(`^${pattern.replace(/\*/g, ".*")}$`).test(path);
+    }
+
+    /**
+     * Glob route match: `*` matches within a segment and `**` across segments.
+     * A catch-all is widened to `**` first so it keeps the deep reach it had
+     * under the regex. Invalid patterns are skipped (and logged).
+     */
+    private routeMatchesGlob(pattern: string, path: string): boolean {
+        const validation = validateGlobPattern(pattern);
+        if (!validation.ok) {
+            logger.warn("Skipping unsafe route pattern", {
+                path,
+                pattern,
+                reason: validation.reason,
+            });
+            return false;
+        }
+        return matchGlob(regexToGlobPattern(pattern), path);
     }
 
     /**

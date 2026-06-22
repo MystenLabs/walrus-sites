@@ -6,6 +6,7 @@ import {
     validateGlobPattern,
     validateRegexPattern,
     matchGlob,
+    regexToGlobPattern,
     countStars,
 } from "@lib/route_patterns";
 
@@ -124,5 +125,19 @@ describe("matchGlob — wildcards", () => {
         expect(matchGlob("/a/b", "/a/b")).toBe(true);
         expect(matchGlob("/a/b", "/a/b/c")).toBe(false);
         expect(matchGlob("/a/b", "/a")).toBe(false);
+    });
+});
+
+describe("regexToGlobPattern", () => {
+    test.each([
+        ["*", "/**"], // bare catch-all matches everything
+        ["/*", "/**/*"], // root catch-all requires at least one segment
+        ["/docs/*", "/docs/**/*"], // trailing star requires the slash + a segment
+        ["/forms/*/admin", "/forms/*/admin"], // mid-pattern star stays single-segment
+        ["/blog/old-*", "/blog/old-*"], // within-segment star is untouched
+        ["/foo/**", "/foo/**"], // already a glob, untouched
+        ["/about", "/about"], // no wildcard, untouched
+    ])("regexToGlobPattern(%j) = %j", (input, expected) => {
+        expect(regexToGlobPattern(input)).toBe(expected);
     });
 });
