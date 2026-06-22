@@ -151,6 +151,21 @@ testCases.forEach(([requestPath, _]) => {
     });
 });
 
+describe("matchPathToRoute skips unsafe patterns", () => {
+    test("an over-cap route pattern is skipped, not matched", () => {
+        const routes = {
+            routes_list: new Map<string, string>([
+                ["/a*b*c*", "/bad.html"], // 3 stars total -> skipped before the regex runs
+                ["/*", "/ok.html"],
+            ]),
+        };
+        // The unsafe pattern is longer, so if it were matched it would win.
+        // Getting the catch-all proves it was skipped.
+        const { match } = wsRouter.matchPathToRoute("/aXbYcZ", routes);
+        expect(match).toBe("/ok.html");
+    });
+});
+
 // --- Redirect matching tests ---
 
 const redirectsExample: Redirects = {
@@ -199,6 +214,17 @@ describe("matchPathToRedirect", () => {
         expect(wsRouter.matchPathToRedirect("/blog/old-x", redirectsExample)?.status_code).toBe(
             308,
         );
+    });
+});
+
+describe("matchPathToRedirect skips unsafe patterns", () => {
+    test("an over-cap redirect pattern is skipped", () => {
+        const redirects: Redirects = {
+            redirect_list: new Map<string, Redirect>([
+                ["/a*b*c*", { location: "/bad", status_code: 301 }], // 3 stars in one segment
+            ]),
+        };
+        expect(wsRouter.matchPathToRedirect("/aXbYcZ", redirects)).toBeUndefined();
     });
 });
 

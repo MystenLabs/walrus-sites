@@ -9,7 +9,7 @@ import { RPCSelector } from "@lib/rpc_selector";
 import { SuiClientTypes } from "@mysten/sui/client";
 import { deriveDynamicFieldID } from "@mysten/sui/utils";
 import { instrumentationFacade } from "@lib/instrumentation";
-import picomatch from "picomatch";
+import { matchGlob, validateGlobPattern, validateRegexPattern } from "@lib/route_patterns";
 
 /**
  * The WalrusSitesRouter class is responsible for handling the routing and redirect
@@ -65,13 +65,13 @@ export class WalrusSitesRouter {
      * Matches the path to the appropriate route.
      * Uses the legacy regex pattern where `*` is converted to `.*` (matches
      * any characters including `/`). When multiple patterns match, the longest
-     * pattern wins.
+     * pattern wins. Patterns that fail validation are skipped (and logged).
      *
      * Returns an object with:
      * - `match`: the matched route target, or undefined if no match.
-     * - `regexOnlyPatterns`: patterns that matched via the legacy regex but
-     *   NOT via picomatch (glob). These patterns will break when we migrate
-     *   routes to glob matching. The caller should log these with site context.
+     * - `regexOnlyPatterns`: patterns that matched via the legacy regex but NOT
+     *   via the glob matcher. These will behave differently once routes migrate
+     *   to glob matching; the caller logs them with site context as a canary.
      *
      * @param path - The path to match.
      * @param routes - The routes to match against.
@@ -92,10 +92,19 @@ export class WalrusSitesRouter {
         const regexOnlyPatterns: string[] = [];
 
         const filtered = Array.from(routes.routes_list.entries()).filter(([pattern]) => {
+            const validation = validateRegexPattern(pattern);
+            if (!validation.ok) {
+                logger.warn("Skipping unsafe route pattern", {
+                    path,
+                    pattern,
+                    reason: validation.reason,
+                });
+                return false;
+            }
             const regexMatch = new RegExp(`^${pattern.replace(/\*/g, ".*")}$`).test(path);
-            // Shadow-test picomatch to identify existing route patterns that won't
+            // Shadow-test glob matching to surface route patterns that won't
             // survive the migration from regex to glob matching.
-            if (regexMatch && !picomatch(pattern, { dot: true })(path)) {
+            if (regexMatch && !matchGlob(pattern, path)) {
                 regexOnlyPatterns.push(pattern);
             }
             return regexMatch;
@@ -117,8 +126,9 @@ export class WalrusSitesRouter {
     }
 
     /**
-     * Matches the path to a redirect entry using glob patterns (picomatch).
-     * When multiple patterns match, the longest pattern wins.
+     * Matches the path to a redirect entry using glob patterns.
+     * When multiple patterns match, the longest pattern wins. Patterns that fail
+     * validation are skipped (and logged).
      *
      * @param path - The path to match.
      * @param redirects - The redirects to match against.
@@ -127,9 +137,18 @@ export class WalrusSitesRouter {
         logger.info("Attempting to match the provided `path` with the redirects", { path });
         if (redirects.redirect_list.size === 0) return undefined;
 
-        const filtered = Array.from(redirects.redirect_list.entries()).filter(([pattern]) =>
-            picomatch(pattern, { dot: true })(path),
-        );
+        const filtered = Array.from(redirects.redirect_list.entries()).filter(([pattern]) => {
+            const validation = validateGlobPattern(pattern);
+            if (!validation.ok) {
+                logger.warn("Skipping unsafe redirect pattern", {
+                    path,
+                    pattern,
+                    reason: validation.reason,
+                });
+                return false;
+            }
+            return matchGlob(pattern, path);
+        });
 
         if (filtered.length === 0) {
             logger.info("No matching redirects found.", { path });

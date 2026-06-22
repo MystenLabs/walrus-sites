@@ -194,7 +194,7 @@ export class UrlFetcher {
                 routes,
             );
             if (regexOnlyPatterns.length > 0) {
-                logger.warn("Route patterns match via regex but not via glob (picomatch)", {
+                logger.warn("Route patterns match via regex but not via the glob matcher", {
                     subdomain: parsedUrl.subdomain,
                     siteObjectId: resolvedObjectId,
                     path: parsedUrl.path,
