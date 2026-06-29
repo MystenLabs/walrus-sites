@@ -124,10 +124,10 @@ export class WalrusSitesRouter {
                 });
                 return false;
             }
-            return new RegExp(`^${pattern.replace(/\*/g, ".*")}$`).test(path);
+            return new RegExp(`^${pattern.replaceAll("*", ".*")}$`).test(path);
         });
         if (matches.length === 0) return undefined;
-        return matches.reduce((a, b) => (a[0].length >= b[0].length ? a : b))[1];
+        return matches.reduce((a, b) => (a[0].length >= b[0].length ? a : b), matches[0])[1];
     }
 
     /**
