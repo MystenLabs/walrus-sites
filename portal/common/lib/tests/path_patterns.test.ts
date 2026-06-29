@@ -175,13 +175,13 @@ function checkMatrix(title: string, patterns: string[], rows: [string, MatrixCel
     console.log(`\n${title}\n${table.join("\n")}\n`);
 }
 
-// Matrix0 — root catch-alls. `/*` and `*` are redirect-only (routes rewrite them
+// Matrix0 — root catch-all. `/*` and `*` are redirect-only (routes rewrite them
 // to `/**/*` and `/**`). Bare `*` matches nothing: every path has a leading
 // slash, so ≥2 segments, and `*` is a single segment.
-describe("Matrix0 — root catch-alls", () => {
+describe("Matrix0 — root catch-all", () => {
     test("crowns the most-specific root catch-all", () => {
         checkMatrix(
-            "Matrix0 — root catch-alls",
+            "Matrix0 — root catch-all",
             ["/", "/**", "/**/*", "**", "/*", "*"],
             [
                 ["/", [0, 3, 2, 4, 1, "-"]],
@@ -194,7 +194,7 @@ describe("Matrix0 — root catch-alls", () => {
 });
 
 // Matrix1 — middle wildcards. Exact / finite-segment patterns beat the globstar
-// catch-alls they overlap.
+// catch-all they overlap.
 describe("Matrix1 — middle wildcards", () => {
     test("crowns the most-specific middle wildcard", () => {
         checkMatrix(
