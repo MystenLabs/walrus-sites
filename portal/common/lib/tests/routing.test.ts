@@ -223,6 +223,47 @@ describe("matchPathToRoute with glob routing enabled", () => {
         expect(globRouter.matchPathToRoute("/section/sub", routes)).toBe("/child.html");
     });
 
+    test("an exact `/foo/` beats its sibling `/foo/*`, and neither matches `/foo`", () => {
+        const routes = {
+            routes_list: new Map<string, string>([
+                ["/foo/*", "/catch.html"],
+                ["/foo/", "/exact.html"],
+            ]),
+        };
+        // `/foo/` is the most specific match for the trailing-slash path.
+        expect(globRouter.matchPathToRoute("/foo/", routes)).toBe("/exact.html");
+        // Only the catch-all matches a deeper path.
+        expect(globRouter.matchPathToRoute("/foo/bar", routes)).toBe("/catch.html");
+        // The widened `/foo/*` (-> `/foo/**/*`) does not match the bare prefix.
+        expect(globRouter.matchPathToRoute("/foo", routes)).toBeUndefined();
+    });
+
+    test("a globstar plus a segment beats a bare globstar for a deep path", () => {
+        // `/something/else/**/*` has one more literal `/` than `/something/else/**`,
+        // so the deeper, more explicit pattern wins where both match.
+        const routes = {
+            routes_list: new Map<string, string>([
+                ["/something/else/**", "/glob.html"],
+                ["/something/else/**/*", "/glob-deep.html"],
+            ]),
+        };
+        expect(globRouter.matchPathToRoute("/something/else/foo/bar", routes)).toBe(
+            "/glob-deep.html",
+        );
+    });
+
+    test("equally specific patterns resolve deterministically to the first", () => {
+        // `/a/*/c` and `/*/b/c` both match `/a/b/c` with the same literal and
+        // star counts, so the first-defined one wins.
+        const routes = {
+            routes_list: new Map<string, string>([
+                ["/a/*/c", "/first.html"],
+                ["/*/b/c", "/second.html"],
+            ]),
+        };
+        expect(globRouter.matchPathToRoute("/a/b/c", routes)).toBe("/first.html");
+    });
+
     test("an unsafe pattern is skipped under glob too", () => {
         const routes = {
             routes_list: new Map<string, string>([
@@ -256,10 +297,19 @@ describe("matchPathToRedirect", () => {
         expect(match).toEqual({ location: "/blog/archive", status_code: 308 });
     });
 
-    test("longest glob match wins", () => {
-        // /blog/old-post matches /blog/old-* (length 11) but not /docs/* (doesn't match)
-        const match = wsRouter.matchPathToRedirect("/blog/old-post", redirectsExample);
-        expect(match).toEqual({ location: "/blog/archive", status_code: 308 });
+    test("most specific redirect wins over a broader sibling", () => {
+        // `/blog/` and `/blog/*` both match `/blog/`; the exact one is more
+        // specific (same literals, no wildcard), so it wins.
+        const redirects: Redirects = {
+            redirect_list: new Map<string, Redirect>([
+                ["/blog/", { location: "/blog-index", status_code: 301 }],
+                ["/blog/*", { location: "/blog-catch", status_code: 302 }],
+            ]),
+        };
+        expect(wsRouter.matchPathToRedirect("/blog/", redirects)).toEqual({
+            location: "/blog-index",
+            status_code: 301,
+        });
     });
 
     test("no match returns undefined", () => {

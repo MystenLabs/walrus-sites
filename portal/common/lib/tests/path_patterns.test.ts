@@ -7,8 +7,9 @@ import {
     validateRegexPattern,
     matchGlob,
     regexToGlobPattern,
+    compareGlobSpecificity,
     countStars,
-} from "@lib/route_patterns";
+} from "@lib/path_patterns";
 
 describe("countStars", () => {
     test.each([
@@ -91,40 +92,41 @@ describe("matchGlob — literals", () => {
 });
 
 describe("matchGlob — wildcards", () => {
-    test("`*` matches within one segment only", () => {
-        expect(matchGlob("/p/*", "/p/x")).toBe(true);
-        expect(matchGlob("/p/*", "/p/x/y")).toBe(false);
-    });
-
+    // Whole-segment `*` and `**` matching is covered by the pattern×path matrices
+    // below; these cover what the matrices don't.
     test("within-segment `*` (prefix/suffix)", () => {
         expect(matchGlob("/blog/old-*", "/blog/old-post")).toBe(true);
         expect(matchGlob("/assets/*.js", "/assets/app.js")).toBe(true);
         expect(matchGlob("/assets/*.js", "/assets/app.css")).toBe(false);
     });
 
-    test("mid-pattern `*` stays single-segment", () => {
-        expect(matchGlob("/forms/*/admin", "/forms/123/admin")).toBe(true);
-        expect(matchGlob("/forms/*/admin", "/forms/a/b/admin")).toBe(false);
-    });
-
-    test("`**` matches any run of segments, including zero", () => {
+    test("`**` does not match a different prefix", () => {
         expect(matchGlob("/foo/**", "/foo")).toBe(true);
-        expect(matchGlob("/foo/**", "/foo/x")).toBe(true);
-        expect(matchGlob("/foo/**", "/foo/x/y/z")).toBe(true);
         expect(matchGlob("/foo/**", "/bar")).toBe(false);
     });
+});
 
-    test("`/foo/**/*` requires one more segment than `/foo/**`", () => {
-        // The "extra slash" the most-exact tiebreaker relies on.
-        expect(matchGlob("/foo/**/*", "/foo")).toBe(false);
-        expect(matchGlob("/foo/**/*", "/foo/x")).toBe(true);
-        expect(matchGlob("/foo/**/*", "/foo/x/y")).toBe(true);
+describe("compareGlobSpecificity", () => {
+    // Scored on the rewritten glob form; a negative result means the first
+    // pattern is more specific (sorts first).
+    test("more literal characters win", () => {
+        // The extra slash makes the deeper catch-all more literal.
+        expect(compareGlobSpecificity("/something/else/**/*", "/something/else/**")).toBeLessThan(
+            0,
+        );
+        expect(compareGlobSpecificity("/docs/**/*", "/**/*")).toBeLessThan(0);
     });
 
-    test("with no `**`, segments must line up one-to-one", () => {
-        expect(matchGlob("/a/b", "/a/b")).toBe(true);
-        expect(matchGlob("/a/b", "/a/b/c")).toBe(false);
-        expect(matchGlob("/a/b", "/a")).toBe(false);
+    test("with equal literals, fewer wildcards win", () => {
+        // `/a/b` and `/a/b/**` both have four literal chars; the exact one has no star.
+        expect(compareGlobSpecificity("/a/b", "/a/b/**")).toBeLessThan(0);
+    });
+
+    test("sorts a list most-specific first", () => {
+        const sorted = ["/**/*", "/something/else/**", "/something/else/**/*"].sort(
+            compareGlobSpecificity,
+        );
+        expect(sorted).toEqual(["/something/else/**/*", "/something/else/**", "/**/*"]);
     });
 });
 
@@ -139,5 +141,104 @@ describe("regexToGlobPattern", () => {
         ["/about", "/about"], // no wildcard, untouched
     ])("regexToGlobPattern(%j) = %j", (input, expected) => {
         expect(regexToGlobPattern(input)).toBe(expected);
+    });
+});
+
+// Path×pattern matrices: one row per path, one column per pattern. Each cell is
+// `-` (no match) or a rank among the patterns matching that row's path — `0` is
+// the winner, `1` wins if `0` weren't there, and so on (compareGlobSpecificity
+// order, ties to the first column, like the router). Run with
+// `vitest run … --disableConsoleIntercept` to see the printed tables.
+type MatrixCell = number | "-";
+
+function checkMatrix(title: string, patterns: string[], rows: [string, MatrixCell[]][]): void {
+    const actual: MatrixCell[][] = rows.map(([path]) => {
+        // Patterns matching this path, ranked by specificity: 0 wins, 1 wins if 0
+        // weren't there, etc. Ties keep column order (stable sort), like the router.
+        const ranked = patterns
+            .map((pattern, col) => ({ pattern, col }))
+            .filter(({ pattern }) => matchGlob(pattern, path))
+            .sort((a, b) => compareGlobSpecificity(a.pattern, b.pattern));
+        const rankByCol = new Map(ranked.map(({ col }, rank) => [col, rank]));
+        return patterns.map((_, col) => rankByCol.get(col) ?? "-");
+    });
+    expect(actual).toEqual(rows.map(([, row]) => row));
+
+    const patW = Math.max(...rows.map(([p]) => p.length));
+    const colW = patterns.map((p) => Math.max(p.length, 1));
+    const line = (label: string, cells: string[]): string =>
+        label.padEnd(patW) + "  " + cells.map((c, i) => c.padEnd(colW[i])).join("  ");
+    const table = [
+        line("", patterns),
+        ...actual.map((cells, r) => line(rows[r][0], cells.map(String))),
+    ];
+    console.log(`\n${title}\n${table.join("\n")}\n`);
+}
+
+// Matrix0 — root catch-alls. `/*` and `*` are redirect-only (routes rewrite them
+// to `/**/*` and `/**`). Bare `*` matches nothing: every path has a leading
+// slash, so ≥2 segments, and `*` is a single segment.
+describe("Matrix0 — root catch-alls", () => {
+    test("crowns the most-specific root catch-all", () => {
+        checkMatrix(
+            "Matrix0 — root catch-alls",
+            ["/", "/**", "/**/*", "**", "/*", "*"],
+            [
+                ["/", [0, 3, 2, 4, 1, "-"]],
+                ["/foo", ["-", 2, 1, 3, 0, "-"]],
+                ["/foo/", ["-", 1, 0, 2, "-", "-"]],
+                ["/foo/bar", ["-", 1, 0, 2, "-", "-"]],
+            ],
+        );
+    });
+});
+
+// Matrix1 — middle wildcards. Exact / finite-segment patterns beat the globstar
+// catch-alls they overlap.
+describe("Matrix1 — middle wildcards", () => {
+    test("crowns the most-specific middle wildcard", () => {
+        checkMatrix(
+            "Matrix1 — middle wildcards",
+            ["/foo/bar", "/foo/*/bar", "/foo/**/bar", "/foo/**/*/bar"],
+            [
+                ["/foo/bar", [0, "-", 1, "-"]],
+                ["/foo/x/bar", ["-", 0, 2, 1]],
+                ["/foo/x/y/bar", ["-", "-", 1, 0]],
+                ["/foo/x/y/z/bar", ["-", "-", 1, 0]],
+            ],
+        );
+    });
+});
+
+// Matrix2 — trailing wildcards. Every tail (`/foo`, `/foo/*`, `/foo/*/*`,
+// `/foo/**`, `/foo/**/*`, `/foo/**/*/*`) paired with its trailing-slash variant,
+// against growing path depth. The finite tail always beats its globstar twin.
+describe("Matrix2 — trailing wildcards", () => {
+    test("crowns the most-specific trailing wildcard", () => {
+        checkMatrix(
+            "Matrix2 — trailing wildcards",
+            [
+                "/foo",
+                "/foo/",
+                "/foo/*",
+                "/foo/*/",
+                "/foo/*/*",
+                "/foo/*/*/",
+                "/foo/**",
+                "/foo/**/",
+                "/foo/**/*",
+                "/foo/**/*/",
+                "/foo/**/*/*",
+                "/foo/**/*/*/",
+            ],
+            [
+                ["/foo", [0, "-", "-", "-", "-", "-", 1, "-", "-", "-", "-", "-"]],
+                ["/foo/", ["-", 0, 1, "-", "-", "-", 4, 2, 3, "-", "-", "-"]],
+                ["/foo/bar", ["-", "-", 0, "-", "-", "-", 2, "-", 1, "-", "-", "-"]],
+                ["/foo/bar/", ["-", "-", "-", 0, 1, "-", 6, 4, 5, 2, 3, "-"]],
+                ["/foo/bar/baz", ["-", "-", "-", "-", 0, "-", 3, "-", 2, "-", 1, "-"]],
+                ["/foo/bar/baz/", ["-", "-", "-", "-", "-", 0, 6, 4, 5, 2, 3, 1]],
+            ],
+        );
     });
 });

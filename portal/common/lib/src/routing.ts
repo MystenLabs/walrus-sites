@@ -10,11 +10,12 @@ import { SuiClientTypes } from "@mysten/sui/client";
 import { deriveDynamicFieldID } from "@mysten/sui/utils";
 import { instrumentationFacade } from "@lib/instrumentation";
 import {
+    compareGlobSpecificity,
     matchGlob,
     regexToGlobPattern,
     validateGlobPattern,
     validateRegexPattern,
-} from "@lib/route_patterns";
+} from "@lib/path_patterns";
 
 /**
  * The WalrusSitesRouter class is responsible for handling the routing and redirect
@@ -42,6 +43,11 @@ export class WalrusSitesRouter {
         const reqStartTime = Date.now();
         const routesDfId = this.deriveSiteFieldId(siteObjectId, "routes");
         const redirectsDfId = this.deriveSiteFieldId(siteObjectId, "redirects");
+        logger.info("Fetching routes and redirects dynamic fields", {
+            siteObjectId,
+            routesDfId,
+            redirectsDfId,
+        });
 
         const responses = await this.rpcSelector.multiGetObjects([routesDfId, redirectsDfId], {
             content: true,
@@ -71,82 +77,64 @@ export class WalrusSitesRouter {
 
     /**
      * Matches the path to the appropriate route. With the glob flag off,
-     * patterns match via the legacy regex (`*` becomes `.*` and crosses `/`);
-     * with it on, each pattern is rewritten to its glob equivalent and matched
-     * via the glob matcher. Either way, patterns that fail validation are skipped
-     * (and logged), and when several patterns match the longest one wins.
+     * patterns match via the legacy regex (`*` becomes `.*` and crosses `/`) and
+     * the longest matching pattern wins; with it on, each pattern is rewritten to
+     * its glob equivalent, matched via the glob matcher, and the most-specific
+     * match wins. Either way, patterns that fail validation are skipped (and
+     * logged).
      *
      * @param path - The path to match.
      * @param routes - The routes to match against.
      */
     public matchPathToRoute(path: string, routes: Routes): string | undefined {
-        logger.info(
-            "Attempting to match the provided `path` with the routes in the Routes object",
-            {
-                path,
-                routesDFList: routes.routes_list,
-            },
-        );
+        logger.info("Attempting to match the provided `path` with the routes", { path });
         if (routes.routes_list.size === 0) return undefined;
 
-        const filtered = Array.from(routes.routes_list.entries()).filter(([pattern]) =>
-            this.enableGlobRouting
-                ? this.routeMatchesGlob(pattern, path)
-                : this.routeMatchesRegex(pattern, path),
-        );
-
-        if (filtered.length === 0) {
-            logger.info("No matching routes found.", {
-                path,
-                routesDFList: routes.routes_list,
-            });
-            return undefined;
+        let match: string | undefined;
+        if (this.enableGlobRouting) {
+            // Rewrite each legacy pattern to its glob form, then match.
+            const globRoutes = Array.from(
+                routes.routes_list,
+                ([pattern, target]): [string, string] => [regexToGlobPattern(pattern), target],
+            );
+            match = this.matchGlobEntry(globRoutes, path, "route");
+        } else {
+            match = this.matchRouteViaRegex(path, routes);
         }
 
-        // When several patterns match, the longest pattern wins.
-        return filtered.reduce((a, b) => (a[0].length >= b[0].length ? a : b), filtered[0])[1];
+        if (match === undefined) {
+            logger.info("No matching routes found.", { path });
+        }
+        return match;
     }
 
     /**
-     * Legacy route match: `*` becomes `.*` and crosses `/`. The pattern is
-     * validated first, so a ReDoS-prone pattern is skipped (and logged) instead
-     * of being handed to `RegExp`.
+     * Legacy route matching: each `*` becomes `.*` and crosses `/`. Patterns are
+     * validated first so a ReDoS-prone one is skipped (and logged) instead of
+     * being handed to `RegExp`. The longest matching pattern wins.
      */
-    private routeMatchesRegex(pattern: string, path: string): boolean {
-        const validation = validateRegexPattern(pattern);
-        if (!validation.ok) {
-            logger.warn("Skipping unsafe route pattern", {
-                path,
-                pattern,
-                reason: validation.reason,
-            });
-            return false;
-        }
-        return new RegExp(`^${pattern.replace(/\*/g, ".*")}$`).test(path);
+    private matchRouteViaRegex(path: string, routes: Routes): string | undefined {
+        const matches = Array.from(routes.routes_list.entries()).filter(([pattern]) => {
+            const validation = validateRegexPattern(pattern);
+            if (!validation.ok) {
+                logger.warn("Skipping unsafe route pattern", {
+                    path,
+                    pattern,
+                    reason: validation.reason,
+                });
+                return false;
+            }
+            return new RegExp(`^${pattern.replace(/\*/g, ".*")}$`).test(path);
+        });
+        if (matches.length === 0) return undefined;
+        return matches.reduce((a, b) => (a[0].length >= b[0].length ? a : b))[1];
     }
 
     /**
-     * Glob route match: `*` matches within a segment and `**` across segments.
-     * A catch-all is widened to `**` first so it keeps the deep reach it had
-     * under the regex. Invalid patterns are skipped (and logged).
-     */
-    private routeMatchesGlob(pattern: string, path: string): boolean {
-        const validation = validateGlobPattern(pattern);
-        if (!validation.ok) {
-            logger.warn("Skipping unsafe route pattern", {
-                path,
-                pattern,
-                reason: validation.reason,
-            });
-            return false;
-        }
-        return matchGlob(regexToGlobPattern(pattern), path);
-    }
-
-    /**
-     * Matches the path to a redirect entry using glob patterns.
-     * When multiple patterns match, the longest pattern wins. Patterns that fail
-     * validation are skipped (and logged).
+     * Matches the path to a redirect entry using glob patterns. Redirects are
+     * authored as globs, so they are matched directly (no regex rewrite). The
+     * most specific matching pattern wins; patterns that fail validation are
+     * skipped (and logged).
      *
      * @param path - The path to match.
      * @param redirects - The redirects to match against.
@@ -155,25 +143,43 @@ export class WalrusSitesRouter {
         logger.info("Attempting to match the provided `path` with the redirects", { path });
         if (redirects.redirect_list.size === 0) return undefined;
 
-        const filtered = Array.from(redirects.redirect_list.entries()).filter(([pattern]) => {
-            const validation = validateGlobPattern(pattern);
+        const match = this.matchGlobEntry(redirects.redirect_list, path, "redirect");
+        if (match === undefined) {
+            logger.info("No matching redirects found.", { path });
+        }
+        return match;
+    }
+
+    /**
+     * Matches `path` against the glob `entries` ([glob, value] pairs) and returns
+     * the value of the most specific match, or undefined if none match. Entries
+     * whose glob fails validation are skipped (and logged). The most specific
+     * glob wins — most literal characters, then fewest wildcards — with ties
+     * resolved in iteration order. Routes rewrite their legacy patterns to globs
+     * before calling; redirects are already globs.
+     */
+    private matchGlobEntry<V>(
+        entries: Iterable<[string, V]>,
+        path: string,
+        kind: "route" | "redirect",
+    ): V | undefined {
+        let winner: { glob: string; value: V } | undefined;
+        for (const [glob, value] of entries) {
+            const validation = validateGlobPattern(glob);
             if (!validation.ok) {
-                logger.warn("Skipping unsafe redirect pattern", {
+                logger.warn(`Skipping unsafe ${kind} pattern`, {
                     path,
-                    pattern,
+                    pattern: glob,
                     reason: validation.reason,
                 });
-                return false;
+                continue;
             }
-            return matchGlob(pattern, path);
-        });
-
-        if (filtered.length === 0) {
-            logger.info("No matching redirects found.", { path });
-            return undefined;
+            if (!matchGlob(glob, path)) continue;
+            if (!winner || compareGlobSpecificity(glob, winner.glob) < 0) {
+                winner = { glob, value };
+            }
         }
-
-        return filtered.reduce((a, b) => (a[0].length >= b[0].length ? a : b), filtered[0])[1];
+        return winner?.value;
     }
 
     /**

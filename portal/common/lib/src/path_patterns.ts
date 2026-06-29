@@ -163,3 +163,28 @@ export function regexToGlobPattern(pattern: string): string {
         return pattern;
     }
 }
+
+/**
+ * Literal "footprint" of `pattern`: non-`*` characters, minus one slash per `**`.
+ * A `**` can match zero segments, collapsing one of its two surrounding slashes,
+ * so that slash isn't a guaranteed literal. A single `*` always fills a segment,
+ * so its slashes do count.
+ */
+function literalCharCount(pattern: string): number {
+    const globstars = pattern.split("/").filter((segment) => segment === "**").length;
+    return pattern.length - countStars(pattern) - globstars;
+}
+
+/**
+ * Orders two glob patterns by specificity, most-exact first, for choosing a
+ * winner when several patterns match the same path. A pattern is more specific
+ * when it has more literal characters (slashes included); ties break toward
+ * fewer wildcards. Returns a negative number when `a` is more specific than `b`.
+ * Pass the rewritten glob form (from `regexToGlobPattern`) so the extra slash a
+ * widened catch-all gains counts toward its literal characters.
+ */
+export function compareGlobSpecificity(a: string, b: string): number {
+    const literalDiff = literalCharCount(b) - literalCharCount(a);
+    if (literalDiff !== 0) return literalDiff; // more literal characters first
+    return countStars(a) - countStars(b); // tie -> fewer wildcards first
+}
