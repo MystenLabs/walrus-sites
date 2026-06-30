@@ -52,7 +52,7 @@ class WrappedSuiClient extends SuiGrpcClient {
  * structured code. We also keep the legacy JSON-RPC `code: "notExists"` check
  * for safety. Detection is duck-typed because no error class is exported.
  */
-function isNotExistsError(error: unknown): boolean {
+export function isNotExistsError(error: unknown): boolean {
     if (typeof error !== "object" || error === null) {
         return false;
     }
