@@ -40,7 +40,7 @@ import { HttpStatusCodes } from "@lib/http/http_status_codes";
  *
  * Unregistered SuiNS names are now handled at the RPCSelector level
  * (getNameRecord returns null), so they never reach the catch block here.
- * See rpc_selector_get_name_record.test.ts for the notExists tests.
+ * See rpc_selector_get_name_record.test.ts for the not-registered tests.
  */
 describe("UrlFetcher.resolveObjectId — FN-fail counter", () => {
     let suinsResolver: SuiNSResolver;

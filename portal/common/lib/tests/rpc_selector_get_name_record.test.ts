@@ -75,4 +75,21 @@ describe("RPCSelector.getNameRecord — not-found handling", () => {
         // 1 transient failure + 1 not-found = 2 calls total (stopped on second).
         expect(spy).toHaveBeenCalledTimes(2);
     });
+
+    it("retries a transport error whose message contains 'not found' (HTTP 404)", async () => {
+        const rpcSelector = new RPCSelector(urls, "testnet");
+        // A gRPC-web HTTP 404 surfaces as RpcError("Not Found", "NOT_FOUND"):
+        // the message contains "not found", but it is a transient transport
+        // failure, NOT an authoritative "name not registered" — so it must be
+        // retried/failed over, never short-circuited to null.
+        const transportNotFound = () =>
+            Object.assign(new Error("Not Found"), { code: "NOT_FOUND" });
+        const spy = vi
+            .spyOn(SuinsClient.prototype, "getNameRecord")
+            .mockRejectedValue(transportNotFound());
+
+        await expect(rpcSelector.getNameRecord("docs.sui")).rejects.toThrow();
+        // 2 URLs × (1 initial + 2 retries) = 6 calls.
+        expect(spy).toHaveBeenCalledTimes(6);
+    });
 });

@@ -44,23 +44,42 @@ class WrappedSuiClient extends SuiGrpcClient {
 }
 
 /**
- * Returns true if the error means the fullnode cleanly responded that an object
- * (e.g. an unregistered SuiNS name's dynamic field) does not exist. This is an
- * authoritative answer, so retrying won't change it.
- *
- * The gRPC core API throws a plain Error like "Object 0x… not found" with no
- * structured code. We also keep the legacy JSON-RPC `code: "notExists"` check
- * for safety. Detection is duck-typed because no error class is exported.
+ * True only for the authoritative "object doesn't exist" miss. A transient
+ * HTTP 404 (`RpcError`) also says "not found" but carries a gRPC `code`, so
+ * we key off shape: a plain `Error`, no code, message `"Object 0x… not found"`
+ * (pinned by the drift-guard tests).
  */
-export function isNotExistsError(error: unknown): boolean {
-    if (typeof error !== "object" || error === null) {
+export function isObjectNotFoundError(error: unknown): boolean {
+    if (!(error instanceof Error)) {
         return false;
     }
-    const { code, message } = error as { code?: unknown; message?: unknown };
-    if (code === "notExists") {
+    // Transport errors (RpcError) always carry a gRPC status `code` string; a
+    // genuine missing-object error has none.
+    if (typeof (error as { code?: unknown }).code === "string") {
+        return false;
+    }
+    return /^Object 0x[0-9a-f]+ not found/i.test(error.message);
+}
+
+/**
+ * True only for the authoritative "SuiNS name not registered" error, which the
+ * caller resolves to `null`; every other error stays retryable.
+ *
+ * TODO(tech-debt): only needed because `@mysten/suins` getNameRecord throws on
+ * a miss instead of returning null as its signature promises; delete once
+ * fixed upstream.
+ */
+export function isNameNotRegisteredError(error: unknown): boolean {
+    if (isObjectNotFoundError(error)) {
         return true;
     }
-    return typeof message === "string" && /not found|does not exist/i.test(message);
+    if (!(error instanceof Error)) {
+        return false;
+    }
+    if (typeof (error as { code?: unknown }).code === "string") {
+        return false;
+    }
+    return /not registered/i.test(error.message);
 }
 
 export class RPCSelector implements RPCSelectorInterface {
@@ -112,12 +131,6 @@ export class RPCSelector implements RPCSelectorInterface {
                 }
             } catch (error) {
                 const wrappedError = error instanceof Error ? error : new Error(String(error));
-                // ObjectError(notExists) means the FN authoritatively answered
-                // "this object does not exist" — retrying won't change the
-                // answer.
-                if (isNotExistsError(error)) {
-                    return { status: "stop", error: wrappedError };
-                }
                 logger.warn("RPC call failed", { url, error: formatError(error) });
                 return { status: "retry-same", error: wrappedError };
             }
@@ -146,20 +159,20 @@ export class RPCSelector implements RPCSelectorInterface {
 
     public async getNameRecord(name: string): Promise<NameRecord | null> {
         logger.info("RPCSelector: getNameRecord", { name });
-        try {
-            return await this.invokeWithFailover((client) => client.getNameRecord(name));
-        } catch (error) {
-            // The executor wraps the ObjectError in: AggregateError → Error
-            // ("stop from <url>", { cause: ObjectError }). Check the cause
-            // chain for the notExists code.
-            if (
-                error instanceof AggregateError &&
-                error.errors.some((e) => isNotExistsError((e as Error & { cause?: unknown }).cause))
-            ) {
-                logger.info("SuiNS name not registered (FN responded notExists)", { name });
-                return null;
+        return await this.invokeWithFailover(async (client) => {
+            try {
+                return await client.getNameRecord(name);
+            } catch (error) {
+                // A name with no on-chain record is an authoritative answer, not
+                // a failure. Resolve it to null here: a successful null ends the
+                // failover loop, so we stop instead of retrying every node. Any
+                // other error propagates and is retried / failed over as usual.
+                if (isNameNotRegisteredError(error)) {
+                    logger.info("SuiNS name not registered", { name });
+                    return null;
+                }
+                throw error;
             }
-            throw error;
-        }
+        });
     }
 }
