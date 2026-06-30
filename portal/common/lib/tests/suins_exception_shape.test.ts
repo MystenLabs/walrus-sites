@@ -11,14 +11,21 @@ import { parsePriorityUrlList } from "@lib/priority_executor";
  * Integration tests — confirm that an unregistered SuiNS name is handled as
  * "not found" on real testnet.
  *
- * Skipped unless RPC_URL_LIST is set (e.g. via .env.test). Hits real testnet
- * so it's a few seconds and may be flaky if all FNs in the priority list are
- * down at once.
+ * Requires RPC_URL_LIST and MAINNET_RPC_URL (set via .env.test). We error rather
+ * than skip when either is absent, so the mainnet drift guard below can't silently
+ * vanish. Hits real testnet (and mainnet for the drift guard).
  */
-const rpcEnv = process.env.RPC_URL_LIST;
+const testnetRpc = process.env.RPC_URL_LIST;
+const mainnetRpc = process.env.MAINNET_RPC_URL;
+if (!testnetRpc || !mainnetRpc) {
+    throw new Error(
+        "RPC_URL_LIST and MAINNET_RPC_URL must be set to run the SuiNS network tests " +
+            "(normally provided by .env.test)",
+    );
+}
 
-describe.skipIf(!rpcEnv)("SuiNS name resolution on real testnet", () => {
-    const rpcSelector = new RPCSelector(parsePriorityUrlList(rpcEnv ?? ""), "testnet");
+describe("SuiNS name resolution on real testnet", () => {
+    const rpcSelector = new RPCSelector(parsePriorityUrlList(testnetRpc), "testnet");
 
     it("returns null for an unregistered name", async () => {
         // A name we are confident is not registered. Random suffix avoids
@@ -41,15 +48,12 @@ describe.skipIf(!rpcEnv)("SuiNS name resolution on real testnet", () => {
  * fails, the SDK changed how it signals "not found": update `isNameNotRegisteredError`
  * in rpc_selector.ts to match the new shape.
  *
- * Uses the canonical mainnet fullnode directly (not RPC_URL_LIST, which is
- * testnet), gated on the same "network tests enabled" signal.
+ * Uses MAINNET_RPC_URL directly (not RPC_URL_LIST, which is testnet).
  */
-const MAINNET_GRPC_URL = "https://fullnode.mainnet.sui.io:443";
-
-describe.skipIf(!rpcEnv)("gRPC not-found error shape (mainnet drift guard)", () => {
+describe("gRPC not-found error shape (mainnet drift guard)", () => {
     it("not-found error is still detected by isNameNotRegisteredError", async () => {
         const suins = new SuinsClient({
-            client: new SuiGrpcClient({ baseUrl: MAINNET_GRPC_URL, network: "mainnet" }),
+            client: new SuiGrpcClient({ baseUrl: mainnetRpc, network: "mainnet" }),
             network: "mainnet",
         });
         const name = `walrus-portal-drift-guard-${Date.now()}.sui`;

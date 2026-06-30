@@ -4,6 +4,7 @@
 import { describe, it, expect } from "vitest";
 import { SuiGrpcClient } from "@mysten/sui/grpc";
 import { SUI_CLOCK_OBJECT_ID } from "@mysten/sui/utils";
+import { isObjectNotFoundError } from "@lib/rpc_selector";
 
 /**
  * Drift guard for the gRPC `core.getObjects` shape, checked against mainnet — the
@@ -22,16 +23,20 @@ import { SUI_CLOCK_OBJECT_ID } from "@mysten/sui/utils";
  * (e.g. it starts throwing, or returns null), this goes red — go update the
  * mapping in `multiGetObjects` (rpc_selector.ts) to match the new shape.
  *
- * Gated on the same "network tests enabled" signal (RPC_URL_LIST) as the SuiNS
- * drift guard; uses the mainnet fullnode directly, not RPC_URL_LIST (testnet).
+ * Requires MAINNET_RPC_URL (set via .env.test). We error rather than skip when
+ * it's absent, so this guard can't silently vanish.
  */
-const rpcEnv = process.env.RPC_URL_LIST;
-const MAINNET_GRPC_URL = "https://fullnode.mainnet.sui.io:443";
+const mainnetRpc = process.env.MAINNET_RPC_URL;
+if (!mainnetRpc) {
+    throw new Error(
+        "MAINNET_RPC_URL must be set to run the gRPC drift guard (normally provided by .env.test)",
+    );
+}
 const MISSING_OBJECT_ID = "0x" + "0".repeat(63) + "f"; // valid-shaped id, never exists
 
-describe.skipIf(!rpcEnv)("gRPC getObjects shape (mainnet drift guard)", () => {
+describe("gRPC getObjects shape (mainnet drift guard)", () => {
     it("returns a present object and an Error element for a miss, in order", async () => {
-        const client = new SuiGrpcClient({ baseUrl: MAINNET_GRPC_URL, network: "mainnet" });
+        const client = new SuiGrpcClient({ baseUrl: mainnetRpc, network: "mainnet" });
 
         const { objects } = await client.core.getObjects({
             objectIds: [SUI_CLOCK_OBJECT_ID, MISSING_OBJECT_ID],
@@ -57,6 +62,17 @@ describe.skipIf(!rpcEnv)("gRPC getObjects shape (mainnet drift guard)", () => {
         expect(
             objects[1] instanceof Error,
             "SDK no longer returns a per-object miss as an Error element — revisit multiGetObjects mapping",
+        ).toBe(true);
+
+        // Pin the miss message shape: callers (e.g. url_fetcher's routes/redirects
+        // logging) use isObjectNotFoundError to tell an expected miss from an
+        // unexpected error. If this fails, the SDK/fullnode changed the message —
+        // update isObjectNotFoundError in rpc_selector.ts.
+        expect(
+            isObjectNotFoundError(objects[1]),
+            `isObjectNotFoundError no longer detects a per-object miss: ${
+                (objects[1] as Error)?.message
+            }`,
         ).toBe(true);
     }, 30_000);
 });
