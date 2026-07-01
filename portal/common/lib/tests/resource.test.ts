@@ -7,8 +7,7 @@ import { ResourceFetcher } from "@lib/resource";
 import { RPCSelector } from "@lib/rpc_selector";
 import { HttpStatusCodes } from "@lib/http/http_status_codes";
 import { checkRedirect } from "@lib/redirects";
-import { fromBase64 } from "@mysten/bcs";
-import { SuiObjectResponse } from "@mysten/sui/jsonRpc";
+import { SuiClientTypes } from "@mysten/sui/client";
 import { parsePriorityUrlList } from "@lib/priority_executor";
 
 vi.mock("@mysten/sui/utils", () => ({
@@ -20,14 +19,22 @@ vi.mock("../src/redirects", () => ({
     checkRedirect: vi.fn(),
 }));
 
-// Mock fromBase64
-vi.mock("@mysten/bcs", async () => {
-    const actual = await vi.importActual<typeof import("@mysten/bcs")>("@mysten/bcs");
+// Builds a fetched object with BCS content present; the parsed value is supplied
+// by the mocked DynamicFieldStruct below.
+// TODO(tech-debt): partial mock — cast because SuiClientTypes.Object also requires
+// owner/type/previousTransaction/objectBcs/json, unused by these tests.
+function mockSiteObject(
+    overrides: Partial<SuiClientTypes.Object<{ content: true; display: true }>> = {},
+): SuiClientTypes.Object<{ content: true; display: true }> {
     return {
-        ...actual,
-        fromBase64: vi.fn(),
-    };
-});
+        objectId: "",
+        version: "1",
+        digest: "",
+        content: new Uint8Array([1]),
+        display: null,
+        ...overrides,
+    } as SuiClientTypes.Object<{ content: true; display: true }>;
+}
 
 vi.mock("../src/bcs_data_parsing", async (importOriginal) => {
     const actual = (await importOriginal()) as typeof import("../src/bcs_data_parsing");
@@ -67,37 +74,7 @@ describe("fetchResource", () => {
 
     test("should fetch resource without redirect", async () => {
         // Mock object response
-        multiGetObjects.mockResolvedValueOnce([
-            {
-                data: {
-                    bcs: {
-                        dataType: "moveObject",
-                        bcsBytes: "mockBcsBytes",
-                        hasPublicTransfer: true,
-                        type: "mockType",
-                        version: "1",
-                    },
-                    digest: "",
-                    objectId: "",
-                    version: "1",
-                },
-            },
-            {
-                data: {
-                    bcs: {
-                        dataType: "moveObject",
-                        bcsBytes: "mockBcsBytes",
-                        hasPublicTransfer: true,
-                        type: "mockType",
-                        version: "1.0",
-                    },
-                    digest: "",
-                    objectId: "",
-                    version: "1",
-                },
-            },
-        ]);
-        (fromBase64 as any).mockReturnValueOnce("decodedBcsBytes");
+        multiGetObjects.mockResolvedValueOnce([mockSiteObject(), mockSiteObject()]);
 
         const result = await resourceFetcher.fetchResource("0x1", "/path", new Set());
         expect(result).toEqual({
@@ -109,47 +86,13 @@ describe("fetchResource", () => {
     });
 
     test("should follow redirect and recursively fetch resource", async () => {
-        const mockObject: SuiObjectResponse = {
-            data: {
-                bcs: {
-                    dataType: "moveObject",
-                    bcsBytes: "mockBcsBytes",
-                    hasPublicTransfer: true,
-                    type: "mockType",
-                    version: "1",
-                },
-                display: {
-                    data: {
-                        "walrus site address": "mockAddress",
-                    },
-                    error: null,
-                },
-                digest: "",
-                objectId: "",
-                version: "1",
-            },
-        };
+        const mockObject = mockSiteObject({
+            display: { output: { "walrus site address": "mockAddress" }, errors: null },
+        });
 
-        const mockResource: SuiObjectResponse = {
-            data: {
-                bcs: {
-                    dataType: "moveObject",
-                    bcsBytes: "mockBcsBytes",
-                    hasPublicTransfer: true,
-                    type: "mockType",
-                    version: "1",
-                },
-                display: {
-                    data: {
-                        "walrus site address": "mockAddress",
-                    },
-                    error: null,
-                },
-                digest: "",
-                objectId: "",
-                version: "1",
-            },
-        };
+        const mockResource = mockSiteObject({
+            display: { output: { "walrus site address": "mockAddress" }, errors: null },
+        });
 
         (checkRedirect as any).mockResolvedValueOnce(undefined);
 
@@ -176,23 +119,9 @@ describe("fetchResource", () => {
         const seenResources = new Set<string>();
         (checkRedirect as any).mockResolvedValueOnce(undefined);
         multiGetObjects.mockResolvedValue([
-            {
-                data: {
-                    bcs: {
-                        dataType: "moveObject",
-                        bcsBytes: "mockBcsBytes",
-                        hasPublicTransfer: true,
-                        type: "mockType",
-                        version: "1.0",
-                    },
-                    digest: "",
-                    objectId: "",
-                    version: "1.0",
-                },
-            },
-            {},
+            mockSiteObject({ version: "1.0" }),
+            new Error("Object 0xdynamicFieldId not found"),
         ]);
-        (fromBase64 as any).mockReturnValueOnce(undefined);
 
         const result = await resourceFetcher.fetchResource("0x1", "/path", seenResources);
 
@@ -208,21 +137,8 @@ describe("fetchResource", () => {
 
         // Mock to simulate that dynamic fields are not found
         multiGetObjects.mockResolvedValue([
-            {
-                data: {
-                    bcs: {
-                        dataType: "moveObject",
-                        bcsBytes: "mockBcsBytes",
-                        hasPublicTransfer: true,
-                        type: "mockType",
-                        version: "1.0",
-                    },
-                    digest: "mockDigest",
-                    objectId: "mockObjectId",
-                    version: "1.0",
-                },
-            },
-            {},
+            mockSiteObject({ objectId: "mockObjectId", digest: "mockDigest", version: "1.0" }),
+            new Error("Object 0xdynamicFieldId not found"),
         ]);
 
         const result = await resourceFetcher.fetchResource("0x1", "/path", seenResources);

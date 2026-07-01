@@ -1,13 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import {
-    GetDynamicFieldObjectParams,
-    GetObjectParams,
-    MultiGetObjectsParams,
-    SuiJsonRpcClient,
-    SuiObjectResponse,
-} from "@mysten/sui/jsonRpc";
+import { SuiClientTypes } from "@mysten/sui/client";
+import { SuiGrpcClient } from "@mysten/sui/grpc";
 import { SuinsClient } from "@mysten/suins";
 import logger, { formatError } from "@lib/logger";
 import { NameRecord, Network } from "@lib/types";
@@ -18,17 +13,18 @@ export const rpcRequestTimeoutMs =
     Number(process.env.RPC_REQUEST_TIMEOUT_MS) || DEFAULT_RPC_REQUEST_TIMEOUT_MS;
 
 interface RPCSelectorInterface {
-    getObject(input: GetObjectParams): Promise<SuiObjectResponse>;
-    multiGetObjects(input: MultiGetObjectsParams): Promise<SuiObjectResponse[]>;
-    getDynamicFieldObject(input: GetDynamicFieldObjectParams): Promise<SuiObjectResponse>;
+    multiGetObjects<Include extends SuiClientTypes.ObjectInclude>(
+        objectIds: string[],
+        include: Include,
+    ): Promise<SuiClientTypes.GetObjectsResponse<Include>["objects"]>;
 }
 
-class WrappedSuiClient extends SuiJsonRpcClient {
+class WrappedSuiClient extends SuiGrpcClient {
     private url: string;
     private suinsClient: SuinsClient;
 
     constructor(url: string, network: Network) {
-        super({ url, network });
+        super({ baseUrl: url, network });
         this.url = url;
         this.suinsClient = new SuinsClient({
             client: this,
@@ -48,18 +44,23 @@ class WrappedSuiClient extends SuiJsonRpcClient {
 }
 
 /**
- * Returns true if the error is an ObjectError with code "notExists" from the
- * @mysten/sui SDK. This is thrown when the FN cleanly responds that an object
- * doesn't exist (e.g. an unregistered SuiNS name's dynamic field).
+ * Returns true if the error means the fullnode cleanly responded that an object
+ * (e.g. an unregistered SuiNS name's dynamic field) does not exist. This is an
+ * authoritative answer, so retrying won't change it.
  *
- * We use duck-typing because ObjectError is not exported from @mysten/sui.
+ * The gRPC core API throws a plain Error like "Object 0x… not found" with no
+ * structured code. We also keep the legacy JSON-RPC `code: "notExists"` check
+ * for safety. Detection is duck-typed because no error class is exported.
  */
 function isNotExistsError(error: unknown): boolean {
-    return (
-        typeof error === "object" &&
-        error !== null &&
-        (error as { code?: unknown }).code === "notExists"
-    );
+    if (typeof error !== "object" || error === null) {
+        return false;
+    }
+    const { code, message } = error as { code?: unknown; message?: unknown };
+    if (code === "notExists") {
+        return true;
+    }
+    return typeof message === "string" && /not found|does not exist/i.test(message);
 }
 
 export class RPCSelector implements RPCSelectorInterface {
@@ -123,58 +124,24 @@ export class RPCSelector implements RPCSelectorInterface {
         });
     }
 
-    private isValidGetObjectResponse(suiObjectResponse: SuiObjectResponse): boolean {
-        const data = suiObjectResponse.data;
-        const error = suiObjectResponse.error;
-        if (data) {
-            return true;
-        }
-        if (error) {
-            logger.warn("Failed to get object", { error: JSON.stringify(error) });
-            return true;
-        }
-        return false;
-    }
-
-    private isValidMultiGetObjectResponse(suiObjectResponseArray: SuiObjectResponse[]): boolean {
-        return suiObjectResponseArray.every((suiObjectResponse) => {
-            return this.isValidGetObjectResponse(suiObjectResponse);
-        });
-    }
-
-    public async getObject(input: GetObjectParams): Promise<SuiObjectResponse> {
-        logger.info("RPCSelector: getObject", { input });
-        const suiObjectResponse = await this.invokeWithFailover((client) =>
-            client.getObject(input),
+    /**
+     * Fetches multiple objects by ID, in the same order they were requested.
+     *
+     * Each entry is the fetched object, or an `Error` when the fullnode reported
+     * that object as not existing. The gRPC core API already returns a per-object
+     * miss as an `Error` element (not a thrown error), so we hand its result back
+     * unchanged and let each caller decide what a miss means — a 404 for a
+     * resource, or simply an absent optional field for routes/redirects.
+     */
+    public async multiGetObjects<Include extends SuiClientTypes.ObjectInclude>(
+        objectIds: string[],
+        include: Include,
+    ): Promise<SuiClientTypes.GetObjectsResponse<Include>["objects"]> {
+        logger.info("RPCSelector: multiGetObjects", { objectIds, include });
+        const { objects } = await this.invokeWithFailover((client) =>
+            client.core.getObjects({ objectIds, include }),
         );
-        if (this.isValidGetObjectResponse(suiObjectResponse)) {
-            return suiObjectResponse;
-        }
-        throw new Error("Invalid response from getObject.");
-    }
-
-    public async multiGetObjects(input: MultiGetObjectsParams): Promise<SuiObjectResponse[]> {
-        logger.info("RPCSelector: multiGetObjects", { input });
-        const suiObjectResponseArray = await this.invokeWithFailover((client) =>
-            client.multiGetObjects(input),
-        );
-        if (this.isValidMultiGetObjectResponse(suiObjectResponseArray)) {
-            return suiObjectResponseArray;
-        }
-        throw new Error("Invalid response from multiGetObjects.");
-    }
-
-    public async getDynamicFieldObject(
-        input: GetDynamicFieldObjectParams,
-    ): Promise<SuiObjectResponse> {
-        logger.info("RPCSelector: getDynamicFieldObject", { input });
-        const suiObjectResponse = await this.invokeWithFailover((client) =>
-            client.getDynamicFieldObject(input),
-        );
-        if (this.isValidGetObjectResponse(suiObjectResponse)) {
-            return suiObjectResponse;
-        }
-        throw new Error("Invalid response from getDynamicFieldObject.");
+        return objects;
     }
 
     public async getNameRecord(name: string): Promise<NameRecord | null> {

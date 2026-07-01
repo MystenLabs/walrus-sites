@@ -1,0 +1,62 @@
+// Copyright (c) Mysten Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+import { describe, it, expect } from "vitest";
+import { SuiGrpcClient } from "@mysten/sui/grpc";
+import { SUI_CLOCK_OBJECT_ID } from "@mysten/sui/utils";
+
+/**
+ * Drift guard for the gRPC `core.getObjects` shape, checked against mainnet — the
+ * canonical, stable network (testnet is periodically reset).
+ *
+ * `RPCSelector.multiGetObjects` depends on a specific contract from the SDK +
+ * fullnode, and silently relies on it: for a batch of object ids, `getObjects`
+ * returns a single `{ objects: [...] }` array, in request order, where
+ *   - a MISSING object is an `Error` ELEMENT (not thrown, not omitted), which our
+ *     code collapses to `null`, and
+ *   - a PRESENT object carries the fields we read (`content` bytes, `version`).
+ *
+ * This test pins that contract by hitting a real fullnode with one guaranteed
+ * object (the Clock, 0x6, exists on every network) and one guaranteed-missing
+ * id. If a Sui SDK / fullnode bump changes how a per-object miss is signalled
+ * (e.g. it starts throwing, or returns null), this goes red — go update the
+ * mapping in `multiGetObjects` (rpc_selector.ts) to match the new shape.
+ *
+ * Gated on the same "network tests enabled" signal (RPC_URL_LIST) as the SuiNS
+ * drift guard; uses the mainnet fullnode directly, not RPC_URL_LIST (testnet).
+ */
+const rpcEnv = process.env.RPC_URL_LIST;
+const MAINNET_GRPC_URL = "https://fullnode.mainnet.sui.io:443";
+const MISSING_OBJECT_ID = "0x" + "0".repeat(63) + "f"; // valid-shaped id, never exists
+
+describe.skipIf(!rpcEnv)("gRPC getObjects shape (mainnet drift guard)", () => {
+    it("returns a present object and an Error element for a miss, in order", async () => {
+        const client = new SuiGrpcClient({ baseUrl: MAINNET_GRPC_URL, network: "mainnet" });
+
+        const { objects } = await client.core.getObjects({
+            objectIds: [SUI_CLOCK_OBJECT_ID, MISSING_OBJECT_ID],
+            include: { content: true, display: true },
+        });
+
+        // Order is preserved: result[i] corresponds to objectIds[i].
+        expect(objects).toHaveLength(2);
+
+        // The present object is NOT an Error and carries the fields we read.
+        const present = objects[0];
+        expect(
+            present instanceof Error,
+            `expected Clock (0x6) to be present, got error: ${(present as Error)?.message}`,
+        ).toBe(false);
+        const obj = present as Exclude<typeof present, Error>;
+        expect(obj.content).toBeInstanceOf(Uint8Array);
+        expect(typeof obj.version).toBe("string");
+
+        // The missing object surfaces as an Error ELEMENT — the signal our
+        // Error→null mapping keys off. If this stops being an Error, the mapping
+        // would leak a malformed object instead of returning null.
+        expect(
+            objects[1] instanceof Error,
+            "SDK no longer returns a per-object miss as an Error element — revisit multiGetObjects mapping",
+        ).toBe(true);
+    }, 30_000);
+});

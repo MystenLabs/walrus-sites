@@ -189,7 +189,7 @@ export class UrlFetcher {
                     return routeResult.response;
                 }
             } else {
-                logger.warn(`No matching route found for ${parsedUrl.path}`, {
+                logger.info(`No matching route found for ${parsedUrl.path}`, {
                     resolvedObjectIdNoMatchingRoute: resolvedObjectId,
                 });
             }

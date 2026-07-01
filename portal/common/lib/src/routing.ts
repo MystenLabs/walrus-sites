@@ -1,12 +1,12 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { SuiObjectResponse } from "@mysten/sui/jsonRpc";
 import { Redirect, Redirects, Routes } from "@lib/types";
 import { DynamicFieldStruct, RedirectsStruct, RoutesStruct } from "@lib/bcs_data_parsing";
-import { bcs, BcsType, fromBase64 } from "@mysten/bcs";
+import { bcs, BcsType } from "@mysten/bcs";
 import logger from "@lib/logger";
 import { RPCSelector } from "@lib/rpc_selector";
+import { SuiClientTypes } from "@mysten/sui/client";
 import { deriveDynamicFieldID } from "@mysten/sui/utils";
 import { instrumentationFacade } from "@lib/instrumentation";
 import picomatch from "picomatch";
@@ -33,9 +33,8 @@ export class WalrusSitesRouter {
         const routesDfId = this.deriveSiteFieldId(siteObjectId, "routes");
         const redirectsDfId = this.deriveSiteFieldId(siteObjectId, "redirects");
 
-        const responses = await this.rpcSelector.multiGetObjects({
-            ids: [routesDfId, redirectsDfId],
-            options: { showBcs: true },
+        const responses = await this.rpcSelector.multiGetObjects([routesDfId, redirectsDfId], {
+            content: true,
         });
 
         const rpcDuration = Date.now() - reqStartTime;
@@ -44,8 +43,23 @@ export class WalrusSitesRouter {
             siteObjectId,
         );
 
-        const routes = this.parseDynamicFieldValue(responses[0], RoutesStruct, "Routes");
-        const redirects = this.parseDynamicFieldValue(responses[1], RedirectsStruct, "Redirects");
+        // A miss means the site simply doesn't define that optional field —
+        // normal, not an error — so we leave it undefined.
+        let routes: Routes | undefined;
+        if (responses[0] instanceof Error) {
+            logger.info("No Routes dynamic field for this site", { reason: responses[0].message });
+        } else {
+            routes = this.parseDynamicFieldValue(responses[0], RoutesStruct, "Routes");
+        }
+
+        let redirects: Redirects | undefined;
+        if (responses[1] instanceof Error) {
+            logger.info("No Redirects dynamic field for this site", {
+                reason: responses[1].message,
+            });
+        } else {
+            redirects = this.parseDynamicFieldValue(responses[1], RedirectsStruct, "Redirects");
+        }
 
         const totalDuration = Date.now() - reqStartTime;
         instrumentationFacade.recordRoutesAndRedirectsResolutionTime(totalDuration, siteObjectId);
@@ -143,26 +157,21 @@ export class WalrusSitesRouter {
     }
 
     /**
-     * Parses a dynamic field value from a SuiObjectResponse.
-     * Returns undefined if the DF doesn't exist on-chain.
+     * Parses a dynamic field value from a fetched object.
      * Throws if the object exists but has unexpected format.
      */
     private parseDynamicFieldValue<T>(
-        response: SuiObjectResponse,
+        response: SuiClientTypes.Object<{ content: true }>,
         valueStruct: BcsType<T>,
         fieldName: string,
-    ): T | undefined {
-        const objectData = response.data;
-        if (objectData?.bcs?.dataType === "moveObject") {
+    ): T {
+        if (response.content) {
             const df = DynamicFieldStruct(bcs.vector(bcs.u8()), valueStruct).parse(
-                fromBase64(objectData.bcs.bcsBytes),
+                response.content,
             );
             return df.value as any as T;
         }
-        if (!objectData) {
-            return undefined;
-        }
-        logger.warn(`${fieldName} dynamic field has unexpected format`, { objectData });
+        logger.warn(`${fieldName} dynamic field has unexpected format`, { response });
         throw new Error(`${fieldName} object data could not be fetched.`);
     }
 }

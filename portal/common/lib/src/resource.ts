@@ -2,15 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { HttpStatusCodes } from "@lib/http/http_status_codes";
-import { SuiObjectData, SuiObjectResponse } from "@mysten/sui/jsonRpc";
 import { Resource, VersionedResource } from "@lib/types";
 import { MAX_REDIRECT_DEPTH } from "@lib/constants";
 import { checkRedirect } from "@lib/redirects";
-import { fromBase64 } from "@mysten/bcs";
 import { ResourcePathStruct, DynamicFieldStruct, ResourceStruct } from "./bcs_data_parsing";
 import { deriveDynamicFieldID } from "@mysten/sui/utils";
 import { bcs } from "@mysten/bcs";
 import { RPCSelector } from "./rpc_selector";
+import { SuiClientTypes } from "@mysten/sui/client";
 import logger from "./logger";
 
 /**
@@ -74,9 +73,22 @@ export class ResourceFetcher {
 
         seenResources.add(objectId);
 
-        const redirectId = checkRedirect(primaryObjectResponse);
-        if (redirectId) {
-            return this.fetchResource(redirectId, path, seenResources, depth + 1);
+        // A miss (the site object wasn't found) carries no Display to redirect on.
+        if (!(primaryObjectResponse instanceof Error)) {
+            const redirectId = checkRedirect(primaryObjectResponse);
+            if (redirectId) {
+                return this.fetchResource(redirectId, path, seenResources, depth + 1);
+            }
+        }
+
+        if (dynamicFieldResponse instanceof Error) {
+            // A missing dynamic field just means the requested path isn't a
+            // resource of this site — a normal 404, not an error.
+            logger.info("No resource found for dynamic field object", {
+                dynamicFieldId,
+                reason: dynamicFieldResponse.message,
+            });
+            return HttpStatusCodes.NOT_FOUND;
         }
 
         return this.extractResource(dynamicFieldResponse, dynamicFieldId);
@@ -84,29 +96,23 @@ export class ResourceFetcher {
 
     /**
      * Fetches the data of a parentObject and its' dynamicFieldObject.
-     * @param client: A SuiClient to interact with the Sui network.
      * @param objectId: The objectId of the parentObject (e.g. site::Site).
      * @param dynamicFieldId: The Id of the dynamicFieldObject (e.g. site::Resource).
-     * @returns A tuple of SuiObjectResponse[] or an HttpStatusCode in case of an error.
+     * @returns A tuple [parentObject, dynamicFieldObject]; each entry is an `Error` if not found.
      */
     private async fetchObjectPairData(
         objectId: string,
         dynamicFieldId: string,
-    ): Promise<SuiObjectResponse[]> {
+    ): Promise<SuiClientTypes.GetObjectsResponse<{ content: true; display: true }>["objects"]> {
         logger.info("Fetching Display object and Dynamic Field object", {
             objectIdForDisplay: objectId,
             dynamicFieldId,
         });
-        // MultiGetObjects returns the objects *always* in the order they were requested.
-        const pageData = await this.rpcSelector.multiGetObjects({
-            ids: [objectId, dynamicFieldId],
-            options: { showBcs: true, showDisplay: true },
+        // multiGetObjects returns the objects *always* in the order they were requested.
+        return this.rpcSelector.multiGetObjects([objectId, dynamicFieldId], {
+            content: true,
+            display: true,
         });
-        // MultiGetObjects returns the objects *always* in the order they were requested.
-        const primaryObjectResponse: SuiObjectResponse = pageData[0];
-        const dynamicFieldResponse: SuiObjectResponse = pageData[1];
-
-        return [primaryObjectResponse, dynamicFieldResponse];
     }
 
     /**
@@ -116,21 +122,13 @@ export class ResourceFetcher {
      * @returns A VersionedResource or an HttpStatusCode in case of an error.
      */
     private extractResource(
-        dynamicFieldResponse: SuiObjectResponse,
+        dynamicFieldResponse: SuiClientTypes.Object<{ content: true; display: true }>,
         dynamicFieldId: string,
     ): VersionedResource | HttpStatusCodes {
         logger.info("Extracting resource data from the dynamic field object", {
             dynamicFieldId,
         });
-        if (!dynamicFieldResponse.data) {
-            logger.warn("No page resource data found for dynamic field object", {
-                dynamicFieldId,
-                dynamicFieldResponse,
-            });
-            return HttpStatusCodes.NOT_FOUND;
-        }
-
-        const siteResource = this.getResourceFields(dynamicFieldResponse.data);
+        const siteResource = this.getResourceFields(dynamicFieldResponse);
         if (!siteResource || !siteResource.blob_id) {
             logger.error("No site resource found inside the dynamicFieldResponse:", {
                 dynamicFieldId,
@@ -141,7 +139,7 @@ export class ResourceFetcher {
 
         return {
             ...siteResource,
-            version: dynamicFieldResponse.data.version,
+            version: dynamicFieldResponse.version,
             objectId: dynamicFieldId,
         } as VersionedResource;
     }
@@ -166,12 +164,12 @@ export class ResourceFetcher {
     /**
      * Parses the resource information from the Sui object data response.
      */
-    private getResourceFields(data: SuiObjectData): Resource | null {
-        // Deserialize the bcs encoded struct
-        if (data.bcs && data.bcs.dataType === "moveObject") {
-            const df = DynamicFieldStruct(ResourcePathStruct, ResourceStruct).parse(
-                fromBase64(data.bcs.bcsBytes),
-            );
+    private getResourceFields(
+        object: SuiClientTypes.Object<{ content: true; display: true }>,
+    ): Resource | null {
+        // Deserialize the BCS-encoded Move struct content of the dynamic field.
+        if (object.content) {
+            const df = DynamicFieldStruct(ResourcePathStruct, ResourceStruct).parse(object.content);
             return df.value;
         }
         return null;
