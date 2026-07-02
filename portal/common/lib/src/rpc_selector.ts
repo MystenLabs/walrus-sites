@@ -12,6 +12,9 @@ const DEFAULT_RPC_REQUEST_TIMEOUT_MS = 7_000;
 export const rpcRequestTimeoutMs =
     Number(process.env.RPC_REQUEST_TIMEOUT_MS) || DEFAULT_RPC_REQUEST_TIMEOUT_MS;
 
+// TODO(tech-debt): leftover ceremony — it declares only multiGetObjects (not
+// even getNameRecord), isn't exported, and RPCSelector is its single
+// implementer. Nothing types against it; it can be deleted.
 interface RPCSelectorInterface {
     multiGetObjects<Include extends SuiClientTypes.ObjectInclude>(
         objectIds: string[],
