@@ -73,6 +73,10 @@ export class ResourceFetcher {
 
         seenResources.add(objectId);
 
+        // Note: if the site object was deleted, its dynamic fields survive on
+        // chain as orphans and stay fetchable by derived ID — so the resource
+        // fetch below can still succeed and serve a deleted site's leftovers.
+
         // A miss (the site object wasn't found) carries no Display to redirect on.
         if (!(primaryObjectResponse instanceof Error)) {
             const redirectId = checkRedirect(primaryObjectResponse);

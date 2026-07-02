@@ -3,7 +3,7 @@
 
 import { WalrusSitesRouter } from "@lib/routing";
 import { test, expect, describe, vi, beforeEach, afterEach } from "vitest";
-import { RPCSelector } from "@lib/rpc_selector";
+import { isObjectNotFoundError, RPCSelector } from "@lib/rpc_selector";
 import { SuiClientTypes } from "@mysten/sui/client";
 import { UrlFetcher } from "@lib/url_fetcher";
 import type { FetchUrlResult } from "@lib/url_fetcher";
@@ -53,17 +53,20 @@ describe("getRoutesAndRedirects", () => {
         vi.restoreAllMocks();
     });
 
-    test("returns undefined when dynamic fields don't exist", async () => {
+    test("returns the Error elements when dynamic fields don't exist", async () => {
         const spy = vi.spyOn(rpcSelector, "multiGetObjects");
         // A missing dynamic field comes back as an `Error` element (gRPC core API).
-        spy.mockResolvedValue([
-            new Error("Object 0xroutes not found"),
-            new Error("Object 0xredirects not found"),
-        ]);
+        const routesMiss = new Error("Object 0xab not found");
+        const redirectsMiss = new Error("Object 0xcd not found");
+        spy.mockResolvedValue([routesMiss, redirectsMiss]);
 
         const result = await wsRouter.getRoutesAndRedirects(snakeSiteObjectId);
-        expect(result.routes).toBeUndefined();
-        expect(result.redirects).toBeUndefined();
+        // The Error slots are passed through untouched, and their shape is the
+        // one callers recognize as an expected miss (info log, not warn).
+        expect(result.routes).toBe(routesMiss);
+        expect(result.redirects).toBe(redirectsMiss);
+        expect(isObjectNotFoundError(result.routes)).toBe(true);
+        expect(isObjectNotFoundError(result.redirects)).toBe(true);
         expect(spy).toHaveBeenCalledOnce();
         expect(spy).toHaveBeenCalledWith([expect.any(String), expect.any(String)], {
             content: true,
@@ -86,10 +89,12 @@ describe("getRoutesAndRedirects", () => {
 
         const result = await wsRouter.getRoutesAndRedirects(snakeSiteObjectId);
 
-        expect(result.routes).toBeDefined();
-        expect(result.routes!.routes_list.get("/*")).toBe("/index.html");
-        expect(result.redirects).toBeDefined();
-        expect(result.redirects!.redirect_list.get("/old")).toEqual({
+        const { routes, redirects } = result;
+        if (routes instanceof Error || redirects instanceof Error) {
+            throw new Error("expected parsed routes and redirects, got an Error element");
+        }
+        expect(routes.routes_list.get("/*")).toBe("/index.html");
+        expect(redirects.redirect_list.get("/old")).toEqual({
             location: "/new",
             status_code: 301,
         });
@@ -242,7 +247,7 @@ describe("routing integration tests", () => {
         const getRoutesAndRedirectsSpy = vi.spyOn(wsRouter, "getRoutesAndRedirects");
         getRoutesAndRedirectsSpy.mockImplementation(async () => ({
             routes: { routes_list: new Map([["/test", "/test.html"]]) },
-            redirects: undefined,
+            redirects: new Error("Object 0xcd not found"),
         }));
 
         // First get the actual content directly
@@ -297,7 +302,7 @@ describe("routing integration tests", () => {
         const getRoutesAndRedirectsSpy = vi.spyOn(wsRouter, "getRoutesAndRedirects");
         getRoutesAndRedirectsSpy.mockImplementation(async () => ({
             routes: { routes_list: new Map() },
-            redirects: undefined,
+            redirects: new Error("Object 0xcd not found"),
         }));
 
         const response = await urlFetcher.resolveDomainAndFetchUrl(
@@ -386,7 +391,7 @@ describe("routing integration tests", () => {
 
         const getRoutesAndRedirectsSpy = vi.spyOn(wsRouter, "getRoutesAndRedirects");
         getRoutesAndRedirectsSpy.mockImplementation(async () => ({
-            routes: undefined,
+            routes: new Error("Object 0xab not found"),
             redirects: {
                 redirect_list: new Map<string, Redirect>([
                     ["/external", { location: "https://example.com/page", status_code: 302 }],
@@ -413,7 +418,7 @@ describe("routing integration tests", () => {
 
         const getRoutesAndRedirectsSpy = vi.spyOn(wsRouter, "getRoutesAndRedirects");
         getRoutesAndRedirectsSpy.mockImplementation(async () => ({
-            routes: undefined,
+            routes: new Error("Object 0xab not found"),
             redirects: {
                 redirect_list: new Map<string, Redirect>([
                     ["/loop", { location: "/loop", status_code: 301 }],

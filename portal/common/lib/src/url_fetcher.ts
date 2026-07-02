@@ -23,6 +23,7 @@ import { blobAggregatorEndpoint, quiltAggregatorEndpoint } from "@lib/aggregator
 import { toBase64 } from "@mysten/bcs";
 import { sha256 } from "@lib/crypto";
 import { WalrusSitesRouter } from "@lib/routing";
+import { isObjectNotFoundError } from "@lib/rpc_selector";
 import logger, { formatError } from "@lib/logger";
 import BlocklistChecker from "@lib/blocklist_checker";
 import { QuiltPatch } from "@lib/quilt";
@@ -145,8 +146,17 @@ export class UrlFetcher {
         // The on-chain resource was not found — try redirects, route matching, and fallbacks.
         const { routes, redirects } = await routingPromise;
 
-        // Check redirects first (takes priority over routes).
-        if (redirects) {
+        // Check redirects first (takes priority over routes). An Error normally
+        // just means the site doesn't define the optional field.
+        if (redirects instanceof Error) {
+            if (isObjectNotFoundError(redirects)) {
+                logger.info("Site defines no redirects", { reason: redirects.message });
+            } else {
+                logger.warn("Unexpected error fetching the Redirects dynamic field", {
+                    error: redirects.message,
+                });
+            }
+        } else {
             const redirect = this.wsRouter.matchPathToRedirect(parsedUrl.path, redirects);
             if (redirect) {
                 if (redirect.location === parsedUrl.path) {
@@ -170,7 +180,15 @@ export class UrlFetcher {
         }
 
         // Try matching route if routes exist.
-        if (routes) {
+        if (routes instanceof Error) {
+            if (isObjectNotFoundError(routes)) {
+                logger.info("Site defines no routes", { reason: routes.message });
+            } else {
+                logger.warn("Unexpected error fetching the Routes dynamic field", {
+                    error: routes.message,
+                });
+            }
+        } else {
             const { match: matchingRoute, regexOnlyPatterns } = this.wsRouter.matchPathToRoute(
                 parsedUrl.path,
                 routes,
@@ -270,6 +288,10 @@ export class UrlFetcher {
     public async fetchUrl(objectId: string, path: string): Promise<FetchUrlResult> {
         const result = await this.resourceFetcher.fetchResource(objectId, path, new Set<string>());
         if (!isResource(result) || !result.blob_id) {
+            // TODO(tech-debt): fetchResource returns a specific HttpStatusCodes
+            // (NOT_FOUND, LOOP_DETECTED, TOO_MANY_REDIRECTS), but we swallow it
+            // here — everything collapses into ResourceNotFound and the fallback
+            // chain, so e.g. a redirect loop is served as a plain 404.
             return { status: "ResourceNotFound" };
         }
 

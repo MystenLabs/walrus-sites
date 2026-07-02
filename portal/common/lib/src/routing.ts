@@ -23,11 +23,13 @@ export class WalrusSitesRouter {
      * Gets both the Routes and Redirects dynamic fields in a single RPC call.
      *
      * @param siteObjectId - The ID of the site object.
-     * @returns The routes and redirects, each undefined if not present.
+     * @returns The routes and redirects; each is an `Error` when the dynamic
+     * field couldn't be fetched (normally an expected miss — the site simply
+     * doesn't define that optional field). Callers decide how to log it.
      */
     public async getRoutesAndRedirects(siteObjectId: string): Promise<{
-        routes: Routes | undefined;
-        redirects: Redirects | undefined;
+        routes: Routes | Error;
+        redirects: Redirects | Error;
     }> {
         const reqStartTime = Date.now();
         const routesDfId = this.deriveSiteFieldId(siteObjectId, "routes");
@@ -43,23 +45,15 @@ export class WalrusSitesRouter {
             siteObjectId,
         );
 
-        // A miss means the site simply doesn't define that optional field —
-        // normal, not an error — so we leave it undefined.
-        let routes: Routes | undefined;
-        if (responses[0] instanceof Error) {
-            logger.info("No Routes dynamic field for this site", { reason: responses[0].message });
-        } else {
-            routes = this.parseDynamicFieldValue(responses[0], RoutesStruct, "Routes");
-        }
-
-        let redirects: Redirects | undefined;
-        if (responses[1] instanceof Error) {
-            logger.info("No Redirects dynamic field for this site", {
-                reason: responses[1].message,
-            });
-        } else {
-            redirects = this.parseDynamicFieldValue(responses[1], RedirectsStruct, "Redirects");
-        }
+        const [routesRes, redirectsRes] = responses;
+        const routes =
+            routesRes instanceof Error
+                ? routesRes
+                : this.parseDynamicFieldValue(routesRes, RoutesStruct, "Routes");
+        const redirects =
+            redirectsRes instanceof Error
+                ? redirectsRes
+                : this.parseDynamicFieldValue(redirectsRes, RedirectsStruct, "Redirects");
 
         const totalDuration = Date.now() - reqStartTime;
         instrumentationFacade.recordRoutesAndRedirectsResolutionTime(totalDuration, siteObjectId);
@@ -159,6 +153,13 @@ export class WalrusSitesRouter {
     /**
      * Parses a dynamic field value from a fetched object.
      * Throws if the object exists but has unexpected format.
+     *
+     * TODO(tech-debt): the throw rejects the whole getRoutesAndRedirects
+     * promise, which fails the request. Now that the return channel already
+     * carries `Routes | Error`, a malformed field could instead be returned as
+     * an `Error` — the caller's warn branch would log it and the request would
+     * degrade gracefully to the fallback chain. Kept as a throw for now to
+     * avoid a behavior change in this PR.
      */
     private parseDynamicFieldValue<T>(
         response: SuiClientTypes.Object<{ content: true }>,
