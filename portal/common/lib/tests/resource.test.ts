@@ -86,19 +86,15 @@ describe("fetchResource", () => {
     });
 
     test("should follow redirect and recursively fetch resource", async () => {
-        const mockObject = mockSiteObject({
-            display: { output: { "walrus site address": "mockAddress" }, errors: null },
-        });
-
-        const mockResource = mockSiteObject({
-            display: { output: { "walrus site address": "mockAddress" }, errors: null },
-        });
-
-        (checkRedirect as any).mockResolvedValueOnce(undefined);
+        // checkRedirect is sync: a mockResolvedValueOnce would return a
+        // Promise — truthy — and the redirect branch would recurse with a
+        // Promise as the objectId, passing by accident. vi.mocked keeps the
+        // stub typed to string | null so that can't recur.
+        vi.mocked(checkRedirect).mockReturnValueOnce("0xredirectTarget").mockReturnValueOnce(null);
 
         multiGetObjects
-            .mockResolvedValueOnce([mockObject, mockResource])
-            .mockResolvedValueOnce([mockObject, mockResource]);
+            .mockResolvedValueOnce([mockSiteObject(), mockSiteObject()])
+            .mockResolvedValueOnce([mockSiteObject(), mockSiteObject()]);
 
         const result = await resourceFetcher.fetchResource(
             "0x26dc2460093a9d6d31b58cb0ed1e72b19d140542a49be7472a6f25d542cb5cc3",
@@ -113,11 +109,17 @@ describe("fetchResource", () => {
             version: "1",
         });
         expect(checkRedirect).toHaveBeenCalledTimes(2);
+        // The recursion actually targets the redirect id.
+        expect(multiGetObjects).toHaveBeenNthCalledWith(
+            2,
+            ["0xredirectTarget", "0xdynamicFieldId"],
+            { content: true, display: true },
+        );
     });
 
     test("should return NOT_FOUND if the resource does not contain a blob_id", async () => {
         const seenResources = new Set<string>();
-        (checkRedirect as any).mockResolvedValueOnce(undefined);
+        vi.mocked(checkRedirect).mockReturnValueOnce(null);
         multiGetObjects.mockResolvedValue([
             mockSiteObject({ version: "1.0" }),
             new Error("Object 0xdynamicFieldId not found"),
@@ -130,7 +132,7 @@ describe("fetchResource", () => {
     });
 
     test("serves an orphaned resource when the site object is missing (SEW-1037)", async () => {
-        (checkRedirect as any).mockReturnValueOnce(null);
+        vi.mocked(checkRedirect).mockReturnValueOnce(null);
         multiGetObjects.mockResolvedValue([new Error("Object 0xab not found"), mockSiteObject()]);
 
         const result = await resourceFetcher.fetchResource("0x1", "/path", new Set());
@@ -150,7 +152,7 @@ describe("fetchResource", () => {
         const seenResources = new Set<string>();
 
         // Mock to return no redirect
-        (checkRedirect as any).mockResolvedValueOnce(null);
+        vi.mocked(checkRedirect).mockReturnValueOnce(null);
 
         // Mock to simulate that dynamic fields are not found
         multiGetObjects.mockResolvedValue([
