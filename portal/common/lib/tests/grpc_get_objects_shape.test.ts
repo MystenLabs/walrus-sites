@@ -33,7 +33,10 @@ if (!mainnetRpc) {
         "MAINNET_RPC_URL must be set to run the gRPC drift guard (normally provided by .env.test)",
     );
 }
-const MISSING_OBJECT_ID = "0x" + "0".repeat(63) + "f"; // valid-shaped id, never exists
+// Full-width improbable id: low addresses are reserved namespace that framework
+// releases keep claiming (0xd became the Display registry), so "never exists"
+// erodes there.
+const MISSING_OBJECT_ID = "0x" + "deadbeef".repeat(8); // valid-shaped id, never exists
 
 describe("gRPC getObjects shape (mainnet drift guard)", () => {
     it("returns a present object and an Error element for a miss, in order", async () => {
