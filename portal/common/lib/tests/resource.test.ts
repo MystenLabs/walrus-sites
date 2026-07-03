@@ -129,6 +129,23 @@ describe("fetchResource", () => {
         expect(result).toBe(HttpStatusCodes.NOT_FOUND);
     });
 
+    test("serves an orphaned resource when the site object is missing (SEW-1037)", async () => {
+        (checkRedirect as any).mockReturnValueOnce(null);
+        multiGetObjects.mockResolvedValue([new Error("Object 0xab not found"), mockSiteObject()]);
+
+        const result = await resourceFetcher.fetchResource("0x1", "/path", new Set());
+
+        // Pre-existing behavior, pinned until SEW-1037 decides otherwise: the
+        // orphaned dynamic field is still served.
+        expect(result).toEqual({
+            blob_id: "0xresourceBlobId",
+            objectId: "0xdynamicFieldId",
+            version: "1",
+        });
+        // The site miss must not be treated as a redirect candidate.
+        expect(checkRedirect).not.toHaveBeenCalled();
+    });
+
     test("should return NOT_FOUND if dynamic fields are not found", async () => {
         const seenResources = new Set<string>();
 

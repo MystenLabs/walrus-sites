@@ -83,6 +83,13 @@ export class ResourceFetcher {
             if (redirectId) {
                 return this.fetchResource(redirectId, path, seenResources, depth + 1);
             }
+        } else {
+            // Without this, a deleted/nonexistent site is indistinguishable in
+            // the logs from a missing path (the miss below reads as a path 404).
+            logger.info("Site object not found", {
+                objectId,
+                reason: primaryObjectResponse.message,
+            });
         }
 
         if (dynamicFieldResponse instanceof Error) {
@@ -93,6 +100,15 @@ export class ResourceFetcher {
                 reason: dynamicFieldResponse.message,
             });
             return HttpStatusCodes.NOT_FOUND;
+        }
+
+        if (primaryObjectResponse instanceof Error) {
+            // The site object is gone but its dynamic field survived — we are
+            // serving a deleted site's orphaned resource (SEW-1037).
+            logger.warn("Site object missing but resource exists — serving orphaned resource", {
+                objectId,
+                dynamicFieldId,
+            });
         }
 
         return this.extractResource(dynamicFieldResponse, dynamicFieldId);
