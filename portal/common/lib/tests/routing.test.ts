@@ -3,7 +3,8 @@
 
 import { WalrusSitesRouter } from "@lib/routing";
 import { test, expect, describe, vi, beforeEach, afterEach } from "vitest";
-import { RPCSelector } from "@lib/rpc_selector";
+import { isObjectNotFoundError, RPCSelector } from "@lib/rpc_selector";
+import { SuiClientTypes } from "@mysten/sui/client";
 import { UrlFetcher } from "@lib/url_fetcher";
 import type { FetchUrlResult } from "@lib/url_fetcher";
 import { ResourceFetcher } from "@lib/resource";
@@ -12,7 +13,6 @@ import { parsePriorityUrlList, PriorityExecutor } from "@lib/priority_executor";
 import { Redirect, Redirects } from "@lib/types";
 import { DynamicFieldStruct, RoutesStruct, RedirectsStruct } from "@lib/bcs_data_parsing";
 import { bcs, type BcsType } from "@mysten/bcs";
-import { toBase64 } from "@mysten/sui/utils";
 
 const snakeSiteObjectId = "0x7a95e4be3948415b852fb287d455166a276d7a52f1a567b4a26b6b5e9c753158";
 const rpcPriorityUrls = parsePriorityUrlList(process.env.RPC_URL_LIST!);
@@ -22,38 +22,30 @@ const aggregatorPriorityUrls = parsePriorityUrlList(process.env.AGGREGATOR_URL_L
 const sitePackage = process.env.ORIGINAL_PACKAGE_ID;
 
 /**
- * Encodes a value as a BCS DynamicField and returns the base64 string,
- * matching the format returned by `multiGetObjects({ options: { showBcs: true } })`.
+ * Encodes a value as a BCS DynamicField and returns the raw bytes, matching the
+ * `content` returned by `multiGetObjects(ids, { content: true })`.
  */
-function encodeDynamicField<T>(fieldName: string, valueStruct: BcsType<T>, value: T): string {
+function encodeDynamicField<T>(fieldName: string, valueStruct: BcsType<T>, value: T): Uint8Array {
     const parentId = "0000000000000000000000000000000000000000000000000000000000000000";
     const df = DynamicFieldStruct(bcs.vector(bcs.u8()), valueStruct);
-    return toBase64(
-        df
-            .serialize({
-                parentId,
-                name: Array.from(Buffer.from(fieldName)),
-                value,
-            })
-            .toBytes(),
-    );
+    return df
+        .serialize({
+            parentId,
+            name: Array.from(Buffer.from(fieldName)),
+            value,
+        })
+        .toBytes();
 }
 
-function makeBcsObjectResponse(bcsBytes: string) {
+// TODO(tech-debt): partial mock — cast because SuiClientTypes.Object also requires
+// owner/type/previousTransaction/objectBcs/json, unused by these tests.
+function makeBcsObjectResponse(content: Uint8Array): SuiClientTypes.Object<{ content: true }> {
     return {
-        data: {
-            objectId: "0x1",
-            version: "1",
-            digest: "test",
-            bcs: {
-                dataType: "moveObject" as const,
-                bcsBytes,
-                type: "0x2::dynamic_field::Field",
-                hasPublicTransfer: false,
-                version: "1",
-            },
-        },
-    };
+        objectId: "0x1",
+        version: "1",
+        digest: "test",
+        content,
+    } as SuiClientTypes.Object<{ content: true }>;
 }
 
 describe("getRoutesAndRedirects", () => {
@@ -61,20 +53,23 @@ describe("getRoutesAndRedirects", () => {
         vi.restoreAllMocks();
     });
 
-    test("returns undefined when dynamic fields don't exist", async () => {
+    test("returns the Error elements when dynamic fields don't exist", async () => {
         const spy = vi.spyOn(rpcSelector, "multiGetObjects");
-        spy.mockResolvedValue([
-            { error: { code: "notExists" as const, object_id: "0xroutes" } },
-            { error: { code: "notExists" as const, object_id: "0xredirects" } },
-        ]);
+        // A missing dynamic field comes back as an `Error` element (gRPC core API).
+        const routesMiss = new Error("Object 0xab not found");
+        const redirectsMiss = new Error("Object 0xcd not found");
+        spy.mockResolvedValue([routesMiss, redirectsMiss]);
 
         const result = await wsRouter.getRoutesAndRedirects(snakeSiteObjectId);
-        expect(result.routes).toBeUndefined();
-        expect(result.redirects).toBeUndefined();
+        // The Error slots are passed through untouched, and their shape is the
+        // one callers recognize as an expected miss (info log, not warn).
+        expect(result.routes).toBe(routesMiss);
+        expect(result.redirects).toBe(redirectsMiss);
+        expect(isObjectNotFoundError(result.routes)).toBe(true);
+        expect(isObjectNotFoundError(result.redirects)).toBe(true);
         expect(spy).toHaveBeenCalledOnce();
-        expect(spy).toHaveBeenCalledWith({
-            ids: [expect.any(String), expect.any(String)],
-            options: { showBcs: true },
+        expect(spy).toHaveBeenCalledWith([expect.any(String), expect.any(String)], {
+            content: true,
         });
     });
 
@@ -94,10 +89,12 @@ describe("getRoutesAndRedirects", () => {
 
         const result = await wsRouter.getRoutesAndRedirects(snakeSiteObjectId);
 
-        expect(result.routes).toBeDefined();
-        expect(result.routes!.routes_list.get("/*")).toBe("/index.html");
-        expect(result.redirects).toBeDefined();
-        expect(result.redirects!.redirect_list.get("/old")).toEqual({
+        const { routes, redirects } = result;
+        if (routes instanceof Error || redirects instanceof Error) {
+            throw new Error("expected parsed routes and redirects, got an Error element");
+        }
+        expect(routes.routes_list.get("/*")).toBe("/index.html");
+        expect(redirects.redirect_list.get("/old")).toEqual({
             location: "/new",
             status_code: 301,
         });
@@ -106,15 +103,11 @@ describe("getRoutesAndRedirects", () => {
     test("throws on unexpected object format", async () => {
         const spy = vi.spyOn(rpcSelector, "multiGetObjects");
         spy.mockResolvedValue([
-            {
-                data: {
-                    objectId: "0x1",
-                    version: "1",
-                    digest: "test",
-                    // no bcs field — unexpected format
-                },
-            },
-            { error: { code: "notExists" as const, object_id: "0xredirects" } },
+            // present object but no `content` — unexpected format
+            { objectId: "0x1", version: "1", digest: "test" } as SuiClientTypes.Object<{
+                content: true;
+            }>,
+            new Error("Object 0xredirects not found"),
         ]);
 
         await expect(wsRouter.getRoutesAndRedirects(snakeSiteObjectId)).rejects.toThrow(
@@ -254,7 +247,7 @@ describe("routing integration tests", () => {
         const getRoutesAndRedirectsSpy = vi.spyOn(wsRouter, "getRoutesAndRedirects");
         getRoutesAndRedirectsSpy.mockImplementation(async () => ({
             routes: { routes_list: new Map([["/test", "/test.html"]]) },
-            redirects: undefined,
+            redirects: new Error("Object 0xcd not found"),
         }));
 
         // First get the actual content directly
@@ -309,7 +302,7 @@ describe("routing integration tests", () => {
         const getRoutesAndRedirectsSpy = vi.spyOn(wsRouter, "getRoutesAndRedirects");
         getRoutesAndRedirectsSpy.mockImplementation(async () => ({
             routes: { routes_list: new Map() },
-            redirects: undefined,
+            redirects: new Error("Object 0xcd not found"),
         }));
 
         const response = await urlFetcher.resolveDomainAndFetchUrl(
@@ -398,7 +391,7 @@ describe("routing integration tests", () => {
 
         const getRoutesAndRedirectsSpy = vi.spyOn(wsRouter, "getRoutesAndRedirects");
         getRoutesAndRedirectsSpy.mockImplementation(async () => ({
-            routes: undefined,
+            routes: new Error("Object 0xab not found"),
             redirects: {
                 redirect_list: new Map<string, Redirect>([
                     ["/external", { location: "https://example.com/page", status_code: 302 }],
@@ -425,7 +418,7 @@ describe("routing integration tests", () => {
 
         const getRoutesAndRedirectsSpy = vi.spyOn(wsRouter, "getRoutesAndRedirects");
         getRoutesAndRedirectsSpy.mockImplementation(async () => ({
-            routes: undefined,
+            routes: new Error("Object 0xab not found"),
             redirects: {
                 redirect_list: new Map<string, Redirect>([
                     ["/loop", { location: "/loop", status_code: 301 }],

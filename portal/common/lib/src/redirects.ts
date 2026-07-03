@@ -4,7 +4,7 @@
 import { DomainDetails } from "@lib/types/index";
 import { getDomain } from "@lib/domain_parsing";
 import { blobAggregatorEndpoint } from "@lib/aggregator";
-import { SuiObjectResponse } from "@mysten/sui/jsonRpc";
+import { SuiClientTypes } from "@mysten/sui/client";
 import logger from "@lib/logger";
 
 /**
@@ -33,19 +33,21 @@ export function redirectToAggregatorUrlResponse(blobId: string, aggregatorUrl: s
 
 /**
  * Checks if the object has a redirect in its Display representation.
+ *
+ * IMPORTANT: this reads the *rendered* Display returned by gRPC
+ * (`core.getObjects`), which only renders Display **v2** (the `@0xd` registry).
+ * A legacy v1 Display comes back here as `undefined`, so the redirect silently
+ * won't fire — the object's Display must have been migrated to v2. Verified: a
+ * v1 Redirector rendered `undefined` over gRPC until migrated, then rendered the
+ * field (JSON-RPC rendered both, which is why this was invisible pre-migration).
  */
-export function checkRedirect(object: SuiObjectResponse): string | null {
+export function checkRedirect(object: SuiClientTypes.Object<{ display: true }>): string | null {
     logger.info("Checking if the request should be redirected (existing Display object)", {
-        objectId: object.data?.objectId,
+        objectId: object.objectId,
     });
-    if (object.data && object.data.display) {
-        let display = object.data.display;
-        // Check if "walrus site address" is set in the display field.
-        if (display.data && display.data["walrus site address"]) {
-            return display.data["walrus site address"];
-        }
-    }
-    return null;
+    // Check if "walrus site address" is set in the rendered Display fields.
+    const address = object.display?.output?.["walrus site address"];
+    return typeof address === "string" ? address : null;
 }
 
 function makeRedirectResponse(url: string): Response {

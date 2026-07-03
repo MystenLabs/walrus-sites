@@ -4,11 +4,10 @@
 // Import necessary functions and types
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { ResourceFetcher } from "@lib/resource";
-import { RPCSelector } from "@lib/rpc_selector";
+import { isObjectNotFoundError, RPCSelector } from "@lib/rpc_selector";
 import { HttpStatusCodes } from "@lib/http/http_status_codes";
 import { checkRedirect } from "@lib/redirects";
-import { fromBase64 } from "@mysten/bcs";
-import { SuiObjectResponse } from "@mysten/sui/jsonRpc";
+import { SuiClientTypes } from "@mysten/sui/client";
 import { parsePriorityUrlList } from "@lib/priority_executor";
 
 vi.mock("@mysten/sui/utils", () => ({
@@ -20,14 +19,31 @@ vi.mock("../src/redirects", () => ({
     checkRedirect: vi.fn(),
 }));
 
-// Mock fromBase64
-vi.mock("@mysten/bcs", async () => {
-    const actual = await vi.importActual<typeof import("@mysten/bcs")>("@mysten/bcs");
+// Builds a fetched object with BCS content present; the parsed value is supplied
+// by the mocked DynamicFieldStruct below.
+// TODO(tech-debt): partial mock — cast because SuiClientTypes.Object also requires
+// owner/type/previousTransaction/objectBcs/json, unused by these tests.
+function mockSiteObject(
+    overrides: Partial<SuiClientTypes.Object<{ content: true; display: true }>> = {},
+): SuiClientTypes.Object<{ content: true; display: true }> {
     return {
-        ...actual,
-        fromBase64: vi.fn(),
-    };
-});
+        objectId: "",
+        version: "1",
+        digest: "",
+        content: new Uint8Array([1]),
+        display: null,
+        ...overrides,
+    } as SuiClientTypes.Object<{ content: true; display: true }>;
+}
+
+// A per-object miss as the fullnode words it. Pinned against the real
+// classifier so the mock can't drift from what production would see
+// (resource.ts only gates on instanceof Error today, but keep them honest).
+function mockObjectMiss(objectId: string): Error {
+    const miss = new Error(`Object ${objectId} not found`);
+    expect(isObjectNotFoundError(miss)).toBe(true);
+    return miss;
+}
 
 vi.mock("../src/bcs_data_parsing", async (importOriginal) => {
     const actual = (await importOriginal()) as typeof import("../src/bcs_data_parsing");
@@ -67,37 +83,7 @@ describe("fetchResource", () => {
 
     test("should fetch resource without redirect", async () => {
         // Mock object response
-        multiGetObjects.mockResolvedValueOnce([
-            {
-                data: {
-                    bcs: {
-                        dataType: "moveObject",
-                        bcsBytes: "mockBcsBytes",
-                        hasPublicTransfer: true,
-                        type: "mockType",
-                        version: "1",
-                    },
-                    digest: "",
-                    objectId: "",
-                    version: "1",
-                },
-            },
-            {
-                data: {
-                    bcs: {
-                        dataType: "moveObject",
-                        bcsBytes: "mockBcsBytes",
-                        hasPublicTransfer: true,
-                        type: "mockType",
-                        version: "1.0",
-                    },
-                    digest: "",
-                    objectId: "",
-                    version: "1",
-                },
-            },
-        ]);
-        (fromBase64 as any).mockReturnValueOnce("decodedBcsBytes");
+        multiGetObjects.mockResolvedValueOnce([mockSiteObject(), mockSiteObject()]);
 
         const result = await resourceFetcher.fetchResource("0x1", "/path", new Set());
         expect(result).toEqual({
@@ -109,53 +95,15 @@ describe("fetchResource", () => {
     });
 
     test("should follow redirect and recursively fetch resource", async () => {
-        const mockObject: SuiObjectResponse = {
-            data: {
-                bcs: {
-                    dataType: "moveObject",
-                    bcsBytes: "mockBcsBytes",
-                    hasPublicTransfer: true,
-                    type: "mockType",
-                    version: "1",
-                },
-                display: {
-                    data: {
-                        "walrus site address": "mockAddress",
-                    },
-                    error: null,
-                },
-                digest: "",
-                objectId: "",
-                version: "1",
-            },
-        };
-
-        const mockResource: SuiObjectResponse = {
-            data: {
-                bcs: {
-                    dataType: "moveObject",
-                    bcsBytes: "mockBcsBytes",
-                    hasPublicTransfer: true,
-                    type: "mockType",
-                    version: "1",
-                },
-                display: {
-                    data: {
-                        "walrus site address": "mockAddress",
-                    },
-                    error: null,
-                },
-                digest: "",
-                objectId: "",
-                version: "1",
-            },
-        };
-
-        (checkRedirect as any).mockResolvedValueOnce(undefined);
+        // checkRedirect is sync: a mockResolvedValueOnce would return a
+        // Promise — truthy — and the redirect branch would recurse with a
+        // Promise as the objectId, passing by accident. vi.mocked keeps the
+        // stub typed to string | null so that can't recur.
+        vi.mocked(checkRedirect).mockReturnValueOnce("0xredirectTarget").mockReturnValueOnce(null);
 
         multiGetObjects
-            .mockResolvedValueOnce([mockObject, mockResource])
-            .mockResolvedValueOnce([mockObject, mockResource]);
+            .mockResolvedValueOnce([mockSiteObject(), mockSiteObject()])
+            .mockResolvedValueOnce([mockSiteObject(), mockSiteObject()]);
 
         const result = await resourceFetcher.fetchResource(
             "0x26dc2460093a9d6d31b58cb0ed1e72b19d140542a49be7472a6f25d542cb5cc3",
@@ -170,29 +118,21 @@ describe("fetchResource", () => {
             version: "1",
         });
         expect(checkRedirect).toHaveBeenCalledTimes(2);
+        // The recursion actually targets the redirect id.
+        expect(multiGetObjects).toHaveBeenNthCalledWith(
+            2,
+            ["0xredirectTarget", "0xdynamicFieldId"],
+            { content: true, display: true },
+        );
     });
 
     test("should return NOT_FOUND if the resource does not contain a blob_id", async () => {
         const seenResources = new Set<string>();
-        (checkRedirect as any).mockResolvedValueOnce(undefined);
+        vi.mocked(checkRedirect).mockReturnValueOnce(null);
         multiGetObjects.mockResolvedValue([
-            {
-                data: {
-                    bcs: {
-                        dataType: "moveObject",
-                        bcsBytes: "mockBcsBytes",
-                        hasPublicTransfer: true,
-                        type: "mockType",
-                        version: "1.0",
-                    },
-                    digest: "",
-                    objectId: "",
-                    version: "1.0",
-                },
-            },
-            {},
+            mockSiteObject({ version: "1.0" }),
+            mockObjectMiss("0xdf"),
         ]);
-        (fromBase64 as any).mockReturnValueOnce(undefined);
 
         const result = await resourceFetcher.fetchResource("0x1", "/path", seenResources);
 
@@ -200,29 +140,33 @@ describe("fetchResource", () => {
         expect(result).toBe(HttpStatusCodes.NOT_FOUND);
     });
 
+    test("serves an orphaned resource when the site object is missing (SEW-1037)", async () => {
+        vi.mocked(checkRedirect).mockReturnValueOnce(null);
+        multiGetObjects.mockResolvedValue([mockObjectMiss("0xab"), mockSiteObject()]);
+
+        const result = await resourceFetcher.fetchResource("0x1", "/path", new Set());
+
+        // Pre-existing behavior, pinned until SEW-1037 decides otherwise: the
+        // orphaned dynamic field is still served.
+        expect(result).toEqual({
+            blob_id: "0xresourceBlobId",
+            objectId: "0xdynamicFieldId",
+            version: "1",
+        });
+        // The site miss must not be treated as a redirect candidate.
+        expect(checkRedirect).not.toHaveBeenCalled();
+    });
+
     test("should return NOT_FOUND if dynamic fields are not found", async () => {
         const seenResources = new Set<string>();
 
         // Mock to return no redirect
-        (checkRedirect as any).mockResolvedValueOnce(null);
+        vi.mocked(checkRedirect).mockReturnValueOnce(null);
 
         // Mock to simulate that dynamic fields are not found
         multiGetObjects.mockResolvedValue([
-            {
-                data: {
-                    bcs: {
-                        dataType: "moveObject",
-                        bcsBytes: "mockBcsBytes",
-                        hasPublicTransfer: true,
-                        type: "mockType",
-                        version: "1.0",
-                    },
-                    digest: "mockDigest",
-                    objectId: "mockObjectId",
-                    version: "1.0",
-                },
-            },
-            {},
+            mockSiteObject({ objectId: "mockObjectId", digest: "mockDigest", version: "1.0" }),
+            mockObjectMiss("0xdf"),
         ]);
 
         const result = await resourceFetcher.fetchResource("0x1", "/path", seenResources);

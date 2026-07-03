@@ -1,13 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import {
-    GetDynamicFieldObjectParams,
-    GetObjectParams,
-    MultiGetObjectsParams,
-    SuiJsonRpcClient,
-    SuiObjectResponse,
-} from "@mysten/sui/jsonRpc";
+import { SuiClientTypes } from "@mysten/sui/client";
+import { SuiGrpcClient } from "@mysten/sui/grpc";
+import { isValidSuiNSName } from "@mysten/sui/utils";
 import { SuinsClient } from "@mysten/suins";
 import logger, { formatError } from "@lib/logger";
 import { NameRecord, Network } from "@lib/types";
@@ -17,18 +13,22 @@ const DEFAULT_RPC_REQUEST_TIMEOUT_MS = 7_000;
 export const rpcRequestTimeoutMs =
     Number(process.env.RPC_REQUEST_TIMEOUT_MS) || DEFAULT_RPC_REQUEST_TIMEOUT_MS;
 
+// TODO(tech-debt): leftover ceremony — it declares only multiGetObjects (not
+// even getNameRecord), isn't exported, and RPCSelector is its single
+// implementer. Nothing types against it; it can be deleted.
 interface RPCSelectorInterface {
-    getObject(input: GetObjectParams): Promise<SuiObjectResponse>;
-    multiGetObjects(input: MultiGetObjectsParams): Promise<SuiObjectResponse[]>;
-    getDynamicFieldObject(input: GetDynamicFieldObjectParams): Promise<SuiObjectResponse>;
+    multiGetObjects<Include extends SuiClientTypes.ObjectInclude>(
+        objectIds: string[],
+        include: Include,
+    ): Promise<SuiClientTypes.GetObjectsResponse<Include>["objects"]>;
 }
 
-class WrappedSuiClient extends SuiJsonRpcClient {
+class WrappedSuiClient extends SuiGrpcClient {
     private url: string;
     private suinsClient: SuinsClient;
 
     constructor(url: string, network: Network) {
-        super({ url, network });
+        super({ baseUrl: url, network });
         this.url = url;
         this.suinsClient = new SuinsClient({
             client: this,
@@ -48,18 +48,42 @@ class WrappedSuiClient extends SuiJsonRpcClient {
 }
 
 /**
- * Returns true if the error is an ObjectError with code "notExists" from the
- * @mysten/sui SDK. This is thrown when the FN cleanly responds that an object
- * doesn't exist (e.g. an unregistered SuiNS name's dynamic field).
- *
- * We use duck-typing because ObjectError is not exported from @mysten/sui.
+ * True only for the authoritative "object doesn't exist" miss. A transient
+ * HTTP 404 (`RpcError`) also says "not found" but carries a gRPC `code`, so
+ * we key off shape: a plain `Error`, no code, message `"Object 0x… not found"`
+ * (pinned by the drift-guard tests).
  */
-function isNotExistsError(error: unknown): boolean {
-    return (
-        typeof error === "object" &&
-        error !== null &&
-        (error as { code?: unknown }).code === "notExists"
-    );
+export function isObjectNotFoundError(error: unknown): boolean {
+    if (!(error instanceof Error)) {
+        return false;
+    }
+    // Transport errors (RpcError) always carry a gRPC status `code` string; a
+    // genuine missing-object error has none.
+    if (typeof (error as { code?: unknown }).code === "string") {
+        return false;
+    }
+    return /^Object 0x[0-9a-f]+ not found/i.test(error.message);
+}
+
+/**
+ * True only for the authoritative "SuiNS name not registered" error, which the
+ * caller resolves to `null`; every other error stays retryable.
+ *
+ * TODO(tech-debt): only needed because `@mysten/suins` getNameRecord throws on
+ * a miss instead of returning null as its signature promises; delete once
+ * fixed upstream.
+ */
+export function isNameNotRegisteredError(error: unknown): boolean {
+    if (isObjectNotFoundError(error)) {
+        return true;
+    }
+    if (!(error instanceof Error)) {
+        return false;
+    }
+    if (typeof (error as { code?: unknown }).code === "string") {
+        return false;
+    }
+    return /not registered/i.test(error.message);
 }
 
 export class RPCSelector implements RPCSelectorInterface {
@@ -111,10 +135,14 @@ export class RPCSelector implements RPCSelectorInterface {
                 }
             } catch (error) {
                 const wrappedError = error instanceof Error ? error : new Error(String(error));
-                // ObjectError(notExists) means the FN authoritatively answered
-                // "this object does not exist" — retrying won't change the
-                // answer.
-                if (isNotExistsError(error)) {
+                // INVALID_ARGUMENT is deterministic: a malformed request gets
+                // the same answer from every node, so retrying or failing over
+                // only burns the whole retry budget (~6 attempts × 7s).
+                if ((error as { code?: unknown }).code === "INVALID_ARGUMENT") {
+                    logger.error("RPC call failed with non-retryable error", {
+                        url,
+                        error: formatError(error),
+                    });
                     return { status: "stop", error: wrappedError };
                 }
                 logger.warn("RPC call failed", { url, error: formatError(error) });
@@ -123,76 +151,51 @@ export class RPCSelector implements RPCSelectorInterface {
         });
     }
 
-    private isValidGetObjectResponse(suiObjectResponse: SuiObjectResponse): boolean {
-        const data = suiObjectResponse.data;
-        const error = suiObjectResponse.error;
-        if (data) {
-            return true;
-        }
-        if (error) {
-            logger.warn("Failed to get object", { error: JSON.stringify(error) });
-            return true;
-        }
-        return false;
-    }
-
-    private isValidMultiGetObjectResponse(suiObjectResponseArray: SuiObjectResponse[]): boolean {
-        return suiObjectResponseArray.every((suiObjectResponse) => {
-            return this.isValidGetObjectResponse(suiObjectResponse);
-        });
-    }
-
-    public async getObject(input: GetObjectParams): Promise<SuiObjectResponse> {
-        logger.info("RPCSelector: getObject", { input });
-        const suiObjectResponse = await this.invokeWithFailover((client) =>
-            client.getObject(input),
+    /**
+     * Fetches multiple objects by ID, in the same order they were requested.
+     *
+     * Each entry is the fetched object, or an `Error` when the fullnode reported
+     * that object as not existing. The gRPC core API already returns a per-object
+     * miss as an `Error` element (not a thrown error), so we hand its result back
+     * unchanged and let each caller decide what a miss means — a 404 for a
+     * resource, or simply an absent optional field for routes/redirects.
+     */
+    public async multiGetObjects<Include extends SuiClientTypes.ObjectInclude>(
+        objectIds: string[],
+        include: Include,
+    ): Promise<SuiClientTypes.GetObjectsResponse<Include>["objects"]> {
+        logger.info("RPCSelector: multiGetObjects", { objectIds, include });
+        const { objects } = await this.invokeWithFailover((client) =>
+            client.core.getObjects({ objectIds, include }),
         );
-        if (this.isValidGetObjectResponse(suiObjectResponse)) {
-            return suiObjectResponse;
-        }
-        throw new Error("Invalid response from getObject.");
-    }
-
-    public async multiGetObjects(input: MultiGetObjectsParams): Promise<SuiObjectResponse[]> {
-        logger.info("RPCSelector: multiGetObjects", { input });
-        const suiObjectResponseArray = await this.invokeWithFailover((client) =>
-            client.multiGetObjects(input),
-        );
-        if (this.isValidMultiGetObjectResponse(suiObjectResponseArray)) {
-            return suiObjectResponseArray;
-        }
-        throw new Error("Invalid response from multiGetObjects.");
-    }
-
-    public async getDynamicFieldObject(
-        input: GetDynamicFieldObjectParams,
-    ): Promise<SuiObjectResponse> {
-        logger.info("RPCSelector: getDynamicFieldObject", { input });
-        const suiObjectResponse = await this.invokeWithFailover((client) =>
-            client.getDynamicFieldObject(input),
-        );
-        if (this.isValidGetObjectResponse(suiObjectResponse)) {
-            return suiObjectResponse;
-        }
-        throw new Error("Invalid response from getDynamicFieldObject.");
+        return objects;
     }
 
     public async getNameRecord(name: string): Promise<NameRecord | null> {
         logger.info("RPCSelector: getNameRecord", { name });
-        try {
-            return await this.invokeWithFailover((client) => client.getNameRecord(name));
-        } catch (error) {
-            // The executor wraps the ObjectError in: AggregateError → Error
-            // ("stop from <url>", { cause: ObjectError }). Check the cause
-            // chain for the notExists code.
-            if (
-                error instanceof AggregateError &&
-                error.errors.some((e) => isNotExistsError((e as Error & { cause?: unknown }).cause))
-            ) {
-                logger.info("SuiNS name not registered (FN responded notExists)", { name });
-                return null;
-            }
-            throw error;
+        // An invalid name (user-typed subdomain) can have no record — return null
+        // before the failover loop. Otherwise SuinsClient throws "Invalid SuiNS name"
+        // pre-network on every node, and the sweep ends in the 503 full-node page.
+        // TODO(ux): surfaces as the generic "Walrus Site not found!" 404 — a
+        // dedicated "invalid name, check for typos" message would help (SEW-1036).
+        if (!isValidSuiNSName(name)) {
+            logger.info("Invalid SuiNS name", { name });
+            return null;
         }
+        return await this.invokeWithFailover(async (client) => {
+            try {
+                return await client.getNameRecord(name);
+            } catch (error) {
+                // A name with no on-chain record is an authoritative answer, not
+                // a failure. Resolve it to null here: a successful null ends the
+                // failover loop, so we stop instead of retrying every node. Any
+                // other error propagates and is retried / failed over as usual.
+                if (isNameNotRegisteredError(error)) {
+                    logger.info("SuiNS name not registered", { name });
+                    return null;
+                }
+                throw error;
+            }
+        });
     }
 }
