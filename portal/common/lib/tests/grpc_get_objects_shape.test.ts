@@ -13,8 +13,9 @@ import { isObjectNotFoundError } from "@lib/rpc_selector";
  * `RPCSelector.multiGetObjects` depends on a specific contract from the SDK +
  * fullnode, and silently relies on it: for a batch of object ids, `getObjects`
  * returns a single `{ objects: [...] }` array, in request order, where
- *   - a MISSING object is an `Error` ELEMENT (not thrown, not omitted), which our
- *     code collapses to `null`, and
+ *   - a MISSING object is an `Error` ELEMENT (not thrown, not omitted), which each
+ *     caller classifies: resource.ts turns it into a 404, routing keeps it as
+ *     `Routes | Error`, and getNameRecord resolves the thrown variant to `null`, and
  *   - a PRESENT object carries the fields we read (`content` bytes, `version`).
  *
  * This test pins that contract by hitting a real fullnode with one guaranteed
@@ -56,9 +57,10 @@ describe("gRPC getObjects shape (mainnet drift guard)", () => {
         expect(obj.content).toBeInstanceOf(Uint8Array);
         expect(typeof obj.version).toBe("string");
 
-        // The missing object surfaces as an Error ELEMENT — the signal our
-        // Error→null mapping keys off. If this stops being an Error, the mapping
-        // would leak a malformed object instead of returning null.
+        // The missing object surfaces as an Error ELEMENT — the signal every
+        // caller keys off (resource 404, routing's `Routes | Error`, getNameRecord's
+        // null). If this stops being an Error, those paths would leak a malformed
+        // object instead.
         expect(
             objects[1] instanceof Error,
             "SDK no longer returns a per-object miss as an Error element — revisit multiGetObjects mapping",
