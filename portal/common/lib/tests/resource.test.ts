@@ -4,7 +4,7 @@
 // Import necessary functions and types
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { ResourceFetcher } from "@lib/resource";
-import { RPCSelector } from "@lib/rpc_selector";
+import { isObjectNotFoundError, RPCSelector } from "@lib/rpc_selector";
 import { HttpStatusCodes } from "@lib/http/http_status_codes";
 import { checkRedirect } from "@lib/redirects";
 import { SuiClientTypes } from "@mysten/sui/client";
@@ -34,6 +34,15 @@ function mockSiteObject(
         display: null,
         ...overrides,
     } as SuiClientTypes.Object<{ content: true; display: true }>;
+}
+
+// A per-object miss as the fullnode words it. Pinned against the real
+// classifier so the mock can't drift from what production would see
+// (resource.ts only gates on instanceof Error today, but keep them honest).
+function mockObjectMiss(objectId: string): Error {
+    const miss = new Error(`Object ${objectId} not found`);
+    expect(isObjectNotFoundError(miss)).toBe(true);
+    return miss;
 }
 
 vi.mock("../src/bcs_data_parsing", async (importOriginal) => {
@@ -122,7 +131,7 @@ describe("fetchResource", () => {
         vi.mocked(checkRedirect).mockReturnValueOnce(null);
         multiGetObjects.mockResolvedValue([
             mockSiteObject({ version: "1.0" }),
-            new Error("Object 0xdynamicFieldId not found"),
+            mockObjectMiss("0xdf"),
         ]);
 
         const result = await resourceFetcher.fetchResource("0x1", "/path", seenResources);
@@ -133,7 +142,7 @@ describe("fetchResource", () => {
 
     test("serves an orphaned resource when the site object is missing (SEW-1037)", async () => {
         vi.mocked(checkRedirect).mockReturnValueOnce(null);
-        multiGetObjects.mockResolvedValue([new Error("Object 0xab not found"), mockSiteObject()]);
+        multiGetObjects.mockResolvedValue([mockObjectMiss("0xab"), mockSiteObject()]);
 
         const result = await resourceFetcher.fetchResource("0x1", "/path", new Set());
 
@@ -157,7 +166,7 @@ describe("fetchResource", () => {
         // Mock to simulate that dynamic fields are not found
         multiGetObjects.mockResolvedValue([
             mockSiteObject({ objectId: "mockObjectId", digest: "mockDigest", version: "1.0" }),
-            new Error("Object 0xdynamicFieldId not found"),
+            mockObjectMiss("0xdf"),
         ]);
 
         const result = await resourceFetcher.fetchResource("0x1", "/path", seenResources);
