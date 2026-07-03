@@ -103,7 +103,17 @@ describe("RPCSelector.getNameRecord — not-found handling", () => {
             .spyOn(SuinsClient.prototype, "getNameRecord")
             .mockRejectedValue(invalidArgument());
 
-        await expect(rpcSelector.getNameRecord("bad..name")).rejects.toThrow();
+        await expect(rpcSelector.getNameRecord("valid.sui")).rejects.toThrow();
         expect(spy).toHaveBeenCalledTimes(1);
+    });
+
+    it("resolves an invalid SuiNS name to null without any network call", async () => {
+        const rpcSelector = new RPCSelector(urls, "testnet");
+        const spy = vi.spyOn(SuinsClient.prototype, "getNameRecord");
+
+        // Underscores are not allowed in SuiNS names.
+        const result = await rpcSelector.getNameRecord("invalid_name.sui");
+        expect(result).toBeNull();
+        expect(spy).not.toHaveBeenCalled();
     });
 });

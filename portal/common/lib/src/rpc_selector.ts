@@ -3,6 +3,7 @@
 
 import { SuiClientTypes } from "@mysten/sui/client";
 import { SuiGrpcClient } from "@mysten/sui/grpc";
+import { isValidSuiNSName } from "@mysten/sui/utils";
 import { SuinsClient } from "@mysten/suins";
 import logger, { formatError } from "@lib/logger";
 import { NameRecord, Network } from "@lib/types";
@@ -172,6 +173,15 @@ export class RPCSelector implements RPCSelectorInterface {
 
     public async getNameRecord(name: string): Promise<NameRecord | null> {
         logger.info("RPCSelector: getNameRecord", { name });
+        // An invalid name (user-typed subdomain) can have no record — return null
+        // before the failover loop. Otherwise SuinsClient throws "Invalid SuiNS name"
+        // pre-network on every node, and the sweep ends in the 503 full-node page.
+        // TODO(ux): surfaces as the generic "Walrus Site not found!" 404 — a
+        // dedicated "invalid name, check for typos" message would help (SEW-1036).
+        if (!isValidSuiNSName(name)) {
+            logger.info("Invalid SuiNS name", { name });
+            return null;
+        }
         return await this.invokeWithFailover(async (client) => {
             try {
                 return await client.getNameRecord(name);
