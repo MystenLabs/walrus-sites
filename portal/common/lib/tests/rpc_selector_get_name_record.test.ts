@@ -92,4 +92,18 @@ describe("RPCSelector.getNameRecord — not-found handling", () => {
         // 2 URLs × (1 initial + 2 retries) = 6 calls.
         expect(spy).toHaveBeenCalledTimes(6);
     });
+
+    it("stops immediately on INVALID_ARGUMENT instead of sweeping the failover list", async () => {
+        const rpcSelector = new RPCSelector(urls, "testnet");
+        // A malformed request is deterministic — every node returns the same
+        // error — so it must abort on the first attempt, not retry/fail over.
+        const invalidArgument = () =>
+            Object.assign(new Error("Invalid params"), { code: "INVALID_ARGUMENT" });
+        const spy = vi
+            .spyOn(SuinsClient.prototype, "getNameRecord")
+            .mockRejectedValue(invalidArgument());
+
+        await expect(rpcSelector.getNameRecord("bad..name")).rejects.toThrow();
+        expect(spy).toHaveBeenCalledTimes(1);
+    });
 });

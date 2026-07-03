@@ -134,6 +134,16 @@ export class RPCSelector implements RPCSelectorInterface {
                 }
             } catch (error) {
                 const wrappedError = error instanceof Error ? error : new Error(String(error));
+                // INVALID_ARGUMENT is deterministic: a malformed request gets
+                // the same answer from every node, so retrying or failing over
+                // only burns the whole retry budget (~6 attempts × 7s).
+                if ((error as { code?: unknown }).code === "INVALID_ARGUMENT") {
+                    logger.error("RPC call failed with non-retryable error", {
+                        url,
+                        error: formatError(error),
+                    });
+                    return { status: "stop", error: wrappedError };
+                }
                 logger.warn("RPC call failed", { url, error: formatError(error) });
                 return { status: "retry-same", error: wrappedError };
             }
