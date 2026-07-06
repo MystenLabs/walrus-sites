@@ -47,7 +47,6 @@ tokio = { version = "=1.52.1", features = [
   "macros",
   "process",
 ] }
-toml = "0.8.14"
 tonic = { version = "0.14.6", default-features = false }
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
