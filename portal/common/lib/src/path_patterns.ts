@@ -4,22 +4,15 @@
 /**
  * Validating and matching owner-supplied route/redirect patterns.
  *
- * Grammar: `*` matches within one path segment, `**` (a whole segment) matches
- * across segments, and every other character is a literal. `*` is reserved, so a
- * literal `*` in a path can't be targeted; every other URL path character
- * (`( ) [ ] ! +` ...) just works.
+ * Grammar: `*` matches within one path segment, a whole-segment `**` matches
+ * across segments, and every other character is a literal.
  *
- * Wildcards are capped so a crafted pattern can't freeze the event loop (ReDoS):
- *  - glob (redirects always; routes when the flag is on): each segment has at
- *    most one `*` or is a whole-segment `**`, and at most one `**` per pattern.
- *    Those two guarantees let `matchGlob` anchor without any backtracking.
- *  - legacy regex (routes, flag off): the pattern is passed to `RegExp` with `*`
- *    turned into `.*` (crossing `/`), so it accepts only plain path characters
- *    plus `*` (the wildcard) and `.` (today's any-char). Every other regex
- *    metacharacter is rejected — they crash `RegExp` (`( ) [ ] { }`), backtrack
- *    (`+ ?`), or just don't work as literals here (`^ $ | \` — none are valid in
- *    a URL path anyway). Such patterns match literally instead under the glob
- *    matcher, which treats every non-`*` character as a literal.
+ * Wildcard caps keep matching cheap: glob patterns (redirects always; routes
+ * when the flag is on) allow one `*` per segment and one `**` per pattern, so
+ * `matchGlob` never backtracks. The legacy regex branch (routes, flag off)
+ * allows only path characters plus `*` and `.`, capping the compiled regex at
+ * two `.*`s — worst case quadratic, a bounded stall rather than a freeze.
+ * Rejected regex metacharacters are plain literals under the glob matcher.
  */
 
 /** Max total `*` characters in a legacy-regex pattern (glob is bounded per segment). */
