@@ -300,6 +300,68 @@ describe("matchPathToRoute with glob routing enabled", () => {
     });
 });
 
+// Each test asserts both sides of an intended flag-off -> flag-on behavior
+// change, so a regression on either matcher fails loudly.
+describe("flag-off -> flag-on behavior deltas", () => {
+    let warnSpy: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+        // Silence (and capture) the divergence-canary and skip warns.
+        warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    });
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    test("exact `/foo/` vs sibling `/foo/*`: longest-wins flips to most-specific", () => {
+        const routes = {
+            routes_list: new Map<string, string>([
+                ["/foo/*", "/catch.html"],
+                ["/foo/", "/exact.html"],
+            ]),
+        };
+        expect(wsRouter.matchPathToRoute("/foo/", routes)).toBe("/catch.html");
+        expect(globRouter.matchPathToRoute("/foo/", routes)).toBe("/exact.html");
+    });
+
+    test("mid-pattern `*` narrows from cross-slash to single-segment", () => {
+        const routes = {
+            routes_list: new Map<string, string>([["/forms/*/admin", "/admin.html"]]),
+        };
+        expect(wsRouter.matchPathToRoute("/forms/a/b/admin", routes)).toBe("/admin.html");
+        expect(globRouter.matchPathToRoute("/forms/a/b/admin", routes)).toBeUndefined();
+    });
+
+    test("glued trailing star `/api*` stops crossing `/`", () => {
+        const routes = { routes_list: new Map<string, string>([["/api*", "/api.html"]]) };
+        expect(wsRouter.matchPathToRoute("/api/x/y", routes)).toBe("/api.html");
+        expect(globRouter.matchPathToRoute("/api/x/y", routes)).toBeUndefined();
+    });
+
+    test("redirect `{a,b}` braces are literals, not alternation", () => {
+        const redirects: Redirects = {
+            redirect_list: new Map<string, Redirect>([
+                ["/x/{a,b}", { location: "/y", status_code: 301 }],
+            ]),
+        };
+        expect(wsRouter.matchPathToRedirect("/x/a", redirects)).toBeUndefined();
+        expect(wsRouter.matchPathToRedirect("/x/{a,b}", redirects)?.location).toBe("/y");
+    });
+
+    test("each request warns once per invalid pattern", () => {
+        const redirects: Redirects = {
+            redirect_list: new Map<string, Redirect>([
+                ["/a**b", { location: "/1", status_code: 301 }], // `**` glued into a segment
+                ["/c***", { location: "/2", status_code: 301 }], // three stars in a segment
+            ]),
+        };
+        wsRouter.matchPathToRedirect("/z", redirects);
+        expect(warnSpy).toHaveBeenCalledTimes(2);
+        // Warns repeat on every request for the same static patterns.
+        wsRouter.matchPathToRedirect("/z", redirects);
+        expect(warnSpy).toHaveBeenCalledTimes(4);
+    });
+});
+
 // --- Redirect matching tests ---
 
 const redirectsExample: Redirects = {
