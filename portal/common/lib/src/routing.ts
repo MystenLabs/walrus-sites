@@ -81,7 +81,9 @@ export class WalrusSitesRouter {
      * the longest matching pattern wins; with it on, each pattern is rewritten to
      * its glob equivalent, matched via the glob matcher, and the most-specific
      * match wins. Either way, patterns that fail validation are skipped (and
-     * logged).
+     * logged). While the flag is off, the glob result is still computed and a
+     * warning is logged when the two targets differ, so real divergences surface
+     * in production logs before the flag flips.
      *
      * @param path - The path to match.
      * @param routes - The routes to match against.
@@ -92,14 +94,18 @@ export class WalrusSitesRouter {
 
         let match: string | undefined;
         if (this.enableGlobRouting) {
-            // Rewrite each legacy pattern to its glob form, then match.
-            const globRoutes = Array.from(
-                routes.routes_list,
-                ([pattern, target]): [string, string] => [regexToGlobPattern(pattern), target],
-            );
-            match = this.matchGlobEntry(globRoutes, path, "route");
+            match = this.matchRouteViaGlob(path, routes);
         } else {
             match = this.matchRouteViaRegex(path, routes);
+            // Migration canary — removed together with the flag.
+            const globMatch = this.matchRouteViaGlob(path, routes);
+            if (globMatch !== match) {
+                logger.warn("Route target will change when glob routing is enabled", {
+                    path,
+                    regexTarget: match,
+                    globTarget: globMatch,
+                });
+            }
         }
 
         if (match === undefined) {
@@ -128,6 +134,19 @@ export class WalrusSitesRouter {
         });
         if (matches.length === 0) return undefined;
         return matches.reduce((a, b) => (a[0].length >= b[0].length ? a : b), matches[0])[1];
+    }
+
+    /**
+     * Glob route matching: each legacy pattern is rewritten to its glob
+     * equivalent (so authored catch-alls keep their reach), then the most
+     * specific matching glob wins.
+     */
+    private matchRouteViaGlob(path: string, routes: Routes): string | undefined {
+        const globRoutes = Array.from(routes.routes_list, ([pattern, target]): [string, string] => [
+            regexToGlobPattern(pattern),
+            target,
+        ]);
+        return this.matchGlobEntry(globRoutes, path, "route");
     }
 
     /**

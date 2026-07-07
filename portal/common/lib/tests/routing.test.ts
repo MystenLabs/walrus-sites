@@ -13,6 +13,7 @@ import { parsePriorityUrlList, PriorityExecutor } from "@lib/priority_executor";
 import { Redirect, Redirects } from "@lib/types";
 import { DynamicFieldStruct, RoutesStruct, RedirectsStruct } from "@lib/bcs_data_parsing";
 import { bcs, type BcsType } from "@mysten/bcs";
+import logger from "@lib/logger";
 
 const snakeSiteObjectId = "0x7a95e4be3948415b852fb287d455166a276d7a52f1a567b4a26b6b5e9c753158";
 const rpcPriorityUrls = parsePriorityUrlList(process.env.RPC_URL_LIST!);
@@ -148,6 +149,30 @@ testCases.forEach(([requestPath, _]) => {
     test(`matchPathToRoute: empty routes for "${requestPath}"`, () => {
         const match = wsRouter.matchPathToRoute(requestPath, emptyRoutes);
         expect(match).toEqual(undefined);
+    });
+});
+
+describe("matchPathToRoute glob-divergence canary (flag off)", () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    test("warns when the glob matcher would pick a different target", () => {
+        const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+        // Glued trailing star: the regex `^/api.*$` crosses `/`; the glob
+        // rewrite leaves `/api*` single-segment, so the target changes.
+        const routes = { routes_list: new Map<string, string>([["/api*", "/api.html"]]) };
+        expect(wsRouter.matchPathToRoute("/api/x/y", routes)).toBe("/api.html");
+        expect(warnSpy).toHaveBeenCalledWith(
+            "Route target will change when glob routing is enabled",
+            { path: "/api/x/y", regexTarget: "/api.html", globTarget: undefined },
+        );
+    });
+
+    test("stays silent when both matchers agree", () => {
+        const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+        expect(wsRouter.matchPathToRoute("/somewhere/else", routesExample)).toBe("/else.jpeg");
+        expect(warnSpy).not.toHaveBeenCalled();
     });
 });
 
