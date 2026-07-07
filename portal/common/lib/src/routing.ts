@@ -120,18 +120,18 @@ export class WalrusSitesRouter {
      * being handed to `RegExp`. The longest matching pattern wins.
      */
     private matchRouteViaRegex(path: string, routes: Routes): string | undefined {
+        const skipped: { pattern: string; reason?: string }[] = [];
         const matches = Array.from(routes.routes_list.entries()).filter(([pattern]) => {
             const validation = validateRegexPattern(pattern);
             if (!validation.ok) {
-                logger.warn("Skipping unsafe route pattern", {
-                    path,
-                    pattern,
-                    reason: validation.reason,
-                });
+                skipped.push({ pattern, reason: validation.reason });
                 return false;
             }
             return new RegExp(`^${pattern.replaceAll("*", ".*")}$`).test(path);
         });
+        if (skipped.length > 0) {
+            logger.info(`Skipped ${skipped.length} unsafe route patterns`, { skipped });
+        }
         if (matches.length === 0) return undefined;
         return matches.reduce((a, b) => (a[0].length >= b[0].length ? a : b), matches[0])[1];
     }
@@ -183,20 +183,20 @@ export class WalrusSitesRouter {
         kind: "route" | "redirect",
     ): V | undefined {
         let winner: { glob: string; value: V } | undefined;
+        const skipped: { pattern: string; reason?: string }[] = [];
         for (const [glob, value] of entries) {
             const validation = validateGlobPattern(glob);
             if (!validation.ok) {
-                logger.warn(`Skipping unsafe ${kind} pattern`, {
-                    path,
-                    pattern: glob,
-                    reason: validation.reason,
-                });
+                skipped.push({ pattern: glob, reason: validation.reason });
                 continue;
             }
             if (!matchGlob(glob, path)) continue;
             if (!winner || compareGlobSpecificity(glob, winner.glob) < 0) {
                 winner = { glob, value };
             }
+        }
+        if (skipped.length > 0) {
+            logger.info(`Skipped ${skipped.length} unsafe ${kind} patterns`, { skipped });
         }
         return winner?.value;
     }

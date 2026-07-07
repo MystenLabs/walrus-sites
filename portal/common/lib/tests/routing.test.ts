@@ -347,7 +347,8 @@ describe("flag-off -> flag-on behavior deltas", () => {
         expect(wsRouter.matchPathToRedirect("/x/{a,b}", redirects)?.location).toBe("/y");
     });
 
-    test("each request warns once per invalid pattern", () => {
+    test("invalid patterns log one aggregated info line per request", () => {
+        const infoSpy = vi.spyOn(logger, "info").mockImplementation(() => {});
         const redirects: Redirects = {
             redirect_list: new Map<string, Redirect>([
                 ["/a**b", { location: "/1", status_code: 301 }], // `**` glued into a segment
@@ -355,10 +356,14 @@ describe("flag-off -> flag-on behavior deltas", () => {
             ]),
         };
         wsRouter.matchPathToRedirect("/z", redirects);
-        expect(warnSpy).toHaveBeenCalledTimes(2);
-        // Warns repeat on every request for the same static patterns.
-        wsRouter.matchPathToRedirect("/z", redirects);
-        expect(warnSpy).toHaveBeenCalledTimes(4);
+        const skipLogs = infoSpy.mock.calls.filter(
+            ([message]) => message === "Skipped 2 unsafe redirect patterns",
+        );
+        expect(skipLogs).toHaveLength(1);
+        const { skipped } = skipLogs[0][1] as { skipped: { pattern: string }[] };
+        expect(skipped.map((entry) => entry.pattern)).toEqual(["/a**b", "/c***"]);
+        // No per-pattern warns anymore.
+        expect(warnSpy).not.toHaveBeenCalled();
     });
 });
 
