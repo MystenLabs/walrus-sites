@@ -7,6 +7,8 @@ original_package_id: "0xf99aee9f21493e1590e7e5a9aea6f343a1f381031a04a732724871fc
 landing_page_oid_b36: "1p3repujoigwcqrk0w4itsxm7hs7xjl4hwgt3t0szn6evad83q"
 
 domain_name_length: 21
+# Boolean options must be unquoted YAML booleans (true/false) — quoted "true" or
+# 1/0 fail validation at startup (the worker build silently treats them as false).
 b36_domain_resolution: true
 bring_your_own_domain: false
 enable_blocklist: false

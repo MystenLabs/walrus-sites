@@ -32,6 +32,9 @@ function loadYamlDefaults() {
     }
     if (yaml.rpc_urls) defaults.RPC_URL_LIST = toPipeString(yaml.rpc_urls);
     if (yaml.aggregator_urls) defaults.AGGREGATOR_URL_LIST = toPipeString(yaml.aggregator_urls);
+    if (yaml.enable_glob_routing !== undefined) {
+        defaults.ENABLE_GLOB_ROUTING = String(yaml.enable_glob_routing);
+    }
 
     return defaults;
 }
