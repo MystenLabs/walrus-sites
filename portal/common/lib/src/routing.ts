@@ -138,7 +138,7 @@ export class WalrusSitesRouter {
 
     /**
      * Glob route matching: each legacy pattern is rewritten to its glob
-     * equivalent (so authored catch-alls keep their reach), then the most
+     * equivalent (so authored catch-all patterns keep their reach), then the most
      * specific matching glob wins.
      */
     private matchRouteViaGlob(path: string, routes: Routes): string | undefined {
