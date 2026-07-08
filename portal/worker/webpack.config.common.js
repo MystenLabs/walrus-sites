@@ -32,6 +32,9 @@ function loadYamlDefaults() {
     }
     if (yaml.rpc_urls) defaults.RPC_URL_LIST = toPipeString(yaml.rpc_urls);
     if (yaml.aggregator_urls) defaults.AGGREGATOR_URL_LIST = toPipeString(yaml.aggregator_urls);
+    if (yaml.enable_glob_routing !== undefined) {
+        defaults.ENABLE_GLOB_ROUTING = String(yaml.enable_glob_routing);
+    }
 
     return defaults;
 }
@@ -98,6 +101,9 @@ module.exports = {
             ),
             'process.env.ORIGINAL_PACKAGE_ID': JSON.stringify(
                 envOrYaml('ORIGINAL_PACKAGE_ID') || envOrYaml('SITE_PACKAGE')
+            ),
+            'process.env.ENABLE_GLOB_ROUTING': JSON.stringify(
+                envOrYaml('ENABLE_GLOB_ROUTING')
             ),
             // common/lib timeout knobs — must be listed here or the bundled
             // worker reads a bare `process.env.X` that's undefined at runtime.

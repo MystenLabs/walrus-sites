@@ -9,7 +9,13 @@ import { RPCSelector } from "@lib/rpc_selector";
 import { SuiClientTypes } from "@mysten/sui/client";
 import { deriveDynamicFieldID } from "@mysten/sui/utils";
 import { instrumentationFacade } from "@lib/instrumentation";
-import picomatch from "picomatch";
+import {
+    compareGlobSpecificity,
+    matchGlob,
+    regexToGlobPattern,
+    validateGlobPattern,
+    validateRegexPattern,
+} from "@lib/path_patterns";
 
 /**
  * The WalrusSitesRouter class is responsible for handling the routing and redirect
@@ -17,7 +23,10 @@ import picomatch from "picomatch";
  * inside the `ws-resources.json`.
  */
 export class WalrusSitesRouter {
-    constructor(private rpcSelector: RPCSelector) {}
+    constructor(
+        private rpcSelector: RPCSelector,
+        private enableGlobRouting = false,
+    ) {}
 
     /**
      * Gets both the Routes and Redirects dynamic fields in a single RPC call.
@@ -34,6 +43,11 @@ export class WalrusSitesRouter {
         const reqStartTime = Date.now();
         const routesDfId = this.deriveSiteFieldId(siteObjectId, "routes");
         const redirectsDfId = this.deriveSiteFieldId(siteObjectId, "redirects");
+        logger.info("Fetching routes and redirects dynamic fields", {
+            siteObjectId,
+            routesDfId,
+            redirectsDfId,
+        });
 
         const responses = await this.rpcSelector.multiGetObjects([routesDfId, redirectsDfId], {
             content: true,
@@ -62,63 +76,84 @@ export class WalrusSitesRouter {
     }
 
     /**
-     * Matches the path to the appropriate route.
-     * Uses the legacy regex pattern where `*` is converted to `.*` (matches
-     * any characters including `/`). When multiple patterns match, the longest
-     * pattern wins.
-     *
-     * Returns an object with:
-     * - `match`: the matched route target, or undefined if no match.
-     * - `regexOnlyPatterns`: patterns that matched via the legacy regex but
-     *   NOT via picomatch (glob). These patterns will break when we migrate
-     *   routes to glob matching. The caller should log these with site context.
+     * Matches the path to the appropriate route. With the glob flag off,
+     * patterns match via the legacy regex (`*` becomes `.*` and crosses `/`) and
+     * the longest matching pattern wins; with it on, each pattern is rewritten to
+     * its glob equivalent, matched via the glob matcher, and the most-specific
+     * match wins. Either way, patterns that fail validation are skipped (and
+     * logged). While the flag is off, the glob result is still computed and a
+     * warning is logged when the two targets differ, so real divergences surface
+     * in production logs before the flag flips.
      *
      * @param path - The path to match.
      * @param routes - The routes to match against.
      */
-    public matchPathToRoute(
-        path: string,
-        routes: Routes,
-    ): { match: string | undefined; regexOnlyPatterns: string[] } {
-        logger.info(
-            "Attempting to match the provided `path` with the routes in the Routes object",
-            {
-                path,
-                routesDFList: routes.routes_list,
-            },
-        );
-        if (routes.routes_list.size === 0) return { match: undefined, regexOnlyPatterns: [] };
+    public matchPathToRoute(path: string, routes: Routes): string | undefined {
+        logger.info("Attempting to match the provided `path` with the routes", { path });
+        if (routes.routes_list.size === 0) return undefined;
 
-        const regexOnlyPatterns: string[] = [];
-
-        const filtered = Array.from(routes.routes_list.entries()).filter(([pattern]) => {
-            const regexMatch = new RegExp(`^${pattern.replace(/\*/g, ".*")}$`).test(path);
-            // Shadow-test picomatch to identify existing route patterns that won't
-            // survive the migration from regex to glob matching.
-            if (regexMatch && !picomatch(pattern, { dot: true })(path)) {
-                regexOnlyPatterns.push(pattern);
+        let match: string | undefined;
+        if (this.enableGlobRouting) {
+            match = this.matchRouteViaGlob(path, routes);
+        } else {
+            match = this.matchRouteViaRegex(path, routes);
+            // Migration canary — removed together with the flag.
+            const globMatch = this.matchRouteViaGlob(path, routes);
+            if (globMatch !== match) {
+                logger.warn("Route target will change when glob routing is enabled", {
+                    path,
+                    regexTarget: match,
+                    globTarget: globMatch,
+                });
             }
-            return regexMatch;
-        });
-
-        if (filtered.length === 0) {
-            logger.info("No matching routes found.", {
-                path,
-                routesDFList: routes.routes_list,
-            });
-            return { match: undefined, regexOnlyPatterns };
         }
 
-        const match = filtered.reduce(
-            (a, b) => (a[0].length >= b[0].length ? a : b),
-            filtered[0],
-        )[1];
-        return { match, regexOnlyPatterns };
+        if (match === undefined) {
+            logger.info("No matching routes found.", { path });
+        }
+        return match;
     }
 
     /**
-     * Matches the path to a redirect entry using glob patterns (picomatch).
-     * When multiple patterns match, the longest pattern wins.
+     * Legacy route matching: each `*` becomes `.*` and crosses `/`. Patterns are
+     * validated first so a ReDoS-prone one is skipped (and logged) instead of
+     * being handed to `RegExp`. The longest matching pattern wins.
+     */
+    private matchRouteViaRegex(path: string, routes: Routes): string | undefined {
+        const skipped: { pattern: string; reason?: string }[] = [];
+        const matches = Array.from(routes.routes_list.entries()).filter(([pattern]) => {
+            const validation = validateRegexPattern(pattern);
+            if (!validation.ok) {
+                skipped.push({ pattern, reason: validation.reason });
+                return false;
+            }
+            return new RegExp(`^${pattern.replaceAll("*", ".*")}$`).test(path);
+        });
+        if (skipped.length > 0) {
+            logger.info(`Skipped ${skipped.length} unsafe route patterns`, { skipped });
+        }
+        if (matches.length === 0) return undefined;
+        return matches.reduce((a, b) => (a[0].length >= b[0].length ? a : b), matches[0])[1];
+    }
+
+    /**
+     * Glob route matching: each legacy pattern is rewritten to its glob
+     * equivalent (so authored catch-all patterns keep their reach), then the most
+     * specific matching glob wins.
+     */
+    private matchRouteViaGlob(path: string, routes: Routes): string | undefined {
+        const globRoutes = Array.from(routes.routes_list, ([pattern, target]): [string, string] => [
+            regexToGlobPattern(pattern),
+            target,
+        ]);
+        return this.matchGlobEntry(globRoutes, path, "route");
+    }
+
+    /**
+     * Matches the path to a redirect entry using glob patterns. Redirects are
+     * authored as globs, so they are matched directly (no regex rewrite). The
+     * most specific matching pattern wins; patterns that fail validation are
+     * skipped (and logged).
      *
      * @param path - The path to match.
      * @param redirects - The redirects to match against.
@@ -127,16 +162,43 @@ export class WalrusSitesRouter {
         logger.info("Attempting to match the provided `path` with the redirects", { path });
         if (redirects.redirect_list.size === 0) return undefined;
 
-        const filtered = Array.from(redirects.redirect_list.entries()).filter(([pattern]) =>
-            picomatch(pattern, { dot: true })(path),
-        );
-
-        if (filtered.length === 0) {
+        const match = this.matchGlobEntry(redirects.redirect_list, path, "redirect");
+        if (match === undefined) {
             logger.info("No matching redirects found.", { path });
-            return undefined;
         }
+        return match;
+    }
 
-        return filtered.reduce((a, b) => (a[0].length >= b[0].length ? a : b), filtered[0])[1];
+    /**
+     * Matches `path` against the glob `entries` ([glob, value] pairs) and returns
+     * the value of the most specific match, or undefined if none match. Entries
+     * whose glob fails validation are skipped (and logged). The most specific
+     * glob wins — most literal characters, then fewest wildcards — with ties
+     * resolved in iteration order. Routes rewrite their legacy patterns to globs
+     * before calling; redirects are already globs.
+     */
+    private matchGlobEntry<V>(
+        entries: Iterable<[string, V]>,
+        path: string,
+        kind: "route" | "redirect",
+    ): V | undefined {
+        let winner: { glob: string; value: V } | undefined;
+        const skipped: { pattern: string; reason?: string }[] = [];
+        for (const [glob, value] of entries) {
+            const validation = validateGlobPattern(glob);
+            if (!validation.ok) {
+                skipped.push({ pattern: glob, reason: validation.reason });
+                continue;
+            }
+            if (!matchGlob(glob, path)) continue;
+            if (!winner || compareGlobSpecificity(glob, winner.glob) < 0) {
+                winner = { glob, value };
+            }
+        }
+        if (skipped.length > 0) {
+            logger.info(`Skipped ${skipped.length} unsafe ${kind} patterns`, { skipped });
+        }
+        return winner?.value;
     }
 
     /**

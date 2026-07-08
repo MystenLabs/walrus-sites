@@ -13,6 +13,7 @@ import { parsePriorityUrlList, PriorityExecutor } from "@lib/priority_executor";
 import { Redirect, Redirects } from "@lib/types";
 import { DynamicFieldStruct, RoutesStruct, RedirectsStruct } from "@lib/bcs_data_parsing";
 import { bcs, type BcsType } from "@mysten/bcs";
+import logger from "@lib/logger";
 
 const snakeSiteObjectId = "0x7a95e4be3948415b852fb287d455166a276d7a52f1a567b4a26b6b5e9c753158";
 const rpcPriorityUrls = parsePriorityUrlList(process.env.RPC_URL_LIST!);
@@ -136,7 +137,7 @@ const testCases = [
 
 testCases.forEach(([requestPath, expected]) => {
     test(`matchPathToRoute: "${requestPath}" -> "${expected}"`, () => {
-        const { match } = wsRouter.matchPathToRoute(requestPath, routesExample);
+        const match = wsRouter.matchPathToRoute(requestPath, routesExample);
         expect(match).toEqual(expected);
     });
 });
@@ -146,8 +147,223 @@ const emptyRoutes = { routes_list: new Map<string, string>() };
 
 testCases.forEach(([requestPath, _]) => {
     test(`matchPathToRoute: empty routes for "${requestPath}"`, () => {
-        const { match } = wsRouter.matchPathToRoute(requestPath, emptyRoutes);
+        const match = wsRouter.matchPathToRoute(requestPath, emptyRoutes);
         expect(match).toEqual(undefined);
+    });
+});
+
+describe("matchPathToRoute glob-divergence canary (flag off)", () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    test("warns when the glob matcher would pick a different target", () => {
+        const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+        // Glued trailing star: the regex `^/api.*$` crosses `/`; the glob
+        // rewrite leaves `/api*` single-segment, so the target changes.
+        const routes = { routes_list: new Map<string, string>([["/api*", "/api.html"]]) };
+        expect(wsRouter.matchPathToRoute("/api/x/y", routes)).toBe("/api.html");
+        expect(warnSpy).toHaveBeenCalledWith(
+            "Route target will change when glob routing is enabled",
+            { path: "/api/x/y", regexTarget: "/api.html", globTarget: undefined },
+        );
+    });
+
+    test("stays silent when both matchers agree", () => {
+        const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+        expect(wsRouter.matchPathToRoute("/somewhere/else", routesExample)).toBe("/else.jpeg");
+        expect(warnSpy).not.toHaveBeenCalled();
+    });
+});
+
+describe("matchPathToRoute skips unsafe patterns", () => {
+    test("an over-cap route pattern is skipped, not matched", () => {
+        const routes = {
+            routes_list: new Map<string, string>([
+                ["/a*b*c*", "/bad.html"], // 3 stars total -> skipped before the regex runs
+                ["/*", "/ok.html"],
+            ]),
+        };
+        // The unsafe pattern is longer, so if it were matched it would win.
+        // Getting the catch-all proves it was skipped.
+        const match = wsRouter.matchPathToRoute("/aXbYcZ", routes);
+        expect(match).toBe("/ok.html");
+    });
+});
+
+// --- Glob route matching (ENABLE_GLOB_ROUTING) ---
+
+const globRouter = new WalrusSitesRouter(rpcSelector, true);
+
+// A catch-all widens to require the extra slash, so every legacy regex case
+// above resolves identically under the glob matcher (no behaviour drift).
+testCases.forEach(([requestPath, expected]) => {
+    test(`matchPathToRoute (glob): "${requestPath}" -> "${expected}"`, () => {
+        expect(globRouter.matchPathToRoute(requestPath, routesExample)).toEqual(expected);
+    });
+});
+
+describe("matchPathToRoute with glob routing enabled", () => {
+    test("a catch-all `/*` matches any path below root", () => {
+        const routes = { routes_list: new Map<string, string>([["/*", "/index.html"]]) };
+        expect(globRouter.matchPathToRoute("/a/b/c/d", routes)).toBe("/index.html");
+        expect(globRouter.matchPathToRoute("/x", routes)).toBe("/index.html");
+    });
+
+    test("a mid-pattern `*` stays within a single segment", () => {
+        const routes = {
+            routes_list: new Map<string, string>([["/forms/*/admin", "/admin.html"]]),
+        };
+        expect(globRouter.matchPathToRoute("/forms/contact/admin", routes)).toBe("/admin.html");
+        // The legacy regex would cross `/` here; glob does not.
+        expect(globRouter.matchPathToRoute("/forms/a/b/admin", routes)).toBeUndefined();
+    });
+
+    test("a within-segment `*` matches a prefix in one segment only", () => {
+        const routes = { routes_list: new Map<string, string>([["/blog/old-*", "/archive.html"]]) };
+        expect(globRouter.matchPathToRoute("/blog/old-post", routes)).toBe("/archive.html");
+        expect(globRouter.matchPathToRoute("/blog/old/post", routes)).toBeUndefined();
+    });
+
+    test("a more specific prefix route beats the catch-all", () => {
+        const routes = {
+            routes_list: new Map<string, string>([
+                ["/*", "/catch-all.html"],
+                ["/docs/*", "/docs.html"],
+            ]),
+        };
+        expect(globRouter.matchPathToRoute("/docs/intro", routes)).toBe("/docs.html");
+    });
+
+    test("an exact route is not shadowed by a sibling `/*` route", () => {
+        // `/section/*` widens to require a deeper segment, so the bare `/section`
+        // resolves to its own exact route — not the sibling catch-all.
+        const routes = {
+            routes_list: new Map<string, string>([
+                ["/section", "/exact.html"],
+                ["/section/*", "/child.html"],
+            ]),
+        };
+        expect(globRouter.matchPathToRoute("/section", routes)).toBe("/exact.html");
+        expect(globRouter.matchPathToRoute("/section/sub", routes)).toBe("/child.html");
+    });
+
+    test("an exact `/foo/` beats its sibling `/foo/*`, and neither matches `/foo`", () => {
+        const routes = {
+            routes_list: new Map<string, string>([
+                ["/foo/*", "/catch.html"],
+                ["/foo/", "/exact.html"],
+            ]),
+        };
+        // `/foo/` is the most specific match for the trailing-slash path.
+        expect(globRouter.matchPathToRoute("/foo/", routes)).toBe("/exact.html");
+        // Only the catch-all matches a deeper path.
+        expect(globRouter.matchPathToRoute("/foo/bar", routes)).toBe("/catch.html");
+        // The widened `/foo/*` (-> `/foo/**/*`) does not match the bare prefix.
+        expect(globRouter.matchPathToRoute("/foo", routes)).toBeUndefined();
+    });
+
+    test("a globstar plus a segment beats a bare globstar for a deep path", () => {
+        // `/something/else/**/*` has one more literal `/` than `/something/else/**`,
+        // so the deeper, more explicit pattern wins where both match.
+        const routes = {
+            routes_list: new Map<string, string>([
+                ["/something/else/**", "/glob.html"],
+                ["/something/else/**/*", "/glob-deep.html"],
+            ]),
+        };
+        expect(globRouter.matchPathToRoute("/something/else/foo/bar", routes)).toBe(
+            "/glob-deep.html",
+        );
+    });
+
+    test("equally specific patterns resolve deterministically to the first", () => {
+        // `/a/*/c` and `/*/b/c` both match `/a/b/c` with the same literal and
+        // star counts, so the first-defined one wins.
+        const routes = {
+            routes_list: new Map<string, string>([
+                ["/a/*/c", "/first.html"],
+                ["/*/b/c", "/second.html"],
+            ]),
+        };
+        expect(globRouter.matchPathToRoute("/a/b/c", routes)).toBe("/first.html");
+    });
+
+    test("an unsafe pattern is skipped under glob too", () => {
+        const routes = {
+            routes_list: new Map<string, string>([
+                ["/x/a*a*a*/y", "/bad.html"], // more than one star in a segment -> skipped
+                ["/*", "/ok.html"],
+            ]),
+        };
+        expect(globRouter.matchPathToRoute("/x/aaa/y", routes)).toBe("/ok.html");
+    });
+});
+
+// Each test asserts both sides of an intended flag-off -> flag-on behavior
+// change, so a regression on either matcher fails loudly.
+describe("flag-off -> flag-on behavior deltas", () => {
+    let warnSpy: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+        // Silence (and capture) the divergence-canary and skip warns.
+        warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    });
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    test("exact `/foo/` vs sibling `/foo/*`: longest-wins flips to most-specific", () => {
+        const routes = {
+            routes_list: new Map<string, string>([
+                ["/foo/*", "/catch.html"],
+                ["/foo/", "/exact.html"],
+            ]),
+        };
+        expect(wsRouter.matchPathToRoute("/foo/", routes)).toBe("/catch.html");
+        expect(globRouter.matchPathToRoute("/foo/", routes)).toBe("/exact.html");
+    });
+
+    test("mid-pattern `*` narrows from cross-slash to single-segment", () => {
+        const routes = {
+            routes_list: new Map<string, string>([["/forms/*/admin", "/admin.html"]]),
+        };
+        expect(wsRouter.matchPathToRoute("/forms/a/b/admin", routes)).toBe("/admin.html");
+        expect(globRouter.matchPathToRoute("/forms/a/b/admin", routes)).toBeUndefined();
+    });
+
+    test("glued trailing star `/api*` stops crossing `/`", () => {
+        const routes = { routes_list: new Map<string, string>([["/api*", "/api.html"]]) };
+        expect(wsRouter.matchPathToRoute("/api/x/y", routes)).toBe("/api.html");
+        expect(globRouter.matchPathToRoute("/api/x/y", routes)).toBeUndefined();
+    });
+
+    test("redirect `{a,b}` braces are literals, not alternation", () => {
+        const redirects: Redirects = {
+            redirect_list: new Map<string, Redirect>([
+                ["/x/{a,b}", { location: "/y", status_code: 301 }],
+            ]),
+        };
+        expect(wsRouter.matchPathToRedirect("/x/a", redirects)).toBeUndefined();
+        expect(wsRouter.matchPathToRedirect("/x/{a,b}", redirects)?.location).toBe("/y");
+    });
+
+    test("invalid patterns log one aggregated info line per request", () => {
+        const infoSpy = vi.spyOn(logger, "info").mockImplementation(() => {});
+        const redirects: Redirects = {
+            redirect_list: new Map<string, Redirect>([
+                ["/a**b", { location: "/1", status_code: 301 }], // `**` glued into a segment
+                ["/c***", { location: "/2", status_code: 301 }], // three stars in a segment
+            ]),
+        };
+        wsRouter.matchPathToRedirect("/z", redirects);
+        const skipLogs = infoSpy.mock.calls.filter(
+            ([message]) => message === "Skipped 2 unsafe redirect patterns",
+        );
+        expect(skipLogs).toHaveLength(1);
+        const { skipped } = skipLogs[0][1] as { skipped: { pattern: string }[] };
+        expect(skipped.map((entry) => entry.pattern)).toEqual(["/a**b", "/c***"]);
+        // No per-pattern warns anymore.
+        expect(warnSpy).not.toHaveBeenCalled();
     });
 });
 
@@ -173,10 +389,19 @@ describe("matchPathToRedirect", () => {
         expect(match).toEqual({ location: "/blog/archive", status_code: 308 });
     });
 
-    test("longest glob match wins", () => {
-        // /blog/old-post matches /blog/old-* (length 11) but not /docs/* (doesn't match)
-        const match = wsRouter.matchPathToRedirect("/blog/old-post", redirectsExample);
-        expect(match).toEqual({ location: "/blog/archive", status_code: 308 });
+    test("most specific redirect wins over a broader sibling", () => {
+        // `/blog/` and `/blog/*` both match `/blog/`; the exact one is more
+        // specific (same literals, no wildcard), so it wins.
+        const redirects: Redirects = {
+            redirect_list: new Map<string, Redirect>([
+                ["/blog/", { location: "/blog-index", status_code: 301 }],
+                ["/blog/*", { location: "/blog-catch", status_code: 302 }],
+            ]),
+        };
+        expect(wsRouter.matchPathToRedirect("/blog/", redirects)).toEqual({
+            location: "/blog-index",
+            status_code: 301,
+        });
     });
 
     test("no match returns undefined", () => {
@@ -199,6 +424,17 @@ describe("matchPathToRedirect", () => {
         expect(wsRouter.matchPathToRedirect("/blog/old-x", redirectsExample)?.status_code).toBe(
             308,
         );
+    });
+});
+
+describe("matchPathToRedirect skips unsafe patterns", () => {
+    test("an over-cap redirect pattern is skipped", () => {
+        const redirects: Redirects = {
+            redirect_list: new Map<string, Redirect>([
+                ["/a*b*c*", { location: "/bad", status_code: 301 }], // 3 stars in one segment
+            ]),
+        };
+        expect(wsRouter.matchPathToRedirect("/aXbYcZ", redirects)).toBeUndefined();
     });
 });
 
