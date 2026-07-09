@@ -51,9 +51,9 @@ tonic = { version = "0.14.6", default-features = false }
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
 # TODO: change to v1.50 when ready; pinned for walrus#3389 (owner/version/digest on ObjectChangeEntry).
-walrus-sdk = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.51.1" }
-walrus-sui = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.51.1" }
-walrus-utils = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.51.1" }
+walrus-sdk = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.51.2" }
+walrus-sui = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.51.2" }
+walrus-utils = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.51.2" }
 
 [dev-dependencies]
 gag = "1.0.0"
@@ -62,7 +62,7 @@ sui-config = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.74.0
 sui-move-build = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.74.0" }
 tempfile = "3.20.0"
 test-cluster = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.74.0" }
-walrus-service = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.51.1", features = [
+walrus-service = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.51.2", features = [
   "test-utils",
 ] }
-walrus-test-utils = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.51.1" }
+walrus-test-utils = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.51.2" }
