@@ -1,5 +1,5 @@
 name: Attach Walrus Sites binaries to a release
-run-name: Attach Walrus Sites binaries to a ${{ github.event.inputs.site-builder-tag || github.ref_name }} release
+run-name: Attach Walrus Sites binaries to a ${{ github.event.inputs.site-builder-tag || github.event.release.tag_name || github.ref_name }} release
 
 on:
   release:
@@ -14,7 +14,7 @@ on:
 concurrency: ${{ github.workflow }}-${{ inputs.site-builder-tag || github.ref }}
 
 env:
-  TAG_NAME: "${{ github.event.inputs.site-builder-tag || github.ref_name }}"
+  TAG_NAME: "${{ github.event.inputs.site-builder-tag || github.event.release.tag_name || github.ref_name }}"
   CARGO_TERM_COLOR: always
   # Disable incremental compilation.
   #
@@ -60,6 +60,7 @@ jobs:
         id: validate_tag_name
         run: |
           export site_builder_tag=$(echo ${{ env.TAG_NAME }} | sed s/'refs\/tags\/'//)
+          [[ -z "${site_builder_tag}" ]] && echo "tag cannot be empty" && exit 1
           [[ "${site_builder_tag}" == "main" ]] && echo "tag cannot be equals to 'main'" && exit 1
           echo "site-builder-tag=${site_builder_tag}" >> $GITHUB_OUTPUT
 
