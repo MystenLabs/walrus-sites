@@ -36,7 +36,7 @@
     },
     "server": {
       "name": "server",
-      "version": "2.11.0",
+      "version": "2.11.1",
       "dependencies": {
         "@logtape/logtape": "^0.11.0",
         "@vercel/edge-config": "^1.4.0",
@@ -60,7 +60,7 @@
     },
     "worker": {
       "name": "worker",
-      "version": "2.11.0",
+      "version": "2.11.1",
       "dependencies": {
         "@mysten/sui": "^2.20.1",
         "buffer": "^6.0.3",
