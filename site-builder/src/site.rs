@@ -12,7 +12,6 @@ pub mod resource;
 
 use anyhow::{Context, Result};
 use resource::{ResourceSet, SiteOps};
-use sui_sdk::rpc_types::SuiObjectDataOptions;
 use sui_types::{base_types::ObjectID, dynamic_field::derive_dynamic_field_id, TypeTag};
 use walrus_sui::{contracts::TypeOriginMap, dynamic_field_info::DynamicFieldInfo};
 use walrus_utils::http::bytes::Bytes;
@@ -221,30 +220,19 @@ impl RemoteSiteFactory<'_> {
 
         tracing::info!(
             count = resource_df_ids.len(),
-            "fetching resource dynamic fields via multi_get"
+            "fetching resource dynamic fields via batched object gets"
         );
 
-        let responses = self
-            .sui_client
-            .multi_get_object_with_options_batched(
-                &resource_df_ids,
-                SuiObjectDataOptions::new().with_bcs().with_type(),
-            )
-            .await?;
+        let resource_dfs: Vec<ResourceDynamicField> =
+            self.sui_client.get_sui_objects(&resource_df_ids).await?;
 
         let mut resources = ResourceSet::empty();
-        resources.extend(
-            responses
-                .iter()
-                .map(|resp| {
-                    contracts::get_sui_object_from_object_response::<ResourceDynamicField>(resp)
-                        .map(|df| df.value)
-                })
-                .collect::<Result<Vec<_>>>()?,
-        );
+        resources.extend(resource_dfs.into_iter().map(|df| df.value));
 
         tracing::debug!("fetching the routes and redirects from the dynamic fields");
-        let (routes, redirects) = self.get_routes_and_redirects(site_id).await?;
+        let (routes, redirects) = self
+            .get_routes_and_redirects(site_id, &dynamic_fields)
+            .await?;
 
         Ok(SiteData {
             resources,
@@ -255,11 +243,16 @@ impl RemoteSiteFactory<'_> {
         })
     }
 
-    /// Fetches routes and redirects by deriving their DF object IDs from the known keys
-    /// and batch-fetching them in a single RPC call.
+    /// Fetches routes and redirects by deriving their DF object IDs from the known keys,
+    /// checking their existence against the site's dynamic field listing, and fetching each
+    /// existing field.
+    ///
+    /// The existence check uses the already-fetched `dynamic_fields` so that a missing routes or
+    /// redirects field results in `None` without relying on per-object not-found errors.
     async fn get_routes_and_redirects(
         &self,
         site_id: ObjectID,
+        dynamic_fields: &[DynamicFieldInfo],
     ) -> Result<(Option<Routes>, Option<Redirects>)> {
         let vec_u8_tag = TypeTag::Vector(Box::new(TypeTag::U8));
 
@@ -274,37 +267,23 @@ impl RemoteSiteFactory<'_> {
             &bcs::to_bytes(&REDIRECTS_DF_KEY.to_vec())?,
         )?;
 
-        // Batch-fetch both in a single RPC call.
-        let responses = self
-            .sui_client
-            .multi_get_object_with_options(
-                &[routes_df_id, redirects_df_id],
-                SuiObjectDataOptions::new().with_bcs().with_type(),
-            )
-            .await?;
+        let df_exists = |id: ObjectID| dynamic_fields.iter().any(|field| field.field_id == id);
 
-        let routes = responses[0]
-            .data
-            .as_ref()
-            .map(|_| {
-                contracts::get_sui_object_from_object_response::<SuiDynamicField<Vec<u8>, Routes>>(
-                    &responses[0],
-                )
-            })
-            .transpose()?
-            .map(|df| df.value);
+        let routes = if df_exists(routes_df_id) {
+            let field: SuiDynamicField<Vec<u8>, Routes> =
+                self.sui_client.get_sui_object(routes_df_id).await?;
+            Some(field.value)
+        } else {
+            None
+        };
 
-        let redirects =
-            responses[1]
-                .data
-                .as_ref()
-                .map(|_| {
-                    contracts::get_sui_object_from_object_response::<
-                        SuiDynamicField<Vec<u8>, Redirects>,
-                    >(&responses[1])
-                })
-                .transpose()?
-                .map(|df| df.value);
+        let redirects = if df_exists(redirects_df_id) {
+            let field: SuiDynamicField<Vec<u8>, Redirects> =
+                self.sui_client.get_sui_object(redirects_df_id).await?;
+            Some(field.value)
+        } else {
+            None
+        };
 
         Ok((routes, redirects))
     }
