@@ -12,7 +12,7 @@ _testing-dry-run = []
 anyhow = "1.0.100"
 base64 = "0.22.1"
 bcs = "0.1.6"
-bin-version = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.74.0" }
+bin-version = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.75.1" }
 bytesize = "2.1.0"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4.5.7", features = ["derive"] }
@@ -26,7 +26,7 @@ hex = "0.4.3"
 home = "0.5.9"
 humantime = "2.2.0"
 itertools = "0.14.0"
-move-core-types = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.74.0" }
+move-core-types = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.75.1" }
 notify = "6.1.1"
 prettytable = "0.10.0"
 rand = "0.8.5"
@@ -36,10 +36,10 @@ serde = { version = "1.0.203", features = ["derive"] }
 serde_json = "1.0.150"
 serde_with = { version = "3.8.1", features = ["base64"] }
 serde_yaml = "0.9"
-shared-crypto = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.74.0" }
-sui-keys = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.74.0" }
-sui-sdk = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.74.0" }
-sui-types = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.74.0" }
+shared-crypto = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.75.1" }
+sui-keys = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.75.1" }
+sui-sdk = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.75.1" }
+sui-types = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.75.1" }
 thiserror = "2.0.18"
 tokio = { version = "=1.52.1", features = [
   "rt",
@@ -51,18 +51,18 @@ tonic = { version = "0.14.6", default-features = false }
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
 # TODO: change to v1.50 when ready; pinned for walrus#3389 (owner/version/digest on ObjectChangeEntry).
-walrus-sdk = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.51.2" }
-walrus-sui = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.51.2" }
-walrus-utils = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.51.2" }
+walrus-sdk = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.52.0" }
+walrus-sui = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.52.0" }
+walrus-utils = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.52.0" }
 
 [dev-dependencies]
 gag = "1.0.0"
-move-package-alt = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.74.0" }
-sui-config = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.74.0" }
-sui-move-build = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.74.0" }
+move-package-alt = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.75.1" }
+sui-config = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.75.1" }
+sui-move-build = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.75.1" }
 tempfile = "3.20.0"
-test-cluster = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.74.0" }
-walrus-service = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.51.2", features = [
+test-cluster = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.75.1" }
+walrus-service = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.52.0", features = [
   "test-utils",
 ] }
-walrus-test-utils = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.51.2" }
+walrus-test-utils = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.52.0" }
