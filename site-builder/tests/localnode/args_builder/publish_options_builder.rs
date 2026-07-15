@@ -16,6 +16,9 @@ pub struct PublishOptionsBuilder {
     /// Preprocess the directory before publishing.
     /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
     pub list_directory: bool,
+    /// Rewrite legacy route patterns to their glob equivalents before storing them on-chain.
+    // TODO(sew-1001): remove with the routing migration.
+    pub rewrite_legacy_routes: bool,
     /// Common configurations.
     // Note: We are currently re-using `WalrusStoreOptionsBuilder`'s methods for convenience,
     // and keeping walrus_store_options_builder mod private.
@@ -35,6 +38,7 @@ impl PublishOptionsBuilder {
         let PublishOptionsBuilder {
             directory,
             list_directory,
+            rewrite_legacy_routes,
             walrus_options,
         } = self;
         let Some(directory) = directory else {
@@ -46,6 +50,7 @@ impl PublishOptionsBuilder {
         Ok(PublishOptions {
             directory,
             list_directory,
+            rewrite_legacy_routes,
             walrus_options,
         })
     }
@@ -57,6 +62,11 @@ impl PublishOptionsBuilder {
 
     pub fn with_list_directory(mut self, list_directory: bool) -> Self {
         self.list_directory = list_directory;
+        self
+    }
+
+    pub fn with_rewrite_legacy_routes(mut self, rewrite_legacy_routes: bool) -> Self {
+        self.rewrite_legacy_routes = rewrite_legacy_routes;
         self
     }
 

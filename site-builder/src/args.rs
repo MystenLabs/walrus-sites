@@ -423,6 +423,23 @@ pub struct PublishOptions {
     /// See the `list-directory` command. Warning: Rewrites all `index.html` files.
     #[arg(long)]
     pub list_directory: bool,
+    /// Rewrite legacy route patterns to their glob equivalents before storing them on-chain.
+    ///
+    /// Historically a `*` in a route pattern was matched as a regex `.*` and could cross `/`
+    /// boundaries. Portals are migrating to glob matching, where `*` matches within a single
+    /// path segment and a whole-segment `**` crosses segments. With this flag, patterns that
+    /// relied on the old reach are rewritten before comparing and storing routes, so the
+    /// on-chain routes use the glob spelling: `*` becomes `/**`, and a trailing `/*` becomes
+    /// `/**/*` (e.g. `/docs/*` -> `/docs/**/*`). Redirect patterns are never rewritten.
+    ///
+    /// WARNING: rewritten patterns such as `/docs/**/*` are only matched by portals with glob
+    /// routing enabled; portals still running legacy (regex) routing skip them. Do not enable
+    /// this flag until the portal fleet runs glob routing.
+    ///
+    /// The rewrite is in-memory only: `ws-resources.json` is not modified.
+    // TODO(sew-1001): remove with the routing migration.
+    #[arg(long)]
+    pub rewrite_legacy_routes: bool,
     /// Common configurations.
     #[clap(flatten)]
     pub walrus_options: WalrusStoreOptions,
