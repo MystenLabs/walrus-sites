@@ -564,7 +564,7 @@ fn test_check_write_boundary_rewrite_sequencing_hazard() {
         concat!(
             "'/docs/*' was rewritten to '/docs/**/*', which portals still running legacy ",
             "(regex) routing cannot match (3 '*' characters (max 2 in total)) and will skip. ",
-            "Only deploy with --rewrite-legacy-routes once the portal fleet runs glob routing.",
+            "Only deploy with --rewrite-legacy-routes once portal deployments run glob routing.",
         )
     );
 }

@@ -171,12 +171,12 @@ pub enum PatternIssueKind {
     /// unchanged on-chain.
     GlobInvalid,
     /// Valid glob, but beyond the legacy (regex) matcher's limits: portals
-    /// with the glob flag off skip it, so it only takes effect once the fleet
-    /// runs glob routing.
+    /// with the glob flag off skip it, so it only takes effect once portal
+    /// deployments run glob routing.
     LegacySkipped,
     /// A pattern our own `--rewrite-legacy-routes` rewrite produced that
-    /// legacy portals cannot match: deploying it before the fleet runs glob
-    /// routing is a sequencing hazard.
+    /// legacy portals cannot match: deploying it before portal deployments
+    /// run glob routing is a sequencing hazard.
     // TODO(sew-1001): remove with the routing migration.
     LegacyAfterRewrite,
     /// Informational: the pattern's `*` crossed `/` under the legacy regex
@@ -534,7 +534,7 @@ pub fn format_warning(issue: &PatternIssue, rewritten: &[(String, String)]) -> S
             format!(
                 "'{original}' was rewritten to '{pattern}', which portals still running legacy \
                  (regex) routing cannot match ({reason}) and will skip. Only deploy with \
-                 --rewrite-legacy-routes once the portal fleet runs glob routing."
+                 --rewrite-legacy-routes once portal deployments run glob routing."
             )
         }
         PatternIssueKind::StarNarrowing => format!(

@@ -434,7 +434,7 @@ pub struct PublishOptions {
     ///
     /// WARNING: rewritten patterns such as `/docs/**/*` are only matched by portals with glob
     /// routing enabled; portals still running legacy (regex) routing skip them. Do not enable
-    /// this flag until the portal fleet runs glob routing.
+    /// this flag until portal deployments run glob routing.
     ///
     /// The rewrite is in-memory only: `ws-resources.json` is not modified.
     // TODO(sew-1001): remove with the routing migration.
