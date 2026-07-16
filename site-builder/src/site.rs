@@ -7,6 +7,7 @@ pub mod content;
 pub mod contracts;
 pub mod estimates;
 pub mod manager;
+pub mod path_patterns;
 pub mod quilts;
 pub mod resource;
 
@@ -78,6 +79,7 @@ impl SiteDataDiff<'_> {
             metadata_updated: !self.metadata_op.is_noop(),
             site_name_updated: !self.site_name_op.is_noop(),
             extend_ops: self.extend_ops.clone(),
+            route_rewrites: Vec::new(),
         }
     }
 }
@@ -142,21 +144,11 @@ impl SiteData {
     }
 
     fn redirects_diff(&self, start: &Self) -> RedirectOps {
-        match (&self.redirects, &start.redirects) {
-            (Some(r), Some(s)) => r.diff(s),
-            (None, Some(_)) => RedirectOps::Replace(Redirects::empty()),
-            (Some(s), None) => RedirectOps::Replace(s.clone()),
-            _ => RedirectOps::Unchanged,
-        }
+        Redirects::diff_opt(self.redirects.as_ref(), start.redirects.as_ref())
     }
 
     fn routes_diff(&self, start: &Self) -> RouteOps {
-        match (&self.routes, &start.routes) {
-            (Some(r), Some(s)) => r.diff(s),
-            (None, Some(_)) => RouteOps::Replace(Routes::empty()),
-            (Some(s), None) => RouteOps::Replace(s.clone()),
-            _ => RouteOps::Unchanged,
-        }
+        Routes::diff_opt(self.routes.as_ref(), start.routes.as_ref())
     }
 
     /// Current logic is to return MetadataOp::Update only when metadata read
@@ -180,6 +172,14 @@ impl SiteData {
 
     pub fn resources(&self) -> &ResourceSet {
         &self.resources
+    }
+
+    pub fn routes(&self) -> Option<&Routes> {
+        self.routes.as_ref()
+    }
+
+    pub fn redirects(&self) -> Option<&Redirects> {
+        self.redirects.as_ref()
     }
 }
 
