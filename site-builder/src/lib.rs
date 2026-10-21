@@ -182,12 +182,12 @@ async fn run_internal(
                 mock_resource_set.extend(mock_resources);
 
                 // Get existing site data for accurate estimation
-                let existing_site = if site_manager.site_id.is_some() {
+                let existing_site = if let Some(site_id) = site_manager.site_id {
                     let retriable_client = site_manager.sui_client();
                     let package_id = config.package();
                     RemoteSiteFactory::new(retriable_client, package_id)
                         .await?
-                        .get_from_chain(site_manager.site_id.unwrap())
+                        .get_from_chain(site_id)
                         .await?
                 } else {
                     SiteData::empty()
