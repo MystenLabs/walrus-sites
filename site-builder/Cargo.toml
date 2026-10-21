@@ -57,10 +57,12 @@ walrus-utils = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1
 [dev-dependencies]
 gag = "1.0.0"
 move-package-alt = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.81.0" }
+prometheus = "0.14.0"
 sui-config = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.81.0" }
 sui-move-build = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.81.0" }
 tempfile = "3.20.0"
 test-cluster = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.81.0" }
+typed-store = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.58.1" }
 walrus-service = { git = "https://github.com/MystenLabs/walrus", tag = "testnet-v1.58.1", features = [
   "test-utils",
 ] }

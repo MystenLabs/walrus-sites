@@ -5,7 +5,7 @@ use std::{
     fs::File,
     path::{Path, PathBuf},
     str::FromStr,
-    sync::Arc,
+    sync::{Arc, Once},
 };
 
 use anyhow::{anyhow, bail};
@@ -129,12 +129,23 @@ pub struct TestSetup {
     pub walrus_sites_package_id: ObjectID,
 }
 
+/// Guards the one-time initialization of the RocksDB metrics used by the Walrus test cluster.
+static DB_METRICS_INIT: Once = Once::new();
+
 impl TestSetup {
     /// Start test cluster with optional custom epoch duration.
     /// If None, uses the default epoch duration from E2eTestSetupBuilder.
     pub async fn start_local_test_cluster(
         epoch_duration: Option<std::time::Duration>,
     ) -> anyhow::Result<Self> {
+        // `typed_store::metrics::DBMetrics::get` lazily initializes the metrics against the global
+        // Prometheus registry when nothing has initialized them yet. Several tests in one binary
+        // start clusters concurrently, so two of them can race that first initialization and the
+        // loser panics with `AlreadyReg`. Initialize once, race-free, with a private registry.
+        DB_METRICS_INIT.call_once(|| {
+            typed_store::metrics::DBMetrics::init(&prometheus::Registry::new());
+        });
+
         let mut builder = test_cluster::E2eTestSetupBuilder::new();
         if let Some(duration) = epoch_duration {
             builder = builder.with_epoch_duration(duration);
