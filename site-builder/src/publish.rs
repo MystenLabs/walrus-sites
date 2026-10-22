@@ -5,7 +5,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use sui_types::base_types::{ObjectID, SuiAddress};
 use walrus_sui::types::transaction::{ExecuteTransactionResponse, TransactionEffectsStatus};
 
@@ -18,6 +18,7 @@ use crate::{
         config::WSResources,
         estimates::Estimator,
         manager::{BlobExtensionResult, BlobExtensions, SiteManager},
+        path_patterns,
         quilts::QuiltsManager,
         resource::{ParsedResources, ResourceData, ResourceManager, ResourceSet, SiteOps},
         RemoteSiteFactory,
@@ -140,7 +141,7 @@ impl SiteEditor<EditOptions> {
         Option<ExecuteTransactionResponse>,
         SiteDataDiffSummary,
     )> {
-        let (resource_manager, mut quilts_manager, mut site_manager) =
+        let (mut resource_manager, mut quilts_manager, mut site_manager) =
             self.create_managers().await?;
         if self.is_list_directory() {
             self.preprocess_directory(&resource_manager)?;
@@ -166,6 +167,51 @@ impl SiteEditor<EditOptions> {
         // Parse directory to get unchanged and changed resources
         let parsed = resource_manager.read_dir(self.directory(), &existing_site)?;
         display::done();
+
+        // Validate route/redirect patterns before any Walrus spend or estimate:
+        // a doomed deploy must fail here.
+        // TODO(sew-1001): remove the legacy-route rewrite with the routing migration.
+        let rewrite_session = match resource_manager.ws_resources.as_mut() {
+            Some(ws) if self.edit_options.publish_options.rewrite_legacy_routes => {
+                match path_patterns::RewriteSession::apply(&mut ws.routes) {
+                    Ok(session) => session,
+                    Err(collisions) => {
+                        bail!(path_patterns::format_rewrite_collisions(&collisions))
+                    }
+                }
+            }
+            _ => path_patterns::RewriteSession::empty(),
+        };
+        if !rewrite_session.pairs().is_empty() {
+            display::info(path_patterns::format_rewrite_notice(
+                rewrite_session.pairs(),
+            ));
+        }
+        let report = path_patterns::check_write_boundary(
+            resource_manager
+                .ws_resources
+                .as_ref()
+                .and_then(|ws| ws.routes.as_ref()),
+            existing_site.routes(),
+            resource_manager
+                .ws_resources
+                .as_ref()
+                .and_then(|ws| ws.redirects.as_ref()),
+            existing_site.redirects(),
+            rewrite_session.pairs(),
+        );
+        for warning in &report.warnings {
+            display::warning(path_patterns::format_warning(
+                warning,
+                rewrite_session.pairs(),
+            ));
+        }
+        if !report.errors.is_empty() {
+            bail!(path_patterns::format_errors(
+                &report.errors,
+                rewrite_session.pairs()
+            ));
+        }
 
         let walrus_pkg = self
             .config
@@ -314,7 +360,7 @@ impl SiteEditor<EditOptions> {
 
         let local_site_data = resource_manager.to_site_data(resource_set);
 
-        let (response, summary) = site_manager
+        let (response, mut summary) = site_manager
             .update_site(
                 &local_site_data,
                 &existing_site,
@@ -322,6 +368,12 @@ impl SiteEditor<EditOptions> {
                 walrus_pkg,
             )
             .await?;
+        summary.route_rewrites = rewrite_session.pairs().to_vec();
+
+        // The rewrite is in-memory only: persisting writes the whole WSResources back to disk.
+        if let Some(ws) = resource_manager.ws_resources.as_mut() {
+            rewrite_session.restore(&mut ws.routes);
+        }
         self.persist_site_identifier(resource_manager, &site_manager, response.as_ref())?;
 
         Ok((site_manager.active_address()?, response, summary))
