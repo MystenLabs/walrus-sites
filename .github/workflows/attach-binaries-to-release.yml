@@ -44,6 +44,7 @@ jobs:
     permissions:
       contents: write
       actions: write
+      id-token: write
     strategy:
       matrix:
         os:
@@ -78,7 +79,8 @@ jobs:
         id: auth
         uses: google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193 # pin@v2
         with:
-          credentials_json: ${{ secrets.GCP_WALRUS_RELEASE_BUCKET_SVCUSER_CREDENTIALS }}
+          workload_identity_provider: projects/984139309829/locations/global/workloadIdentityPools/github-actions/providers/github
+          service_account: gha-walrus-sites-repo@cryptic-bolt-398315.iam.gserviceaccount.com
 
       - name: Set os/arch variables (Windows)
         if: ${{ startsWith(matrix.os, 'windows') }}
