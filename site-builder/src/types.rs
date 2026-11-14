@@ -101,6 +101,16 @@ where
         self.0.entry(key)
     }
 
+    /// Rebuilds the map with every key passed through `f`, keeping each value
+    /// with its (re-keyed) entry. If `f` maps two keys to the same output, the
+    /// entry with the greatest original key wins.
+    pub fn map_keys(&mut self, mut f: impl FnMut(&K) -> K) {
+        self.0 = std::mem::take(&mut self.0)
+            .into_iter()
+            .map(|(key, value)| (f(&key), value))
+            .collect();
+    }
+
     #[allow(unused)]
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
         self.0.insert(key, value)
@@ -207,6 +217,20 @@ impl Routes {
             RouteOps::Replace(self.clone())
         }
     }
+
+    /// Single source of truth for how optional local/existing route sets diff.
+    ///
+    /// Used by both site diffing and write-boundary pattern validation, which must never
+    /// diverge. Semantics: local `None` + existing `Some` = remove-all (`Replace` with an
+    /// empty set); local `Some` + existing `None` = fresh write.
+    pub fn diff_opt(local: Option<&Routes>, existing: Option<&Routes>) -> RouteOps {
+        match (local, existing) {
+            (Some(l), Some(e)) => l.diff(e),
+            (None, Some(_)) => RouteOps::Replace(Routes::empty()),
+            (Some(l), None) => RouteOps::Replace(l.clone()),
+            (None, None) => RouteOps::Unchanged,
+        }
+    }
 }
 
 impl AssociatedContractStruct for Routes {
@@ -251,6 +275,20 @@ impl Redirects {
             RedirectOps::Unchanged
         } else {
             RedirectOps::Replace(self.clone())
+        }
+    }
+
+    /// Single source of truth for how optional local/existing redirect sets diff.
+    ///
+    /// Used by both site diffing and write-boundary pattern validation, which must never
+    /// diverge. Semantics: local `None` + existing `Some` = remove-all (`Replace` with an
+    /// empty set); local `Some` + existing `None` = fresh write.
+    pub fn diff_opt(local: Option<&Redirects>, existing: Option<&Redirects>) -> RedirectOps {
+        match (local, existing) {
+            (Some(l), Some(e)) => l.diff(e),
+            (None, Some(_)) => RedirectOps::Replace(Redirects::empty()),
+            (Some(l), None) => RedirectOps::Replace(l.clone()),
+            (None, None) => RedirectOps::Unchanged,
         }
     }
 }

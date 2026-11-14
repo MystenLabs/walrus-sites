@@ -117,6 +117,9 @@ pub struct SiteDataDiffSummary {
     pub metadata_updated: bool,
     pub site_name_updated: bool,
     pub extend_ops: ExtendOps,
+    /// `(original, stored)` route-pattern pairs rewritten by `--rewrite-legacy-routes`.
+    // TODO(sew-1001): remove with the routing migration.
+    pub route_rewrites: Vec<(String, String)>,
 }
 
 impl From<&SiteDataDiff<'_>> for SiteDataDiffSummary {
@@ -128,6 +131,7 @@ impl From<&SiteDataDiff<'_>> for SiteDataDiffSummary {
             metadata_updated: !value.metadata_op.is_noop(),
             site_name_updated: !value.site_name_op.is_noop(),
             extend_ops: value.extend_ops.clone(),
+            route_rewrites: Vec::new(),
         }
     }
 }
@@ -146,6 +150,7 @@ impl Summarizable for SiteDataDiffSummary {
             && !self.metadata_updated
             && !self.site_name_updated
             && self.extend_ops.is_noop()
+            && self.route_rewrites.is_empty()
         {
             return "No operation needs to be performed.".to_owned();
         }
@@ -159,7 +164,19 @@ impl Summarizable for SiteDataDiffSummary {
         } else {
             "No resource operations performed.".to_owned()
         };
-        let route_str = self.route_ops.to_summary();
+        let mut route_str = self.route_ops.to_summary();
+        if !self.route_rewrites.is_empty() {
+            let rewrite_lines = self
+                .route_rewrites
+                .iter()
+                .map(|(original, stored)| format!("  - '{original}' -> '{stored}'"))
+                .collect::<Vec<_>>()
+                .join("\n");
+            route_str = format!(
+                "{route_str}\nRoute patterns rewritten to glob form \
+                (--rewrite-legacy-routes):\n{rewrite_lines}"
+            );
+        }
         let redirect_str = self.redirect_ops.to_summary();
         let metadata_str = if self.metadata_updated {
             "Metadata updated."
@@ -174,5 +191,54 @@ impl Summarizable for SiteDataDiffSummary {
         let extend_str = self.extend_ops.to_summary();
 
         format!("{resource_str}\n{route_str}\n{redirect_str}\n{metadata_str}\n{site_name_str}\n{extend_str}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn all_noop_summary(route_rewrites: Vec<(String, String)>) -> SiteDataDiffSummary {
+        SiteDataDiffSummary {
+            resource_ops: Vec::new(),
+            route_ops: RouteOps::Unchanged,
+            redirect_ops: RedirectOps::Unchanged,
+            metadata_updated: false,
+            site_name_updated: false,
+            extend_ops: ExtendOps::Noop,
+            route_rewrites,
+        }
+    }
+
+    #[test]
+    fn test_route_rewrites_rendered() {
+        let summary = all_noop_summary(vec![
+            ("/docs/*".to_owned(), "/docs/**/*".to_owned()),
+            ("*".to_owned(), "/**".to_owned()),
+        ]);
+        let text = summary.to_summary();
+        assert!(
+            text.contains("Route patterns rewritten to glob form (--rewrite-legacy-routes):"),
+            "missing rewrite header in: {text}"
+        );
+        assert!(text.contains("  - '/docs/*' -> '/docs/**/*'"));
+        assert!(text.contains("  - '*' -> '/**'"));
+    }
+
+    #[test]
+    fn test_all_noop_with_rewrites_does_not_early_return() {
+        // The key regression scenario: an idempotent re-deploy with the rewrite
+        // flag on (rewrite applied, diff Unchanged) must still surface the
+        // rewrite notice instead of "No operation needs to be performed.".
+        let summary = all_noop_summary(vec![("/docs/*".to_owned(), "/docs/**/*".to_owned())]);
+        let text = summary.to_summary();
+        assert!(!text.contains("No operation needs to be performed."));
+        assert!(text.contains("Route patterns rewritten to glob form"));
+    }
+
+    #[test]
+    fn test_all_noop_without_rewrites_early_returns() {
+        let summary = all_noop_summary(Vec::new());
+        assert_eq!(summary.to_summary(), "No operation needs to be performed.");
     }
 }
