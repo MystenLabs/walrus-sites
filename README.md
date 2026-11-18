@@ -32,14 +32,14 @@ For example, let's analyze the following site: https://stake-wal.wal.app
 2. The site SuiNS domain is `stake`, so we need to use it as a subdomain of wal.app: `stake-wal.wal.app`.
 3. Therefore, we can access the site with standard HTTPS at `https://stake-wal.wal.app`.
 
-Documentation of Walrus and Walrus Sites is available at [docs.wal.app][walrus-sites-docs].
-
-> Fun fact: the documentation is itself a Walrus Site!
+Documentation of Walrus and Walrus Sites is available at [docs.wal.app][walrus-sites-docs]. Its
+source lives in [MystenLabs/walrus-documentation][walrus-documentation]; open documentation pull
+requests there.
 
 ## Quick Start
 
 Walrus Sites undergo a lot of changes, so the best way to avoid confusion with deprecated features
-please start by following the guide [here](https://docs.wal.app/walrus-sites/intro.html).
+please start by following the guide [here](https://docs.wal.app/docs/sites).
 
 ## File structure
 
@@ -64,7 +64,8 @@ Walrus Sites is open source! Here is a graph showing the star history over time.
 
 [walrus-link]: https://www.walrus.xyz/
 [sui-link]: https://docs.sui.io/
-[use-cases]: https://docs.wal.app/design/objectives_use_cases.html#use-cases
-[walrus-sites-docs]: https://docs.wal.app/walrus-sites/intro.html
+[use-cases]: https://docs.wal.app/docs/system-overview/core-concepts
+[walrus-sites-docs]: https://docs.wal.app/docs/sites
+[walrus-documentation]: https://github.com/MystenLabs/walrus-documentation
 [service-worker]: https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API
 [suins]: https://suins.io/
